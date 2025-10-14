@@ -60,4 +60,5 @@ const promotionsData = {
   ],
 };
 
-export default promotionsData;
+export const PROMOTIONS = [ ... ];
+
