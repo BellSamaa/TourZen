@@ -13,7 +13,73 @@ import "slick-carousel/slick/slick-theme.css";
 const TourDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const tour = TOURS.find((t) => t.id === parseInt(id));
+  const [selectedMonth, setSelectedMonth] = React.useState("10/2025");
+// Removed monthlyInfo object as it's now part of each tour data
+    "11/2025": {
+      dates: { start: "15/11/2025", book: "13/11/2025" },
+      prices: {
+        adult: "3.790.000₫",
+        child: "1.895.000₫",
+        infant: "0₫",
+        singleRoom: "1.200.000₫"
+      },
+      group: "Lý tưởng cho cặp đôi, gia đình nhỏ 3-4 người",
+      promotion: "Ưu đãi Black Friday - Giảm 15%",
+      flights: [
+        { airline: "Vietnam Airlines", price: "920.000₫", time: "6:30" },
+        { airline: "Vietjet Air", price: "680.000₫", time: "10:00" },
+        { airline: "Bamboo Airways", price: "780.000₫", time: "15:30" }
+      ]
+    },
+    "12/2025": {
+      dates: { start: "20/12/2025", book: "18/12/2025" },
+      prices: {
+        adult: "4.190.000₫",
+        child: "2.095.000₫",
+        infant: "0₫",
+        singleRoom: "1.400.000₫"
+      },
+      group: "Phù hợp cho gia đình lớn 6-10 người, nhóm bạn 8-12 người",
+      promotion: "Ưu đãi Giáng sinh và Năm mới - Giảm 20%",
+      flights: [
+        { airline: "Vietnam Airlines", price: "1.200.000₫", time: "7:30" },
+        { airline: "Vietjet Air", price: "890.000₫", time: "11:00" },
+        { airline: "Bamboo Airways", price: "950.000₫", time: "16:00" }
+      ]
+    },
+    "1/2026": {
+      dates: { start: "15/1/2026", book: "13/1/2026" },
+      prices: {
+        adult: "3.890.000₫",
+        child: "1.945.000₫",
+        infant: "0₫",
+        singleRoom: "1.300.000₫"
+      },
+      group: "Phù hợp cho nhóm bạn 4-6 người, gia đình 4-5 người",
+      promotion: "Ưu đãi đầu năm - Giảm 12%",
+      flights: [
+        { airline: "Vietnam Airlines", price: "950.000₫", time: "8:00" },
+        { airline: "Vietjet Air", price: "720.000₫", time: "10:30" },
+        { airline: "Bamboo Airways", price: "830.000₫", time: "15:00" }
+      ]
+    },
+    "2/2026": {
+      dates: { start: "10/2/2026", book: "8/2/2026" },
+      prices: {
+        adult: "4.290.000₫",
+        child: "2.145.000₫",
+        infant: "0₫",
+        singleRoom: "1.400.000₫"
+      },
+      group: "Đặc biệt cho dịp Tết - Phù hợp cho gia đình lớn 8-12 người",
+      promotion: "Ưu đãi Tết Nguyên Đán - Tặng vé Vinwonder",
+      flights: [
+        { airline: "Vietnam Airlines", price: "1.500.000₫", time: "7:00" },
+        { airline: "Vietjet Air", price: "1.200.000₫", time: "9:30" },
+        { airline: "Bamboo Airways", price: "1.300.000₫", time: "14:00" }
+      ]
+    }
+  };
 
   if (!tour) {
     return (
@@ -98,8 +164,9 @@ const TourDetail = () => {
             {["10/2025", "11/2025", "12/2025", "1/2026", "2/2026"].map((month) => (
               <button
                 key={month}
+                onClick={() => setSelectedMonth(month)}
                 className={`px-4 py-2 rounded-lg text-sm font-semibold border hover:bg-blue-50 transition ${
-                  month === "10/2025" ? "bg-blue-600 text-white" : "text-gray-700"
+                  month === selectedMonth ? "bg-blue-600 text-white" : "text-gray-700"
                 }`}
               >
                 {month}
@@ -110,26 +177,55 @@ const TourDetail = () => {
           {/* Bảng thông tin chuyến đi */}
           <div className="flex-1 bg-gray-50 p-5 rounded-xl shadow-inner">
             <div className="flex justify-between mb-3">
-              <span className="font-semibold">Ngày đi: 18/10/2025</span>
-              <span className="font-semibold text-red-600">16/10/2025</span>
+              <span className="font-semibold">Ngày đi: {tour.monthlyInfo[selectedMonth].dates.start}</span>
+              <span className="font-semibold text-red-600">Hạn đặt: {tour.monthlyInfo[selectedMonth].dates.book}</span>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center text-sm">
               <div>
                 <p className="font-semibold text-gray-700">Người lớn</p>
-                <p className="text-red-600 font-bold text-lg">3.590.000₫</p>
+                <p className="text-red-600 font-bold text-lg">{tour.monthlyInfo[selectedMonth].prices.adult}</p>
               </div>
               <div>
                 <p className="font-semibold text-gray-700">Trẻ em</p>
-                <p className="text-red-600 font-bold text-lg">1.795.000₫</p>
+                <p className="text-red-600 font-bold text-lg">{tour.monthlyInfo[selectedMonth].prices.child}</p>
               </div>
               <div>
                 <p className="font-semibold text-gray-700">Trẻ nhỏ</p>
-                <p className="text-gray-400 font-bold text-lg">0₫</p>
+                <p className="text-gray-400 font-bold text-lg">{tour.monthlyInfo[selectedMonth].prices.infant}</p>
               </div>
               <div>
                 <p className="font-semibold text-gray-700">Phụ thu phòng đơn</p>
-                <p className="text-red-600 font-bold text-lg">1.200.000₫</p>
+                <p className="text-red-600 font-bold text-lg">{tour.monthlyInfo[selectedMonth].prices.singleRoom}</p>
+              </div>
+            </div>
+
+            {/* Thông tin thêm về tour */}
+            <div className="mt-4 p-4 bg-white rounded-lg">
+              <p className="text-gray-700 mb-2">
+                <span className="font-semibold">Đối tượng phù hợp:</span> {tour.monthlyInfo[selectedMonth].group}
+              </p>
+              <p className="text-green-600 font-semibold mb-2">
+                {tour.monthlyInfo[selectedMonth].promotion}
+              </p>
+              <div className="mt-3">
+                <p className="font-semibold mb-2">Các chuyến bay:</p>
+                <div className="grid gap-2">
+                  {tour.monthlyInfo[selectedMonth].flights.map((flight, index) => (
+                    <div key={index} className="flex justify-between items-center border-b pb-1">
+                      <span>{flight.airline}</span>
+                      <span className="text-blue-600">{flight.time}</span>
+                      <span className="font-medium">{flight.price}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  *Chuyến bay rẻ nhất: {tour.monthlyInfo[selectedMonth].flights.reduce((min, flight) => 
+                    parseFloat(flight.price.replace(/[^\d]/g, '')) < parseFloat(min.price.replace(/[^\d]/g, '')) ? flight : min
+                  ).airline} - {tour.monthlyInfo[selectedMonth].flights.reduce((min, flight) => 
+                    parseFloat(flight.price.replace(/[^\d]/g, '')) < parseFloat(min.price.replace(/[^\d]/g, '')) ? flight : min
+                  ).price}
+                </p>
               </div>
             </div>
 
