@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { TOURS } from "../data/tours";
-import { promotionsData } from "../data/promotionsData.js";
+import { PROMOTIONS } from "../data/promotionsData.js";
 import FlyingPlane from "../components/FlyingPlane";
 import { FaMapMarkerAlt, FaStar } from "react-icons/fa";
 
