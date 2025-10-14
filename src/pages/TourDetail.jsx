@@ -1,3 +1,4 @@
+// src/pages/TourDetail.jsx
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { TOURS } from "../data/tours_updated.js";
@@ -13,7 +14,7 @@ import {
   FaPlaneDeparture,
   FaPlus,
   FaMinus,
-  FaCreditCard // Icon mới cho nút đặt tour
+  FaCreditCard
 } from "react-icons/fa";
 import { MdFamilyRestroom } from "react-icons/md";
 import { motion } from "framer-motion";
@@ -29,8 +30,7 @@ const formatCurrency = (number) => {
 const TourDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  // ✅ Lấy thêm hàm clearCart từ context
-  const { addToCart, clearCart } = useCart();
+  const { addToCart, clearCart } = useCart(); // ✅ lấy hàm quản lý giỏ hàng
   const tour = TOURS.find((t) => t.id === parseInt(id));
 
   const [activeMonthData, setActiveMonthData] = useState(null);
@@ -44,37 +44,35 @@ const TourDetail = () => {
     }
   }, [tour]);
 
-  // ✅ HÀM MỚI: Xử lý "Đặt Tour Ngay" để chuyển sang trang thanh toán
+  // ✅ HÀM MỚI: Xử lý "Đặt Tour Ngay" để chuyển sang trang Payment
   const handleBookNow = () => {
-    // Kiểm tra các điều kiện
     if (!activeMonthData) {
-        setNotification('Vui lòng chọn tháng khởi hành.');
-        setTimeout(() => setNotification(''), 3000);
-        return;
+      setNotification('Vui lòng chọn tháng khởi hành.');
+      setTimeout(() => setNotification(''), 3000);
+      return;
     }
     if (adults === 0 && children === 0) {
-       setNotification('Vui lòng chọn ít nhất 1 người lớn hoặc trẻ em.');
-       setTimeout(() => setNotification(''), 3000);
+      setNotification('Vui lòng chọn ít nhất 1 người lớn hoặc trẻ em.');
+      setTimeout(() => setNotification(''), 3000);
       return;
     }
 
-    // Tạo đối tượng tour để thêm vào giỏ
     const itemToBook = {
       tour: tour,
       selectedMonth: activeMonthData,
-      adults: adults,
-      children: children,
+      adults,
+      children
     };
-    
-    clearCart(); // Xóa các tour khác trong giỏ hàng (hành vi "mua ngay")
-    addToCart(itemToBook); // Thêm tour hiện tại vào giỏ
-    navigate('/checkout'); // Chuyển thẳng đến trang thanh toán
+
+    clearCart();           // Xóa các tour khác
+    addToCart(itemToBook); // Thêm tour hiện tại
+    navigate('/payment');  // Chuyển sang trang Payment
   };
-  
+
   if (!tour) {
     return <motion.div className="text-center text-xl py-20">Tour không tồn tại.</motion.div>;
   }
-  
+
   const sliderSettings = {
     dots: true,
     infinite: true,
@@ -94,7 +92,7 @@ const TourDetail = () => {
         exit={{ opacity: 0, y: -30 }}
         transition={{ duration: 0.6, ease: "easeInOut" }}
     >
-      {/* --- Các phần Parallax, Slider giữ nguyên --- */}
+      {/* --- Parallax Banner --- */}
       <ParallaxBanner
         layers={[{ image: tour.image, speed: -20 }]}
         className="h-[70vh] relative"
@@ -105,6 +103,7 @@ const TourDetail = () => {
         </div>
       </ParallaxBanner>
 
+      {/* --- Slider ảnh tour --- */}
       <motion.section className="max-w-5xl mx-auto py-10 px-4" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.8 }}>
         <Slider {...sliderSettings}>
           {[tour.image, "/images/travel1.jpg", "/images/travel2.jpg"].map((src, i) => (
@@ -113,7 +112,7 @@ const TourDetail = () => {
         </Slider>
       </motion.section>
 
-      {/* --- LỊCH KHỞI HÀNH & CHỌN SỐ LƯỢNG --- */}
+      {/* --- Lịch khởi hành & chọn số lượng --- */}
       <motion.section
         className="max-w-6xl mx-auto p-4 md:p-6 bg-white rounded-2xl shadow-lg mt-5"
         initial={{ opacity: 0, y: 20 }}
@@ -182,7 +181,7 @@ const TourDetail = () => {
         )}
       </motion.section>
       
-      {/* --- ✅ NÚT ĐẶT TOUR đã được cập nhật --- */}
+      {/* --- ✅ NÚT ĐẶT TOUR NGAY --- */}
       <div className="sticky bottom-0 bg-white/80 backdrop-blur-sm py-4 shadow-top z-10">
           <div className="max-w-6xl mx-auto flex justify-center items-center px-4">
               <motion.button
@@ -206,7 +205,7 @@ const TourDetail = () => {
           )}
       </div>
 
-      {/* --- Các phần Lịch trình, Map giữ nguyên --- */}
+      {/* --- Lịch trình tour --- */}
        <motion.section className="max-w-6xl mx-auto p-6 mt-8 bg-white rounded-2xl shadow-lg" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}>
         <h2 className="text-2xl font-bold mb-6 text-center">LỊCH TRÌNH</h2>
         {tour.itinerary.map((item, i) => (
@@ -217,6 +216,7 @@ const TourDetail = () => {
         ))}
       </motion.section>
 
+      {/* --- Bản đồ --- */}
       <motion.section className="max-w-5xl mx-auto my-10 p-5" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }}>
           <h2 className="text-2xl font-semibold mb-4">Vị trí điểm đến</h2>
           <div className="rounded-xl overflow-hidden shadow-lg">
@@ -229,4 +229,3 @@ const TourDetail = () => {
 };
 
 export default TourDetail;
-
