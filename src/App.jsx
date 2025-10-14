@@ -19,18 +19,19 @@ import CartPage from "./pages/Cart.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import AdminDashboard from "./pages/AdminDashboard.jsx";
-import HotelPage from "./pages/HotelPage.jsx"; // Thêm các trang mới
-import PromotionPage from "./pages/PromotionPage.jsx"; // Thêm các trang mới
+import HotelPage from "./pages/HotelPage.jsx";
+import PromotionPage from "./pages/PromotionPage.jsx";
+import Checkout from "./pages/Checkout.jsx"; // ✅ Thêm route mới cho trang thanh toán
 
 // Context Providers
 import { CartProvider } from "./context/CartContext.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 
 // CSS Imports
-import 'swiper/css';
-import 'swiper/css/navigation';
-import 'swiper/css/pagination';
-import './index.css';
+import "swiper/css";
+import "swiper/css/navigation";
+import "swiper/css/pagination";
+import "./index.css";
 
 // Component NotFound
 function NotFound() {
@@ -52,16 +53,17 @@ export default function App() {
       <CartProvider>
         <ScrollToTop />
         <Navbar />
+
         {/* Thêm padding-top bằng chiều cao Navbar để không bị che */}
-        <main className="pt-[76px] bg-white dark:bg-neutral-900">
+        <main className="pt-[76px] bg-white dark:bg-neutral-900 min-h-screen">
           <AnimatePresence mode="wait">
-            {/* Không cần motion.div bọc ngoài Routes nữa vì các trang con đã có animation riêng */}
             <Routes location={location} key={location.pathname}>
               <Route path="/" element={<Home />} />
               <Route path="/tours" element={<TourList />} />
               <Route path="/tour/:id" element={<TourDetail />} />
               <Route path="/booking/:id" element={<Booking />} />
               <Route path="/cart" element={<CartPage />} />
+              <Route path="/checkout" element={<Checkout />} /> {/* ✅ Route mới */}
               <Route path="/hotels" element={<HotelPage />} />
               <Route path="/promotions" element={<PromotionPage />} />
               <Route path="/payment/*" element={<Payment />} />
@@ -73,6 +75,7 @@ export default function App() {
             </Routes>
           </AnimatePresence>
         </main>
+
         <Footer />
       </CartProvider>
     </AuthProvider>
