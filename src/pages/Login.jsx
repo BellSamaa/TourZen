@@ -21,7 +21,7 @@ export default function Login() {
     try {
       const url = isRegister ? `${API_BASE}/api/register` : `${API_BASE}/api/login`;
       const payload = isRegister
-        ? { name: form.name, password: form.password } // tạo account ảo chỉ với tên + password
+        ? { name: form.name, password: form.password }
         : { email: form.email, password: form.password };
 
       const res = await axios.post(url, payload, { headers: { Authorization: `Bearer ${API_KEY}` } });
@@ -46,37 +46,43 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden"
-         style={{ background: "linear-gradient(to bottom, #a8e6cf, #dcedc1)" }}>
-      <div className="w-full max-w-md">
-        <div className={`relative w-full transition-transform duration-700 transform-style-preserve-3d ${isRegister ? "rotate-y-180" : ""}`}>
-          
+    <div
+      className="min-h-screen flex items-center justify-center relative overflow-hidden bg-cover bg-center"
+      style={{
+        backgroundImage:
+          "url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1470&q=80')",
+      }}
+    >
+      <div className="w-full max-w-md p-6 perspective-1200">
+        <div
+          className={`relative w-full transition-transform duration-700 transform-style-preserve-3d ${
+            isRegister ? "rotate-y-180" : ""
+          }`}
+        >
           {/* Login */}
-          <div className="absolute w-full backface-hidden bg-white/20 backdrop-blur-md p-10 rounded-xl shadow-lg">
-            <h2 className="text-3xl font-bold mb-6 text-center text-gray-800">Đăng nhập</h2>
+          <div className="absolute w-full backface-hidden glass-card p-8 rounded-xl shadow-xl animated-border hover-effect">
+            <h2 className="text-3xl font-bold mb-6 text-center text-gray-900">Đăng nhập</h2>
             {error && <div className="bg-red-200 text-red-800 p-2 mb-4 rounded">{error}</div>}
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="relative">
-                <input
-                  type="email"
-                  placeholder="Email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full pl-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-300"
-                  required
-                />
-              </div>
+              <input
+                type="email"
+                placeholder="Email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                className="w-full pl-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-400 bg-white/70 text-gray-900"
+                required
+              />
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
                   placeholder="Mật khẩu"
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  className="w-full pl-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-300"
+                  className="w-full pl-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-400 bg-white/70 text-gray-900"
                   required
                 />
                 <span
-                  className="absolute top-2 right-3 cursor-pointer"
+                  className="absolute top-2 right-3 cursor-pointer text-gray-700"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? <FaEyeSlash /> : <FaEye />}
@@ -84,51 +90,55 @@ export default function Login() {
               </div>
               <button
                 type="submit"
-                className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded font-semibold"
+                className="w-full bg-gradient-to-r from-green-400 to-yellow-300 hover:from-green-500 hover:to-yellow-400 text-white py-2 rounded-xl font-semibold shadow-lg transition-all duration-200"
               >
                 Đăng nhập
               </button>
             </form>
             <button
               onClick={handleFacebookLogin}
-              className="mt-3 w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-semibold"
+              className="mt-3 w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-xl font-semibold shadow-lg transition-all duration-200"
             >
               <FaFacebook /> Đăng nhập bằng Facebook
             </button>
-            <p className="mt-4 text-center text-gray-700">
+            <p className="mt-4 text-center text-gray-800">
               Chưa có tài khoản?{" "}
-              <span className="text-green-600 cursor-pointer" onClick={() => { setIsRegister(true); setError(""); }}>
+              <span
+                className="text-green-600 cursor-pointer font-medium"
+                onClick={() => {
+                  setIsRegister(true);
+                  setError("");
+                }}
+              >
                 Đăng ký
               </span>
             </p>
           </div>
 
           {/* Register */}
-          <div className="absolute w-full backface-hidden rotate-y-180 bg-white/20 backdrop-blur-md p-10 rounded-xl shadow-lg">
-            <h2 className="text-3xl font-bold mb-6 text-center text-gray-800">Đăng ký</h2>
+          <div className="absolute w-full backface-hidden rotate-y-180 glass-card p-8 rounded-xl shadow-xl animated-border hover-effect">
+            <h2 className="text-3xl font-bold mb-6 text-center text-gray-900">Đăng ký</h2>
             {error && <div className="bg-red-200 text-red-800 p-2 mb-4 rounded">{error}</div>}
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Tên của bạn"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full pl-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-300"
-                  required
-                />
-              </div>
+              <input
+                type="text"
+                placeholder="Tên của bạn"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className="w-full pl-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-400 bg-white/70 text-gray-900"
+                required
+              />
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
                   placeholder="Mật khẩu"
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  className="w-full pl-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-300"
+                  className="w-full pl-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-400 bg-white/70 text-gray-900"
                   required
                 />
                 <span
-                  className="absolute top-2 right-3 cursor-pointer"
+                  className="absolute top-2 right-3 cursor-pointer text-gray-700"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? <FaEyeSlash /> : <FaEye />}
@@ -136,23 +146,27 @@ export default function Login() {
               </div>
               <button
                 type="submit"
-                className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded font-semibold"
+                className="w-full bg-gradient-to-r from-green-400 to-yellow-300 hover:from-green-500 hover:to-yellow-400 text-white py-2 rounded-xl font-semibold shadow-lg transition-all duration-200"
               >
                 Tạo tài khoản
               </button>
             </form>
-            <p className="mt-4 text-center text-gray-700">
+            <p className="mt-4 text-center text-gray-800">
               Đã có tài khoản?{" "}
-              <span className="text-green-600 cursor-pointer" onClick={() => { setIsRegister(false); setError(""); }}>
+              <span
+                className="text-green-600 cursor-pointer font-medium"
+                onClick={() => {
+                  setIsRegister(false);
+                  setError("");
+                }}
+              >
                 Đăng nhập
               </span>
             </p>
           </div>
-
         </div>
       </div>
 
-      {/* Success icon */}
       {success && (
         <FaCheckCircle className="absolute text-green-500 text-6xl top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
       )}
@@ -162,6 +176,41 @@ export default function Login() {
         .transform-style-preserve-3d { transform-style: preserve-3d; }
         .backface-hidden { backface-visibility: hidden; }
         .rotate-y-180 { transform: rotateY(180deg); }
+        .glass-card {
+          background: rgba(255,255,255,0.6);
+          backdrop-filter: blur(12px);
+          position: relative;
+          overflow: hidden;
+        }
+        .animated-border {
+          border: 2px solid transparent;
+          border-radius: 1rem;
+          background-clip: padding-box, border-box;
+          position: relative;
+        }
+        .animated-border::before {
+          content: "";
+          position: absolute;
+          inset: -2px;
+          z-index: -1;
+          border-radius: inherit;
+          padding: 2px;
+          background: linear-gradient(270deg, #6ee7b7, #facc15, #34d399, #fbbf24, #6ee7b7);
+          background-size: 600% 600%;
+          animation: gradientBorder 10s ease infinite;
+        }
+        .hover-effect {
+          transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .hover-effect:hover {
+          transform: scale(1.03);
+          box-shadow: 0 15px 30px rgba(0,0,0,0.25);
+        }
+        @keyframes gradientBorder {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
       `}</style>
     </div>
   );
