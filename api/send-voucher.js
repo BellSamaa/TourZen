@@ -1,7 +1,7 @@
 // api/send-voucher.js
 import { Resend } from 'resend';
 // ✅ Chỉ giữ 1 import duy nhất với đường dẫn đúng
-import VoucherEmail from '../src/emails/VoucherEmail.jsx';  // ← PHẢI có .jsx
+import VoucherEmail from '../src/emails/VoucherEmail.js';  // ← PHẢI có .jsx
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
