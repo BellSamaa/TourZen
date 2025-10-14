@@ -6,11 +6,18 @@ import { PROMOTIONS } from "../data/promotionsData.js";
 import FlyingPlane from "../components/FlyingPlane";
 import { FaMapMarkerAlt, FaStar } from "react-icons/fa";
 
+// 🧭 Swiper (slide tour tự động)
+import { Swiper, SwiperSlide } from "swiper/react";
+import { Autoplay, Pagination, Navigation } from "swiper/modules";
+import "swiper/css";
+import "swiper/css/pagination";
+import "swiper/css/navigation";
+
 export default function Home() {
   const navigate = useNavigate();
   const [selectedPromo, setSelectedPromo] = useState(null);
 
-  // 🌍 Blog mẫu (có thể chuyển qua lấy từ API sau)
+  // 🌍 Blog mẫu
   const blogs = [
     {
       id: 1,
@@ -35,7 +42,7 @@ export default function Home() {
     },
   ];
 
-  // 🔹 Gộp tất cả ưu đãi thành 1 mảng duy nhất
+  // 🔹 Gộp tất cả ưu đãi
   const allPromos = [
     ...PROMOTIONS.events,
     ...PROMOTIONS.regions,
@@ -46,6 +53,45 @@ export default function Home() {
     <div className="relative bg-gradient-to-b from-blue-50 via-sky-100 to-white overflow-hidden">
       {/* ✈️ Hiệu ứng bay */}
       <FlyingPlane />
+
+      {/* 🖼️ SLIDE GIỚI THIỆU TỰ ĐỘNG */}
+      <section className="relative w-full h-[80vh] overflow-hidden">
+        <Swiper
+          modules={[Autoplay, Pagination, Navigation]}
+          autoplay={{ delay: 4000, disableOnInteraction: false }}
+          pagination={{ clickable: true }}
+          navigation
+          loop
+          className="h-full"
+        >
+          {TOURS.slice(0, 5).map((tour) => (
+            <SwiperSlide key={tour.id}>
+              <div
+                className="h-full bg-cover bg-center flex items-center justify-center"
+                style={{ backgroundImage: `url(${tour.image})` }}
+              >
+                <div className="bg-black/50 w-full h-full flex flex-col justify-center items-center text-center text-white px-4">
+                  <motion.h1
+                    initial={{ opacity: 0, y: 40 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.8 }}
+                    className="text-4xl md:text-6xl font-bold mb-4"
+                  >
+                    {tour.title || tour.name}
+                  </motion.h1>
+                  <p className="text-lg mb-6">{tour.location}</p>
+                  <button
+                    onClick={() => navigate(`/tour/${tour.id}`)}
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium"
+                  >
+                    Khám phá ngay
+                  </button>
+                </div>
+              </div>
+            </SwiperSlide>
+          ))}
+        </Swiper>
+      </section>
 
       {/* Header */}
       <motion.section
@@ -62,16 +108,14 @@ export default function Home() {
         </p>
       </motion.section>
 
-      {/* TOUR NỔI BẬT */}
+      {/* 🌍 TOUR NỔI BẬT */}
       <motion.section
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3, duration: 0.8 }}
         className="max-w-7xl mx-auto px-6 mb-16"
       >
-        <h2 className="text-2xl font-semibold mb-6 text-gray-800">
-          🌍 Tour Nổi Bật
-        </h2>
+        <h2 className="text-2xl font-semibold mb-6 text-gray-800">🌍 Tour Nổi Bật</h2>
         <div className="grid md:grid-cols-3 gap-6">
           {TOURS.slice(0, 3).map((tour) => (
             <motion.div
@@ -100,7 +144,7 @@ export default function Home() {
         </div>
       </motion.section>
 
-      {/* TOUR BÁN CHẠY */}
+      {/* 🔥 TOUR BÁN CHẠY */}
       <motion.section
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -134,7 +178,7 @@ export default function Home() {
         </div>
       </motion.section>
 
-      {/* ĐIỂM ĐẾN YÊU THÍCH */}
+      {/* 🏖️ ĐIỂM ĐẾN YÊU THÍCH */}
       <motion.section
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -163,7 +207,7 @@ export default function Home() {
         </div>
       </motion.section>
 
-      {/* ƯU ĐÃI ĐẶC BIỆT */}
+      {/* 🎁 ƯU ĐÃI ĐẶC BIỆT */}
       <motion.section
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -215,8 +259,7 @@ export default function Home() {
               />
               <p className="text-gray-600 mb-4">{selectedPromo.description}</p>
               <p className="text-red-600 font-bold text-lg mb-6">
-                Giảm {selectedPromo.discountPercent}%
-              </p>
+                Giảm {selectedPromo.discountPercent}%</p>
               <button
                 onClick={() => setSelectedPromo(null)}
                 className="px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700"
