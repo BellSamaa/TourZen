@@ -60,5 +60,5 @@ const promotionsData = {
   ],
 };
 
-export const PROMOTIONS = [ ... ];
+export const PROMOTIONS = [];
 
