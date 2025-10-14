@@ -2,36 +2,20 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import {
-  FaEnvelope,
-  FaLock,
-  FaEye,
-  FaEyeSlash,
-  FaCheckCircle,
-  FaFacebook,
-  FaGoogle,
-} from "react-icons/fa";
-
-const API_KEY = "re_fEAkkZm4_7do16hgga5NUWenjbag35DZo";
-const API_BASE = process.env.REACT_APP_API_BASE_URL || "http://localhost:3001";
-
-const SocialButton = ({ onClick, children, className }) => (
-  <button
-    onClick={onClick}
-    className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg font-semibold text-lg shadow-md transform hover:scale-105 transition-all duration-200 ${className}`}
-  >
-    {children}
-  </button>
-);
+import { FaEnvelope, FaLock, FaEye, FaEyeSlash, FaCheckCircle, FaFacebook, FaUser } from "react-icons/fa";
 
 export default function Login() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ email: "", password: "" });
-  const [showPassword, setShowPassword] = useState(false);
+  const [isRegister, setIsRegister] = useState(false);
+  const [form, setForm] = useState({ email: "", password: "", name: "" });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [shake, setShake] = useState(false);
   const [particles, setParticles] = useState([]);
+
+  const API_KEY = "re_fEAkkZm4_7do16hgga5NUWenjbag35DZo";
+  const API_BASE = process.env.REACT_APP_API_BASE_URL || "http://localhost:3001";
 
   const triggerShake = () => {
     setShake(true);
@@ -49,16 +33,14 @@ export default function Login() {
     setParticles(arr);
   };
 
-  // --- Login Email ---
-  const handleEmailLogin = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     try {
-      const res = await axios.post(
-        `${API_BASE}/api/login`,
-        form,
-        { headers: { Authorization: `Bearer ${API_KEY}`, "Content-Type": "application/json" } }
-      );
+      const url = isRegister ? `${API_BASE}/api/register` : `${API_BASE}/api/login`;
+      const payload = isRegister ? form : { email: form.email, password: form.password };
+
+      const res = await axios.post(url, payload, { headers: { Authorization: `Bearer ${API_KEY}` } });
 
       if (res.data.success) {
         setSuccess(true);
@@ -69,7 +51,7 @@ export default function Login() {
           navigate("/");
         }, 1200);
       } else {
-        setError(res.data.message || "Đăng nhập thất bại");
+        setError(res.data.message || (isRegister ? "Đăng ký thất bại" : "Đăng nhập thất bại"));
         triggerShake();
       }
     } catch (err) {
@@ -79,15 +61,10 @@ export default function Login() {
     }
   };
 
-  // --- Login Facebook ---
   const handleFacebookLogin = async () => {
     setError("");
     try {
-      const res = await axios.post(
-        `${API_BASE}/api/login/facebook`,
-        {},
-        { headers: { Authorization: `Bearer ${API_KEY}` } }
-      );
+      const res = await axios.post(`${API_BASE}/api/login/facebook`, {}, { headers: { Authorization: `Bearer ${API_KEY}` } });
       if (res.data.success) {
         setSuccess(true);
         generateParticles();
@@ -107,139 +84,189 @@ export default function Login() {
     }
   };
 
-  // --- Login Google ---
-  const handleGoogleLogin = async () => {
-    setError("");
-    try {
-      const res = await axios.post(
-        `${API_BASE}/api/login/google`,
-        {},
-        { headers: { Authorization: `Bearer ${API_KEY}` } }
-      );
-      if (res.data.success) {
-        setSuccess(true);
-        generateParticles();
-        setTimeout(() => {
-          setSuccess(false);
-          setParticles([]);
-          navigate("/");
-        }, 1200);
-      } else {
-        setError(res.data.message || "Google login thất bại");
-        triggerShake();
-      }
-    } catch (err) {
-      console.error(err);
-      setError("Google login lỗi server");
-      triggerShake();
-    }
-  };
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-400 to-purple-600 p-4">
-      <div
-        className={`relative bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md
-        animate-fadeIn ${shake ? "animate-shake" : ""} ${success ? "animate-success" : ""}`}
-      >
-        <h2 className="text-3xl font-bold mb-6 text-center text-gray-800">
-          Đăng nhập
-        </h2>
-
-        {error && !success && (
-          <div className="bg-red-100 text-red-700 p-2 mb-4 rounded flex items-center justify-center">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleEmailLogin} className="space-y-5">
-          <div className="relative">
-            <FaEnvelope className="absolute top-3 left-3 text-gray-400" />
-            <input
-              type="email"
-              placeholder="Nhập email"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="w-full pl-10 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-              required
-            />
-          </div>
-
-          <div className="relative">
-            <FaLock className="absolute top-3 left-3 text-gray-400" />
-            <input
-              type={showPassword ? "text" : "password"}
-              placeholder="Nhập mật khẩu"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              className="w-full pl-10 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-              required
-            />
-            <span
-              className="absolute top-3 right-3 cursor-pointer text-gray-500"
-              onClick={() => setShowPassword(!showPassword)}
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-gradient-to-br from-purple-700 to-pink-500">
+      <div className="relative w-full max-w-md perspective-1200">
+        <div
+          className={`relative w-full transition-transform duration-800 transform-style-preserve-3d ${
+            isRegister ? "rotate-y-180" : ""
+          }`}
+        >
+          {/* --- Front: Login --- */}
+          <div className="absolute w-full backface-hidden glass-card p-10 shine-card">
+            <h2 className="text-3xl font-bold mb-6 text-center text-white drop-shadow-lg">Đăng nhập</h2>
+            {error && <div className="bg-red-200 text-red-800 p-3 mb-4 rounded-lg flex items-center shadow-md">{error}</div>}
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="relative">
+                <FaEnvelope className="absolute top-3 left-3 text-gray-300" />
+                <input
+                  type="email"
+                  placeholder="Nhập email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  className="w-full pl-10 py-3 border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white/10 text-white placeholder-white/70"
+                  required
+                />
+              </div>
+              <div className="relative">
+                <FaLock className="absolute top-3 left-3 text-gray-300" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Nhập mật khẩu"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  className="w-full pl-10 py-3 border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white/10 text-white placeholder-white/70"
+                  required
+                />
+                <span
+                  className="absolute top-3 right-3 cursor-pointer text-white/80"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <FaEyeSlash /> : <FaEye />}
+                </span>
+              </div>
+              <button
+                type="submit"
+                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white py-3 rounded-xl font-semibold text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
+              >
+                Đăng nhập bằng Email
+              </button>
+            </form>
+            <button
+              onClick={handleFacebookLogin}
+              className="mt-4 w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl shadow-lg transform hover:scale-105 transition-all duration-200"
             >
-              {showPassword ? <FaEyeSlash /> : <FaEye />}
-            </span>
+              <FaFacebook /> Đăng nhập bằng Facebook
+            </button>
+            <p className="mt-5 text-center text-white/80">
+              Chưa có tài khoản?{" "}
+              <span
+                className="text-purple-300 cursor-pointer hover:text-purple-100 font-medium"
+                onClick={() => { setIsRegister(true); setError(""); }}
+              >
+                Đăng ký
+              </span>
+            </p>
           </div>
 
-          <SocialButton type="submit" className="bg-blue-500 hover:bg-blue-600 text-white">
-            Đăng nhập bằng Email
-          </SocialButton>
-        </form>
-
-        <div className="mt-4 space-y-3">
-          <SocialButton
-            onClick={handleFacebookLogin}
-            className="bg-blue-700 hover:bg-blue-800 text-white"
-          >
-            <FaFacebook /> Facebook
-          </SocialButton>
-
-          <SocialButton
-            onClick={handleGoogleLogin}
-            className="bg-red-500 hover:bg-red-600 text-white"
-          >
-            <FaGoogle /> Google
-          </SocialButton>
+          {/* --- Back: Register --- */}
+          <div className="absolute w-full backface-hidden rotate-y-180 glass-card p-10 shine-card">
+            <h2 className="text-3xl font-bold mb-6 text-center text-white drop-shadow-lg">Đăng ký</h2>
+            {error && <div className="bg-red-200 text-red-800 p-3 mb-4 rounded-lg flex items-center shadow-md">{error}</div>}
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="relative">
+                <FaUser className="absolute top-3 left-3 text-gray-300" />
+                <input
+                  type="text"
+                  placeholder="Tên của bạn"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  className="w-full pl-10 py-3 border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white/10 text-white placeholder-white/70"
+                  required
+                />
+              </div>
+              <div className="relative">
+                <FaEnvelope className="absolute top-3 left-3 text-gray-300" />
+                <input
+                  type="email"
+                  placeholder="Nhập email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  className="w-full pl-10 py-3 border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white/10 text-white placeholder-white/70"
+                  required
+                />
+              </div>
+              <div className="relative">
+                <FaLock className="absolute top-3 left-3 text-gray-300" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Nhập mật khẩu"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  className="w-full pl-10 py-3 border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white/10 text-white placeholder-white/70"
+                  required
+                />
+                <span
+                  className="absolute top-3 right-3 cursor-pointer text-white/80"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <FaEyeSlash /> : <FaEye />}
+                </span>
+              </div>
+              <button
+                type="submit"
+                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white py-3 rounded-xl font-semibold text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
+              >
+                Đăng ký bằng Email
+              </button>
+            </form>
+            <button
+              onClick={handleFacebookLogin}
+              className="mt-4 w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl shadow-lg transform hover:scale-105 transition-all duration-200"
+            >
+              <FaFacebook /> Đăng ký bằng Facebook
+            </button>
+            <p className="mt-5 text-center text-white/80">
+              Đã có tài khoản?{" "}
+              <span
+                className="text-purple-300 cursor-pointer hover:text-purple-100 font-medium"
+                onClick={() => { setIsRegister(false); setError(""); }}
+              >
+                Đăng nhập
+              </span>
+            </p>
+          </div>
         </div>
-
-        {/* Success Check */}
-        {success && (
-          <FaCheckCircle className="absolute text-green-500 text-6xl top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-bounce" />
-        )}
-
-        {/* Particle Effects */}
-        {particles.map((p) => (
-          <div
-            key={p.id}
-            className="absolute bg-yellow-400 rounded-full pointer-events-none"
-            style={{
-              width: `${p.size}px`,
-              height: `${p.size}px`,
-              top: "50%",
-              left: "50%",
-              transform: `translate(-50%, -50%)`,
-              animation: `particleMove ${p.duration}s ease-out forwards`,
-              "--dx": `${p.left}px`,
-              "--dy": `${p.top}px`,
-            }}
-          />
-        ))}
       </div>
 
+      {/* Particles + Success Icon */}
+      {success && (
+        <FaCheckCircle className="absolute text-green-500 text-6xl top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 drop-shadow-lg" />
+      )}
+      {particles.map((p) => (
+        <div
+          key={p.id}
+          className="absolute bg-yellow-400 rounded-full pointer-events-none"
+          style={{
+            width: `${p.size}px`,
+            height: `${p.size}px`,
+            top: "50%",
+            left: "50%",
+            transform: `translate(-50%, -50%)`,
+            animation: `particleMove ${p.duration}s ease-out forwards`,
+            "--dx": `${p.left}px`,
+            "--dy": `${p.top}px`,
+          }}
+        />
+      ))}
+
       <style>{`
-        @keyframes fadeIn { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
-        .animate-fadeIn { animation: fadeIn 0.5s ease-out; }
-
-        @keyframes shake { 0%{transform:translateX(0);}20%{transform:translateX(-8px);}40%{transform:translateX(8px);}60%{transform:translateX(-8px);}80%{transform:translateX(8px);}100%{transform:translateX(0);} }
-        .animate-shake { animation: shake 0.5s; }
-
-        @keyframes successFlash { 0%{background-color:#fff;}50%{background-color:#d1fae5;}100%{background-color:#fff;} }
-        .animate-success { animation: successFlash 0.8s ease-out; }
-
-        @keyframes bounce { 0%,100%{transform:translateY(0);}50%{transform:translateY(-15px);} }
-        .animate-bounce { animation: bounce 0.8s ease-out forwards; }
-
+        .perspective-1200 { perspective: 1200px; }
+        .transform-style-preserve-3d { transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; }
+        .rotate-y-180 { transform: rotateY(180deg); }
+        .glass-card {
+          background: rgba(255,255,255,0.05);
+          border: 1px solid rgba(255,255,255,0.3);
+          border-radius: 1rem;
+          backdrop-filter: blur(15px);
+          position: relative;
+          overflow: hidden;
+        }
+        .shine-card::before {
+          content: '';
+          position: absolute;
+          top: 0; left: -75%;
+          width: 50%;
+          height: 100%;
+          background: linear-gradient(120deg, rgba(255,255,255,0.2), rgba(255,255,255,0));
+          transform: skewX(-25deg);
+          animation: shineMove 2s linear infinite;
+        }
+        @keyframes shineMove {
+          0% { left: -75%; }
+          100% { left: 125%; }
+        }
         @keyframes particleMove { 0%{transform:translate(-50%,-50%) scale(1);opacity:1;}100%{transform:translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.5);opacity:0;} }
       `}</style>
     </div>
