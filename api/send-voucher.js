@@ -2,6 +2,7 @@
 import { Resend } from 'resend';
 import VoucherEmail from '../src/emails/VoucherEmail.js';
 
+// ✅ Dùng biến môi trường
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export default async function handler(req, res) {
@@ -16,7 +17,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Email and promo data are required.' });
     }
 
-    // Generate HTML email from the VoucherEmail function
     const emailHtml = VoucherEmail({
       userEmail: email,
       voucherCode: promo.voucherCode,
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
       from: 'TourZen <onboarding@resend.dev>',
       to: [email],
       subject: `🎁 Voucher giảm giá ${promo.discountPercent}% từ TourZen!`,
-      html: emailHtml,  // ✅ Dùng html: thay vì react:
+      html: emailHtml,
     });
 
     if (error) {
