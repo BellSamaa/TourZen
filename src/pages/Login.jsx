@@ -13,10 +13,18 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [shake, setShake] = useState(false);
   const [particles, setParticles] = useState([]);
-  const [blurAmount, setBlurAmount] = useState(0);
+  const [hue, setHue] = useState(0); // để đổi màu nền theo thời gian
 
   const API_KEY = "re_fEAkkZm4_7do16hgga5NUWenjbag35DZo";
   const API_BASE = process.env.REACT_APP_API_BASE_URL || "http://localhost:3001";
+
+  // Animate background hue
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setHue((prev) => (prev + 0.2) % 360); // tăng hue liên tục
+    }, 30); // update mỗi 30ms
+    return () => clearInterval(interval);
+  }, []);
 
   const triggerShake = () => {
     setShake(true);
@@ -85,39 +93,30 @@ export default function Login() {
     }
   };
 
-  // Khi flip card, tăng blur nền
-  useEffect(() => {
-    if (isRegister) {
-      setBlurAmount(8);
-      const t = setTimeout(() => setBlurAmount(4), 800);
-      return () => clearTimeout(t);
-    } else {
-      setBlurAmount(0);
-    }
-  }, [isRegister]);
-
   return (
-    <div
-      className="min-h-screen flex items-center justify-center relative overflow-hidden"
-      style={{
-        backgroundImage:
-          'url(https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1470&q=80)',
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        filter: `blur(${blurAmount}px)`,
-        transition: "filter 0.6s ease",
-      }}
-    >
-      {/* Overlay mờ để form nổi bật */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/10 to-black/20 z-0"></div>
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden">
+      {/* Animated Background */}
+      <div
+        className="absolute inset-0 bg-cover bg-center"
+        style={{
+          backgroundImage: 'url(https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1470&q=80)',
+          filter: "blur(3px)",
+          zIndex: 0,
+          transition: "filter 0.3s",
+          // đổi màu hue theo thời gian
+          filter: `blur(3px) hue-rotate(${hue}deg)`,
+        }}
+      ></div>
+      <div className="absolute inset-0 bg-black/20 z-0"></div>
 
+      {/* Form Container */}
       <div className="relative w-full max-w-md perspective-1200 z-10">
         <div
           className={`relative w-full transition-transform duration-800 transform-style-preserve-3d ${
             isRegister ? "rotate-y-180" : ""
           }`}
         >
-          {/* --- Front: Login --- */}
+          {/* Front: Login */}
           <div className="absolute w-full backface-hidden glass-card p-10 shine-card">
             <h2 className="text-3xl font-bold mb-6 text-center text-white drop-shadow-lg">Đăng nhập</h2>
             {error && <div className="bg-red-200 text-red-800 p-3 mb-4 rounded-lg flex items-center shadow-md">{error}</div>}
@@ -152,7 +151,7 @@ export default function Login() {
               </div>
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-green-500 to-emerald-400 hover:from-green-600 hover:to-emerald-500 text-white py-3 rounded-xl font-semibold text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
+                className="w-full bg-gradient-to-r from-green-500 to-yellow-400 hover:from-green-600 hover:to-yellow-300 text-white py-3 rounded-xl font-semibold text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
               >
                 Đăng nhập bằng Email
               </button>
@@ -174,7 +173,7 @@ export default function Login() {
             </p>
           </div>
 
-          {/* --- Back: Register --- */}
+          {/* Back: Register */}
           <div className="absolute w-full backface-hidden rotate-y-180 glass-card p-10 shine-card">
             <h2 className="text-3xl font-bold mb-6 text-center text-white drop-shadow-lg">Đăng ký</h2>
             {error && <div className="bg-red-200 text-red-800 p-3 mb-4 rounded-lg flex items-center shadow-md">{error}</div>}
@@ -220,7 +219,7 @@ export default function Login() {
               </div>
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-green-500 to-emerald-400 hover:from-green-600 hover:to-emerald-500 text-white py-3 rounded-xl font-semibold text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
+                className="w-full bg-gradient-to-r from-green-500 to-yellow-400 hover:from-green-600 hover:to-yellow-300 text-white py-3 rounded-xl font-semibold text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
               >
                 Đăng ký bằng Email
               </button>
