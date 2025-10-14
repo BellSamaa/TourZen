@@ -168,7 +168,7 @@ export default function Home() {
             🎁 Ưu Đãi Đặc Biệt
           </h2>
           <div className="grid md:grid-cols-3 gap-6">
-            {promotionsData.map((promo) => (
+            {PROMOTIONS.map((promo) => (
               <motion.div
                 key={promo.id}
                 whileHover={{ scale: 1.03 }}
