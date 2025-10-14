@@ -92,7 +92,7 @@ export default function Login() {
             isRegister ? "rotate-y-180" : ""
           }`}
         >
-          {/* --- Front: Login --- */}
+          {/* Front: Login */}
           <div className="absolute w-full backface-hidden glass-card p-10 shine-card">
             <h2 className="text-3xl font-bold mb-6 text-center text-white drop-shadow-lg">Đăng nhập</h2>
             {error && <div className="bg-red-200 text-red-800 p-3 mb-4 rounded-lg flex items-center shadow-md">{error}</div>}
@@ -149,7 +149,7 @@ export default function Login() {
             </p>
           </div>
 
-          {/* --- Back: Register --- */}
+          {/* Back: Register */}
           <div className="absolute w-full backface-hidden rotate-y-180 glass-card p-10 shine-card">
             <h2 className="text-3xl font-bold mb-6 text-center text-white drop-shadow-lg">Đăng ký</h2>
             {error && <div className="bg-red-200 text-red-800 p-3 mb-4 rounded-lg flex items-center shadow-md">{error}</div>}
@@ -216,3 +216,59 @@ export default function Login() {
               </span>
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Particles + Success Icon */}
+      {success && (
+        <FaCheckCircle className="absolute text-green-500 text-6xl top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 drop-shadow-lg" />
+      )}
+      {particles.map((p) => (
+        <div
+          key={p.id}
+          className="absolute bg-yellow-400 rounded-full pointer-events-none"
+          style={{
+            width: `${p.size}px`,
+            height: `${p.size}px`,
+            top: "50%",
+            left: "50%",
+            transform: `translate(-50%, -50%)`,
+            animation: `particleMove ${p.duration}s ease-out forwards`,
+            "--dx": `${p.left}px`,
+            "--dy": `${p.top}px`,
+          }}
+        />
+      ))}
+
+      <style>{`
+        .perspective-1200 { perspective: 1200px; }
+        .transform-style-preserve-3d { transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; }
+        .rotate-y-180 { transform: rotateY(180deg); }
+        .glass-card {
+          background: rgba(255,255,255,0.05);
+          border: 1px solid rgba(255,255,255,0.3);
+          border-radius: 1rem;
+          backdrop-filter: blur(15px);
+          position: relative;
+          overflow: hidden;
+        }
+        .shine-card::before {
+          content: '';
+          position: absolute;
+          top: 0; left: -75%;
+          width: 50%;
+          height: 100%;
+          background: linear-gradient(120deg, rgba(255,255,255,0.2), rgba(255,255,255,0));
+          transform: skewX(-25deg);
+          animation: shineMove 2s linear infinite;
+        }
+        @keyframes shineMove {
+          0% { left: -75%; }
+          100% { left: 125%; }
+        }
+        @keyframes particleMove { 0%{transform:translate(-50%,-50%) scale(1);opacity:1;}100%{transform:translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.5);opacity:0;} }
+      `}</style>
+    </div>
+  );
+}
