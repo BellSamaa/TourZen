@@ -35,6 +35,13 @@ export default function Home() {
     },
   ];
 
+  // 🔹 Gộp tất cả ưu đãi thành 1 mảng duy nhất
+  const allPromos = [
+    ...PROMOTIONS.events,
+    ...PROMOTIONS.regions,
+    ...PROMOTIONS.thematic,
+  ];
+
   return (
     <div className="relative bg-gradient-to-b from-blue-50 via-sky-100 to-white overflow-hidden">
       {/* ✈️ Hiệu ứng bay */}
@@ -168,18 +175,23 @@ export default function Home() {
             🎁 Ưu Đãi Đặc Biệt
           </h2>
           <div className="grid md:grid-cols-3 gap-6">
-            {PROMOTIONS.map((promo) => (
+            {allPromos.map((promo) => (
               <motion.div
                 key={promo.id}
                 whileHover={{ scale: 1.03 }}
                 className="bg-white rounded-2xl shadow p-6 cursor-pointer hover:shadow-xl"
                 onClick={() => setSelectedPromo(promo)}
               >
+                <img
+                  src={promo.image}
+                  alt={promo.title}
+                  className="h-40 w-full object-cover rounded-lg mb-3"
+                />
                 <h3 className="text-lg font-semibold text-blue-700 mb-2">
                   {promo.title}
                 </h3>
                 <p className="text-gray-600 text-sm mb-3">{promo.description}</p>
-                <p className="text-red-600 font-bold">{promo.discount}</p>
+                <p className="text-red-600 font-bold">Giảm {promo.discountPercent}%</p>
               </motion.div>
             ))}
           </div>
@@ -196,9 +208,14 @@ export default function Home() {
               <h3 className="text-xl font-semibold text-blue-700 mb-3">
                 {selectedPromo.title}
               </h3>
+              <img
+                src={selectedPromo.image}
+                alt={selectedPromo.title}
+                className="w-full h-48 object-cover rounded-xl mb-4"
+              />
               <p className="text-gray-600 mb-4">{selectedPromo.description}</p>
               <p className="text-red-600 font-bold text-lg mb-6">
-                Giảm: {selectedPromo.discount}
+                Giảm {selectedPromo.discountPercent}%
               </p>
               <button
                 onClick={() => setSelectedPromo(null)}
