@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { TOURS } from "../data/tours_updated.js";
-import { useCart } from "../contexts/CartContext.jsx"; // Import hook quản lý giỏ hàng
+import { useCart } from "../context/CartContext.jsx"; // Import hook quản lý giỏ hàng
 import { ParallaxBanner } from "react-scroll-parallax";
 import Slider from "react-slick";
 import {
