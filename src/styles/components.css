@@ -1,0 +1,73 @@
+.nav-wrap{background:linear-gradient(90deg,#0b6cff,#7c3aed);color:#fff;padding:10px 0;position:sticky;top:0;z-index:60}
+.nav-inner{max-width:1100px;margin:0 auto;padding:0 16px;display:flex;align-items:center;justify-content:space-between}
+.brand a{display:flex;align-items:center;gap:8px;color:#fff;font-weight:800}
+.logo-img{height:36px;width:36px;border-radius:6px;background:#fff;padding:4px}
+.nav-inner nav{display:flex;gap:12px;align-items:center}
+.nav-user{font-weight:700}
+.hero{display:flex;gap:16px;align-items:center;padding:24px}
+.hero img{max-width:420px;border-radius:8px}
+.tour-card{border-radius:8px;overflow:hidden;background:#fff;box-shadow:0 8px 18px rgba(0,0,0,0.04)}
+.tour-thumb img{width:100%;height:140px;object-fit:cover}
+.tour-body{padding:10px}
+.tour-actions{display:flex;gap:8px;margin-top:8px}
+.site-footer{border-top:1px solid #eee;margin-top:24px;padding:16px;background:transparent}
+.footer-inner{max-width:1100px;margin:0 auto;display:flex;justify-content:space-between;align-items:center}
+
+.tour-detail {
+  max-width: 1000px;
+  margin: 40px auto;
+  padding: 20px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+}
+
+.tour-header {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.tour-detail-image {
+  width: 50%;
+  border-radius: 14px;
+}
+
+.tour-info h2 {
+  color: #0077b6;
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+
+.tour-info .btn-primary {
+  background: #0077b6;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.login-container {
+  width: 350px;
+  margin: 100px auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  background: white;
+}
+
+.login-container input {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+
+.btn-primary:hover {
+  background: #023e8a;
+  transform: scale(1.02);
+  transition: 0.3s;
+}

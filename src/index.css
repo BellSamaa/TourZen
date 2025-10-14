@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Có thể thêm custom style bên dưới nếu cần */
+body {
+  @apply bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-100;
+  font-family: 'Inter', sans-serif;
+  @apply bg-white dark:bg-neutral-900;
+}
