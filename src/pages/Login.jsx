@@ -20,13 +20,15 @@ export default function Auth() {
   // --- Form submit ---
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
     try {
       let res;
       if (isRegister) {
-        res = await register(form); // Gọi backend /api/register
+        res = await register(form);
       } else {
-        res = await login(form); // Gọi backend /api/login
+        res = await login(form);
       }
+
       if (res.success) {
         setSuccess(true);
         setShowCheck(true);
@@ -40,7 +42,7 @@ export default function Auth() {
         setError(res.message || "Có lỗi xảy ra");
         triggerShake();
       }
-    } catch (err) {
+    } catch {
       setError("Lỗi server, vui lòng thử lại.");
       triggerShake();
     }
@@ -66,20 +68,31 @@ export default function Auth() {
   // --- Facebook login ---
   const handleFacebookLogin = async () => {
     try {
-      const res = await loginWithFacebook(); // OAuth backend
-      if (res.success) {
-        setSuccess(true);
-        setShowCheck(true);
-        generateParticles();
-        setTimeout(() => {
-          setShowCheck(false);
-          setParticles([]);
-          navigate("/");
-        }, 1200);
-      } else {
-        setError(res.message || "Facebook login thất bại");
-        triggerShake();
+      if (!window.FB) {
+        setError("Facebook SDK chưa load");
+        return;
       }
+      window.FB.login(async (response) => {
+        if (response.authResponse) {
+          const res = await loginWithFacebook(response.authResponse.accessToken);
+          if (res.success) {
+            setSuccess(true);
+            setShowCheck(true);
+            generateParticles();
+            setTimeout(() => {
+              setShowCheck(false);
+              setParticles([]);
+              navigate("/");
+            }, 1200);
+          } else {
+            setError(res.message || "Facebook login thất bại");
+            triggerShake();
+          }
+        } else {
+          setError("Bạn đã hủy đăng nhập Facebook");
+          triggerShake();
+        }
+      }, { scope: "email" });
     } catch {
       setError("Facebook login lỗi server");
       triggerShake();
@@ -87,13 +100,19 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-100 to-blue-200 relative overflow-hidden">
-      <div className={`
-        relative bg-white shadow-xl rounded-xl p-8 w-full max-w-md
+    <div
+      className="min-h-screen flex items-center justify-center relative overflow-hidden"
+      style={{
+        backgroundImage: 'url(https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1470&q=80)',
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
+    >
+      <div className={`relative bg-white/95 shadow-xl rounded-xl p-8 w-full max-w-md
         animate-fadeIn
         ${shake ? "animate-shake" : ""}
-        ${success ? "animate-success" : ""}
-      `}>
+        ${success ? "animate-success" : ""}`}
+      >
         <h2 className="text-3xl font-bold mb-6 text-center text-gray-800">
           {isRegister ? "Đăng ký" : "Đăng nhập"}
         </h2>
@@ -106,44 +125,40 @@ export default function Auth() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {isRegister && (
-            <div className="relative group">
-              <input
-                type="text"
-                placeholder="Tên của bạn"
-                value={form.name}
-                onChange={e => setForm({ ...form, name: e.target.value })}
-                className="w-full pl-4 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gradient-blue-purple transition-all duration-200 animate-input"
-                required
-              />
-            </div>
+            <input
+              type="text"
+              placeholder="Tên của bạn"
+              value={form.name}
+              onChange={e => setForm({ ...form, name: e.target.value })}
+              className="w-full pl-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+              required
+            />
           )}
 
-          {/* Email */}
-          <div className="relative group">
-            <FaEnvelope className="absolute top-3 left-3 text-gray-400 group-focus-within:text-gradient-blue-purple transition-colors" />
+          <div className="relative">
+            <FaEnvelope className="absolute top-3 left-3 text-gray-400" />
             <input
               type="email"
               placeholder="Nhập email"
               value={form.email}
               onChange={e => setForm({ ...form, email: e.target.value })}
-              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gradient-blue-purple transition-all duration-200 animate-input"
+              className="w-full pl-10 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
               required
             />
           </div>
 
-          {/* Password */}
-          <div className="relative group">
-            <FaLock className="absolute top-3 left-3 text-gray-400 group-focus-within:text-gradient-blue-purple transition-colors" />
+          <div className="relative">
+            <FaLock className="absolute top-3 left-3 text-gray-400" />
             <input
               type={showPassword ? "text" : "password"}
               placeholder="Nhập mật khẩu"
               value={form.password}
               onChange={e => setForm({ ...form, password: e.target.value })}
-              className="w-full pl-10 pr-10 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gradient-blue-purple transition-all duration-200 animate-input"
+              className="w-full pl-10 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
               required
             />
             <span
-              className="absolute top-3 right-3 text-gray-500 cursor-pointer hover:text-gradient-blue-purple transition-colors"
+              className="absolute top-3 right-3 cursor-pointer"
               onClick={() => setShowPassword(!showPassword)}
             >
               {showPassword ? <FaEyeSlash /> : <FaEye />}
@@ -158,30 +173,26 @@ export default function Auth() {
           </button>
         </form>
 
-        <div className="flex items-center justify-center mt-4">
-          <button
-            onClick={handleFacebookLogin}
-            className="flex items-center justify-center gap-2 bg-blue-700 hover:bg-blue-800 text-white py-2 px-4 rounded-lg shadow-md transform hover:scale-105 transition-all duration-200 w-full"
-          >
-            <FaFacebook /> {isRegister ? "Đăng ký với Facebook" : "Đăng nhập với Facebook"}
-          </button>
-        </div>
+        <button
+          onClick={handleFacebookLogin}
+          className="mt-4 w-full flex items-center justify-center gap-2 bg-blue-700 hover:bg-blue-800 text-white py-2 rounded-lg shadow-md transform hover:scale-105 transition-all duration-200"
+        >
+          <FaFacebook /> {isRegister ? "Đăng ký với Facebook" : "Đăng nhập với Facebook"}
+        </button>
 
-        <p className="mt-5 text-center text-gray-500 text-sm">
+        <p className="mt-5 text-center text-gray-600">
           {isRegister ? "Đã có tài khoản?" : "Chưa có tài khoản?"}{" "}
           <span
-            className="text-blue-500 hover:underline font-medium cursor-pointer"
+            className="text-blue-500 cursor-pointer"
             onClick={() => { setIsRegister(!isRegister); setError(""); }}
           >
-            {isRegister ? "Đăng nhập ngay" : "Đăng ký ngay"}
+            {isRegister ? "Đăng nhập" : "Đăng ký"}
           </span>
         </p>
 
         {/* Animated Check Icon */}
         {showCheck && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <FaCheckCircle className="text-green-500 text-6xl animate-checkBounce" />
-          </div>
+          <FaCheckCircle className="absolute text-green-500 text-6xl top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
         )}
 
         {/* Particle Effects */}
@@ -203,13 +214,9 @@ export default function Auth() {
         ))}
       </div>
 
-      {/* Animation CSS */}
       <style>{`
         @keyframes fadeIn { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
         .animate-fadeIn { animation: fadeIn 0.5s ease-out; }
-
-        @keyframes inputPulse { 0% { box-shadow:0 0 0 rgba(59,130,246,0); } 50% { box-shadow:0 0 8px rgba(59,130,246,0.5); } 100% { box-shadow:0 0 0 rgba(59,130,246,0); } }
-        .animate-input:focus { animation: inputPulse 0.5s ease-out; }
 
         @keyframes shake { 0%{transform:translateX(0);}20%{transform:translateX(-8px);}40%{transform:translateX(8px);}60%{transform:translateX(-8px);}80%{transform:translateX(8px);}100%{transform:translateX(0);} }
         .animate-shake { animation: shake 0.5s; }
@@ -217,13 +224,7 @@ export default function Auth() {
         @keyframes successFlash { 0%{background-color:#fff;}50%{background-color:#d1fae5;}100%{background-color:#fff;} }
         .animate-success { animation: successFlash 0.8s ease-out; }
 
-        @keyframes checkBounce { 0%{transform:scale(0) translateY(0);opacity:0;}50%{transform:scale(1.2) translateY(-20px);opacity:1;}70%{transform:scale(0.9) translateY(0);}100%{transform:scale(1) translateY(0);opacity:1;} }
-        .animate-checkBounce { animation: checkBounce 0.8s ease-out forwards; }
-
         @keyframes particleMove { 0%{transform:translate(-50%,-50%) scale(1);opacity:1;}100%{transform:translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.5);opacity:0;} }
-
-        .text-gradient-blue-purple { background: linear-gradient(to right, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .focus\\:ring-gradient-blue-purple:focus { border-color: transparent; box-shadow: 0 0 8px 2px rgba(59,130,246,0.5),0 0 8px 2px rgba(139,92,246,0.5); }
       `}</style>
     </div>
   );
