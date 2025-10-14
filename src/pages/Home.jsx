@@ -1,236 +1,249 @@
-// src/pages/Home.jsx
-import React from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
-import HeroSlider from "../components/HeroSlider";
-import TourCard from "../components/TourCard";
+import { useNavigate } from "react-router-dom";
+import { TOURS } from "../data/tours";
+import { promotionsData } from "../data/promotionsData";
 import FlyingPlane from "../components/FlyingPlane";
-import { TOURS, DESTINATIONS } from "../data/tours";
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 40 },
-  visible: (i = 1) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.15, duration: 0.6, ease: "easeOut" },
-  }),
-};
+import { FaMapMarkerAlt, FaStar } from "react-icons/fa";
 
 export default function Home() {
-  const featured = TOURS.slice(0, 6);
-  const cheap = [...TOURS].sort((a, b) => a.price - b.price).slice(0, 6);
-  const popular = [...TOURS].sort((a, b) => b.sold - a.sold).slice(0, 6);
+  const navigate = useNavigate();
+  const [selectedPromo, setSelectedPromo] = useState(null);
+
+  // 🌍 Blog mẫu (có thể chuyển qua lấy từ API sau)
+  const blogs = [
+    {
+      id: 1,
+      title: "Top 5 bãi biển đẹp nhất Việt Nam bạn nên đến ít nhất một lần",
+      excerpt:
+        "Cùng khám phá 5 bãi biển tuyệt đẹp trải dài từ Bắc chí Nam – từ Hạ Long thơ mộng đến Phú Quốc rực rỡ nắng vàng...",
+      image: "/images/blog_beach.jpg",
+    },
+    {
+      id: 2,
+      title: "Kinh nghiệm du lịch Đà Lạt 3 ngày 2 đêm siêu tiết kiệm",
+      excerpt:
+        "Thành phố ngàn hoa luôn là điểm đến mơ ước của giới trẻ. Dưới đây là hành trình 3N2Đ lý tưởng cho bạn cùng nhóm bạn thân...",
+      image: "/images/blog_dalat.jpg",
+    },
+    {
+      id: 3,
+      title: "Những món ăn đường phố không thể bỏ qua khi đến Nha Trang",
+      excerpt:
+        "Ẩm thực Nha Trang không chỉ có hải sản tươi ngon mà còn là thiên đường của các món ăn vặt hấp dẫn khó cưỡng...",
+      image: "/images/blog_nhatrang.jpg",
+    },
+  ];
 
   return (
-    <motion.div initial="hidden" animate="visible" className="bg-gray-900 text-gray-100 relative overflow-hidden min-h-screen">
-
-      {/* ✈️ Máy bay bay giữa màn hình */}
+    <div className="relative bg-gradient-to-b from-blue-50 via-sky-100 to-white overflow-hidden">
+      {/* ✈️ Hiệu ứng bay */}
       <FlyingPlane />
 
-      {/* 🌥️ Mây bay nền */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        {Array.from({ length: 10 }).map((_, i) => (
-          <div
-            key={`cloud-${i}`}
-            className="absolute bg-white rounded-full opacity-20 blur-2xl"
-            style={{
-              width: `${60 + Math.random() * 120}px`,
-              height: `${20 + Math.random() * 50}px`,
-              top: `${Math.random() * 80}%`,
-              left: `${Math.random() * 100}%`,
-              animation: `cloudDrift ${30 + Math.random() * 40}s linear infinite`,
-              animationDelay: `${Math.random() * 40}s`,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* 🌿 HIỆU ỨNG HOA LÁ BAY NGHIÊNG */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        {Array.from({ length: 20 }).map((_, i) => (
-          <div
-            key={`leaf-${i}`}
-            className="absolute w-4 h-4 bg-green-400 rounded-full opacity-70 blur-sm"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animation: `leafDrift ${5 + Math.random() * 5}s linear infinite`,
-              animationDelay: `${Math.random() * 5}s`,
-            }}
-          />
-        ))}
-        {Array.from({ length: 15 }).map((_, i) => (
-          <div
-            key={`petal-${i}`}
-            className="absolute w-3 h-3 bg-yellow-300 rounded-full opacity-80 blur-xs"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animation: `petalDrift ${6 + Math.random() * 6}s linear infinite`,
-              animationDelay: `${Math.random() * 6}s`,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* HERO */}
-      <section className="relative w-full h-[85vh] overflow-hidden">
-        <HeroSlider />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-black/10 animate-pulse-slow"></div>
-      </section>
+      {/* Header */}
+      <motion.section
+        initial={{ opacity: 0, y: -30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 1 }}
+        className="text-center py-16 px-6"
+      >
+        <h1 className="text-4xl font-bold text-blue-700 mb-4">
+          Khám phá thế giới cùng VietTravel
+        </h1>
+        <p className="text-gray-600 max-w-2xl mx-auto">
+          Những hành trình tuyệt vời đang chờ bạn — chọn tour, đặt ngay, và bắt đầu chuyến phiêu lưu đáng nhớ!
+        </p>
+      </motion.section>
 
       {/* TOUR NỔI BẬT */}
-      <section
-        className="max-w-7xl mx-auto px-6 py-20 relative z-10 rounded-3xl overflow-hidden"
-        style={{
-          backgroundImage: "url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1470&q=80')",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
+      <motion.section
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.3, duration: 0.8 }}
+        className="max-w-7xl mx-auto px-6 mb-16"
       >
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm rounded-3xl"></div>
-        <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-bold text-center mb-12 text-yellow-400 glow-text relative z-10">
-          🌟 Tour nổi bật
-        </motion.h2>
-        <div className="grid sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-8 relative z-10">
-          {featured.map((t, i) => (
+        <h2 className="text-2xl font-semibold mb-6 text-gray-800">
+          🌍 Tour Nổi Bật
+        </h2>
+        <div className="grid md:grid-cols-3 gap-6">
+          {TOURS.slice(0, 3).map((tour) => (
             <motion.div
-              key={t.id}
-              variants={fadeUp}
-              custom={i}
-              whileInView="visible"
-              viewport={{ once: true }}
-              whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(255,255,255,0.15)" }}
-              className="transition-transform duration-300 relative tour-card-float bg-white/5 backdrop-blur-md rounded-xl p-2"
+              key={tour.id}
+              whileHover={{ scale: 1.02 }}
+              className="bg-white rounded-2xl shadow hover:shadow-lg overflow-hidden cursor-pointer"
+              onClick={() => navigate(`/tour/${tour.id}`)}
             >
-              <TourCard tour={t} />
-              <div className="absolute inset-0 pointer-events-none shimmer-overlay rounded-xl"></div>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* ƯU ĐÃI ĐẶC BIỆT */}
-      <section
-        className="py-20 relative z-10 rounded-3xl overflow-hidden"
-        style={{
-          backgroundImage: "url('https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=crop&w=1470&q=80')",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-      >
-        <div className="absolute inset-0 bg-green-900/40 backdrop-blur-sm rounded-3xl"></div>
-        <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-bold text-center mb-12 text-green-300 glow-text relative z-10">
-          🔥 Ưu đãi đặc biệt
-        </motion.h2>
-        <div className="max-w-7xl mx-auto grid sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-8 px-6 relative z-10">
-          {cheap.map((t, i) => (
-            <motion.div
-              key={t.id}
-              variants={fadeUp}
-              custom={i}
-              whileInView="visible"
-              viewport={{ once: true }}
-              whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(255,255,255,0.12)" }}
-              className="transition-transform duration-300 relative tour-card-float bg-white/5 backdrop-blur-md rounded-xl p-2"
-            >
-              <TourCard tour={t} />
-              <div className="absolute inset-0 pointer-events-none shimmer-overlay rounded-xl"></div>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* TOUR BÁN CHẠY */}
-      <section
-        className="max-w-7xl mx-auto px-6 py-20 relative z-10 rounded-3xl overflow-hidden"
-        style={{
-          backgroundImage: "url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1470&q=80')",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-      >
-        <div className="absolute inset-0 bg-purple-900/40 backdrop-blur-sm rounded-3xl"></div>
-        <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-bold text-center mb-12 text-purple-300 glow-text relative z-10">
-          💯 Tour bán chạy
-        </motion.h2>
-        <div className="grid sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-8 relative z-10">
-          {popular.map((t, i) => (
-            <motion.div
-              key={t.id}
-              variants={fadeUp}
-              custom={i}
-              whileInView="visible"
-              viewport={{ once: true }}
-              whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(255,255,255,0.15)" }}
-              className="transition-transform duration-300 relative tour-card-float bg-white/5 backdrop-blur-md rounded-xl p-2"
-            >
-              <TourCard tour={t} />
-              <div className="absolute inset-0 pointer-events-none shimmer-overlay rounded-xl"></div>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* CÁC SECTION KHÁC (Điểm đến, CTA, ...) */}
-      <section className="max-w-7xl mx-auto px-6 py-20 bg-gradient-to-r from-yellow-900 via-yellow-800 to-yellow-900 relative z-10">
-        <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-bold text-center mb-12 text-yellow-200 glow-text">
-          ✨ Điểm đến thu hút
-        </motion.h2>
-        <div className="grid sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-8">
-          {DESTINATIONS.map((d, i) => (
-            <motion.div
-              key={d.id}
-              variants={fadeUp}
-              custom={i}
-              whileInView="visible"
-              viewport={{ once: true }}
-              whileHover={{ scale: 1.05, boxShadow: "0 15px 30px rgba(255,255,255,0.2)" }}
-              className="relative overflow-hidden rounded-xl"
-            >
-              <img src={d.image} alt={d.name} className="w-full h-56 object-cover rounded-xl" />
-              <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white p-3 text-center font-semibold">
-                {d.name}
+              <img src={tour.image} alt={tour.title} className="h-48 w-full object-cover" />
+              <div className="p-4">
+                <h3 className="font-semibold text-gray-800">{tour.title}</h3>
+                <p className="text-gray-500 text-sm flex items-center gap-2 mt-1">
+                  <FaMapMarkerAlt className="text-blue-500" /> {tour.location}
+                </p>
+                <div className="flex justify-between items-center mt-3">
+                  <span className="text-red-600 font-semibold">
+                    {tour.price.toLocaleString("vi-VN")}₫
+                  </span>
+                  <button className="text-blue-600 font-medium hover:underline">
+                    Xem chi tiết
+                  </button>
+                </div>
               </div>
             </motion.div>
           ))}
         </div>
-      </section>
+      </motion.section>
 
-      <style>{`
-        .glow-text { text-shadow: 0 0 6px rgba(255,255,255,0.4); }
-        @keyframes pulse-slow { 0%,100% { opacity: 0.85; } 50% { opacity: 1; } }
-        .animate-pulse-slow { animation: pulse-slow 4s ease-in-out infinite; }
+      {/* TOUR BÁN CHẠY */}
+      <motion.section
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5, duration: 0.8 }}
+        className="max-w-7xl mx-auto px-6 mb-16"
+      >
+        <h2 className="text-2xl font-semibold mb-6 text-gray-800">🔥 Tour Bán Chạy</h2>
+        <div className="grid md:grid-cols-4 gap-6">
+          {TOURS.slice(3, 7).map((tour) => (
+            <motion.div
+              key={tour.id}
+              whileHover={{ scale: 1.02 }}
+              className="bg-white rounded-2xl shadow hover:shadow-lg overflow-hidden cursor-pointer"
+              onClick={() => navigate(`/tour/${tour.id}`)}
+            >
+              <img src={tour.image} alt={tour.title} className="h-40 w-full object-cover" />
+              <div className="p-3">
+                <h3 className="font-medium text-gray-800 text-sm">{tour.title}</h3>
+                <div className="flex items-center justify-between mt-2 text-gray-600 text-xs">
+                  <span>{tour.location}</span>
+                  <div className="flex gap-1 text-yellow-500">
+                    <FaStar /><FaStar /><FaStar /><FaStar /><FaStar />
+                  </div>
+                </div>
+                <div className="text-red-600 font-semibold mt-2 text-sm">
+                  {tour.price.toLocaleString("vi-VN")}₫
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </motion.section>
 
-        /* Float nhẹ cho card */
-        @keyframes floatCard { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
-        .tour-card-float { animation: floatCard 6s ease-in-out infinite; }
+      {/* ĐIỂM ĐẾN YÊU THÍCH */}
+      <motion.section
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.7, duration: 0.8 }}
+        className="max-w-7xl mx-auto px-6 mb-20"
+      >
+        <h2 className="text-2xl font-semibold mb-6 text-gray-800">🏖️ Điểm Đến Yêu Thích</h2>
+        <div className="grid md:grid-cols-4 gap-6">
+          {[
+            { name: "Phú Quốc", img: "/images/destination_phuquoc.jpg" },
+            { name: "Đà Lạt", img: "/images/destination_dalat.jpg" },
+            { name: "Nha Trang", img: "/images/destination_nhatrang.jpg" },
+            { name: "Hạ Long", img: "/images/destination_halong.jpg" },
+          ].map((dest, index) => (
+            <motion.div
+              key={index}
+              whileHover={{ scale: 1.05 }}
+              className="relative rounded-2xl overflow-hidden shadow-lg cursor-pointer"
+            >
+              <img src={dest.img} alt={dest.name} className="h-48 w-full object-cover" />
+              <div className="absolute inset-0 bg-black bg-opacity-30 flex items-end p-4">
+                <span className="text-white text-lg font-semibold">{dest.name}</span>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </motion.section>
 
-        /* Shimmer overlay */
-        .shimmer-overlay {
-          background: linear-gradient(120deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.05) 100%);
-          background-size: 200% 100%;
-          animation: shimmerMove 4s linear infinite;
-        }
-        @keyframes shimmerMove { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+      {/* ƯU ĐÃI ĐẶC BIỆT */}
+      <motion.section
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1, duration: 0.8 }}
+        className="bg-gradient-to-r from-blue-100 to-blue-200 py-16"
+      >
+        <div className="max-w-7xl mx-auto px-6">
+          <h2 className="text-2xl font-semibold mb-6 text-gray-800 text-center">
+            🎁 Ưu Đãi Đặc Biệt
+          </h2>
+          <div className="grid md:grid-cols-3 gap-6">
+            {promotionsData.map((promo) => (
+              <motion.div
+                key={promo.id}
+                whileHover={{ scale: 1.03 }}
+                className="bg-white rounded-2xl shadow p-6 cursor-pointer hover:shadow-xl"
+                onClick={() => setSelectedPromo(promo)}
+              >
+                <h3 className="text-lg font-semibold text-blue-700 mb-2">
+                  {promo.title}
+                </h3>
+                <p className="text-gray-600 text-sm mb-3">{promo.description}</p>
+                <p className="text-red-600 font-bold">{promo.discount}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
 
-        /* Lá + cánh hoa bay nghiêng */
-        @keyframes leafDrift {
-          0% { transform: translate(0,0) rotate(0deg); opacity:0.7; }
-          50% { transform: translate(-20px,-30px) rotate(180deg); opacity:1; }
-          100% { transform: translate(-40px,-60px) rotate(360deg); opacity:0.7; }
-        }
-        @keyframes petalDrift {
-          0% { transform: translate(0,0) rotate(0deg); opacity:0.8; }
-          50% { transform: translate(-15px,-20px) rotate(180deg); opacity:1; }
-          100% { transform: translate(-30px,-40px) rotate(360deg); opacity:0.8; }
-        }
+        {/* Modal chi tiết ưu đãi */}
+        {selectedPromo && (
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white rounded-2xl shadow-xl p-8 max-w-md"
+            >
+              <h3 className="text-xl font-semibold text-blue-700 mb-3">
+                {selectedPromo.title}
+              </h3>
+              <p className="text-gray-600 mb-4">{selectedPromo.description}</p>
+              <p className="text-red-600 font-bold text-lg mb-6">
+                Giảm: {selectedPromo.discount}
+              </p>
+              <button
+                onClick={() => setSelectedPromo(null)}
+                className="px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700"
+              >
+                Đóng
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </motion.section>
 
-        /* Mây bay nền */
-        @keyframes cloudDrift {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-120vw); }
-        }
-      `}</style>
-    </motion.div>
+      {/* 📰 BLOG DU LỊCH */}
+      <motion.section
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.2, duration: 0.8 }}
+        className="max-w-7xl mx-auto px-6 py-20"
+      >
+        <h2 className="text-2xl font-semibold mb-10 text-gray-800 text-center">
+          📰 Blog Du Lịch
+        </h2>
+        <div className="grid md:grid-cols-3 gap-8">
+          {blogs.map((post) => (
+            <motion.div
+              key={post.id}
+              whileHover={{ scale: 1.03 }}
+              className="bg-white shadow-lg rounded-2xl overflow-hidden hover:shadow-2xl transition cursor-pointer"
+            >
+              <img src={post.image} alt={post.title} className="h-56 w-full object-cover" />
+              <div className="p-5">
+                <h3 className="font-semibold text-gray-800 text-lg mb-2">
+                  {post.title}
+                </h3>
+                <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+                  {post.excerpt}
+                </p>
+                <button className="text-blue-600 font-medium hover:underline">
+                  Đọc thêm →
+                </button>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </motion.section>
+    </div>
   );
 }
