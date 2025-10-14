@@ -85,7 +85,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-gradient-to-br from-purple-700 to-pink-500">
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-gradient-to-br from-green-400 to-yellow-200">
       <div className="relative w-full max-w-md perspective-1200">
         <div
           className={`relative w-full transition-transform duration-800 transform-style-preserve-3d ${
@@ -104,7 +104,7 @@ export default function Login() {
                   placeholder="Nhập email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full pl-10 py-3 border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white/10 text-white placeholder-white/70"
+                  className="w-full pl-10 py-3 border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-300 bg-white/10 text-white placeholder-white/70"
                   required
                 />
               </div>
@@ -115,7 +115,7 @@ export default function Login() {
                   placeholder="Nhập mật khẩu"
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  className="w-full pl-10 py-3 border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white/10 text-white placeholder-white/70"
+                  className="w-full pl-10 py-3 border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-300 bg-white/10 text-white placeholder-white/70"
                   required
                 />
                 <span
@@ -127,7 +127,7 @@ export default function Login() {
               </div>
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white py-3 rounded-xl font-semibold text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
+                className="w-full bg-gradient-to-r from-green-500 to-yellow-400 hover:from-green-600 hover:to-yellow-300 text-white py-3 rounded-xl font-semibold text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
               >
                 Đăng nhập bằng Email
               </button>
@@ -141,7 +141,7 @@ export default function Login() {
             <p className="mt-5 text-center text-white/80">
               Chưa có tài khoản?{" "}
               <span
-                className="text-purple-300 cursor-pointer hover:text-purple-100 font-medium"
+                className="text-green-300 cursor-pointer hover:text-green-100 font-medium"
                 onClick={() => { setIsRegister(true); setError(""); }}
               >
                 Đăng ký
@@ -161,7 +161,7 @@ export default function Login() {
                   placeholder="Tên của bạn"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full pl-10 py-3 border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white/10 text-white placeholder-white/70"
+                  className="w-full pl-10 py-3 border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-300 bg-white/10 text-white placeholder-white/70"
                   required
                 />
               </div>
@@ -172,7 +172,7 @@ export default function Login() {
                   placeholder="Nhập email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full pl-10 py-3 border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white/10 text-white placeholder-white/70"
+                  className="w-full pl-10 py-3 border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-300 bg-white/10 text-white placeholder-white/70"
                   required
                 />
               </div>
@@ -183,7 +183,7 @@ export default function Login() {
                   placeholder="Nhập mật khẩu"
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  className="w-full pl-10 py-3 border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white/10 text-white placeholder-white/70"
+                  className="w-full pl-10 py-3 border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-300 bg-white/10 text-white placeholder-white/70"
                   required
                 />
                 <span
@@ -195,7 +195,7 @@ export default function Login() {
               </div>
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white py-3 rounded-xl font-semibold text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
+                className="w-full bg-gradient-to-r from-green-500 to-yellow-400 hover:from-green-600 hover:to-yellow-300 text-white py-3 rounded-xl font-semibold text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
               >
                 Đăng ký bằng Email
               </button>
@@ -209,66 +209,10 @@ export default function Login() {
             <p className="mt-5 text-center text-white/80">
               Đã có tài khoản?{" "}
               <span
-                className="text-purple-300 cursor-pointer hover:text-purple-100 font-medium"
+                className="text-green-300 cursor-pointer hover:text-green-100 font-medium"
                 onClick={() => { setIsRegister(false); setError(""); }}
               >
                 Đăng nhập
               </span>
             </p>
           </div>
-        </div>
-      </div>
-
-      {/* Particles + Success Icon */}
-      {success && (
-        <FaCheckCircle className="absolute text-green-500 text-6xl top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 drop-shadow-lg" />
-      )}
-      {particles.map((p) => (
-        <div
-          key={p.id}
-          className="absolute bg-yellow-400 rounded-full pointer-events-none"
-          style={{
-            width: `${p.size}px`,
-            height: `${p.size}px`,
-            top: "50%",
-            left: "50%",
-            transform: `translate(-50%, -50%)`,
-            animation: `particleMove ${p.duration}s ease-out forwards`,
-            "--dx": `${p.left}px`,
-            "--dy": `${p.top}px`,
-          }}
-        />
-      ))}
-
-      <style>{`
-        .perspective-1200 { perspective: 1200px; }
-        .transform-style-preserve-3d { transform-style: preserve-3d; }
-        .backface-hidden { backface-visibility: hidden; }
-        .rotate-y-180 { transform: rotateY(180deg); }
-        .glass-card {
-          background: rgba(255,255,255,0.05);
-          border: 1px solid rgba(255,255,255,0.3);
-          border-radius: 1rem;
-          backdrop-filter: blur(15px);
-          position: relative;
-          overflow: hidden;
-        }
-        .shine-card::before {
-          content: '';
-          position: absolute;
-          top: 0; left: -75%;
-          width: 50%;
-          height: 100%;
-          background: linear-gradient(120deg, rgba(255,255,255,0.2), rgba(255,255,255,0));
-          transform: skewX(-25deg);
-          animation: shineMove 2s linear infinite;
-        }
-        @keyframes shineMove {
-          0% { left: -75%; }
-          100% { left: 125%; }
-        }
-        @keyframes particleMove { 0%{transform:translate(-50%,-50%) scale(1);opacity:1;}100%{transform:translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.5);opacity:0;} }
-      `}</style>
-    </div>
-  );
-}
