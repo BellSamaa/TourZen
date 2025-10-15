@@ -20,6 +20,7 @@ const Payment = () => {
   const { items: cartItems, updateQty, clearCart } = useCart();
   const [notification, setNotification] = useState("");
   const [selectedBranch, setSelectedBranch] = useState("Hà Nội");
+  const [paymentMethod, setPaymentMethod] = useState("vnpay"); // vnpay | direct
 
   const sliderSettings = {
     dots: true,
@@ -35,8 +36,7 @@ const Payment = () => {
   const handleQuantityChange = (index, type, delta) => {
     const item = cartItems[index];
     if (!item) return;
-    let newValue = (item[type] || 0) + delta;
-    if (newValue < 0) newValue = 0;
+    const newValue = Math.max(0, (item[type] || 0) + delta);
     updateQty(
       item.key,
       type === "adults" ? newValue : item.adults,
@@ -58,44 +58,42 @@ const Payment = () => {
       return;
     }
 
-    // Gửi email xác nhận đặt tour
-    try {
-      const templateParams = {
-        customer_email: "khachhang@example.com", // thay bằng email thực tế
-        branch: selectedBranch,
-        tour_list: cartItems
-          .map(
-            (i) =>
-              `${i.title} - Tháng ${i.month} x${i.adults + i.children + i.infants}`
-          )
-          .join("\n"),
-        total: cartItems.reduce(
-          (sum, i) =>
-            sum +
-            (i.adults * i.priceAdult +
-              i.children * i.priceChild +
-              i.infants * i.priceInfant +
-              i.singleSupplement),
-          0
-        ),
-      };
+    if (paymentMethod === "vnpay") {
+      // VNPay: redirect sang VNPay (thường gọi API server tạo link)
+      navigate("/vnpay"); // hoặc window.location.href = linkVNPay
+      return;
+    }
 
-      await emailjs.send(
-        "service_8w8xy0f",
-        "template_lph7t7t",
-        templateParams,
-        "mXugIgN4N-oD4WVZZ"
-      );
+    if (paymentMethod === "direct") {
+      // Thanh toán tại cơ sở: gửi email xác nhận
+      try {
+        const templateParams = {
+          customer_email: "khachhang@example.com", // thay bằng email khách thực tế
+          branch: selectedBranch,
+          tour_list: cartItems
+            .map((i) => `${i.title} - Tháng ${i.month} x${i.adults + i.children + i.infants}`)
+            .join("\n"),
+          total: cartItems.reduce(
+            (sum, i) =>
+              sum + (i.adults * i.priceAdult + i.children * i.priceChild + i.infants * i.priceInfant + i.singleSupplement),
+            0
+          ),
+        };
 
-      // Xóa giỏ hàng
-      clearCart();
+        await emailjs.send(
+          "service_8w8xy0f",
+          "template_lph7t7t",
+          templateParams,
+          "mXugIgN4N-oD4WVZZ"
+        );
 
-      // Redirect sang trang thanh toán thành công
-      navigate("/payment-success");
-    } catch (err) {
-      console.error("Lỗi gửi email:", err);
-      setNotification("Có lỗi xảy ra khi gửi email. Vui lòng thử lại.");
-      setTimeout(() => setNotification(""), 3000);
+        clearCart();
+        navigate("/payment-success");
+      } catch (err) {
+        console.error("Lỗi gửi email:", err);
+        setNotification("Có lỗi xảy ra khi gửi email. Vui lòng thử lại.");
+        setTimeout(() => setNotification(""), 3000);
+      }
     }
   };
 
@@ -119,22 +117,35 @@ const Payment = () => {
       exit={{ opacity: 0, y: -30 }}
       transition={{ duration: 0.6 }}
     >
-      <h1 className="text-3xl font-bold mb-6 text-center text-blue-800">
-        Thanh Toán Tour
-      </h1>
+      <h1 className="text-3xl font-bold mb-6 text-center text-blue-800">Thanh Toán Tour</h1>
 
-      {/* Chọn cơ sở */}
+      {/* Chọn phương thức thanh toán */}
       <div className="mb-6 flex items-center gap-4">
-        <label className="font-semibold text-gray-700">Chọn cơ sở gần nhất:</label>
+        <label className="font-semibold text-gray-700">Chọn phương thức:</label>
         <select
-          value={selectedBranch}
-          onChange={(e) => setSelectedBranch(e.target.value)}
+          value={paymentMethod}
+          onChange={(e) => setPaymentMethod(e.target.value)}
           className="border rounded px-3 py-2"
         >
-          <option value="Hà Nội">Số A, Đường B, Hà Nội</option>
-          <option value="Hồ Chí Minh">Số X, Đường Y, Hồ Chí Minh</option>
+          <option value="vnpay">VNPay</option>
+          <option value="direct">Thanh toán tại cơ sở</option>
         </select>
       </div>
+
+      {/* Nếu thanh toán trực tiếp thì chọn chi nhánh */}
+      {paymentMethod === "direct" && (
+        <div className="mb-6 flex items-center gap-4">
+          <label className="font-semibold text-gray-700">Chọn cơ sở gần nhất:</label>
+          <select
+            value={selectedBranch}
+            onChange={(e) => setSelectedBranch(e.target.value)}
+            className="border rounded px-3 py-2"
+          >
+            <option value="Hà Nội">Số A, Đường B, Hà Nội</option>
+            <option value="Hồ Chí Minh">Số X, Đường Y, Hồ Chí Minh</option>
+          </select>
+        </div>
+      )}
 
       {cartItems.map((item, index) => (
         <motion.div
@@ -144,7 +155,6 @@ const Payment = () => {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6 }}
         >
-          {/* Slider ảnh */}
           <Slider {...sliderSettings} className="mb-4">
             {[item.image || "/images/default.jpg"].map((src, i) => (
               <div key={i}>
@@ -160,16 +170,11 @@ const Payment = () => {
           <h2 className="text-xl font-bold mb-2">{item.title}</h2>
           <p className="mb-2 text-gray-700">Tháng khởi hành: {item.month}</p>
 
-          {/* Giá và số lượng */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
             {["adults", "children", "infants"].map((type) => (
               <div key={type}>
                 <p className="font-semibold text-gray-700">
-                  {type === "adults"
-                    ? "Người lớn"
-                    : type === "children"
-                    ? "Trẻ em"
-                    : "Trẻ nhỏ"}
+                  {type === "adults" ? "Người lớn" : type === "children" ? "Trẻ em" : "Trẻ nhỏ"}
                 </p>
                 <div className="flex justify-center items-center mt-1 gap-2">
                   <button
@@ -205,7 +210,6 @@ const Payment = () => {
         </motion.div>
       ))}
 
-      {/* Thanh toán */}
       <div className="flex justify-center mt-6 mb-16">
         <motion.button
           onClick={handleCheckout}
