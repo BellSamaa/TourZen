@@ -119,23 +119,72 @@ export default function Payment() {
     setTimeout(() => setNotification({ message: "", type: "" }), 4000);
   };
 
-  // ✅ HÀM DÙNG ĐỂ KIỂM TRA LỖI
+  // ✅ KHÔI PHỤC LẠI HÀM GỐC
   const handleCheckout = async (e) => {
     e.preventDefault();
+    if (!contactInfo.name || !contactInfo.phone || !contactInfo.email) {
+      showNotification("Vui lòng điền đầy đủ thông tin liên lạc.");
+      return;
+    }
+    if (passengerDetails.some(p => !p.name || !p.dob)) {
+      showNotification("Vui lòng điền đầy đủ thông tin của tất cả hành khách.");
+      return;
+    }
+    if (!agreedToTerms) {
+      showNotification("Bạn phải đồng ý với các điều khoản và chính sách.");
+      return;
+    }
 
-    // Hiển thị dữ liệu hiện tại trong state để kiểm tra
-    alert(`
-      KIỂM TRA DỮ LIỆU:
-      -------------------
-      Tên: ${contactInfo.name}
-      SĐT: ${contactInfo.phone}
-      Email: ${contactInfo.email}
-      -------------------
-      Hãy kiểm tra xem email có hiển thị ở đây không.
-    `);
+    setIsSubmitting(true);
 
-    // Dừng hàm tại đây, không gửi email
-    return;
+    const templateParams = {
+      customer_name: contactInfo.name,
+      customer_email: contactInfo.email,
+      customer_phone: contactInfo.phone,
+      tour_title: tour.title,
+      tour_location: tour.location,
+      total_passengers: passengers.adults + passengers.children + passengers.infants,
+      passenger_list: passengerDetails.map(p => `- ${p.name} (${p.gender}, sinh ngày ${p.dob})`).join('\n'),
+      total_amount: new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(displayTotal),
+      notes: notes || "Không có",
+    };
+
+    try {
+      if (paymentMethod === 'direct') {
+        await emailjs.send(
+          'service_8w8xy0f',
+          'template_yqexxe9',
+          { ...templateParams, branch_address: selectedBranch, payment_deadline: formattedDeadline },
+          'mXugIgN4N-oD4WVZZ'
+        );
+        clearCart();
+        navigate("/payment-success", {
+          state: {
+            method: 'direct',
+            branch: selectedBranch,
+            deadline: formattedDeadline
+          }
+        });
+      } else { // VNPay
+        await emailjs.send(
+          'service_8w8xy0f',
+          'template_lph7t7t',
+          templateParams,
+          'mXugIgN4N-oD4WVZZ'
+        );
+        clearCart();
+        navigate("/payment-success", {
+          state: {
+            method: 'vnpay'
+          }
+        });
+      }
+    } catch (error) {
+      console.error("Lỗi khi gửi email:", error);
+      showNotification("Đã có lỗi xảy ra. Vui lòng thử lại sau.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
 
