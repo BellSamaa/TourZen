@@ -48,10 +48,10 @@ export default function Home() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('mienBac');
 
-  // Lấy ra 8 tour nổi bật (có thể thay đổi logic tùy ý)
-  const featuredTours = TOURS.slice(0, 8);
+  // Lọc chính xác các tour được đánh dấu là "nổi bật"
+  const featuredTours = TOURS.filter(tour => tour.isFeatured).slice(0, 8);
   
-  // Lọc ra 4 tour bán chạy nhất (dựa trên flag isBestseller trong data)
+  // Lọc chính xác các tour được đánh dấu là "bán chạy nhất"
   const bestsellingTours = TOURS.filter(tour => tour.isBestseller).slice(0, 4);
 
   // Dữ liệu cho mục "Tại sao chọn chúng tôi"
@@ -75,8 +75,8 @@ export default function Home() {
       {/* SLIDE GIỚI THIỆU */}
       <section className="relative w-full h-[90vh] -mt-[76px] text-white">
         <Swiper modules={[Autoplay, Pagination, Navigation]} autoplay={{ delay: 5000, disableOnInteraction: false }} pagination={{ clickable: true }} navigation loop className="h-full">
-          {featuredTours.slice(0, 5).map((tour) => (
-            <SwiperSlide key={tour.id}>
+          {TOURS.slice(0, 5).map((tour) => (
+            <SwiperSlide key={`slide-${tour.id}`}>
               <div className="h-full bg-cover bg-center" style={{ backgroundImage: `url(${tour.image})` }}>
                 <div className="w-full h-full flex flex-col justify-center items-center text-center bg-black/50 p-4">
                   <motion.h1 initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }} className="text-4xl md:text-6xl font-bold mb-4 drop-shadow-lg">
@@ -85,9 +85,18 @@ export default function Home() {
                   <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2 }} className="text-lg mb-6 drop-shadow-lg">
                     <FaMapMarkerAlt className="inline mr-2" />{tour.location}
                   </motion.p>
-                  <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8, delay: 0.4 }} onClick={() => navigate(`/tour/${tour.id}`)} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold shadow-lg transition-transform transform hover:scale-105">
-                    Xem Chi Tiết
+                  
+                  {/* === SỬA LẠI CHÍNH XÁC Ở ĐÂY === */}
+                  <motion.button 
+                    initial={{ opacity: 0 }} 
+                    animate={{ opacity: 1 }} 
+                    transition={{ duration: 0.8, delay: 0.4 }} 
+                    onClick={() => navigate('/about-tourzen')} 
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold shadow-lg transition-transform transform hover:scale-105"
+                  >
+                    Khám phá ngay
                   </motion.button>
+
                 </div>
               </div>
             </SwiperSlide>
@@ -124,28 +133,9 @@ export default function Home() {
             </div>
         </div>
       </section>
-
-      {/* TẠI SAO CHỌN CHÚNG TÔI */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-            <h2 className="text-3xl font-bold mb-4">💖 Tại Sao Chọn TourZen?</h2>
-            <p className="text-slate-500 max-w-2xl mx-auto mb-12">Chúng tôi không chỉ bán tour, chúng tôi mang đến những hành trình và kỷ niệm trọn đời.</p>
-            <div className="grid md:grid-cols-3 gap-10">
-            {features.map((feature, index) => (
-                <motion.div key={index} initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.5 }} transition={{ duration: 0.5, delay: index * 0.1 }} className="flex flex-col items-center">
-                    <div className="bg-blue-100 text-blue-600 w-20 h-20 rounded-full flex items-center justify-center text-4xl mb-4">
-                        {feature.icon}
-                    </div>
-                    <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
-                    <p className="text-slate-500 leading-relaxed">{feature.description}</p>
-                </motion.div>
-            ))}
-            </div>
-        </div>
-      </section>
       
       {/* ĐIỂM ĐẾN YÊU THÍCH */}
-      <section className="py-20 bg-slate-50">
+      <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-6">
             <div className="text-center mb-12">
             <h2 className="text-3xl font-bold mb-4">🏖️ Điểm Đến Yêu Thích</h2>
@@ -179,7 +169,7 @@ export default function Home() {
       </section>
 
       {/* BLOG DU LỊCH */}
-      <section className="py-20 bg-white">
+      <section className="py-20">
         <div className="max-w-7xl mx-auto px-6">
             <div className="text-center mb-12">
                 <h2 className="text-3xl font-bold mb-4">📰 Cẩm Nang Du Lịch</h2>
@@ -202,8 +192,8 @@ export default function Home() {
         </div>
       </section>
       
-      {/* TOUR BÁN CHẠY NHẤT (ĐÃ DI CHUYỂN XUỐNG CUỐI) */}
-      <section className="py-20 bg-slate-50">
+      {/* TOUR BÁN CHẠY NHẤT */}
+      <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-6 text-center">
             <h2 className="text-3xl font-bold mb-4">🔥 Tour Bán Chạy Nhất</h2>
             <p className="text-slate-500 max-w-2xl mx-auto mb-12">Đừng bỏ lỡ cơ hội trải nghiệm những chuyến đi hot nhất đã được kiểm chứng bởi hàng ngàn khách hàng.</p>
@@ -226,6 +216,25 @@ export default function Home() {
                             </div>
                         </div>
                     </div>
+                </motion.div>
+            ))}
+            </div>
+        </div>
+      </section>
+      
+      {/* TẠI SAO CHỌN CHÚNG TÔI (ĐÃ DI CHUYỂN XUỐNG CUỐI) */}
+      <section className="py-20">
+        <div className="max-w-7xl mx-auto px-6 text-center">
+            <h2 className="text-3xl font-bold mb-4">💖 Tại Sao Chọn TourZen?</h2>
+            <p className="text-slate-500 max-w-2xl mx-auto mb-12">Chúng tôi không chỉ bán tour, chúng tôi mang đến những hành trình và kỷ niệm trọn đời.</p>
+            <div className="grid md:grid-cols-3 gap-10">
+            {features.map((feature, index) => (
+                <motion.div key={index} initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.5 }} transition={{ duration: 0.5, delay: index * 0.1 }} className="flex flex-col items-center">
+                    <div className="bg-blue-100 text-blue-600 w-20 h-20 rounded-full flex items-center justify-center text-4xl mb-4">
+                        {feature.icon}
+                    </div>
+                    <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
+                    <p className="text-slate-500 leading-relaxed">{feature.description}</p>
                 </motion.div>
             ))}
             </div>
