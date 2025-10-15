@@ -38,7 +38,54 @@ export default function PromotionPage() {
         </motion.div>
 
         <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-12">
+
+          {/* Section Dịp lễ */}
           <section>
-            <h2 className="text-2xl font-bold text-teal-600 mb-6 flex items-center gap-2"><FiTag className="text-teal-400"/>Ưu đãi theo Dịp lễ</h2>
+            <h2 className="text-2xl font-bold text-teal-600 mb-6 flex items-center gap-2">
+              <FiTag className="text-teal-400" />Ưu đãi theo Dịp lễ
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {promotionsData.events.map
+              {promotionsData.events.map(promo => (
+                <motion.div key={promo.id} variants={cardVariants}>
+                  <PromotionCard promo={promo} onClaim={handleClaimVoucher} />
+                </motion.div>
+              ))}
+            </div>
+          </section>
+
+          {/* Section Vùng miền */}
+          <section>
+            <h2 className="text-2xl font-bold text-teal-600 mb-6 flex items-center gap-2">
+              <FiTag className="text-teal-400" />Ưu đãi theo Vùng miền
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {promotionsData.regions.map(promo => (
+                <motion.div key={promo.id} variants={cardVariants}>
+                  <PromotionCard promo={promo} onClaim={handleClaimVoucher} />
+                </motion.div>
+              ))}
+            </div>
+          </section>
+
+          {/* Section Đặc biệt */}
+          <section>
+            <h2 className="text-2xl font-bold text-teal-600 mb-6 flex items-center gap-2">
+              <FiTag className="text-teal-400" />Ưu đãi Đặc biệt
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
+              {promotionsData.thematic.map(promo => (
+                <motion.div key={promo.id} variants={cardVariants}>
+                  <PromotionCard promo={promo} onClaim={handleClaimVoucher} />
+                </motion.div>
+              ))}
+            </div>
+          </section>
+
+        </motion.div>
+      </div>
+
+      {/* Modal Voucher */}
+      <VoucherModal promo={selectedPromo} onClose={handleCloseModal} />
+    </div>
+  );
+}
