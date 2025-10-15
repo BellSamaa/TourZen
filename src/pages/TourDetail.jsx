@@ -41,7 +41,6 @@ const TourDetail = () => {
     );
   }
   
-  // ✅ NÂNG CẤP: Slider ảnh thông minh, lấy từ dữ liệu
   const galleryImages = tour?.galleryImages?.length > 0 ? tour.galleryImages : [tour.image];
 
   const sliderSettings = {
@@ -62,7 +61,9 @@ const TourDetail = () => {
       return;
     }
     addToCart({ tour, monthData: activeMonthData, adults: 1, children: 0 });
-    navigate("/checkout");
+    
+    // ✅ ĐÃ SỬA: Chuyển thẳng đến trang /payment
+    navigate("/payment");
   };
 
   return (
@@ -84,7 +85,7 @@ const TourDetail = () => {
 
       <motion.section className="max-w-5xl mx-auto py-10 px-4" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.8 }}>
         <Slider {...sliderSettings}>
-          {galleryImages.map((src, i) => ( // <-- Sử dụng galleryImages ở đây
+          {galleryImages.map((src, i) => (
             <div key={i}>
               <img
                 src={src}
@@ -118,7 +119,6 @@ const TourDetail = () => {
 
             {activeMonthData && (
               <div className="flex-1 bg-gray-50 p-5 rounded-xl shadow-inner">
-                {/* ... Giữ nguyên phần hiển thị thông tin tháng của bạn ... */}
                 <div className="border-b pb-4 mb-4">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-bold text-gray-800">Ngày khởi hành:</h3>
@@ -170,16 +170,33 @@ const TourDetail = () => {
       </motion.section>
 
       <motion.section className="max-w-6xl mx-auto p-6 mt-8 bg-white rounded-2xl shadow-lg" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}>
-         {/* ... Giữ nguyên phần lịch trình của bạn ... */}
+        <h2 className="text-3xl font-bold mb-6 text-center text-blue-800">Lịch Trình Chi Tiết</h2>
+        <div className="space-y-6">
+          {tour.itinerary?.length > 0 ? (
+            tour.itinerary.map((item, i) => (
+              <div key={i} className="flex gap-4">
+                <div className="flex flex-col items-center">
+                  <div className="bg-blue-600 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold">{i + 1}</div>
+                  {i < tour.itinerary.length - 1 && <div className="w-0.5 flex-grow bg-gray-200 mt-2"></div>}
+                </div>
+                <div>
+                  <h4 className="font-semibold text-lg text-gray-800">{item.day}</h4>
+                  <p className="text-gray-600">{item.description}</p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-gray-500 text-center">Chưa có lịch trình chi tiết.</p>
+          )}
+        </div>
       </motion.section>
 
       <motion.section className="max-w-5xl mx-auto my-10 p-5" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }}>
         <h2 className="text-2xl font-semibold mb-4">Vị trí điểm đến</h2>
         <div className="rounded-xl overflow-hidden shadow-lg">
-          {/* ✅ SỬA LỖI: URL Google Maps */}
           <iframe
             title="map"
-            src={`http://googleusercontent.com/maps.google.com/6{encodeURIComponent(tour.location || "")}`}
+            src={`https://www.google.com/maps/embed/v1/place?key=API_KEY&q=...0{encodeURIComponent(tour.location || "")}`}
             width="100%"
             height="350"
             loading="lazy"

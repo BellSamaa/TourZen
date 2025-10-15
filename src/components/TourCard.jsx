@@ -4,9 +4,8 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ShoppingCart, MapPin, Star, PlaneTakeoff } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useCart } from "../context/CartContext"; // Đảm bảo bạn đã import useCart
+import { useCart } from "../context/CartContext";
 
-// Helper định dạng tiền tệ
 const formatCurrency = (number) => {
     if (typeof number !== "number") return "Liên hệ";
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(number);
@@ -17,17 +16,17 @@ export default function TourCard({ tour }) {
   const navigate = useNavigate();
   const [toast, setToast] = useState(false);
 
-  // Chức năng thêm vào giỏ hàng
   const handleAddToCart = () => {
-    addToCart({ tour, adults: 1, children: 0 }); // Thêm tour vào giỏ
+    addToCart({ tour, adults: 1, children: 0 });
     setToast(true);
     setTimeout(() => setToast(false), 2000);
   };
 
-  // Chức năng thanh toán ngay
   const handleBookNow = () => {
     addToCart({ tour, adults: 1, children: 0 });
-    navigate("/checkout"); // Chuyển đến trang thanh toán
+    
+    // ✅ ĐÃ SỬA: Chuyển thẳng đến trang /payment
+    navigate("/payment");
   };
 
   return (
@@ -35,7 +34,6 @@ export default function TourCard({ tour }) {
       whileHover={{ y: -5 }}
       className="relative bg-white dark:bg-neutral-800 rounded-2xl shadow-lg overflow-hidden flex flex-col h-full border border-transparent hover:border-sky-500 transition-colors duration-300"
     >
-      {/* ẢNH TOUR */}
       <div className="relative h-56 w-full overflow-hidden">
         <Link to={`/tour/${tour.id}`}>
           <img
@@ -49,7 +47,6 @@ export default function TourCard({ tour }) {
         </div>
       </div>
 
-      {/* NỘI DUNG */}
       <div className="p-5 flex flex-col flex-grow">
         <div className="flex justify-between items-start mb-2">
             <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
@@ -104,7 +101,6 @@ export default function TourCard({ tour }) {
         </div>
       </div>
 
-      {/* TOAST THÔNG BÁO */}
       <AnimatePresence>
         {toast && (
           <motion.div
