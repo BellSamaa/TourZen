@@ -11,6 +11,7 @@ import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import { useCart } from "../context/CartContext";
 
+// Helper định dạng tiền tệ
 const formatCurrency = (number) => {
   if (typeof number !== "number") return "N/A";
   return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(number);
@@ -23,9 +24,6 @@ const TourDetail = () => {
   const { addToCart } = useCart();
 
   const [activeMonthData, setActiveMonthData] = useState(null);
-  const [adults, setAdults] = useState(1);
-  const [children, setChildren] = useState(0);
-  const [infants, setInfants] = useState(0);
   const [notification, setNotification] = useState("");
 
   useEffect(() => {
@@ -59,26 +57,30 @@ const TourDetail = () => {
       setTimeout(() => setNotification(""), 3000);
       return;
     }
-    if (adults === 0 && children === 0) {
-      setNotification("Vui lòng chọn ít nhất 1 người lớn hoặc trẻ em.");
-      setTimeout(() => setNotification(""), 3000);
-      return;
-    }
 
-    // Thêm vào giỏ
-    addToCart({ tour, monthData: activeMonthData, adults, children, infants });
+    // Thêm tour vào giỏ mà không cần nhập số lượng
+    addToCart({ tour, monthData: activeMonthData });
 
-    // Chuyển sang Payment
+    // Chuyển sang trang Payment
     navigate("/payment");
   };
 
   return (
-    <motion.div className="text-gray-800" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -30 }} transition={{ duration: 0.6, ease: "easeInOut" }}>
-      
+    <motion.div
+      className="text-gray-800"
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -30 }}
+      transition={{ duration: 0.6, ease: "easeInOut" }}
+    >
       {/* HERO PARALLAX */}
       <ParallaxBanner layers={[{ image: tour.image, speed: -20 }]} className="h-[70vh] relative">
         <div className="absolute inset-0 bg-black/50 flex flex-col justify-center items-center text-white text-center p-4">
-          <motion.h1 className="text-4xl md:text-5xl font-bold mb-2" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
+          <motion.h1
+            className="text-4xl md:text-5xl font-bold mb-2"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+          >
             {tour.title}
           </motion.h1>
           <p className="text-lg md:text-xl">{tour.location}</p>
@@ -86,20 +88,33 @@ const TourDetail = () => {
       </ParallaxBanner>
 
       {/* SLIDER ẢNH */}
-      <motion.section className="max-w-5xl mx-auto py-10 px-4" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.8 }}>
+      <motion.section
+        className="max-w-5xl mx-auto py-10 px-4"
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        transition={{ duration: 0.8 }}
+      >
         <Slider {...sliderSettings}>
           {[tour.image, "/images/travel1.jpg", "/images/travel2.jpg"].map((src, i) => (
             <div key={i}>
-              <img src={src} alt={`${tour.title} - ảnh ${i + 1}`} className="rounded-xl mx-auto shadow-lg h-[300px] md:h-[500px] object-cover w-full" />
+              <img
+                src={src}
+                alt={`${tour.title} - ảnh ${i + 1}`}
+                className="rounded-xl mx-auto shadow-lg h-[300px] md:h-[500px] object-cover w-full"
+              />
             </div>
           ))}
         </Slider>
       </motion.section>
 
       {/* LỊCH KHỞI HÀNH */}
-      <motion.section className="max-w-6xl mx-auto p-4 md:p-6 bg-white rounded-2xl shadow-lg mt-5" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+      <motion.section
+        className="max-w-6xl mx-auto p-4 md:p-6 bg-white rounded-2xl shadow-lg mt-5"
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+      >
         <h2 className="text-3xl font-bold mb-6 text-center text-blue-800">LỊCH KHỞI HÀNH</h2>
-
         {tour.departureMonths && tour.departureMonths.length > 0 ? (
           <div className="flex flex-col md:flex-row gap-6">
             {/* Chọn tháng */}
@@ -119,51 +134,58 @@ const TourDetail = () => {
               ))}
             </div>
 
-            {/* Bảng thông tin tháng chọn */}
+            {/* Thông tin tháng chọn */}
             {activeMonthData && (
               <div className="flex-1 bg-gray-50 p-5 rounded-xl shadow-inner">
                 <div className="border-b pb-4 mb-4">
-                  <h3 className="text-lg font-bold text-gray-800">Ngày khởi hành:</h3>
-                  <div className="text-right font-semibold text-blue-600">{activeMonthData.departureDates.join(" | ")}</div>
-                  <div className="space-y-3 text-sm mt-4">
-                    <div className="flex items-start">
-                      <FaGift className="text-orange-500 text-base mr-3 mt-1 flex-shrink-0" />
-                      <p>
-                        <span className="font-semibold">Ưu đãi tháng:</span> {activeMonthData.promotions}
-                      </p>
-                    </div>
-                    <div className="flex items-start">
-                      <MdFamilyRestroom className="text-green-500 text-base mr-3 mt-1 flex-shrink-0" />
-                      <p>
-                        <span className="font-semibold">Phù hợp cho:</span> {activeMonthData.familySuitability}
-                      </p>
-                    </div>
-                    <div className="flex items-start">
-                      <FaPlaneDeparture className="text-sky-500 text-base mr-3 mt-1 flex-shrink-0" />
-                      <p>
-                        <span className="font-semibold">Thông tin chuyến bay:</span> {activeMonthData.flightDeals}
-                      </p>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-bold text-gray-800">Ngày khởi hành:</h3>
+                    <div className="text-right font-semibold text-blue-600">
+                      {activeMonthData.departureDates.join(" | ")}
                     </div>
                   </div>
-
-                  <p className="text-xs text-gray-500 mt-4 pt-4 border-t italic">{activeMonthData.notes}</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center text-sm">
+                    <div>
+                      <p className="font-semibold text-gray-700">Người lớn</p>
+                      <p className="text-red-600 font-bold text-lg">{formatCurrency(activeMonthData.prices.adult)}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-700">Trẻ em</p>
+                      <p className="text-red-600 font-bold text-lg">{formatCurrency(activeMonthData.prices.child)}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-700">Trẻ nhỏ</p>
+                      <p className="text-gray-500 font-bold text-lg">{formatCurrency(activeMonthData.prices.infant)}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-700">Phụ thu phòng đơn</p>
+                      <p className="text-red-600 font-bold text-lg">{formatCurrency(activeMonthData.prices.singleSupplement)}</p>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Nhập số lượng */}
-                <div className="flex gap-4">
-                  <div>
-                    <label className="font-semibold">Người lớn:</label>
-                    <input type="number" min={0} value={adults} onChange={(e) => setAdults(parseInt(e.target.value) || 0)} className="border rounded px-2 py-1 w-20" />
+                {/* Thông tin thêm */}
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-start">
+                    <FaGift className="text-orange-500 text-base mr-3 mt-1 flex-shrink-0" />
+                    <p>
+                      <span className="font-semibold">Ưu đãi tháng:</span> {activeMonthData.promotions}
+                    </p>
                   </div>
-                  <div>
-                    <label className="font-semibold">Trẻ em:</label>
-                    <input type="number" min={0} value={children} onChange={(e) => setChildren(parseInt(e.target.value) || 0)} className="border rounded px-2 py-1 w-20" />
+                  <div className="flex items-start">
+                    <MdFamilyRestroom className="text-green-500 text-base mr-3 mt-1 flex-shrink-0" />
+                    <p>
+                      <span className="font-semibold">Phù hợp cho:</span> {activeMonthData.familySuitability}
+                    </p>
                   </div>
-                  <div>
-                    <label className="font-semibold">Trẻ nhỏ:</label>
-                    <input type="number" min={0} value={infants} onChange={(e) => setInfants(parseInt(e.target.value) || 0)} className="border rounded px-2 py-1 w-20" />
+                  <div className="flex items-start">
+                    <FaPlaneDeparture className="text-sky-500 text-base mr-3 mt-1 flex-shrink-0" />
+                    <p>
+                      <span className="font-semibold">Thông tin chuyến bay:</span> {activeMonthData.flightDeals}
+                    </p>
                   </div>
                 </div>
+                <p className="text-xs text-gray-500 mt-4 pt-4 border-t italic">{activeMonthData.notes}</p>
               </div>
             )}
           </div>
@@ -173,7 +195,11 @@ const TourDetail = () => {
       </motion.section>
 
       {/* LỊCH TRÌNH */}
-      <motion.section className="max-w-6xl mx-auto p-6 mt-8 bg-white rounded-2xl shadow-lg" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}>
+      <motion.section
+        className="max-w-6xl mx-auto p-6 mt-8 bg-white rounded-2xl shadow-lg"
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+      >
         <h2 className="text-2xl font-bold mb-6 text-center">LỊCH TRÌNH</h2>
         {tour.itinerary.map((item, i) => (
           <div key={i} className="mb-4">
@@ -187,11 +213,17 @@ const TourDetail = () => {
       <motion.section className="max-w-5xl mx-auto my-10 p-5" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }}>
         <h2 className="text-2xl font-semibold mb-4">Vị trí điểm đến</h2>
         <div className="rounded-xl overflow-hidden shadow-lg">
-          <iframe title="map" src={`https://www.google.com/maps?q=${encodeURIComponent(tour.location)}&output=embed`} width="100%" height="350" loading="lazy"></iframe>
+          <iframe
+            title="map"
+            src={`https://www.google.com/maps?q=${encodeURIComponent(tour.location)}&output=embed`}
+            width="100%"
+            height="350"
+            loading="lazy"
+          ></iframe>
         </div>
       </motion.section>
 
-      {/* NÚT THANH TOÁN */}
+      {/* NÚT ĐẶT TOUR */}
       <div className="flex justify-center mb-16">
         <motion.button
           onClick={handleBookNow}
@@ -204,6 +236,7 @@ const TourDetail = () => {
         </motion.button>
       </div>
 
+      {/* Thông báo lỗi */}
       {notification && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
