@@ -1,4 +1,4 @@
-import React, auseState } from "react";
+import React, { useState } from "react"; // <--- LỖI ĐÃ ĐƯỢC SỬA Ở ĐÂY
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { TOURS } from "../data/tours";
