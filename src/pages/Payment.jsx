@@ -6,10 +6,10 @@ import { FaGift, FaPlaneDeparture, FaCreditCard, FaPlus, FaMinus } from "react-i
 import { MdFamilyRestroom } from "react-icons/md";
 import { motion } from "framer-motion";
 import { useCart } from "../context/CartContext";
+import emailjs from "@emailjs/browser";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 
-// Helper định dạng tiền tệ
 const formatCurrency = (number) =>
   typeof number === "number"
     ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(number)
@@ -19,6 +19,7 @@ const Payment = () => {
   const navigate = useNavigate();
   const { items: cartItems, updateQty, clearCart } = useCart();
   const [notification, setNotification] = useState("");
+  const [selectedBranch, setSelectedBranch] = useState("Hà Nội");
 
   const sliderSettings = {
     dots: true,
@@ -31,7 +32,6 @@ const Payment = () => {
     fade: true,
   };
 
-  // Thay đổi số lượng
   const handleQuantityChange = (index, type, delta) => {
     const item = cartItems[index];
     if (!item) return;
@@ -45,22 +45,58 @@ const Payment = () => {
     );
   };
 
-  // Tính tổng cho 1 item
   const calculateTotal = (item) =>
     (item.adults || 0) * (item.priceAdult || 0) +
     (item.children || 0) * (item.priceChild || 0) +
     (item.infants || 0) * (item.priceInfant || 0) +
     (item.singleSupplement || 0);
 
-  // Thanh toán
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (!cartItems || cartItems.length === 0) {
       setNotification("Giỏ hàng trống, không thể thanh toán.");
       setTimeout(() => setNotification(""), 3000);
       return;
     }
-    // Thực tế có thể gọi API thanh toán ở đây
-    navigate("/checkout");
+
+    // Gửi email xác nhận đặt tour
+    try {
+      const templateParams = {
+        customer_email: "khachhang@example.com", // thay bằng email thực tế
+        branch: selectedBranch,
+        tour_list: cartItems
+          .map(
+            (i) =>
+              `${i.title} - Tháng ${i.month} x${i.adults + i.children + i.infants}`
+          )
+          .join("\n"),
+        total: cartItems.reduce(
+          (sum, i) =>
+            sum +
+            (i.adults * i.priceAdult +
+              i.children * i.priceChild +
+              i.infants * i.priceInfant +
+              i.singleSupplement),
+          0
+        ),
+      };
+
+      await emailjs.send(
+        "service_8w8xy0f",
+        "template_lph7t7t",
+        templateParams,
+        "mXugIgN4N-oD4WVZZ"
+      );
+
+      // Xóa giỏ hàng
+      clearCart();
+
+      // Redirect sang trang thanh toán thành công
+      navigate("/payment-success");
+    } catch (err) {
+      console.error("Lỗi gửi email:", err);
+      setNotification("Có lỗi xảy ra khi gửi email. Vui lòng thử lại.");
+      setTimeout(() => setNotification(""), 3000);
+    }
   };
 
   if (!cartItems || cartItems.length === 0) {
@@ -83,7 +119,22 @@ const Payment = () => {
       exit={{ opacity: 0, y: -30 }}
       transition={{ duration: 0.6 }}
     >
-      <h1 className="text-3xl font-bold mb-6 text-center text-blue-800">Thanh Toán Tour</h1>
+      <h1 className="text-3xl font-bold mb-6 text-center text-blue-800">
+        Thanh Toán Tour
+      </h1>
+
+      {/* Chọn cơ sở */}
+      <div className="mb-6 flex items-center gap-4">
+        <label className="font-semibold text-gray-700">Chọn cơ sở gần nhất:</label>
+        <select
+          value={selectedBranch}
+          onChange={(e) => setSelectedBranch(e.target.value)}
+          className="border rounded px-3 py-2"
+        >
+          <option value="Hà Nội">Số A, Đường B, Hà Nội</option>
+          <option value="Hồ Chí Minh">Số X, Đường Y, Hồ Chí Minh</option>
+        </select>
+      </div>
 
       {cartItems.map((item, index) => (
         <motion.div
@@ -95,7 +146,7 @@ const Payment = () => {
         >
           {/* Slider ảnh */}
           <Slider {...sliderSettings} className="mb-4">
-            {[item.image || "/images/default.jpg", "/images/travel1.jpg", "/images/travel2.jpg"].map((src, i) => (
+            {[item.image || "/images/default.jpg"].map((src, i) => (
               <div key={i}>
                 <img
                   src={src}
@@ -106,7 +157,6 @@ const Payment = () => {
             ))}
           </Slider>
 
-          {/* Thông tin tour */}
           <h2 className="text-xl font-bold mb-2">{item.title}</h2>
           <p className="mb-2 text-gray-700">Tháng khởi hành: {item.month}</p>
 
@@ -115,60 +165,43 @@ const Payment = () => {
             {["adults", "children", "infants"].map((type) => (
               <div key={type}>
                 <p className="font-semibold text-gray-700">
-                  {type === "adults" ? "Người lớn" : type === "children" ? "Trẻ em" : "Trẻ nhỏ"}
+                  {type === "adults"
+                    ? "Người lớn"
+                    : type === "children"
+                    ? "Trẻ em"
+                    : "Trẻ nhỏ"}
                 </p>
                 <div className="flex justify-center items-center mt-1 gap-2">
-                  <button onClick={() => handleQuantityChange(index, type, -1)} className="px-2 py-1 bg-gray-200 rounded">
+                  <button
+                    onClick={() => handleQuantityChange(index, type, -1)}
+                    className="px-2 py-1 bg-gray-200 rounded"
+                  >
                     <FaMinus />
                   </button>
                   <span className="font-bold">{item[type] || 0}</span>
-                  <button onClick={() => handleQuantityChange(index, type, 1)} className="px-2 py-1 bg-gray-200 rounded">
+                  <button
+                    onClick={() => handleQuantityChange(index, type, 1)}
+                    className="px-2 py-1 bg-gray-200 rounded"
+                  >
                     <FaPlus />
                   </button>
                 </div>
                 <p className="text-red-600 font-bold mt-1">
                   {formatCurrency(
-                    (type === "adults" ? item.priceAdult : type === "children" ? item.priceChild : item.priceInfant) *
-                      (item[type] || 0)
+                    (type === "adults"
+                      ? item.priceAdult
+                      : type === "children"
+                      ? item.priceChild
+                      : item.priceInfant) * (item[type] || 0)
                   )}
                 </p>
               </div>
             ))}
-            <div>
-              <p className="font-semibold text-gray-700">Phụ thu phòng đơn</p>
-              <p className="text-red-600 font-bold mt-5">{formatCurrency(item.singleSupplement || 0)}</p>
-            </div>
           </div>
 
-          {/* Tổng tiền */}
-          <p className="text-right font-bold text-lg mt-4">Tổng: {formatCurrency(calculateTotal(item))}</p>
-
-          {/* Thông tin thêm */}
-          <div className="space-y-3 text-sm mt-4">
-            <div className="flex items-start">
-              <FaGift className="text-orange-500 text-base mr-3 mt-1 flex-shrink-0" />
-              <p><span className="font-semibold">Ưu đãi tháng:</span> {item.promotions || "Không có"}</p>
-            </div>
-            <div className="flex items-start">
-              <MdFamilyRestroom className="text-green-500 text-base mr-3 mt-1 flex-shrink-0" />
-              <p><span className="font-semibold">Phù hợp cho:</span> {item.familySuitability || "Không xác định"}</p>
-            </div>
-            <div className="flex items-start">
-              <FaPlaneDeparture className="text-sky-500 text-base mr-3 mt-1 flex-shrink-0" />
-              <p><span className="font-semibold">Thông tin chuyến bay:</span> {item.flightDeals || "Không có"}</p>
-            </div>
-          </div>
-
-          {/* Bản đồ */}
-          <div className="rounded-xl overflow-hidden shadow-lg mt-4">
-            <iframe
-              title="map"
-              src={`https://www.google.com/maps?q=${encodeURIComponent(item.location || "")}&output=embed`}
-              width="100%"
-              height="350"
-              loading="lazy"
-            />
-          </div>
+          <p className="text-right font-bold text-lg mt-4">
+            Tổng: {formatCurrency(calculateTotal(item))}
+          </p>
         </motion.div>
       ))}
 
@@ -184,7 +217,6 @@ const Payment = () => {
         </motion.button>
       </div>
 
-      {/* Thông báo lỗi */}
       {notification && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
