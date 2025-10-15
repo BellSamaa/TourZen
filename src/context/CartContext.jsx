@@ -29,14 +29,21 @@ export function CartProvider({ children }) {
   }, [items]);
 
   // ✅ Thêm tour vào giỏ
-  function addToCart({ tour, monthData, adults = 1, children = 0, infants = 0 }) {
-    if (!tour || !monthData) return;
+  function addToCart({
+    tour,
+    monthData = { month: "Chưa chọn", prices: { adult: tour?.price || 0, child: 0, infant: 0, singleSupplement: 0 } },
+    adults = 1,
+    children = 0,
+    infants = 0,
+  }) {
+    if (!tour) return;
 
     const key = `${tour.id}_${monthData.month}`;
 
     setItems((prev) => {
       const found = prev.find((p) => p.key === key);
       if (found) {
+        // Cộng dồn số lượng nếu đã tồn tại
         return prev.map((p) =>
           p.key === key
             ? {
@@ -49,6 +56,7 @@ export function CartProvider({ children }) {
         );
       }
 
+      // Thêm mới
       return [
         ...prev,
         {
