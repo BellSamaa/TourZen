@@ -1,10 +1,10 @@
 // src/pages/Payment.jsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import emailjs from "@emailjs/browser";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaUserFriends, FaMapMarkerAlt, FaMinus, FaPlus, FaCreditCard, FaShuttleVan } from "react-icons/fa";
+import { FaUserFriends, FaMapMarkerAlt, FaCreditCard, FaShuttleVan, FaUsers } from "react-icons/fa";
 import { IoIosMail, IoIosCall } from "react-icons/io";
 
 // --- Helper Components ---
@@ -15,28 +15,13 @@ const InfoInput = ({ icon, ...props }) => (
     </div>
 );
 
-const QuantityCounter = ({ label, description, value, onDecrease, onIncrease }) => (
-    <div className="flex justify-between items-center">
-        <div>
-            <p className="font-semibold">{label}</p>
-            <p className="text-sm text-gray-500">{description}</p>
-        </div>
-        <div className="flex items-center gap-3">
-            <button type="button" onClick={onDecrease} className="w-8 h-8 flex items-center justify-center bg-gray-200 rounded-full hover:bg-gray-300 transition-colors disabled:opacity-50" disabled={value <= (label === "Người lớn" ? 1 : 0)}><FaMinus size={12} /></button>
-            <span className="font-bold text-lg w-8 text-center">{value}</span>
-            <button type="button" onClick={onIncrease} className="w-8 h-8 flex items-center justify-center bg-gray-200 rounded-full hover:bg-gray-300 transition-colors"><FaPlus size={12} /></button>
-        </div>
-    </div>
-);
-
 // --- Main Payment Component ---
 export default function Payment() {
     const navigate = useNavigate();
     const { items: cartItems, clearCart, total } = useCart();
-    const tour = cartItems.length > 0 ? cartItems[0] : null;
 
+    // --- State ---
     const [contactInfo, setContactInfo] = useState({ name: "", phone: "", email: "", address: "" });
-    const [passengers, setPassengers] = useState({ adults: 1, children: 0, infants: 0 });
     const [notes, setNotes] = useState("");
     const [paymentMethod, setPaymentMethod] = useState("direct");
     const [selectedBranch, setSelectedBranch] = useState("Số 123, Đường ABC, Quận Hoàn Kiếm, Hà Nội");
@@ -45,32 +30,35 @@ export default function Payment() {
     const [notification, setNotification] = useState({ message: "", type: "" });
     const [useShuttle, setUseShuttle] = useState(false);
     const [shuttleAddress, setShuttleAddress] = useState("");
-    const shuttlePrice = 400000;
     
-    // ✅ FIX: Di chuyển biến discount ra ngoài để toàn bộ component có thể truy cập
-    const discount = 800000; 
+    // --- Constants ---
+    const shuttlePrice = 400000;
+    const discount = 800000;
+    const formatCurrency = (num) => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(num);
+
+    // --- Memoized Calculations from Cart Data ---
+    const totalPassengers = useMemo(() => 
+        cartItems.reduce((sum, item) => sum + (item.adults || 0) + (item.children || 0) + (item.infants || 0), 0)
+    , [cartItems]);
+    
+    const finalTotal = useMemo(() => 
+        total + (useShuttle ? shuttlePrice : 0) - discount
+    , [total, useShuttle, shuttlePrice, discount]);
 
     const paymentDeadline = useMemo(() => {
-        if (!tour || !tour.departureDates || !tour.departureDates.length === 0) {
-            const today = new Date(); today.setDate(today.getDate() + 7); return today;
-        }
-        const earliestDeparture = new Date(tour.departureDates[0]);
-        earliestDeparture.setDate(earliestDeparture.getDate() - 7);
-        return earliestDeparture;
-    }, [tour]);
+        const earliestDate = cartItems
+            .map(item => item.departureDates?.[0])
+            .filter(Boolean)
+            .map(dateStr => new Date(dateStr))
+            .sort((a, b) => a - b)[0] || new Date();
+        earliestDate.setDate(earliestDate.getDate() - 7);
+        return earliestDate;
+    }, [cartItems]);
 
     const formattedDeadline = paymentDeadline.toLocaleDateString("vi-VN", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-    const displayTotal = useMemo(() => {
-        const adultsTotal = passengers.adults * (tour?.priceAdult || 0);
-        const childrenTotal = passengers.children * (tour?.priceChild || 0);
-        const infantsTotal = 0; 
-        const shuttleFee = useShuttle ? shuttlePrice : 0;
-        return adultsTotal + childrenTotal + infantsTotal - discount + shuttleFee;
-    }, [passengers, tour, useShuttle, discount, shuttlePrice]);
-
+    // --- Handlers ---
     const handleInputChange = (e, setState) => { setState(prev => ({ ...prev, [e.target.name]: e.target.value })); };
-    const handlePassengerCount = (type, delta) => { setPassengers(prev => { const newValue = Math.max((type === 'adults' ? 1 : 0), prev[type] + delta); return { ...prev, [type]: newValue }; }); };
     const showNotification = (message, type = "error") => { setNotification({ message, type }); setTimeout(() => setNotification({ message: "", type: "" }), 4000); };
 
     const handleCheckout = async (e) => {
@@ -86,14 +74,19 @@ export default function Payment() {
         }
 
         setIsSubmitting(true);
+
+        const tourListForEmail = `<ul>${cartItems.map(item => 
+            `<li><b>${item.title}</b> (${item.adults} NL, ${item.children || 0} TE)</li>`
+        ).join('')}</ul>`;
+
         const templateParams = {
             customer_name: contactInfo.name,
             customer_email: contactInfo.email,
             customer_phone: contactInfo.phone,
-            tour_title: cartItems.map(i => i.title).join(', '),
-            total_passengers: passengers.adults + passengers.children + passengers.infants,
+            tour_title: cartItems.map(i => i.title).join(', '), // Gửi tên các tour
+            total_passengers: totalPassengers,
             shuttle_service: useShuttle ? `Có, đón tại: ${shuttleAddress}` : "Không sử dụng",
-            total_amount: new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(total + (useShuttle ? shuttlePrice : 0) - discount),
+            total_amount: formatCurrency(finalTotal),
             notes: notes || "Không có",
         };
 
@@ -123,10 +116,11 @@ export default function Payment() {
         <div className="bg-gray-100 min-h-screen py-8 px-4 sm:px-6 lg:px-8">
             <div className="max-w-7xl mx-auto">
                 <div className="text-center mb-8">
-                    <h1 className="text-3xl font-bold text-blue-800">ĐẶT TOUR</h1>
+                    <h1 className="text-3xl font-bold text-blue-800">XÁC NHẬN ĐẶT TOUR</h1>
                 </div>
                 <form onSubmit={handleCheckout} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="lg:col-span-2 space-y-6">
+                        {/* THÔNG TIN LIÊN LẠC */}
                         <div className="bg-white p-6 rounded-lg shadow-md">
                             <h2 className="text-xl font-bold mb-4">THÔNG TIN LIÊN LẠC</h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -137,15 +131,9 @@ export default function Payment() {
                             </div>
                         </div>
 
-                        <div className="bg-white p-6 rounded-lg shadow-md">
-                            <h2 className="text-xl font-bold mb-4">SỐ LƯỢNG HÀNH KHÁCH</h2>
-                            <div className="space-y-4">
-                                <QuantityCounter label="Người lớn" description="Trên 1m4" value={passengers.adults} onDecrease={() => handlePassengerCount('adults', -1)} onIncrease={() => handlePassengerCount('adults', 1)} />
-                                <QuantityCounter label="Trẻ em" description="Dưới 1m4" value={passengers.children} onDecrease={() => handlePassengerCount('children', -1)} onIncrease={() => handlePassengerCount('children', 1)} />
-                                <QuantityCounter label="Em bé" description="Dưới 2 tuổi (Miễn phí)" value={passengers.infants} onDecrease={() => handlePassengerCount('infants', -1)} onIncrease={() => handlePassengerCount('infants', 1)} />
-                            </div>
-                        </div>
+                        {/* ✅ ĐÃ XÓA BỘ ĐẾM SỐ LƯỢNG HÀNH KHÁCH */}
 
+                        {/* DỊCH VỤ CỘNG THÊM */}
                         <div className="bg-white p-6 rounded-lg shadow-md">
                             <h2 className="text-xl font-bold flex items-center gap-2 mb-4"><FaShuttleVan className="text-blue-500"/>DỊCH VỤ CỘNG THÊM</h2>
                             <div className="bg-blue-50 p-4 rounded-lg">
@@ -155,7 +143,7 @@ export default function Payment() {
                                         <p className="font-semibold text-blue-800">TourZen Xpress - Xe đưa đón riêng</p>
                                         <p className="text-sm text-gray-600">Tài xế riêng sẽ đón bạn tại nhà/sân bay.</p>
                                     </div>
-                                    <span className="font-bold text-blue-600">{new Intl.NumberFormat("vi-VN").format(shuttlePrice)} ₫</span>
+                                    <span className="font-bold text-blue-600">{formatCurrency(shuttlePrice)}</span>
                                 </label>
                                 <AnimatePresence>
                                     {useShuttle && (
@@ -167,11 +155,11 @@ export default function Payment() {
                             </div>
                         </div>
 
+                        {/* GHI CHÚ VÀ PHƯƠNG THỨC THANH TOÁN */}
                         <div className="bg-white p-6 rounded-lg shadow-md">
                           <h2 className="text-xl font-bold mb-4">GHI CHÚ</h2>
                           <textarea placeholder="Ghi chú thêm (nếu có)" value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full h-24 px-3 py-2 border border-gray-300 rounded-md"></textarea>
                         </div>
-
                         <div className="bg-white p-6 rounded-lg shadow-md">
                             <h2 className="text-xl font-bold mb-4">PHƯƠNG THỨC THANH TOÁN</h2>
                             <div className="space-y-4">
@@ -207,38 +195,43 @@ export default function Payment() {
                     
                     <aside className="lg:col-span-1">
                         <div className="bg-white p-6 rounded-lg shadow-md sticky top-8">
-                            <h2 className="text-xl font-bold mb-4 border-b pb-2">TÓM TẮT CHUYẾN ĐI</h2>
+                            <h2 className="text-xl font-bold mb-4 border-b pb-2">TÓM TẮT ĐƠN HÀNG</h2>
+                            
                             <div className="space-y-4 max-h-64 overflow-y-auto pr-2 mb-4">
                                 {cartItems.map(item => (
                                     <div key={item.key} className="flex gap-4 border-b pb-2 last:border-0">
                                         <img src={item.image || '/images/default.jpg'} alt={item.title} className="w-20 h-20 object-cover rounded-lg" />
                                         <div>
                                             <p className="font-bold text-sm text-blue-800">{item.title}</p>
-                                            <p className="text-xs text-gray-500">{item.location}</p>
-                                            <p className="text-sm font-semibold">{new Intl.NumberFormat("vi-VN").format((item.adults * item.priceAdult) + ((item.children || 0) * item.priceChild || 0))} ₫</p>
+                                            <p className="text-xs text-gray-500">{`${item.adults || 0} NL, ${item.children || 0} TE, ${item.infants || 0} EB`}</p>
+                                            <p className="text-sm font-semibold">{formatCurrency((item.adults * item.priceAdult) + ((item.children || 0) * item.priceChild || 0))}</p>
                                         </div>
                                     </div>
                                 ))}
                             </div>
                             <div className="space-y-2 text-sm border-t pt-4">
+                                <div className="flex justify-between font-semibold">
+                                    <div className="flex items-center gap-2"><FaUsers/> <span>Tổng số khách</span></div>
+                                    <span>{totalPassengers}</span>
+                                </div>
                                 <div className="flex justify-between">
                                     <span>Tạm tính</span>
-                                    <span>{new Intl.NumberFormat("vi-VN").format(total)} ₫</span>
+                                    <span>{formatCurrency(total)}</span>
                                 </div>
                                 {useShuttle && (
                                     <div className="flex justify-between">
                                         <span>Phí xe TourZen Xpress</span>
-                                        <span>{new Intl.NumberFormat("vi-VN").format(shuttlePrice)} ₫</span>
+                                        <span>{formatCurrency(shuttlePrice)}</span>
                                     </div>
                                 )}
                                 <div className="flex justify-between text-red-600">
                                     <span>Ưu đãi</span>
-                                    <span>- {new Intl.NumberFormat("vi-VN").format(discount)} ₫</span>
+                                    <span>- {formatCurrency(discount)}</span>
                                 </div>
                             </div>
                             <div className="mt-4 pt-4 border-t flex justify-between items-center">
-                                <span className="text-lg font-bold">Tổng tiền</span>
-                                <span className="text-2xl font-bold text-red-600">{new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(total + (useShuttle ? shuttlePrice : 0) - discount)}</span>
+                                <span className="text-lg font-bold">Tổng cộng</span>
+                                <span className="text-2xl font-bold text-red-600">{formatCurrency(finalTotal)}</span>
                             </div>
                             <div className="mt-6">
                                 <label className="flex items-center">
@@ -248,7 +241,7 @@ export default function Payment() {
                             </div>
                             <button type="submit" disabled={isSubmitting} className="w-full mt-6 bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-all disabled:bg-gray-400 flex items-center justify-center gap-2">
                                 <FaCreditCard />
-                                {isSubmitting ? 'ĐANG XỬ LÝ...' : 'THANH TOÁN'}
+                                {isSubmitting ? 'ĐANG XỬ LÝ...' : 'XÁC NHẬN THANH TOÁN'}
                             </button>
                         </div>
                     </aside>
@@ -269,3 +262,4 @@ export default function Payment() {
         </div>
     );
 }
+
