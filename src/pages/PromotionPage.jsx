@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { FiTag } from 'react-icons/fi';
+import PromotionCard from '../components/PromotionCard';
+import VoucherModal from '../components/VoucherModal';
 
 // Dữ liệu mẫu giữ nguyên
 const promotionsData = {
@@ -17,64 +19,14 @@ const promotionsData = {
   ]
 };
 
-// Component thẻ khuyến mãi
-const PromotionCard = ({ promo, onClaim }) => (
-  <div className="bg-white dark:bg-neutral-800 rounded-3xl shadow-lg overflow-hidden transform hover:-translate-y-2 hover:shadow-2xl transition-all duration-300">
-    <div className="relative">
-      <img src={promo.image} alt={promo.title} className="w-full h-56 object-cover" />
-      <div className="absolute top-4 left-4 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow">{promo.tag}</div>
-    </div>
-    <div className="p-6">
-      <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-2">{promo.title}</h3>
-      <p className="text-neutral-600 dark:text-neutral-400 text-sm mb-4">{promo.description}</p>
-      <div className="flex justify-between items-center">
-        <span className="text-xs font-semibold text-red-500">{promo.timeLimit}</span>
-        <button onClick={() => onClaim(promo)} className="bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-md">
-          Săn Voucher
-        </button>
-      </div>
-    </div>
-  </div>
-);
-
-// Modal voucher
-const VoucherModal = ({ promo, onClose }) => {
-  if (!promo) return null;
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <motion.div
-        className="bg-white dark:bg-neutral-800 p-8 rounded-3xl shadow-2xl text-center max-w-sm w-full border border-neutral-200 dark:border-neutral-700"
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-      >
-        <h2 className="text-2xl font-bold mb-4 text-blue-600">Săn Voucher Thành Công!</h2>
-        <p className="mb-2 text-neutral-700 dark:text-neutral-300">
-          Mã voucher của bạn cho ưu đãi <span className="font-semibold">{promo.title}</span> là:
-        </p>
-        <p className="font-mono text-xl bg-gray-100 dark:bg-neutral-700 p-3 rounded-lg my-4 text-neutral-800 dark:text-white tracking-widest">{promo.voucherCode}</p>
-        <button onClick={onClose} className="mt-4 bg-red-500 text-white px-8 py-2 rounded-lg font-semibold hover:bg-red-600 transition-colors shadow-md">
-          Đóng
-        </button>
-      </motion.div>
-    </div>
-  );
-};
-
 export default function PromotionPage() {
   const [selectedPromo, setSelectedPromo] = useState(null);
 
   const handleClaimVoucher = (promo) => setSelectedPromo(promo);
   const handleCloseModal = () => setSelectedPromo(null);
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
-  };
-
-  const cardVariants = {
-    hidden: { opacity: 0, y: 30 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } }
-  };
+  const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1 } } };
+  const cardVariants = { hidden: { opacity: 0, y: 30 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } } };
 
   return (
     <div className="bg-gray-50 dark:bg-neutral-900 min-h-screen">
@@ -87,47 +39,25 @@ export default function PromotionPage() {
         </motion.div>
 
         <motion.div variants={containerVariants} initial="hidden" animate="visible">
-          <section className="mb-16">
-            <h2 className="text-3xl font-bold text-neutral-800 dark:text-white mb-8 flex items-center gap-3">
-              <FiTag className="text-blue-500"/>Ưu đãi theo Dịp lễ
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {promotionsData.events.map(promo => (
-                <motion.div key={promo.id} variants={cardVariants}>
-                  <PromotionCard promo={promo} onClaim={handleClaimVoucher} />
-                </motion.div>
-              ))}
-            </div>
-          </section>
-
-          <section className="mb-16">
-            <h2 className="text-3xl font-bold text-neutral-800 dark:text-white mb-8 flex items-center gap-3">
-              <FiTag className="text-blue-500"/>Ưu đãi theo Vùng miền
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {promotionsData.regions.map(promo => (
-                <motion.div key={promo.id} variants={cardVariants}>
-                  <PromotionCard promo={promo} onClaim={handleClaimVoucher} />
-                </motion.div>
-              ))}
-            </div>
-          </section>
-
-          <section>
-            <h2 className="text-3xl font-bold text-neutral-800 dark:text-white mb-8 flex items-center gap-3">
-              <FiTag className="text-blue-500"/>Ưu đãi Đặc biệt
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-1 gap-8">
-              {promotionsData.thematic.map(promo => (
-                <motion.div key={promo.id} variants={cardVariants}>
-                  <PromotionCard promo={promo} onClaim={handleClaimVoucher} />
-                </motion.div>
-              ))}
-            </div>
-          </section>
+          {["events", "regions", "thematic"].map((sectionKey) => (
+            <section key={sectionKey} className="mb-16">
+              <h2 className="text-3xl font-bold text-neutral-800 dark:text-white mb-8 flex items-center gap-3">
+                <FiTag className="text-blue-500"/>
+                {sectionKey === "events" ? "Ưu đãi theo Dịp lễ" : sectionKey === "regions" ? "Ưu đãi theo Vùng miền" : "Ưu đãi Đặc biệt"}
+              </h2>
+              <div className={`grid grid-cols-1 md:grid-cols-${sectionKey==="thematic"?1:2} gap-8`}>
+                {promotionsData[sectionKey].map(promo => (
+                  <motion.div key={promo.id} variants={cardVariants}>
+                    <PromotionCard promo={promo} onClaim={handleClaimVoucher} />
+                  </motion.div>
+                ))}
+              </div>
+            </section>
+          ))}
         </motion.div>
       </div>
 
+      {/* Modal với form Họ tên – SĐT – Email */}
       <VoucherModal promo={selectedPromo} onClose={handleCloseModal} />
     </div>
   );

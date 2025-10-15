@@ -1,3 +1,4 @@
+// src/components/VoucherModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Mail, CheckCircle, Loader2, User, Phone } from 'lucide-react';
@@ -60,7 +61,7 @@ export default function VoucherModal({ promo, onClose }) {
           animate={{ scale: 1, y: 0 }}
           exit={{ scale: 0.9, y: 20 }}
           className="relative bg-white dark:bg-neutral-800 rounded-3xl shadow-2xl w-full max-w-lg p-8"
-          onClick={e => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
         >
           <button
             onClick={onClose}
@@ -93,7 +94,7 @@ export default function VoucherModal({ promo, onClose }) {
                   placeholder="Họ tên"
                   required
                   value={name}
-                  onChange={e => setName(e.target.value)}
+                  onChange={(e) => setName(e.target.value)}
                   className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary outline-none"
                 />
               </div>
@@ -104,7 +105,7 @@ export default function VoucherModal({ promo, onClose }) {
                   placeholder="Số điện thoại"
                   required
                   value={phone}
-                  onChange={e => setPhone(e.target.value)}
+                  onChange={(e) => setPhone(e.target.value)}
                   className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary outline-none"
                 />
               </div>
@@ -115,7 +116,7 @@ export default function VoucherModal({ promo, onClose }) {
                   placeholder="Email"
                   required
                   value={email}
-                  onChange={e => setEmail(e.target.value)}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary outline-none"
                 />
               </div>
