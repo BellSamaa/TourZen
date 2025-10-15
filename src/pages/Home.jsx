@@ -13,7 +13,7 @@ import "swiper/css";
 import "swiper/css/pagination";
 import "swiper/css/navigation";
 
-// 🔽 DỮ LIỆU MỚI CHO CÁC ĐIỂM ĐẾN
+// Dữ liệu cho các điểm đến
 const destinationsData = {
   mienBac: [
     { name: 'Quảng Ninh', image: '/images/destinations/quangninh.jpg', gridClass: 'md:col-span-2 md:row-span-2' },
@@ -34,7 +34,6 @@ const destinationsData = {
     { name: 'Nha Trang', image: '/images/destinations/nhatrang_dest.jpg', gridClass: '' },
     { name: 'Phan Thiết', image: '/images/destinations/phanthiet.jpg', gridClass: 'md:col-span-2' },
   ],
-  // Thêm dữ liệu cho các khu vực khác ở đây...
   mienDongNamBo: [],
   mienTayNamBo: [],
   chauA: [],
@@ -60,7 +59,6 @@ const tabs = [
 export default function Home() {
   const navigate = useNavigate();
   const [selectedPromo, setSelectedPromo] = useState(null);
-  // 🔽 STATE MỚI ĐỂ QUẢN LÝ TAB ĐIỂM ĐẾN
   const [activeTab, setActiveTab] = useState('mienBac');
 
 
@@ -128,7 +126,7 @@ export default function Home() {
                   </motion.h1>
                   <p className="text-lg mb-6">{tour.location}</p>
                   <button
-                    onClick={() => navigate(`/tour/${tour.id}`)}
+                    onClick={() => navigate(`/about-tourzen`)}
                     className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium"
                   >
                     Khám phá ngay
@@ -224,10 +222,8 @@ export default function Home() {
           ))}
         </div>
       </motion.section>
-
-      {/* ================================================================== */}
-      {/* 🏖️ ĐIỂM ĐẾN YÊU THÍCH (PHẦN MỚI) */}
-      {/* ================================================================== */}
+      
+      {/* 🏖️ ĐIỂM ĐẾN YÊU THÍCH */}
       <motion.section
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -285,18 +281,7 @@ export default function Home() {
             </motion.div>
           ))}
         </motion.div>
-
-         {/* Call to action button */}
-        <div className="text-center mt-12">
-            <button
-                onClick={() => navigate('/about-tourzen')}
-                className="bg-blue-600 text-white font-semibold px-8 py-3 rounded-lg hover:bg-blue-700 transition-all duration-300 shadow-lg hover:shadow-blue-300"
-            >
-                Khám Phá Ngay Về TourZen
-            </button>
-        </div>
       </motion.section>
-
 
       {/* 🎁 ƯU ĐÃI ĐẶC BIỆT */}
       <motion.section
