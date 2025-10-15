@@ -6,7 +6,7 @@ import { AnimatePresence } from "framer-motion";
 // Layout & Utility Components
 import Navbar from "./components/Navbar.jsx";
 import Footer from "./components/Footer.jsx";
-import ScrollToTop from "./components/ScrollToTop.jsx"; // << Import component mới
+import ScrollToTop from "./components/ScrollToTop.jsx";
 
 // Page Components
 import Home from "./pages/Home.jsx";
@@ -22,7 +22,8 @@ import Register from "./pages/Register.jsx";
 import AdminDashboard from "./pages/AdminDashboard.jsx";
 import HotelPage from "./pages/HotelPage.jsx";
 import PromotionPage from "./pages/PromotionPage.jsx";
-import Checkout from "./pages/Checkout.jsx"; // ✅ Thêm route mới cho trang thanh toán
+import Checkout from "./pages/Checkout.jsx";
+import About from "./pages/About.jsx"; // 👈 [THÊM MỚI] Import trang Giới thiệu
 
 // Context Providers
 import { CartProvider } from "./context/CartContext.jsx";
@@ -60,11 +61,12 @@ export default function App() {
           <AnimatePresence mode="wait">
             <Routes location={location} key={location.pathname}>
               <Route path="/" element={<Home />} />
+              <Route path="/about-tourzen" element={<About />} /> {/* 👈 [THÊM MỚI] Route cho trang Giới thiệu */}
               <Route path="/tours" element={<TourList />} />
               <Route path="/tour/:id" element={<TourDetail />} />
               <Route path="/booking/:id" element={<Booking />} />
               <Route path="/cart" element={<CartPage />} />
-              <Route path="/checkout" element={<Checkout />} /> {/* ✅ Route mới */}
+              <Route path="/checkout" element={<Checkout />} />
               <Route path="/hotels" element={<HotelPage />} />
               <Route path="/promotions" element={<PromotionPage />} />
               <Route path="/payment/*" element={<Payment />} />

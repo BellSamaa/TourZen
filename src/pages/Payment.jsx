@@ -1,7 +1,7 @@
 // src/pages/Payment.jsx
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useCart } from "../context/CartContext";
+import { useCart } from "../context/CartContext.jsx";
 import emailjs from "@emailjs/browser";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaUserFriends, FaMapMarkerAlt, FaCreditCard, FaShuttleVan, FaUsers } from "react-icons/fa";
@@ -43,9 +43,10 @@ export default function Payment() {
     
     const finalTotal = useMemo(() => 
         total + (useShuttle ? shuttlePrice : 0) - discount
-    , [total, useShuttle, shuttlePrice, discount]);
+    , [total, useShuttle]);
 
     const paymentDeadline = useMemo(() => {
+        if (cartItems.length === 0) return new Date();
         const earliestDate = cartItems
             .map(item => item.departureDates?.[0])
             .filter(Boolean)
@@ -75,15 +76,15 @@ export default function Payment() {
 
         setIsSubmitting(true);
 
-        const tourListForEmail = `<ul>${cartItems.map(item => 
-            `<li><b>${item.title}</b> (${item.adults} NL, ${item.children || 0} TE)</li>`
+        const tour_details_html = `<ul>${cartItems.map(item => 
+            `<li><b>${item.title}</b> (${item.adults} NL, ${item.children || 0} TE, ${item.infants || 0} EB)</li>`
         ).join('')}</ul>`;
 
         const templateParams = {
             customer_name: contactInfo.name,
             customer_email: contactInfo.email,
             customer_phone: contactInfo.phone,
-            tour_title: cartItems.map(i => i.title).join(', '), // Gửi tên các tour
+            tour_details: tour_details_html,
             total_passengers: totalPassengers,
             shuttle_service: useShuttle ? `Có, đón tại: ${shuttleAddress}` : "Không sử dụng",
             total_amount: formatCurrency(finalTotal),
@@ -93,16 +94,15 @@ export default function Payment() {
         try {
             if (paymentMethod === 'direct') {
                 await emailjs.send('service_8w8xy0f', 'template_yqexxe9', { ...templateParams, branch_address: selectedBranch, payment_deadline: formattedDeadline }, 'mXugIgN4N-oD4WVZZ');
-                clearCart();
-                navigate("/payment-success", { state: { method: 'direct', branch: selectedBranch, deadline: formattedDeadline } });
             } else { // VNPay
                 await emailjs.send('service_8w8xy0f', 'template_lph7t7t', templateParams, 'mXugIgN4N-oD4WVZZ');
-                clearCart();
-                navigate("/payment-success", { state: { method: 'vnpay' } });
             }
+            clearCart();
+            navigate("/payment-success", { state: { method: paymentMethod, branch: selectedBranch, deadline: formattedDeadline } });
         } catch (error) {
             console.error("Lỗi khi gửi email:", error);
-            showNotification("Đã có lỗi xảy ra. Vui lòng thử lại sau.");
+            const errorMessage = error.text || "Đã có lỗi xảy ra. Vui lòng thử lại sau.";
+            showNotification(errorMessage);
         } finally {
             setIsSubmitting(false);
         }
@@ -120,7 +120,6 @@ export default function Payment() {
                 </div>
                 <form onSubmit={handleCheckout} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="lg:col-span-2 space-y-6">
-                        {/* THÔNG TIN LIÊN LẠC */}
                         <div className="bg-white p-6 rounded-lg shadow-md">
                             <h2 className="text-xl font-bold mb-4">THÔNG TIN LIÊN LẠC</h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -131,9 +130,6 @@ export default function Payment() {
                             </div>
                         </div>
 
-                        {/* ✅ ĐÃ XÓA BỘ ĐẾM SỐ LƯỢNG HÀNH KHÁCH */}
-
-                        {/* DỊCH VỤ CỘNG THÊM */}
                         <div className="bg-white p-6 rounded-lg shadow-md">
                             <h2 className="text-xl font-bold flex items-center gap-2 mb-4"><FaShuttleVan className="text-blue-500"/>DỊCH VỤ CỘNG THÊM</h2>
                             <div className="bg-blue-50 p-4 rounded-lg">
@@ -155,11 +151,11 @@ export default function Payment() {
                             </div>
                         </div>
 
-                        {/* GHI CHÚ VÀ PHƯƠNG THỨC THANH TOÁN */}
                         <div className="bg-white p-6 rounded-lg shadow-md">
                           <h2 className="text-xl font-bold mb-4">GHI CHÚ</h2>
                           <textarea placeholder="Ghi chú thêm (nếu có)" value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full h-24 px-3 py-2 border border-gray-300 rounded-md"></textarea>
                         </div>
+
                         <div className="bg-white p-6 rounded-lg shadow-md">
                             <h2 className="text-xl font-bold mb-4">PHƯƠNG THỨC THANH TOÁN</h2>
                             <div className="space-y-4">

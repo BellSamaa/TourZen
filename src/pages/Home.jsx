@@ -13,9 +13,56 @@ import "swiper/css";
 import "swiper/css/pagination";
 import "swiper/css/navigation";
 
+// 🔽 DỮ LIỆU MỚI CHO CÁC ĐIỂM ĐẾN
+const destinationsData = {
+  mienBac: [
+    { name: 'Quảng Ninh', image: '/images/destinations/quangninh.jpg', gridClass: 'md:col-span-2 md:row-span-2' },
+    { name: 'Hà Giang', image: '/images/destinations/hagiang.jpg', gridClass: 'md:col-span-2' },
+    { name: 'Lào Cai', image: '/images/destinations/laocai.jpg', gridClass: '' },
+    { name: 'Ninh Bình', image: '/images/destinations/ninhbinh.jpg', gridClass: '' },
+    { name: 'Yên Bái', image: '/images/destinations/yenbai.jpg', gridClass: '' },
+    { name: 'Sơn La', image: '/images/destinations/sonla.jpg', gridClass: 'md:col-span-2' },
+    { name: 'Cao Bằng', image: '/images/destinations/caobang.jpg', gridClass: '' },
+    { name: 'Hải Phòng', image: '/images/destinations/haiphong.jpg', gridClass: '' },
+    { name: 'Hà Nội', image: '/images/destinations/hanoi.jpg', gridClass: '' },
+  ],
+  mienTrung: [
+    { name: 'Đà Nẵng', image: '/images/destinations/danang.jpg', gridClass: 'md:col-span-2 md:row-span-2' },
+    { name: 'Hội An', image: '/images/destinations/hoian.jpg', gridClass: 'md:col-span-2' },
+    { name: 'Huế', image: '/images/destinations/hue.jpg', gridClass: '' },
+    { name: 'Quy Nhơn', image: '/images/destinations/quynhon.jpg', gridClass: '' },
+    { name: 'Nha Trang', image: '/images/destinations/nhatrang_dest.jpg', gridClass: '' },
+    { name: 'Phan Thiết', image: '/images/destinations/phanthiet.jpg', gridClass: 'md:col-span-2' },
+  ],
+  // Thêm dữ liệu cho các khu vực khác ở đây...
+  mienDongNamBo: [],
+  mienTayNamBo: [],
+  chauA: [],
+  chauAu: [],
+  chauMy: [],
+  chauUc: [],
+  chauPhi: [],
+};
+
+const tabs = [
+  { key: 'mienBac', label: 'Miền Bắc' },
+  { key: 'mienTrung', label: 'Miền Trung' },
+  { key: 'mienDongNamBo', label: 'Miền Đông Nam Bộ' },
+  { key: 'mienTayNamBo', label: 'Miền Tây Nam Bộ' },
+  { key: 'chauA', label: 'Châu Á' },
+  { key: 'chauAu', label: 'Châu Âu' },
+  { key: 'chauMy', label: 'Châu Mỹ' },
+  { key: 'chauUc', label: 'Châu Úc' },
+  { key: 'chauPhi', label: 'Châu Phi' },
+];
+
+
 export default function Home() {
   const navigate = useNavigate();
   const [selectedPromo, setSelectedPromo] = useState(null);
+  // 🔽 STATE MỚI ĐỂ QUẢN LÝ TAB ĐIỂM ĐẾN
+  const [activeTab, setActiveTab] = useState('mienBac');
+
 
   // 🌍 Blog mẫu
   const blogs = [
@@ -178,34 +225,78 @@ export default function Home() {
         </div>
       </motion.section>
 
-      {/* 🏖️ ĐIỂM ĐẾN YÊU THÍCH */}
+      {/* ================================================================== */}
+      {/* 🏖️ ĐIỂM ĐẾN YÊU THÍCH (PHẦN MỚI) */}
+      {/* ================================================================== */}
       <motion.section
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.7, duration: 0.8 }}
         className="max-w-7xl mx-auto px-6 mb-20"
       >
-        <h2 className="text-2xl font-semibold mb-6 text-gray-800">🏖️ Điểm Đến Yêu Thích</h2>
-        <div className="grid md:grid-cols-4 gap-6">
-          {[
-            { name: "Phú Quốc", img: "/images/destination_phuquoc.jpg" },
-            { name: "Đà Lạt", img: "/images/destination_dalat.jpg" },
-            { name: "Nha Trang", img: "/images/destination_nhatrang.jpg" },
-            { name: "Hạ Long", img: "/images/destination_halong.jpg" },
-          ].map((dest, index) => (
-            <motion.div
-              key={index}
-              whileHover={{ scale: 1.05 }}
-              className="relative rounded-2xl overflow-hidden shadow-lg cursor-pointer"
+        <div className="text-center mb-10">
+          <h2 className="text-3xl font-bold text-gray-800">ĐIỂM ĐẾN YÊU THÍCH</h2>
+          <p className="text-gray-500 mt-2 max-w-2xl mx-auto">
+            Hãy chọn một điểm đến du lịch nổi tiếng dưới đây để khám phá các chuyến đi độc quyền của chúng tôi với mức giá vô cùng hợp lý.
+          </p>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex justify-center flex-wrap gap-x-6 gap-y-2 mb-8 border-b">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-3 py-2 font-medium text-gray-600 transition-colors duration-300 relative
+                ${activeTab === tab.key ? 'text-blue-600' : 'hover:text-blue-500'}
+              `}
             >
-              <img src={dest.img} alt={dest.name} className="h-48 w-full object-cover" />
-              <div className="absolute inset-0 bg-black bg-opacity-30 flex items-end p-4">
-                <span className="text-white text-lg font-semibold">{dest.name}</span>
+              {tab.label}
+              {activeTab === tab.key && (
+                <motion.div
+                  className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-blue-600"
+                  layoutId="underline"
+                />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Grid of destinations */}
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="grid grid-cols-2 md:grid-cols-4 md:grid-flow-row-dense gap-4 auto-rows-[250px]"
+        >
+          {destinationsData[activeTab].map((dest, index) => (
+            <motion.div
+              key={`${activeTab}-${index}`}
+              className={`relative rounded-2xl overflow-hidden shadow-lg group cursor-pointer ${dest.gridClass}`}
+              whileHover={{ scale: 1.03 }}
+              transition={{ type: 'spring', stiffness: 300 }}
+            >
+              <img src={dest.image} alt={dest.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
+              <div className="absolute bottom-0 left-0 p-5">
+                <h3 className="text-white text-xl font-bold">{dest.name}</h3>
               </div>
             </motion.div>
           ))}
+        </motion.div>
+
+         {/* Call to action button */}
+        <div className="text-center mt-12">
+            <button
+                onClick={() => navigate('/about-tourzen')}
+                className="bg-blue-600 text-white font-semibold px-8 py-3 rounded-lg hover:bg-blue-700 transition-all duration-300 shadow-lg hover:shadow-blue-300"
+            >
+                Khám Phá Ngay Về TourZen
+            </button>
         </div>
       </motion.section>
+
 
       {/* 🎁 ƯU ĐÃI ĐẶC BIỆT */}
       <motion.section
