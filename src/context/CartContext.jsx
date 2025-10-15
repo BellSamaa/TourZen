@@ -31,7 +31,9 @@ export function CartProvider({ children }) {
   // ✅ Thêm tour vào giỏ
   function addToCart({ tour, monthData, adults = 1, children = 0, infants = 0 }) {
     if (!tour || !monthData) return;
-    const key = `${tour.id}_${monthData.month}`; // mỗi tour theo tháng là 1 mục riêng
+
+    const key = `${tour.id}_${monthData.month}`;
+
     setItems((prev) => {
       const found = prev.find((p) => p.key === key);
       if (found) {
@@ -39,30 +41,31 @@ export function CartProvider({ children }) {
           p.key === key
             ? {
                 ...p,
-                adults: p.adults + adults,
-                children: p.children + children,
-                infants: p.infants + infants,
+                adults: Math.max(p.adults + adults, 0),
+                children: Math.max(p.children + children, 0),
+                infants: Math.max(p.infants + infants, 0),
               }
             : p
         );
       }
+
       return [
         ...prev,
         {
           key,
           tourId: tour.id,
-          title: tour.title || tour.name,
+          title: tour.title || tour.name || "Tour chưa đặt tên",
           month: monthData.month,
-          departureDates: monthData.departureDates,
-          adults,
-          children,
-          infants,
-          priceAdult: monthData.prices.adult,
-          priceChild: monthData.prices.child,
-          priceInfant: monthData.prices.infant,
-          singleSupplement: monthData.prices.singleSupplement,
-          image: tour.image,
-          location: tour.location,
+          departureDates: monthData.departureDates || [],
+          adults: Math.max(adults, 0),
+          children: Math.max(children, 0),
+          infants: Math.max(infants, 0),
+          priceAdult: monthData.prices?.adult || 0,
+          priceChild: monthData.prices?.child || 0,
+          priceInfant: monthData.prices?.infant || 0,
+          singleSupplement: monthData.prices?.singleSupplement || 0,
+          image: tour.image || "/images/default.jpg",
+          location: tour.location || "",
         },
       ];
     });
@@ -73,20 +76,25 @@ export function CartProvider({ children }) {
     setItems((prev) => prev.filter((p) => p.key !== key));
   }
 
-  // ✅ Cập nhật số lượng
+  // ✅ Cập nhật số lượng theo key
   function updateQty(key, adults, children, infants) {
     setItems((prev) =>
       prev.map((p) =>
         p.key === key
           ? {
               ...p,
-              adults: Math.max(adults, 0),
-              children: Math.max(children, 0),
-              infants: Math.max(infants, 0),
+              adults: Math.max(adults || 0, 0),
+              children: Math.max(children || 0, 0),
+              infants: Math.max(infants || 0, 0),
             }
           : p
       )
     );
+  }
+
+  // ✅ Cập nhật toàn bộ object item (dùng cho Payment.jsx)
+  function updateCartItem(index, newItem) {
+    setItems((prev) => prev.map((item, i) => (i === index ? newItem : item)));
   }
 
   // ✅ Làm trống giỏ
@@ -94,13 +102,14 @@ export function CartProvider({ children }) {
     setItems([]);
   }
 
-  // ✅ Tính tổng tiền
+  // ✅ Tính tổng tiền an toàn
   const total = items.reduce(
     (sum, i) =>
       sum +
-      i.adults * i.priceAdult +
-      i.children * i.priceChild +
-      i.infants * i.priceInfant,
+      i.adults * (i.priceAdult || 0) +
+      i.children * (i.priceChild || 0) +
+      i.infants * (i.priceInfant || 0) +
+      (i.singleSupplement || 0),
     0
   );
 
@@ -110,6 +119,7 @@ export function CartProvider({ children }) {
     addToCart,
     removeFromCart,
     updateQty,
+    updateCartItem,
     clearCart,
     total,
   };
