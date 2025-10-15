@@ -23,7 +23,7 @@ import AdminDashboard from "./pages/AdminDashboard.jsx";
 import HotelPage from "./pages/HotelPage.jsx";
 import PromotionPage from "./pages/PromotionPage.jsx";
 import Checkout from "./pages/Checkout.jsx";
-import About from "./pages/About.jsx"; // 👈 [THÊM MỚI] Import trang Giới thiệu
+import About from "./pages/About.jsx";
 
 // Context Providers
 import { CartProvider } from "./context/CartContext.jsx";
@@ -56,12 +56,11 @@ export default function App() {
         <ScrollToTop />
         <Navbar />
 
-        {/* Thêm padding-top bằng chiều cao Navbar để không bị che */}
         <main className="pt-[76px] bg-white dark:bg-neutral-900 min-h-screen">
           <AnimatePresence mode="wait">
             <Routes location={location} key={location.pathname}>
               <Route path="/" element={<Home />} />
-              <Route path="/about-tourzen" element={<About />} /> {/* 👈 [THÊM MỚI] Route cho trang Giới thiệu */}
+              <Route path="/about-tourzen" element={<About />} />
               <Route path="/tours" element={<TourList />} />
               <Route path="/tour/:id" element={<TourDetail />} />
               <Route path="/booking/:id" element={<Booking />} />
@@ -74,8 +73,10 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/admin/*" element={<AdminDashboard />} />
-              <Route path="*" element={<NotFound />} />
               <Route path="/vnpay" element={<VNPAYPage />} />
+
+              {/* ✅ SỬA LỖI: Route bắt lỗi 404 (path="*") phải luôn nằm ở cuối cùng */}
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </AnimatePresence>
         </main>

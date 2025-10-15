@@ -1,5 +1,4 @@
-// Dữ liệu đầy đủ cho 20 tour, sẵn sàng để sử dụng.
-// Cấu trúc đã được hoàn thiện để chứa thông tin chi tiết cho từng tháng.
+// src/data/tours_updated.js
 
 export const TOURS = [
   // Tour 1: Phan Thiết
@@ -7,15 +6,18 @@ export const TOURS = [
     id: 1,
     title: "Tour Du Lịch Phan Thiết - Mũi Né - Lâu Đài Rượu Vang",
     location: "Phan Thiết, Mũi Né",
+    region: "Miền Nam",
     image: "/images/tour-phanthiet.jpg",
-    price: "3.590.000",
+    galleryImages: ["/images/tour-phanthiet.jpg", "/images/gallery/phanthiet-1.jpg", "/images/gallery/phanthiet-2.jpg"],
+    price: 3590000,
     duration: "4 ngày 3 đêm",
     rating: 4.8,
+    description: "Tận hưởng biển xanh, cát trắng tại Mũi Né, khám phá đồi cát bay kỳ ảo và thưởng thức rượu vang hảo hạng tại lâu đài Sealinks.",
     itinerary: [
-      "TP.HCM - Phan Thiết - Mũi Né - Đồi Cát Bay.",
-      "Bàu Trắng - Lâu Đài Rượu Vang - Sealinks City.",
-      "Tự do khám phá hoặc tham quan các điểm lân cận.",
-      "Phan Thiết - TP.HCM. Mua sắm đặc sản.",
+      { day: "Ngày 1", description: "TP.HCM - Phan Thiết - Mũi Né - Đồi Cát Bay." },
+      { day: "Ngày 2", description: "Bàu Trắng - Lâu Đài Rượu Vang - Sealinks City." },
+      { day: "Ngày 3", description: "Tự do khám phá hoặc tham quan các điểm lân cận." },
+      { day: "Ngày 4", description: "Phan Thiết - TP.HCM. Mua sắm đặc sản." },
     ],
     departureMonths: [
       {
@@ -70,14 +72,17 @@ export const TOURS = [
     id: 2,
     title: "Khám Phá Đảo Ngọc Phú Quốc - Thiên Đường Biển Nhiệt Đới",
     location: "Phú Quốc, Kiên Giang",
+    region: "Miền Nam",
     image: "/images/tour-phuquoc.jpg",
-    price: "4.250.000",
+    galleryImages: ["/images/tour-phuquoc.jpg", "/images/gallery/phuquoc-1.jpg", "/images/gallery/phuquoc-2.jpg"],
+    price: 4250000,
     duration: "3 ngày 2 đêm",
     rating: 4.9,
+    description: "Đắm mình trong làn nước biển trong xanh tại Bãi Sao, khám phá thế giới san hô đầy màu sắc và thưởng thức hải sản tươi ngon.",
     itinerary: [
-      "Tham quan Đông đảo: Dinh Cậu, vườn tiêu, nhà thùng nước mắm.",
-      "Khám phá Nam đảo: Bãi Sao, nhà tù Phú Quốc, cáp treo Hòn Thơm.",
-      "Tự do mua sắm tại chợ đêm Dinh Cậu, khởi hành về lại.",
+      { day: "Ngày 1", description: "Tham quan Đông đảo: Dinh Cậu, vườn tiêu, nhà thùng nước mắm." },
+      { day: "Ngày 2", description: "Khám phá Nam đảo: Bãi Sao, nhà tù Phú Quốc, cáp treo Hòn Thơm." },
+      { day: "Ngày 3", description: "Tự do mua sắm tại chợ đêm Dinh Cậu, khởi hành về lại." },
     ],
     departureMonths: [
       {
@@ -127,20 +132,23 @@ export const TOURS = [
       }
     ]
   },
-  // Tour 3: Đà Nẵng
+    // Tour 3: Đà Nẵng
   {
     id: 3,
-    title: "Đà Nẵng - Hội An - Bà Nà Hills - Con Đường Di Sản Miền Trung",
+    title: "Đà Nẵng - Hội An - Bà Nà Hills - Con Đường Di Sản",
     location: "Đà Nẵng, Hội An, Quảng Nam",
+    region: "Miền Trung",
     image: "/images/tour-danang.jpg",
-    price: "5.100.000",
+    galleryImages: ["/images/tour-danang.jpg", "/images/gallery/danang-1.jpg", "/images/gallery/danang-2.jpg"],
+    price: 5100000,
     duration: "4 ngày 3 đêm",
     rating: 4.9,
+    description: "Trải nghiệm thành phố đáng sống nhất Việt Nam, dạo bước trên Cầu Vàng, khám phá phố cổ Hội An và thưởng thức ẩm thực đặc sắc.",
     itinerary: [
-        "Đón khách tại Đà Nẵng, tham quan bán đảo Sơn Trà, chùa Linh Ứng.",
-        "Khám phá Bà Nà Hills, Cầu Vàng, Làng Pháp.",
-        "Dạo chơi Phố cổ Hội An về đêm, đi thuyền thả hoa đăng.",
-        "Tự do tắm biển Mỹ Khê, mua sắm đặc sản, tiễn sân bay."
+      { day: "Ngày 1", description: "Đón khách tại Đà Nẵng, tham quan bán đảo Sơn Trà, chùa Linh Ứng." },
+      { day: "Ngày 2", description: "Khám phá Bà Nà Hills, Cầu Vàng, Làng Pháp." },
+      { day: "Ngày 3", description: "Dạo chơi Phố cổ Hội An về đêm, đi thuyền thả hoa đăng." },
+      { day: "Ngày 4", description: "Tự do tắm biển Mỹ Khê, mua sắm đặc sản, tiễn sân bay." }
     ],
     departureMonths: [
       {
@@ -195,16 +203,19 @@ export const TOURS = [
     id: 4,
     title: "Hà Nội - Hạ Long - Ninh Bình - Tuyệt Tác Di Sản Phía Bắc",
     location: "Hà Nội, Vịnh Hạ Long, Ninh Bình",
+    region: "Miền Bắc",
     image: "/images/tour-halong.jpg",
-    price: "6.200.000",
+    galleryImages: ["/images/tour-halong.jpg", "/images/gallery/halong-1.jpg", "/images/gallery/halong-2.jpg"],
+    price: 6200000,
     duration: "5 ngày 4 đêm",
     rating: 4.8,
+    description: "Hành trình khám phá trọn vẹn vẻ đẹp Bắc Bộ với 36 phố phường Hà Nội, kỳ quan Vịnh Hạ Long và non nước hữu tình Ninh Bình.",
     itinerary: [
-        "Tham quan 36 phố phường Hà Nội, Lăng Bác, Hồ Gươm.",
-        "Du thuyền Vịnh Hạ Long, tham quan hang Sửng Sốt, chèo kayak.",
-        "Ngủ đêm trên du thuyền 5 sao giữa vịnh.",
-        "Khám phá Tràng An - Ninh Bình, ngồi thuyền xuyên hang động.",
-        "Chinh phục Hang Múa, ngắm toàn cảnh Tam Cốc, trở về Hà Nội."
+        { day: "Ngày 1", description: "Tham quan 36 phố phường Hà Nội, Lăng Bác, Hồ Gươm." },
+        { day: "Ngày 2", description: "Du thuyền Vịnh Hạ Long, tham quan hang Sửng Sốt, chèo kayak." },
+        { day: "Ngày 3", description: "Ngủ đêm trên du thuyền 5 sao giữa vịnh." },
+        { day: "Ngày 4", description: "Khám phá Tràng An - Ninh Bình, ngồi thuyền xuyên hang động." },
+        { day: "Ngày 5", description: "Chinh phục Hang Múa, ngắm toàn cảnh Tam Cốc, trở về Hà Nội." }
     ],
     departureMonths: [
       {
@@ -259,14 +270,17 @@ export const TOURS = [
     id: 5,
     title: "Đà Lạt - Thành Phố Ngàn Hoa Mộng Mơ",
     location: "Đà Lạt, Lâm Đồng",
+    region: "Miền Nam",
     image: "/images/tour-dalat.jpg",
-    price: "2.990.000",
+    galleryImages: ["/images/tour-dalat.jpg", "/images/gallery/dalat-1.jpg", "/images/gallery/dalat-2.jpg"],
+    price: 2990000,
     duration: "3 ngày 2 đêm",
     rating: 4.7,
+    description: "Lạc bước giữa thành phố ngàn hoa với không khí se lạnh, những quán cà phê view đồi và các điểm check-in không thể bỏ lỡ.",
     itinerary: [
-        "Khám phá Thác Datanla, Thiền Viện Trúc Lâm, Hồ Tuyền Lâm.",
-        "Check-in tại Quảng trường Lâm Viên, Ga Đà Lạt, Vườn hoa thành phố.",
-        "Thưởng thức đặc sản tại chợ đêm Đà Lạt, mua sắm quà lưu niệm."
+        { day: "Ngày 1", description: "Khám phá Thác Datanla, Thiền Viện Trúc Lâm, Hồ Tuyền Lâm." },
+        { day: "Ngày 2", description: "Check-in tại Quảng trường Lâm Viên, Ga Đà Lạt, Vườn hoa thành phố." },
+        { day: "Ngày 3", description: "Thưởng thức đặc sản tại chợ đêm Đà Lạt, mua sắm quà lưu niệm." }
     ],
     departureMonths: [
       {
@@ -321,14 +335,17 @@ export const TOURS = [
     id: 6,
     title: "Sapa - Chinh Phục Fansipan - Thị Trấn Trong Sương",
     location: "Sapa, Lào Cai",
+    region: "Miền Bắc",
     image: "/images/tour-sapa.jpg",
-    price: "4.500.000",
+    galleryImages: ["/images/tour-sapa.jpg", "/images/gallery/sapa-1.jpg", "/images/gallery/sapa-2.jpg"],
+    price: 4500000,
     duration: "3 ngày 2 đêm",
     rating: 4.8,
+    description: "Chạm tay vào 'Nóc nhà Đông Dương', săn mây trên đỉnh Fansipan và khám phá nét văn hóa độc đáo của các dân tộc thiểu số.",
     itinerary: [
-        "Di chuyển Hà Nội - Sapa bằng xe giường nằm cao cấp.",
-        "Chinh phục 'Nóc nhà Đông Dương' bằng cáp treo Fansipan.",
-        "Tham quan bản Cát Cát, nhà thờ Đá, chợ Sapa."
+        { day: "Ngày 1", description: "Di chuyển Hà Nội - Sapa bằng xe giường nằm cao cấp." },
+        { day: "Ngày 2", description: "Chinh phục 'Nóc nhà Đông Dương' bằng cáp treo Fansipan." },
+        { day: "Ngày 3", description: "Tham quan bản Cát Cát, nhà thờ Đá, chợ Sapa." }
     ],
     departureMonths: [
       {
@@ -383,15 +400,18 @@ export const TOURS = [
     id: 7,
     title: "Quy Nhơn - Phú Yên - Xứ Nẫu Biển Xanh Cát Trắng",
     location: "Quy Nhơn, Bình Định - Phú Yên",
+    region: "Miền Trung",
     image: "/images/tour-quynhon.jpg",
-    price: "3.800.000",
+    galleryImages: ["/images/tour-quynhon.jpg", "/images/gallery/quynhon-1.jpg", "/images/gallery/quynhon-2.jpg"],
+    price: 3800000,
     duration: "4 ngày 3 đêm",
     rating: 4.7,
+    description: "Hành trình về 'xứ Nẫu', chiêm ngưỡng vẻ đẹp độc đáo của Gành Đá Đĩa và thả hồn vào khung cảnh phim trường 'Tôi thấy hoa vàng trên cỏ xanh'.",
     itinerary: [
-        "Khám phá Eo Gió, Kỳ Co - 'Maldives của Việt Nam'.",
-        "Tham quan Tháp Đôi, Ghềnh Ráng Tiên Sa, mộ Hàn Mặc Tử.",
-        "Di chuyển đến Phú Yên, check-in tại Gành Đá Đĩa, Bãi Xép (phim trường 'Tôi thấy hoa vàng trên cỏ xanh').",
-        "Tham quan Mũi Điện - cực Đông của Tổ quốc, Tháp Nghinh Phong."
+        { day: "Ngày 1", description: "Khám phá Eo Gió, Kỳ Co - 'Maldives của Việt Nam'." },
+        { day: "Ngày 2", description: "Tham quan Tháp Đôi, Ghềnh Ráng Tiên Sa, mộ Hàn Mặc Tử." },
+        { day: "Ngày 3", description: "Di chuyển đến Phú Yên, check-in tại Gành Đá Đĩa, Bãi Xép." },
+        { day: "Ngày 4", description: "Tham quan Mũi Điện - cực Đông của Tổ quốc, Tháp Nghinh Phong." }
     ],
     departureMonths: [
       {
@@ -446,14 +466,17 @@ export const TOURS = [
     id: 8,
     title: "Nha Trang - Hòn Tằm - VinWonders - Vịnh Biển Thiên Đường",
     location: "Nha Trang, Khánh Hòa",
+    region: "Miền Trung",
     image: "/images/tour-nhatrang.jpg",
-    price: "3.200.000",
+    galleryImages: ["/images/tour-nhatrang.jpg", "/images/gallery/nhatrang-1.jpg", "/images/gallery/nhatrang-2.jpg"],
+    price: 3200000,
     duration: "3 ngày 2 đêm",
     rating: 4.8,
+    description: "Vui chơi thả ga tại VinWonders, thư giãn với dịch vụ tắm bùn khoáng cao cấp và khám phá một trong những vịnh biển đẹp nhất thế giới.",
     itinerary: [
-        "Tham quan Viện Hải dương học, Chùa Long Sơn, Tháp Bà Ponagar.",
-        "Vui chơi không giới hạn tại VinWonders Nha Trang trên đảo Hòn Tre.",
-        "Thư giãn và tắm bùn khoáng tại khu du lịch Hòn Tằm."
+        { day: "Ngày 1", description: "Tham quan Viện Hải dương học, Chùa Long Sơn, Tháp Bà Ponagar." },
+        { day: "Ngày 2", description: "Vui chơi không giới hạn tại VinWonders Nha Trang trên đảo Hòn Tre." },
+        { day: "Ngày 3", description: "Thư giãn và tắm bùn khoáng tại khu du lịch Hòn Tằm." }
     ],
     departureMonths: [
       {
@@ -508,14 +531,16 @@ export const TOURS = [
     id: 9,
     title: "Côn Đảo - Về Miền Đất Thiêng Liêng Hùng Vĩ",
     location: "Côn Đảo, Bà Rịa - Vũng Tàu",
+    region: "Miền Nam",
     image: "/images/tour-condao.jpg",
-    price: "5.500.000",
+    galleryImages: ["/images/tour-condao.jpg", "/images/gallery/condao-1.jpg", "/images/gallery/condao-2.jpg"],
+    price: 5500000,
     duration: "2 ngày 1 đêm",
     rating: 4.9,
+    description: "Hành trình tâm linh về với miền đất thiêng, viếng mộ chị Võ Thị Sáu, tìm hiểu lịch sử đấu tranh hào hùng và khám phá vẻ đẹp hoang sơ của Côn Đảo.",
     itinerary: [
-        "Viếng Nghĩa trang Hàng Dương, mộ chị Võ Thị Sáu.",
-        "Tham quan hệ thống nhà tù Côn Đảo, chùa Núi Một.",
-        "Khám phá Bãi Đầm Trầu, lặn ngắm san hô tại Hòn Bảy Cạnh."
+        { day: "Ngày 1", description: "Viếng Nghĩa trang Hàng Dương, mộ chị Võ Thị Sáu. Tham quan hệ thống nhà tù Côn Đảo." },
+        { day: "Ngày 2", description: "Khám phá Bãi Đầm Trầu, lặn ngắm san hô tại Hòn Bảy Cạnh và trở về." }
     ],
     departureMonths: [
       {
@@ -570,15 +595,18 @@ export const TOURS = [
     id: 10,
     title: "Hà Giang - Cung Đường Hạnh Phúc - Mùa Hoa Tam Giác Mạch",
     location: "Hà Giang",
+    region: "Miền Bắc",
     image: "/images/tour-hagiang.jpg",
-    price: "3.900.000",
+    galleryImages: ["/images/tour-hagiang.jpg", "/images/gallery/hagiang-1.jpg", "/images/gallery/hagiang-2.jpg"],
+    price: 3900000,
     duration: "4 ngày 3 đêm",
     rating: 4.9,
+    description: "Chinh phục những cung đường đèo hùng vĩ, check-in Cột cờ Lũng Cú, đi thuyền trên sông Nho Quế và đắm chìm trong sắc hoa tam giác mạch.",
     itinerary: [
-        "Chinh phục Cột cờ Lũng Cú, điểm cực Bắc của Tổ quốc.",
-        "Đi thuyền trên sông Nho Quế, ngắm hẻm Tu Sản hùng vĩ.",
-        "Check-in tại Dinh thự họ Vương, Phố cổ Đồng Văn.",
-        "Ngắm hoa tam giác mạch trên các sườn đồi (tháng 10, 11)."
+        { day: "Ngày 1", description: "Hà Nội - Hà Giang - Cổng trời Quản Bạ." },
+        { day: "Ngày 2", description: "Check-in tại Dinh thự họ Vương, Cột cờ Lũng Cú, Phố cổ Đồng Văn." },
+        { day: "Ngày 3", description: "Chinh phục Mã Pí Lèng, đi thuyền trên sông Nho Quế, ngắm hẻm Tu Sản." },
+        { day: "Ngày 4", description: "Hà Giang - Hà Nội, ngắm hoa tam giác mạch trên đường (vào mùa)." }
     ],
     departureMonths: [
       {
@@ -633,14 +661,17 @@ export const TOURS = [
     id: 11,
     title: "Huế - Kinh Thành Cổ Kính - Vẻ Đẹp Dòng Sông Hương",
     location: "Huế",
+    region: "Miền Trung",
     image: "/images/tour-hue.jpg",
-    price: "2.800.000",
+    galleryImages: ["/images/tour-hue.jpg", "/images/gallery/hue-1.jpg", "/images/gallery/hue-2.jpg"],
+    price: 2800000,
     duration: "3 ngày 2 đêm",
     rating: 4.6,
+    description: "Trở về quá khứ với kinh thành Huế uy nghiêm, lăng tẩm cổ kính và thả hồn theo điệu ca Huế trên dòng sông Hương thơ mộng.",
     itinerary: [
-        "Tham quan Đại Nội Huế, lăng Khải Định, lăng Minh Mạng.",
-        "Đi thuyền rồng trên sông Hương, nghe ca Huế.",
-        "Viếng Chùa Thiên Mụ, tham quan Làng hương Thủy Xuân."
+        { day: "Ngày 1", description: "Tham quan Đại Nội Huế, lăng Khải Định, lăng Minh Mạng." },
+        { day: "Ngày 2", description: "Đi thuyền rồng trên sông Hương, nghe ca Huế." },
+        { day: "Ngày 3", description: "Viếng Chùa Thiên Mụ, tham quan Làng hương Thủy Xuân." }
     ],
     departureMonths: [
       {
@@ -695,15 +726,16 @@ export const TOURS = [
     id: 12,
     title: "Miền Tây - Mỹ Tho - Bến Tre - Cần Thơ - Trải Nghiệm Sông Nước",
     location: "Mỹ Tho, Bến Tre, Cần Thơ",
+    region: "Miền Nam",
     image: "/images/tour-mientay.jpg",
-    price: "2.500.000",
+    galleryImages: ["/images/tour-mientay.jpg", "/images/gallery/mientay-1.jpg", "/images/gallery/mientay-2.jpg"],
+    price: 2500000,
     duration: "2 ngày 1 đêm",
     rating: 4.5,
+    description: "Về với miền Tây sông nước, đi xuồng ba lá, nghe đờn ca tài tử, thưởng thức trái cây tại vườn và trải nghiệm không khí nhộn nhịp của chợ nổi Cái Răng.",
     itinerary: [
-        "Đi thuyền trên sông Tiền, tham quan 4 cồn Long, Lân, Quy, Phụng.",
-        "Nghe đờn ca tài tử, thưởng thức trái cây tại vườn, uống trà mật ong.",
-        "Trải nghiệm đi xuồng ba lá, tham quan lò kẹo dừa.",
-        "Tham quan Chợ nổi Cái Răng (Cần Thơ) vào sáng sớm."
+        { day: "Ngày 1", description: "Đi thuyền trên sông Tiền, tham quan 4 cồn Long, Lân, Quy, Phụng, nghe đờn ca tài tử." },
+        { day: "Ngày 2", description: "Tham quan Chợ nổi Cái Răng (Cần Thơ) vào sáng sớm và trở về TP.HCM." }
     ],
     departureMonths: [
       {
@@ -758,15 +790,17 @@ export const TOURS = [
     id: 13,
     title: "Hải Phòng - Cát Bà - Vịnh Lan Hạ - Hòn Đảo Ngọc Miền Bắc",
     location: "Cát Bà, Hải Phòng",
+    region: "Miền Bắc",
     image: "/images/tour-catba.jpg",
-    price: "3.100.000",
+    galleryImages: ["/images/tour-catba.jpg", "/images/gallery/catba-1.jpg", "/images/gallery/catba-2.jpg"],
+    price: 3100000,
     duration: "3 ngày 2 đêm",
     rating: 4.6,
+    description: "Khám phá vẻ đẹp hoang sơ của Vịnh Lan Hạ, trekking Vườn Quốc gia Cát Bà và thư giãn trên những bãi biển trong xanh.",
     itinerary: [
-        "Di chuyển Hà Nội - Hải Phòng - Cát Bà bằng xe và phà/cáp treo.",
-        "Tắm biển tại các bãi Cát Cò 1, 2, 3.",
-        "Du thuyền khám phá Vịnh Lan Hạ, làng chài Cái Bèo.",
-        "Trekking Vườn Quốc gia Cát Bà, tham quan Pháo đài Thần công."
+        { day: "Ngày 1", description: "Di chuyển Hà Nội - Cát Bà, tắm biển tại các bãi Cát Cò." },
+        { day: "Ngày 2", description: "Du thuyền khám phá Vịnh Lan Hạ, làng chài Cái Bèo, chèo kayak." },
+        { day: "Ngày 3", description: "Trekking Vườn Quốc gia Cát Bà, tham quan Pháo đài Thần công và trở về." }
     ],
     departureMonths: [
       {
@@ -821,15 +855,17 @@ export const TOURS = [
     id: 14,
     title: "Mai Châu - Pù Luông - Về Chốn Bình Yên Giữa Núi Rừng",
     location: "Mai Châu, Hòa Bình - Pù Luông, Thanh Hóa",
+    region: "Miền Bắc",
     image: "/images/tour-puluong.jpg",
-    price: "2.900.000",
+    galleryImages: ["/images/tour-puluong.jpg", "/images/gallery/puluong-1.jpg", "/images/gallery/puluong-2.jpg"],
+    price: 2900000,
     duration: "3 ngày 2 đêm",
     rating: 4.8,
+    description: "'Trốn phố về quê' với thung lũng Mai Châu yên bình, những thửa ruộng bậc thang Pù Luông mùa lúa chín và không khí trong lành của núi rừng.",
     itinerary: [
-        "Khám phá thung lũng Mai Châu, đạp xe qua bản Lác, bản Poom Cọong.",
-        "Nghỉ tại homestay nhà sàn, thưởng thức văn nghệ và rượu cần.",
-        "Trekking tại Khu bảo tồn thiên nhiên Pù Luông, ngắm ruộng bậc thang.",
-        "Check-in tại guồng nước và thác Hiêu."
+        { day: "Ngày 1", description: "Khám phá thung lũng Mai Châu, đạp xe qua bản Lác, bản Poom Cọong." },
+        { day: "Ngày 2", description: "Trekking tại Khu bảo tồn Pù Luông, ngắm ruộng bậc thang, check-in guồng nước." },
+        { day: "Ngày 3", description: "Tham quan thác Hiêu và trở về Hà Nội." }
     ],
     departureMonths: [
       {
@@ -884,14 +920,17 @@ export const TOURS = [
     id: 15,
     title: "Phong Nha - Kẻ Bàng - Khám Phá Vương Quốc Hang Động",
     location: "Phong Nha, Quảng Bình",
+    region: "Miền Trung",
     image: "/images/tour-phongnha.jpg",
-    price: "4.200.000",
+    galleryImages: ["/images/tour-phongnha.jpg", "/images/gallery/phongnha-1.jpg", "/images/gallery/phongnha-2.jpg"],
+    price: 4200000,
     duration: "3 ngày 2 đêm",
     rating: 4.9,
+    description: "Chiêm ngưỡng vẻ đẹp kỳ vĩ của Động Phong Nha và Động Thiên Đường, đồng thời thử thách bản thân với trò Zipline và tắm bùn tại Hang Tối.",
     itinerary: [
-        "Tham quan Động Phong Nha - ngồi thuyền đi vào trong động.",
-        "Khám phá Động Thiên Đường - 'hoàng cung trong lòng đất'.",
-        "Trải nghiệm Zipline và tắm bùn tại Sông Chày - Hang Tối."
+        { day: "Ngày 1", description: "Tham quan Động Phong Nha - ngồi thuyền đi vào trong động." },
+        { day: "Ngày 2", description: "Khám phá Động Thiên Đường - 'hoàng cung trong lòng đất'." },
+        { day: "Ngày 3", description: "Trải nghiệm Zipline và tắm bùn tại Sông Chày - Hang Tối." }
     ],
     departureMonths: [
       {
@@ -946,14 +985,16 @@ export const TOURS = [
     id: 16,
     title: "Đảo Lý Sơn - 'Vương quốc tỏi' Giữa Biển Khơi",
     location: "Đảo Lý Sơn, Quảng Ngãi",
+    region: "Miền Trung",
     image: "/images/tour-lyson.jpg",
-    price: "3.500.000",
+    galleryImages: ["/images/tour-lyson.jpg", "/images/gallery/lyson-1.jpg", "/images/gallery/lyson-2.jpg"],
+    price: 3500000,
     duration: "2 ngày 1 đêm",
     rating: 4.6,
+    description: "Khám phá hòn đảo tiền tiêu của Tổ quốc, chiêm ngưỡng Cổng Tò Vò độc đáo, lặn ngắm san hô ở Đảo Bé và thưởng thức đặc sản tỏi Lý Sơn.",
     itinerary: [
-        "Di chuyển bằng tàu cao tốc ra đảo lớn.",
-        "Tham quan Chùa Hang, Cổng Tò Vò, đỉnh Thới Lới.",
-        "Đi cano ra Đảo Bé, tự do tắm biển, lặn ngắm san hô."
+        { day: "Ngày 1", description: "Di chuyển ra đảo lớn, tham quan Chùa Hang, Cổng Tò Vò, đỉnh Thới Lới." },
+        { day: "Ngày 2", description: "Đi cano ra Đảo Bé, tự do tắm biển, lặn ngắm san hô và trở về đất liền." }
     ],
     departureMonths: [
       {
@@ -1008,14 +1049,16 @@ export const TOURS = [
     id: 17,
     title: "Vũng Tàu - Kỳ Nghỉ Cuối Tuần Tại Thành Phố Biển",
     location: "Vũng Tàu",
+    region: "Miền Nam",
     image: "/images/tour-vungtau.jpg",
-    price: "1.500.000",
+    galleryImages: ["/images/tour-vungtau.jpg", "/images/gallery/vungtau-1.jpg", "/images/gallery/vungtau-2.jpg"],
+    price: 1500000,
     duration: "2 ngày 1 đêm",
     rating: 4.4,
+    description: "Chuyến đi 'đổi gió' cuối tuần nhanh chóng và tiện lợi, tận hưởng không khí biển, thưởng thức hải sản tươi ngon và check-in các điểm nổi tiếng.",
     itinerary: [
-        "Tắm biển tại Bãi Sau, tham quan Tượng Chúa Kitô Vua.",
-        "Check-in tại ngọn hải đăng Vũng Tàu, Mũi Nghinh Phong.",
-        "Thưởng thức hải sản tươi sống và bánh khọt."
+        { day: "Ngày 1", description: "Tắm biển tại Bãi Sau, tham quan Tượng Chúa Kitô Vua, Mũi Nghinh Phong." },
+        { day: "Ngày 2", description: "Check-in tại ngọn hải đăng, thưởng thức bánh khọt và trở về." }
     ],
     departureMonths: [
       {
@@ -1070,14 +1113,17 @@ export const TOURS = [
     id: 18,
     title: "Tây Nguyên - Buôn Ma Thuột - Tiếng Gọi Đại Ngàn",
     location: "Buôn Ma Thuột, Đắk Lắk",
+    region: "Miền Trung",
     image: "/images/tour-taynguyen.jpg",
-    price: "3.200.000",
+    galleryImages: ["/images/tour-taynguyen.jpg", "/images/gallery/taynguyen-1.jpg", "/images/gallery/taynguyen-2.jpg"],
+    price: 3200000,
     duration: "3 ngày 2 đêm",
     rating: 4.7,
+    description: "Lắng nghe tiếng gọi đại ngàn, khám phá thủ phủ cà phê, chiêm ngưỡng những dòng thác hùng vĩ và trải nghiệm văn hóa cồng chiêng đặc sắc.",
     itinerary: [
-        "Tham quan Làng cà phê Trung Nguyên, Bảo tàng Thế giới Cà phê.",
-        "Khám phá cụm thác Dray Nur, Dray Sáp.",
-        "Trải nghiệm cưỡi voi, đi thuyền độc mộc tại Hồ Lắk."
+        { day: "Ngày 1", description: "Tham quan Làng cà phê Trung Nguyên, Bảo tàng Thế giới Cà phê." },
+        { day: "Ngày 2", description: "Khám phá cụm thác Dray Nur, Dray Sáp." },
+        { day: "Ngày 3", description: "Trải nghiệm cưỡi voi, đi thuyền độc mộc tại Hồ Lắk." }
     ],
     departureMonths: [
       {
@@ -1132,14 +1178,16 @@ export const TOURS = [
     id: 19,
     title: "Mộc Châu - Thảo Nguyên Xanh Mướt Mùa Mận Chín",
     location: "Mộc Châu, Sơn La",
+    region: "Miền Bắc",
     image: "/images/tour-mocchau.jpg",
-    price: "2.500.000",
+    galleryImages: ["/images/tour-mocchau.jpg", "/images/gallery/mocchau-1.jpg", "/images/gallery/mocchau-2.jpg"],
+    price: 2500000,
     duration: "2 ngày 1 đêm",
     rating: 4.7,
+    description: "Đắm mình trong vẻ đẹp của đồi chè trái tim, khám phá những thung lũng hoa mận trắng xóa và tận hưởng không khí trong lành của cao nguyên.",
     itinerary: [
-        "Check-in tại đồi chè trái tim, thác Dải Yếm.",
-        "Tham quan rừng thông Bản Áng.",
-        "Khám phá thung lũng mận Nà Ka, tự tay hái mận (vào mùa)."
+        { day: "Ngày 1", description: "Hà Nội - Mộc Châu, check-in tại đồi chè trái tim, thác Dải Yếm." },
+        { day: "Ngày 2", description: "Tham quan rừng thông Bản Áng, thung lũng mận Nà Ka và trở về." }
     ],
     departureMonths: [
       {
@@ -1194,15 +1242,17 @@ export const TOURS = [
     id: 20,
     title: "Cần Thơ - Châu Đốc - Hành Trình Về Miền Tây Tâm Linh",
     location: "Cần Thơ, An Giang",
+    region: "Miền Nam",
     image: "/images/tour-chaudoc.jpg",
-    price: "2.800.000",
+    galleryImages: ["/images/tour-chaudoc.jpg", "/images/gallery/chaudoc-1.jpg", "/images/gallery/chaudoc-2.jpg"],
+    price: 2800000,
     duration: "3 ngày 2 đêm",
     rating: 4.6,
+    description: "Hành trình kết hợp khám phá văn hóa sông nước Cần Thơ và du lịch tâm linh tại Châu Đốc, viếng Miếu Bà Chúa Xứ và khám phá rừng tràm Trà Sư.",
     itinerary: [
-        "Tham quan Chợ nổi Cái Răng, Thiền viện Trúc Lâm Phương Nam (Cần Thơ).",
-        "Di chuyển đến Châu Đốc, viếng Miếu Bà Chúa Xứ Núi Sam, Lăng Thoại Ngọc Hầu.",
-        "Khám phá Rừng tràm Trà Sư, đi xuồng len lỏi giữa rừng tràm.",
-        "Mua sắm đặc sản mắm tại chợ Châu Đốc."
+        { day: "Ngày 1", description: "Tham quan Chợ nổi Cái Răng, Thiền viện Trúc Lâm Phương Nam (Cần Thơ)." },
+        { day: "Ngày 2", description: "Di chuyển đến Châu Đốc, viếng Miếu Bà Chúa Xứ Núi Sam, Lăng Thoại Ngọc Hầu." },
+        { day: "Ngày 3", description: "Khám phá Rừng tràm Trà Sư và mua sắm đặc sản mắm." }
     ],
     departureMonths: [
       {
@@ -1253,4 +1303,3 @@ export const TOURS = [
     ]
   },
 ];
-
