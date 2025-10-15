@@ -51,9 +51,6 @@ export default function Home() {
   // Lọc chính xác các tour được đánh dấu là "nổi bật"
   const featuredTours = TOURS.filter(tour => tour.isFeatured).slice(0, 8);
   
-  // Lọc chính xác các tour được đánh dấu là "bán chạy nhất"
-  const bestsellingTours = TOURS.filter(tour => tour.isBestseller).slice(0, 4);
-
   // Dữ liệu cho mục "Tại sao chọn chúng tôi"
   const features = [
     { icon: <FaAward />, title: "Chất Lượng Hàng Đầu", description: "Chúng tôi cam kết mang đến những trải nghiệm vượt trội và dịch vụ đẳng cấp." },
@@ -85,8 +82,6 @@ export default function Home() {
                   <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2 }} className="text-lg mb-6 drop-shadow-lg">
                     <FaMapMarkerAlt className="inline mr-2" />{tour.location}
                   </motion.p>
-                  
-                  {/* === SỬA LẠI CHÍNH XÁC Ở ĐÂY === */}
                   <motion.button 
                     initial={{ opacity: 0 }} 
                     animate={{ opacity: 1 }} 
@@ -96,7 +91,6 @@ export default function Home() {
                   >
                     Khám phá ngay
                   </motion.button>
-
                 </div>
               </div>
             </SwiperSlide>
@@ -192,38 +186,8 @@ export default function Home() {
         </div>
       </section>
       
-      {/* TOUR BÁN CHẠY NHẤT */}
+      {/* TẠI SAO CHỌN CHÚNG TÔI */}
       <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-            <h2 className="text-3xl font-bold mb-4">🔥 Tour Bán Chạy Nhất</h2>
-            <p className="text-slate-500 max-w-2xl mx-auto mb-12">Đừng bỏ lỡ cơ hội trải nghiệm những chuyến đi hot nhất đã được kiểm chứng bởi hàng ngàn khách hàng.</p>
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {bestsellingTours.map((tour) => (
-                <motion.div key={tour.id} whileHover={{ y: -8 }} className="bg-white rounded-2xl shadow-md hover:shadow-xl overflow-hidden cursor-pointer transition-all duration-300" onClick={() => navigate(`/tour/${tour.id}`)}>
-                    <div className="relative">
-                        <img src={tour.image} alt={tour.title} className="h-56 w-full object-cover" />
-                        <div className="absolute top-3 left-3 bg-red-500 text-white text-xs font-semibold px-3 py-1 rounded-full">{tour.duration}</div>
-                    </div>
-                    <div className="p-5 text-left">
-                        <h3 className="font-semibold text-lg truncate">{tour.title}</h3>
-                        <p className="text-slate-500 text-sm mt-1 flex items-center gap-2">
-                            <FaMapMarkerAlt className="text-blue-500" /> {tour.location}
-                        </p>
-                        <div className="flex justify-between items-center mt-4">
-                            <span className="text-xl font-bold text-red-600">{tour.price.toLocaleString("vi-VN")}₫</span>
-                            <div className="flex items-center gap-1 text-amber-500">
-                                <FaStar /> <span className="text-slate-600 font-semibold">{tour.rating}</span>
-                            </div>
-                        </div>
-                    </div>
-                </motion.div>
-            ))}
-            </div>
-        </div>
-      </section>
-      
-      {/* TẠI SAO CHỌN CHÚNG TÔI (ĐÃ DI CHUYỂN XUỐNG CUỐI) */}
-      <section className="py-20">
         <div className="max-w-7xl mx-auto px-6 text-center">
             <h2 className="text-3xl font-bold mb-4">💖 Tại Sao Chọn TourZen?</h2>
             <p className="text-slate-500 max-w-2xl mx-auto mb-12">Chúng tôi không chỉ bán tour, chúng tôi mang đến những hành trình và kỷ niệm trọn đời.</p>
