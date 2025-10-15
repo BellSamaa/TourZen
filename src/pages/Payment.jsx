@@ -1,148 +1,180 @@
 // src/pages/Payment.jsx
-import React from "react";
-import { useCart } from "../context/CartContext";
-import { FaTrash } from "react-icons/fa";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import Slider from "react-slick";
+import { FaGift, FaPlaneDeparture, FaCreditCard, FaPlus, FaMinus } from "react-icons/fa";
+import { MdFamilyRestroom } from "react-icons/md";
 import { motion } from "framer-motion";
+import { useCart } from "../context/CartContext";
+import "slick-carousel/slick/slick.css";
+import "slick-carousel/slick/slick-theme.css";
 
-// Format tiền
+// Helper định dạng tiền tệ
 const formatCurrency = (number) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(number);
+  typeof number === "number"
+    ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(number)
+    : "N/A";
 
 const Payment = () => {
-  const { items, removeFromCart, updateQty, clearCart, total } = useCart();
+  const navigate = useNavigate();
+  const { cartItems, removeFromCart, updateCartItem } = useCart();
+  const [notification, setNotification] = useState("");
 
-  if (items.length === 0) {
+  const sliderSettings = {
+    dots: true,
+    infinite: true,
+    speed: 700,
+    slidesToShow: 1,
+    slidesToScroll: 1,
+    autoplay: true,
+    autoplaySpeed: 4000,
+    fade: true,
+  };
+
+  const handleQuantityChange = (index, type, delta) => {
+    const item = cartItems[index];
+    let newValue = item[type] + delta;
+    if (newValue < 0) newValue = 0;
+    updateCartItem(index, { ...item, [type]: newValue });
+  };
+
+  const calculateTotal = (item) => {
+    const { adults, children, infants, monthData } = item;
+    const prices = monthData.prices;
+    let total =
+      adults * prices.adult +
+      children * prices.child +
+      infants * prices.infant +
+      prices.singleSupplement;
+    return total;
+  };
+
+  const handleCheckout = () => {
+    if (cartItems.length === 0) {
+      setNotification("Giỏ hàng trống, không thể thanh toán.");
+      setTimeout(() => setNotification(""), 3000);
+      return;
+    }
+    navigate("/checkout"); // giả định có trang checkout
+  };
+
+  if (cartItems.length === 0) {
     return (
-      <motion.div
-        className="text-center py-20 text-xl"
+      <motion.div className="text-center text-xl py-20 text-gray-500"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
       >
-        Giỏ hàng trống. Vui lòng chọn tour trước khi thanh toán.
+        Giỏ hàng trống. Vui lòng chọn tour trước.
       </motion.div>
     );
   }
 
   return (
-    <motion.div
-      className="max-w-6xl mx-auto p-6 space-y-8"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+    <motion.div className="text-gray-800 max-w-6xl mx-auto p-4 md:p-6"
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -30 }}
+      transition={{ duration: 0.6 }}
     >
-      <h1 className="text-3xl font-bold text-center mb-6">Thanh Toán</h1>
+      <h1 className="text-3xl font-bold mb-6 text-center text-blue-800">Thanh Toán Tour</h1>
 
-      {items.map((item) => (
-        <div key={item.key} className="bg-white rounded-2xl shadow p-5 flex flex-col md:flex-row gap-4">
-          <img
-            src={item.image}
-            alt={item.title}
-            className="w-full md:w-48 h-32 md:h-40 object-cover rounded-xl"
-          />
-          <div className="flex-1 flex flex-col justify-between">
+      {/* Hiển thị từng tour trong giỏ */}
+      {cartItems.map((item, index) => (
+        <motion.div key={index} className="mb-8 p-5 bg-white rounded-2xl shadow-lg"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6 }}
+        >
+          {/* Hero Slider */}
+          <Slider {...sliderSettings} className="mb-4">
+            {[item.tour.image, "/images/travel1.jpg", "/images/travel2.jpg"].map((src, i) => (
+              <div key={i}>
+                <img
+                  src={src}
+                  alt={`${item.tour.title} - ảnh ${i + 1}`}
+                  className="rounded-xl mx-auto shadow-lg h-[300px] md:h-[500px] object-cover w-full"
+                />
+              </div>
+            ))}
+          </Slider>
+
+          {/* Thông tin tour */}
+          <h2 className="text-xl font-bold mb-2">{item.tour.title}</h2>
+          <p className="mb-2 text-gray-700">Tháng khởi hành: {item.monthData.month}</p>
+
+          {/* Giá và số lượng */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+            {["adults", "children", "infants"].map((type) => (
+              <div key={type}>
+                <p className="font-semibold text-gray-700">{type === "adults" ? "Người lớn" : type === "children" ? "Trẻ em" : "Trẻ nhỏ"}</p>
+                <div className="flex justify-center items-center mt-1 gap-2">
+                  <button onClick={() => handleQuantityChange(index, type, -1)} className="px-2 py-1 bg-gray-200 rounded"><FaMinus /></button>
+                  <span className="font-bold">{item[type]}</span>
+                  <button onClick={() => handleQuantityChange(index, type, 1)} className="px-2 py-1 bg-gray-200 rounded"><FaPlus /></button>
+                </div>
+                <p className="text-red-600 font-bold mt-1">{formatCurrency(item.monthData.prices[type] * item[type])}</p>
+              </div>
+            ))}
             <div>
-              <h2 className="text-xl font-semibold">{item.title}</h2>
-              <p className="text-gray-500">Tháng: {item.month}</p>
-              <p className="text-gray-500">Địa điểm: {item.location}</p>
-              <p className="text-gray-500">Ngày khởi hành: {item.departureDates.join(" | ")}</p>
-
-              {/* Giá */}
-              <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm text-gray-700">
-                <div>
-                  <p>Người lớn:</p>
-                  <p className="font-bold text-red-600">{formatCurrency(item.priceAdult)}</p>
-                </div>
-                <div>
-                  <p>Trẻ em:</p>
-                  <p className="font-bold text-red-600">{formatCurrency(item.priceChild)}</p>
-                </div>
-                <div>
-                  <p>Trẻ nhỏ:</p>
-                  <p className="font-bold text-red-600">{formatCurrency(item.priceInfant)}</p>
-                </div>
-                <div>
-                  <p>Phụ thu phòng đơn:</p>
-                  <p className="font-bold text-red-600">{formatCurrency(item.singleSupplement)}</p>
-                </div>
-              </div>
-
-              {/* Số lượng */}
-              <div className="mt-3 flex gap-3 items-center">
-                <label className="flex items-center gap-1">
-                  Người lớn:
-                  <input
-                    type="number"
-                    min={0}
-                    value={item.adults}
-                    onChange={(e) =>
-                      updateQty(item.key, parseInt(e.target.value), item.children, item.infants)
-                    }
-                    className="w-16 border rounded px-1 text-center"
-                  />
-                </label>
-                <label className="flex items-center gap-1">
-                  Trẻ em:
-                  <input
-                    type="number"
-                    min={0}
-                    value={item.children}
-                    onChange={(e) =>
-                      updateQty(item.key, item.adults, parseInt(e.target.value), item.infants)
-                    }
-                    className="w-16 border rounded px-1 text-center"
-                  />
-                </label>
-                <label className="flex items-center gap-1">
-                  Trẻ nhỏ:
-                  <input
-                    type="number"
-                    min={0}
-                    value={item.infants}
-                    onChange={(e) =>
-                      updateQty(item.key, item.adults, item.children, parseInt(e.target.value))
-                    }
-                    className="w-16 border rounded px-1 text-center"
-                  />
-                </label>
-                <button
-                  onClick={() => removeFromCart(item.key)}
-                  className="ml-auto text-red-600 hover:text-red-800"
-                  title="Xóa tour"
-                >
-                  <FaTrash />
-                </button>
-              </div>
-
-              {/* Tổng tiền tour này */}
-              <p className="mt-2 font-semibold text-lg">
-                Tổng:{" "}
-                {formatCurrency(
-                  item.adults * item.priceAdult +
-                    item.children * item.priceChild +
-                    item.infants * item.priceInfant
-                )}
-              </p>
+              <p className="font-semibold text-gray-700">Phụ thu phòng đơn</p>
+              <p className="text-red-600 font-bold mt-5">{formatCurrency(item.monthData.prices.singleSupplement)}</p>
             </div>
           </div>
-        </div>
+
+          {/* Tổng tiền */}
+          <p className="text-right font-bold text-lg mt-4">Tổng: {formatCurrency(calculateTotal(item))}</p>
+
+          {/* Thông tin thêm */}
+          <div className="space-y-3 text-sm mt-4">
+            <div className="flex items-start">
+              <FaGift className="text-orange-500 text-base mr-3 mt-1 flex-shrink-0" />
+              <p><span className="font-semibold">Ưu đãi tháng:</span> {item.monthData.promotions}</p>
+            </div>
+            <div className="flex items-start">
+              <MdFamilyRestroom className="text-green-500 text-base mr-3 mt-1 flex-shrink-0" />
+              <p><span className="font-semibold">Phù hợp cho:</span> {item.monthData.familySuitability}</p>
+            </div>
+            <div className="flex items-start">
+              <FaPlaneDeparture className="text-sky-500 text-base mr-3 mt-1 flex-shrink-0" />
+              <p><span className="font-semibold">Thông tin chuyến bay:</span> {item.monthData.flightDeals}</p>
+            </div>
+          </div>
+
+          {/* Bản đồ */}
+          <div className="rounded-xl overflow-hidden shadow-lg mt-4">
+            <iframe
+              title="map"
+              src={`https://www.google.com/maps?q=${encodeURIComponent(item.tour.location)}&output=embed`}
+              width="100%"
+              height="350"
+              loading="lazy"
+            ></iframe>
+          </div>
+        </motion.div>
       ))}
 
-      {/* Tổng tất cả */}
-      <div className="text-right text-2xl font-bold">
-        Tổng cộng: {formatCurrency(total)}
+      {/* Thanh toán */}
+      <div className="flex justify-center mt-6 mb-16">
+        <motion.button
+          onClick={handleCheckout}
+          className="px-10 py-4 bg-gradient-to-r from-blue-600 to-sky-500 text-white text-lg font-semibold rounded-full shadow-lg hover:shadow-xl hover:from-blue-700 transition-all duration-300 flex items-center gap-3"
+          whileTap={{ scale: 0.95 }}
+          whileHover={{ scale: 1.05 }}
+        >
+          <FaCreditCard /> Thanh Toán Ngay
+        </motion.button>
       </div>
 
-      <div className="flex justify-end gap-4 mt-4">
-        <button
-          onClick={clearCart}
-          className="px-6 py-3 bg-red-600 text-white rounded-lg shadow hover:bg-red-700 transition"
+      {/* Thông báo lỗi */}
+      {notification && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-2 rounded-full shadow-lg text-sm z-50"
         >
-          Xóa tất cả
-        </button>
-        <button className="px-6 py-3 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition">
-          Thanh toán
-        </button>
-      </div>
+          {notification}
+        </motion.div>
+      )}
     </motion.div>
   );
 };
