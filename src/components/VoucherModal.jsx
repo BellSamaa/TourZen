@@ -1,162 +1,107 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, Loader2 } from 'lucide-react';
-import toast, { Toaster } from 'react-hot-toast'; // ✅ thêm import
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 
-export default function VoucherModal({ promo, onClose }) {
-  const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [isClaimed, setIsClaimed] = useState(false);
+const VoucherModal = ({ promo, onClose }) => {
+  const [form, setForm] = useState({ name: '', phone: '', email: '' });
+  const [status, setStatus] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [timeLeft, setTimeLeft] = useState(3600);
-
-  useEffect(() => {
-    if (promo) {
-      setIsClaimed(false);
-      setEmail('');
-      setName('');
-      setPhone('');
-      setError('');
-      setIsLoading(false);
-    }
-  }, [promo]);
-
-  useEffect(() => {
-    if (!promo) return;
-    const timer = setInterval(() => {
-      setTimeLeft(prev => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [promo]);
 
   if (!promo) return null;
 
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name || !phone || !email) {
-      setError('Vui lòng điền đầy đủ Họ tên, SĐT và Email.');
+    if (!form.name || !form.phone || !form.email) {
+      setStatus('Vui lòng điền đầy đủ Họ tên, SĐT và Email.');
       return;
     }
 
     setIsLoading(true);
-    setError('');
+    setStatus('Đang gửi...');
 
     try {
       const res = await fetch('/api/send-voucher', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, promo }),
+        body: JSON.stringify({ email: form.email, promo }),
       });
 
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error || 'Lỗi gửi mail. Vui lòng thử lại.');
-
-      setIsClaimed(true);
-      toast.success('🎉 Email voucher đã được gửi thành công!'); // ✅ toast thành công
+      if (res.ok) {
+        setStatus('Gửi thành công! Kiểm tra mail của bạn.');
+      } else {
+        setStatus('Gửi thất bại: ' + (data.error || 'Thử lại sau.'));
+      }
     } catch (err) {
-      setError(err.message);
-      toast.error('❌ Gửi email thất bại: ' + err.message); // ✅ toast lỗi
+      console.error(err);
+      setStatus('Gửi thất bại, thử lại sau.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const formatTime = (seconds) => {
-    const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
-    const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
-    const s = String(seconds % 60).padStart(2, '0');
-    return `${h}:${m}:${s}`;
-  };
-
   return (
-    <>
-      <Toaster position="top-right" /> {/* ✅ Thêm Toaster */}
-      <AnimatePresence>
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={onClose}
-        >
-          <motion.div
-            initial={{ scale: 0.9, y: 20 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.9, y: 20 }}
-            className="relative bg-white dark:bg-neutral-800 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden"
-            onClick={e => e.stopPropagation()}
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <motion.div
+        className="bg-white dark:bg-neutral-800 p-6 rounded-3xl shadow-lg text-center max-w-sm w-full"
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+      >
+        <h2 className="text-2xl font-bold mb-3 text-teal-600">Săn Voucher: {promo.title}</h2>
+        <p className="mb-2 text-gray-700 dark:text-gray-300">
+          Mã voucher: <span className="font-mono bg-gray-100 dark:bg-neutral-700 px-2 py-1 rounded">{promo.voucherCode}</span>
+        </p>
+
+        <form className="mt-3 space-y-3" onSubmit={handleSubmit}>
+          <input
+            type="text"
+            name="name"
+            placeholder="Họ và tên"
+            value={form.name}
+            onChange={handleChange}
+            required
+            className="w-full border px-3 py-2 rounded-lg"
+          />
+          <input
+            type="tel"
+            name="phone"
+            placeholder="Số điện thoại"
+            value={form.phone}
+            onChange={handleChange}
+            required
+            className="w-full border px-3 py-2 rounded-lg"
+          />
+          <input
+            type="email"
+            name="email"
+            placeholder="Email"
+            value={form.email}
+            onChange={handleChange}
+            required
+            className="w-full border px-3 py-2 rounded-lg"
+          />
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-teal-500 text-white py-2 rounded-full font-semibold hover:bg-teal-600 transition-colors disabled:opacity-70"
           >
-            <img src={promo.image} alt={promo.title} className="w-full h-48 object-cover" />
-            <button onClick={onClose} className="absolute top-4 right-4 bg-black/40 text-white p-2 rounded-full hover:bg-black/60">
-              <X size={20} />
-            </button>
+            {isLoading ? 'Đang gửi...' : 'Gửi Voucher'}
+          </button>
+        </form>
 
-            <div className="p-8 text-center">
-              {isClaimed ? (
-                <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }}>
-                  <CheckCircle size={60} className="mx-auto text-green-500" />
-                  <h2 className="text-2xl font-bold mt-4">Săn Voucher Thành Công!</h2>
-                  <p className="mt-2 text-neutral-600 dark:text-neutral-400">Mã giảm giá đã được gửi đến email <span className="font-semibold text-primary">{email}</span></p>
-                  <div className="mt-6 bg-primary-50 dark:bg-neutral-700 border-2 border-dashed border-primary-200 dark:border-neutral-600 rounded-lg p-4">
-                    <p className="text-sm text-neutral-500">Mã của bạn:</p>
-                    <p className="text-3xl font-extrabold text-primary tracking-widest">{promo.voucherCode}</p>
-                  </div>
-                  <p className="mt-4 text-xs text-neutral-500">Lưu ý: Voucher có giới hạn về số lượng và thời gian sử dụng.</p>
-                </motion.div>
-              ) : (
-                <>
-                  <h2 className="text-3xl font-bold text-neutral-900 dark:text-white">{promo.title}</h2>
-                  <p className="mt-2 text-neutral-600 dark:text-neutral-400">Giảm ngay <span className="font-bold text-secondary">{promo.discountPercent}%</span> cho các tour trong chương trình.</p>
+        {status && <p className={`mt-2 text-sm ${status.includes('thành công') ? 'text-green-600' : 'text-red-500'}`}>{status}</p>}
 
-                  <div className="my-6 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 font-bold text-2xl py-2 rounded-lg">
-                    Kết thúc sau: {formatTime(timeLeft)}
-                  </div>
-
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <input
-                      type="text"
-                      placeholder="Họ tên"
-                      required
-                      value={name}
-                      onChange={e => setName(e.target.value)}
-                      className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:bg-neutral-700 focus:ring-primary focus:border-primary"
-                    />
-                    <input
-                      type="tel"
-                      placeholder="Số điện thoại"
-                      required
-                      value={phone}
-                      onChange={e => setPhone(e.target.value)}
-                      className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:bg-neutral-700 focus:ring-primary focus:border-primary"
-                    />
-                    <div className="flex">
-                      <input 
-                        type="email"
-                        placeholder="Email"
-                        required
-                        value={email}
-                        onChange={e => setEmail(e.target.value)}
-                        className="flex-grow px-4 py-3 rounded-l-lg border border-gray-300 dark:bg-neutral-700 focus:ring-primary focus:border-primary"
-                      />
-                      <button
-                        type="submit"
-                        disabled={isLoading}
-                        className="bg-primary hover:bg-primary-dark text-white font-bold px-6 rounded-r-lg flex items-center justify-center w-36 disabled:opacity-70"
-                      >
-                        {isLoading ? <Loader2 className="animate-spin" /> : 'Săn Voucher'}
-                      </button>
-                    </div>
-                    {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
-                  </form>
-                </>
-              )}
-            </div>
-          </motion.div>
-        </motion.div>
-      </AnimatePresence>
-    </>
+        <button
+          onClick={onClose}
+          className="mt-3 bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-200 px-6 py-2 rounded-full font-semibold hover:bg-gray-400 transition-colors"
+        >
+          Đóng
+        </button>
+      </motion.div>
+    </div>
   );
-}
+};
+
+export default VoucherModal;
