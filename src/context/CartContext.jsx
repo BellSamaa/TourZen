@@ -7,12 +7,12 @@ const KEY = "tourzen_cart_v2";
 // Tạo Context
 const CartContext = createContext();
 
-// ✅ Hook để gọi trong các component khác
+// ✅ Hook dùng trong component
 export function useCart() {
   return useContext(CartContext);
 }
 
-// ✅ Provider bao quanh toàn bộ app
+// ✅ Provider bao quanh App
 export function CartProvider({ children }) {
   const [items, setItems] = useState(() => {
     try {
@@ -29,21 +29,38 @@ export function CartProvider({ children }) {
   }, [items]);
 
   // ✅ Thêm tour vào giỏ
-  function addToCart(tour) {
+  function addToCart({ tour, monthData, adults = 1, children = 0, infants = 0 }) {
+    if (!tour || !monthData) return;
+    const key = `${tour.id}_${monthData.month}`; // mỗi tour theo tháng là 1 mục riêng
     setItems((prev) => {
-      const found = prev.find((p) => p.tourId === tour.id);
+      const found = prev.find((p) => p.key === key);
       if (found) {
         return prev.map((p) =>
-          p.tourId === tour.id ? { ...p, qty: p.qty + 1 } : p
+          p.key === key
+            ? {
+                ...p,
+                adults: p.adults + adults,
+                children: p.children + children,
+                infants: p.infants + infants,
+              }
+            : p
         );
       }
       return [
         ...prev,
         {
+          key,
           tourId: tour.id,
           title: tour.title || tour.name,
-          price: tour.price,
-          qty: 1,
+          month: monthData.month,
+          departureDates: monthData.departureDates,
+          adults,
+          children,
+          infants,
+          priceAdult: monthData.prices.adult,
+          priceChild: monthData.prices.child,
+          priceInfant: monthData.prices.infant,
+          singleSupplement: monthData.prices.singleSupplement,
           image: tour.image,
           location: tour.location,
         },
@@ -52,15 +69,22 @@ export function CartProvider({ children }) {
   }
 
   // ✅ Xóa tour khỏi giỏ
-  function removeFromCart(tourId) {
-    setItems((prev) => prev.filter((p) => p.tourId !== tourId));
+  function removeFromCart(key) {
+    setItems((prev) => prev.filter((p) => p.key !== key));
   }
 
   // ✅ Cập nhật số lượng
-  function updateQty(tourId, qty) {
+  function updateQty(key, adults, children, infants) {
     setItems((prev) =>
       prev.map((p) =>
-        p.tourId === tourId ? { ...p, qty: Math.max(qty, 1) } : p
+        p.key === key
+          ? {
+              ...p,
+              adults: Math.max(adults, 0),
+              children: Math.max(children, 0),
+              infants: Math.max(infants, 0),
+            }
+          : p
       )
     );
   }
@@ -71,7 +95,14 @@ export function CartProvider({ children }) {
   }
 
   // ✅ Tính tổng tiền
-  const total = items.reduce((sum, i) => sum + i.price * i.qty, 0);
+  const total = items.reduce(
+    (sum, i) =>
+      sum +
+      i.adults * i.priceAdult +
+      i.children * i.priceChild +
+      i.infants * i.priceInfant,
+    0
+  );
 
   // ✅ Trả giá trị cho context
   const value = {
@@ -83,12 +114,7 @@ export function CartProvider({ children }) {
     total,
   };
 
-  return (
-    <CartContext.Provider value={value}>
-      {children}
-    </CartContext.Provider>
-  );
+  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
 
-// ✅ Export mặc định cho import linh hoạt
 export default CartContext;
