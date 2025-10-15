@@ -1,4 +1,4 @@
-import React, { useState } from "react"; // <--- LỖI ĐÃ ĐƯỢC SỬA Ở ĐÂY
+import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { TOURS } from "../data/tours";
@@ -144,38 +144,8 @@ export default function Home() {
         </div>
       </section>
       
-      {/* TOUR BÁN CHẠY */}
-      <section className="py-20">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-            <h2 className="text-3xl font-bold mb-4">🔥 Tour Bán Chạy Nhất</h2>
-            <p className="text-slate-500 max-w-2xl mx-auto mb-12">Đừng bỏ lỡ cơ hội trải nghiệm những chuyến đi hot nhất đã được kiểm chứng bởi hàng ngàn khách hàng.</p>
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {bestsellingTours.map((tour) => (
-                <motion.div key={tour.id} whileHover={{ y: -8 }} className="bg-white rounded-2xl shadow-md hover:shadow-xl overflow-hidden cursor-pointer transition-all duration-300" onClick={() => navigate(`/tour/${tour.id}`)}>
-                    <div className="relative">
-                        <img src={tour.image} alt={tour.title} className="h-56 w-full object-cover" />
-                        <div className="absolute top-3 left-3 bg-red-500 text-white text-xs font-semibold px-3 py-1 rounded-full">{tour.duration}</div>
-                    </div>
-                    <div className="p-5 text-left">
-                        <h3 className="font-semibold text-lg truncate">{tour.title}</h3>
-                        <p className="text-slate-500 text-sm mt-1 flex items-center gap-2">
-                            <FaMapMarkerAlt className="text-blue-500" /> {tour.location}
-                        </p>
-                        <div className="flex justify-between items-center mt-4">
-                            <span className="text-xl font-bold text-red-600">{tour.price.toLocaleString("vi-VN")}₫</span>
-                            <div className="flex items-center gap-1 text-amber-500">
-                                <FaStar /> <span className="text-slate-600 font-semibold">{tour.rating}</span>
-                            </div>
-                        </div>
-                    </div>
-                </motion.div>
-            ))}
-            </div>
-        </div>
-      </section>
-
       {/* ĐIỂM ĐẾN YÊU THÍCH */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-slate-50">
         <div className="max-w-7xl mx-auto px-6">
             <div className="text-center mb-12">
             <h2 className="text-3xl font-bold mb-4">🏖️ Điểm Đến Yêu Thích</h2>
@@ -209,7 +179,7 @@ export default function Home() {
       </section>
 
       {/* BLOG DU LỊCH */}
-      <section className="py-20">
+      <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-6">
             <div className="text-center mb-12">
                 <h2 className="text-3xl font-bold mb-4">📰 Cẩm Nang Du Lịch</h2>
@@ -225,6 +195,36 @@ export default function Home() {
                         <h3 className="font-semibold text-lg mb-2 h-14">{post.title}</h3>
                         <p className="text-slate-500 text-sm mb-4 line-clamp-2">{post.excerpt}</p>
                         <button className="font-semibold text-blue-600 hover:text-blue-700">Đọc thêm →</button>
+                    </div>
+                </motion.div>
+            ))}
+            </div>
+        </div>
+      </section>
+      
+      {/* TOUR BÁN CHẠY NHẤT (ĐÃ DI CHUYỂN XUỐNG CUỐI) */}
+      <section className="py-20 bg-slate-50">
+        <div className="max-w-7xl mx-auto px-6 text-center">
+            <h2 className="text-3xl font-bold mb-4">🔥 Tour Bán Chạy Nhất</h2>
+            <p className="text-slate-500 max-w-2xl mx-auto mb-12">Đừng bỏ lỡ cơ hội trải nghiệm những chuyến đi hot nhất đã được kiểm chứng bởi hàng ngàn khách hàng.</p>
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {bestsellingTours.map((tour) => (
+                <motion.div key={tour.id} whileHover={{ y: -8 }} className="bg-white rounded-2xl shadow-md hover:shadow-xl overflow-hidden cursor-pointer transition-all duration-300" onClick={() => navigate(`/tour/${tour.id}`)}>
+                    <div className="relative">
+                        <img src={tour.image} alt={tour.title} className="h-56 w-full object-cover" />
+                        <div className="absolute top-3 left-3 bg-red-500 text-white text-xs font-semibold px-3 py-1 rounded-full">{tour.duration}</div>
+                    </div>
+                    <div className="p-5 text-left">
+                        <h3 className="font-semibold text-lg truncate">{tour.title}</h3>
+                        <p className="text-slate-500 text-sm mt-1 flex items-center gap-2">
+                            <FaMapMarkerAlt className="text-blue-500" /> {tour.location}
+                        </p>
+                        <div className="flex justify-between items-center mt-4">
+                            <span className="text-xl font-bold text-red-600">{tour.price.toLocaleString("vi-VN")}₫</span>
+                            <div className="flex items-center gap-1 text-amber-500">
+                                <FaStar /> <span className="text-slate-600 font-semibold">{tour.rating}</span>
+                            </div>
+                        </div>
                     </div>
                 </motion.div>
             ))}
