@@ -2,14 +2,37 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, Tag } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export default function PromotionCard({ promo, onClaim }) {
   const [isHovered, setIsHovered] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false); // ✅ highlight khi gửi thành công
+
+  const handleClick = async () => {
+    if (!promo) return;
+    setIsLoading(true);
+    const toastId = toast.loading('⏳ Đang gửi email voucher...');
+
+    try {
+      await onClaim(promo); // onClaim sẽ gọi VoucherModal / API
+      toast.success('🎉 Email voucher đã được gửi thành công!', { id: toastId });
+      setIsSuccess(true); // ✅ bật highlight thành công
+      setTimeout(() => setIsSuccess(false), 2000); // ✅ tắt highlight sau 2s
+    } catch (err) {
+      toast.error('❌ Gửi voucher thất bại: ' + err.message, { id: toastId });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <motion.div
-      className="relative rounded-2xl overflow-hidden shadow-2xl group cursor-pointer border-2 border-transparent hover:border-blue-400 transition-all duration-300"
-      onClick={() => onClaim(promo)}
+      className={`relative rounded-2xl overflow-hidden shadow-2xl group cursor-pointer border-2 transition-all duration-300
+        ${isLoading ? 'opacity-70' : ''}
+        ${isSuccess ? 'border-green-400 shadow-[0_0_20px_rgba(16,185,129,0.5)]' : 'border-transparent'}
+      `}
+      onClick={handleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       whileHover={{ scale: 1.03 }}
@@ -19,7 +42,9 @@ export default function PromotionCard({ promo, onClaim }) {
       <img
         src={promo.image}
         alt={promo.title}
-        className="w-full h-96 object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+        className={`w-full h-96 object-cover group-hover:scale-110 transition-transform duration-700 ease-out
+          ${isSuccess ? 'brightness-110' : ''}
+        `}
       />
 
       {/* Gradient overlay */}
@@ -63,10 +88,13 @@ export default function PromotionCard({ promo, onClaim }) {
 
       {/* Floating "Săn ngay" button */}
       <motion.div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-blue-500 to-sky-400 text-white font-bold px-8 py-3 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500 hover:scale-105 hover:shadow-2xl z-10"
+        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 
+          bg-gradient-to-r from-blue-500 to-sky-400 text-white font-bold px-8 py-3 rounded-full shadow-lg 
+          opacity-0 group-hover:opacity-100 transition-opacity duration-500 hover:scale-105 hover:shadow-2xl z-10
+        `}
         whileHover={{ scale: 1.08 }}
       >
-        Săn ngay
+        {isLoading ? 'Đang gửi...' : 'Săn ngay'}
       </motion.div>
 
       {/* Preview Popup khi hover */}
@@ -76,7 +104,9 @@ export default function PromotionCard({ promo, onClaim }) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="absolute top-4 right-4 w-64 bg-white dark:bg-neutral-800 p-4 rounded-2xl shadow-xl text-black dark:text-white z-20 border border-gray-200"
+            className={`absolute top-4 right-4 w-64 bg-white dark:bg-neutral-800 p-4 rounded-2xl shadow-xl text-black dark:text-white z-20 border transition-all
+              ${isSuccess ? 'border-green-400 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'border-gray-200'}
+            `}
           >
             <h3 className="font-bold text-lg mb-1">{promo.title}</h3>
             <p className="text-sm mb-1">Giảm ngay: <span className="font-semibold text-red-600">{promo.discountPercent}%</span></p>

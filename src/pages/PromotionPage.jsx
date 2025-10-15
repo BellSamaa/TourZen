@@ -20,28 +20,28 @@ const promotionsData = {
 
 // Card khuyến mãi
 const PromotionCard = ({ promo, onClaim }) => (
-  <div className="bg-gradient-to-tr from-white via-blue-50 to-blue-100 rounded-3xl shadow-xl overflow-hidden transform hover:scale-105 hover:shadow-2xl transition-transform duration-300 border border-blue-200">
-    <div className="relative overflow-hidden rounded-t-3xl">
+  <div className="bg-gradient-to-tr from-blue-50 via-blue-100 to-white rounded-2xl shadow-md overflow-hidden transform hover:scale-102 hover:shadow-lg transition-transform duration-300 border border-transparent">
+    <div className="relative overflow-hidden rounded-t-2xl">
       <img
         src={promo.image}
         alt={promo.title}
-        className="w-full h-56 object-cover transition-transform duration-700 ease-in-out hover:scale-110"
+        className="w-full h-56 object-cover transition-transform duration-500 ease-in-out hover:scale-105"
       />
-      <div className="absolute top-4 left-4 bg-gradient-to-r from-blue-500 to-sky-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+      <div className="absolute top-4 left-4 bg-gradient-to-r from-blue-400 to-sky-400 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-sm">
         {promo.tag}
       </div>
-      <div className="absolute top-4 right-4 bg-white/80 text-blue-600 font-semibold px-2 py-1 rounded-md text-xs shadow-md">
+      <div className="absolute top-4 right-4 bg-white/70 text-blue-600 font-semibold px-2 py-1 rounded-md text-xs shadow-sm">
         -{promo.discountPercent}%
       </div>
     </div>
-    <div className="p-6">
-      <h3 className="text-2xl font-extrabold text-blue-800 mb-2">{promo.title}</h3>
+    <div className="p-5">
+      <h3 className="text-xl font-bold text-blue-800 mb-2">{promo.title}</h3>
       <p className="text-gray-700 dark:text-gray-300 text-sm mb-4">{promo.description}</p>
       <div className="flex justify-between items-center">
-        <span className="text-xs font-semibold text-red-500">{promo.timeLimit}</span>
+        <span className="text-xs font-medium text-gray-500">{promo.timeLimit}</span>
         <button
           onClick={() => onClaim(promo)}
-          className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-6 py-2 rounded-full font-bold text-lg shadow-lg hover:scale-105 hover:shadow-xl transition-transform duration-300 animate-pulse"
+          className="bg-gradient-to-r from-green-400 to-teal-400 text-white px-5 py-2 rounded-full font-semibold text-sm shadow hover:scale-105 hover:shadow-md transition-transform duration-300"
         >
           Săn Voucher
         </button>
@@ -83,25 +83,25 @@ const VoucherModal = ({ promo, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <motion.div
-        className="bg-white dark:bg-neutral-800 p-8 rounded-2xl shadow-xl text-center max-w-sm w-full"
+        className="bg-white dark:bg-neutral-800 p-6 rounded-3xl shadow-lg text-center max-w-sm w-full"
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
       >
-        <h2 className="text-2xl font-bold mb-4 text-blue-600">Săn Voucher: {promo.title}</h2>
+        <h2 className="text-2xl font-bold mb-3 text-teal-600">Săn Voucher: {promo.title}</h2>
         <p className="mb-2 text-gray-700 dark:text-gray-300">Mã voucher: <span className="font-mono bg-gray-100 dark:bg-neutral-700 px-2 py-1 rounded">{promo.voucherCode}</span></p>
 
-        <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
+        <form className="mt-3 space-y-3" onSubmit={handleSubmit}>
           <input type="text" name="name" placeholder="Họ và tên" value={form.name} onChange={handleChange} required className="w-full border px-3 py-2 rounded-lg" />
           <input type="tel" name="phone" placeholder="Số điện thoại" value={form.phone} onChange={handleChange} required className="w-full border px-3 py-2 rounded-lg" />
           <input type="email" name="email" placeholder="Email" value={form.email} onChange={handleChange} required className="w-full border px-3 py-2 rounded-lg" />
-          <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-full font-bold hover:bg-blue-700 transition-colors">Gửi Voucher</button>
+          <button type="submit" className="w-full bg-teal-500 text-white py-2 rounded-full font-semibold hover:bg-teal-600 transition-colors">Gửi Voucher</button>
         </form>
 
         {status && <p className="mt-2 text-sm text-green-600">{status}</p>}
 
-        <button onClick={onClose} className="mt-4 bg-red-500 text-white px-8 py-2 rounded-lg font-semibold hover:bg-red-600 transition-colors">
+        <button onClick={onClose} className="mt-3 bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-200 px-6 py-2 rounded-full font-semibold hover:bg-gray-400 transition-colors">
           Đóng
         </button>
       </motion.div>
@@ -116,21 +116,21 @@ export default function PromotionPage() {
   const handleCloseModal = () => setSelectedPromo(null);
 
   const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1 } } };
-  const cardVariants = { hidden: { opacity: 0, y: 30 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } } };
+  const cardVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } } };
 
   return (
-    <div className="bg-gray-50 dark:bg-neutral-900 min-h-screen">
-      <div className="container mx-auto px-4 sm:px-6 py-16">
-        <motion.div className="text-center mb-16" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-sky-500 mb-3">Săn Ưu đãi, Vi vu khắp chốn</h1>
-          <p className="text-lg text-gray-700 dark:text-gray-300 max-w-2xl mx-auto">Các chương trình khuyến mãi hấp dẫn nhất được cập nhật mỗi ngày đang chờ bạn!</p>
+    <div className="bg-gradient-to-b from-blue-50 via-blue-100 to-white min-h-screen py-16">
+      <div className="container mx-auto px-4 sm:px-6">
+        <motion.div className="text-center mb-16" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+          <h1 className="text-4xl sm:text-5xl font-extrabold text-teal-700 mb-3">Săn Ưu đãi, Vi vu khắp chốn</h1>
+          <p className="text-gray-700 dark:text-gray-500 max-w-2xl mx-auto">Các chương trình khuyến mãi hấp dẫn được cập nhật mỗi ngày đang chờ bạn!</p>
         </motion.div>
 
-        <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-16">
+        <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-12">
           {/* Section Dịp lễ */}
           <section>
-            <h2 className="text-3xl font-bold text-blue-800 mb-8 flex items-center gap-3"><FiTag className="text-blue-500"/>Ưu đãi theo Dịp lễ</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <h2 className="text-2xl font-bold text-teal-600 mb-6 flex items-center gap-2"><FiTag className="text-teal-400"/>Ưu đãi theo Dịp lễ</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {promotionsData.events.map(promo => (
                 <motion.div key={promo.id} variants={cardVariants}>
                   <PromotionCard promo={promo} onClaim={handleClaimVoucher} />
@@ -141,8 +141,8 @@ export default function PromotionPage() {
 
           {/* Section Vùng miền */}
           <section>
-            <h2 className="text-3xl font-bold text-blue-800 mb-8 flex items-center gap-3"><FiTag className="text-blue-500"/>Ưu đãi theo Vùng miền</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <h2 className="text-2xl font-bold text-teal-600 mb-6 flex items-center gap-2"><FiTag className="text-teal-400"/>Ưu đãi theo Vùng miền</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {promotionsData.regions.map(promo => (
                 <motion.div key={promo.id} variants={cardVariants}>
                   <PromotionCard promo={promo} onClaim={handleClaimVoucher} />
@@ -153,8 +153,8 @@ export default function PromotionPage() {
 
           {/* Section Đặc biệt */}
           <section>
-            <h2 className="text-3xl font-bold text-blue-800 mb-8 flex items-center gap-3"><FiTag className="text-blue-500"/>Ưu đãi Đặc biệt</h2>
-            <div className="grid grid-cols-1 md:grid-cols-1 gap-8">
+            <h2 className="text-2xl font-bold text-teal-600 mb-6 flex items-center gap-2"><FiTag className="text-teal-400"/>Ưu đãi Đặc biệt</h2>
+            <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
               {promotionsData.thematic.map(promo => (
                 <motion.div key={promo.id} variants={cardVariants}>
                   <PromotionCard promo={promo} onClaim={handleClaimVoucher} />
