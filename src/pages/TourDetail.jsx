@@ -5,23 +5,17 @@ import { TOURS } from "../data/tours_updated";
 import { ParallaxBanner } from "react-scroll-parallax";
 import Slider from "react-slick";
 import {
-  FaMapMarkerAlt,
-  FaUtensils,
   FaGift,
-  FaBusAlt,
-  FaUsers,
   FaPlaneDeparture,
-  FaBaby,
-  FaCheckCircle,
-  FaInfoCircle,
   FaCreditCard,
 } from "react-icons/fa";
-import { MdEventAvailable, MdFamilyRestroom } from "react-icons/md";
+import { MdFamilyRestroom } from "react-icons/md";
 import { motion } from "framer-motion";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
+import { useCart } from "../context/CartContext"; // ✅ import CartContext
 
-// Hàm helper để định dạng tiền tệ
+// Hàm helper định dạng tiền tệ
 const formatCurrency = (number) => {
   if (typeof number !== "number") return "N/A";
   return new Intl.NumberFormat("vi-VN", {
@@ -35,9 +29,12 @@ const TourDetail = () => {
   const navigate = useNavigate();
   const tour = TOURS.find((t) => t.id === parseInt(id));
 
+  const { addToCart } = useCart(); // ✅ sử dụng CartContext
+
   const [activeMonthData, setActiveMonthData] = useState(null);
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0);
+  const [infants, setInfants] = useState(0); // ✅ số trẻ nhỏ
   const [notification, setNotification] = useState("");
 
   // Chọn tháng đầu tiên khi load
@@ -66,7 +63,7 @@ const TourDetail = () => {
     fade: true,
   };
 
-  // ✅ Hàm xử lý "Đặt Tour Ngay" -> chuyển sang /payment
+  // ✅ Xử lý "Đặt Tour Ngay"
   const handleBookNow = () => {
     if (!activeMonthData) {
       setNotification("Vui lòng chọn tháng khởi hành.");
@@ -79,15 +76,11 @@ const TourDetail = () => {
       return;
     }
 
-    // Chuyển sang trang Payment và truyền state
-    navigate("/payment", {
-      state: {
-        tour: tour,
-        selectedMonth: activeMonthData,
-        adults,
-        children,
-      },
-    });
+    // ✅ Thêm vào giỏ
+    addToCart({ tour, monthData: activeMonthData, adults, children, infants });
+
+    // ✅ Chuyển sang trang Payment
+    navigate("/payment");
   };
 
   return (
@@ -161,6 +154,40 @@ const TourDetail = () => {
                       <p className="font-semibold text-gray-700">Phụ thu phòng đơn</p>
                       <p className="text-red-600 font-bold text-lg">{formatCurrency(activeMonthData.prices.singleSupplement)}</p>
                     </div>
+                  </div>
+                </div>
+
+                {/* Nhập số lượng */}
+                <div className="flex gap-4 mb-4">
+                  <div>
+                    <label className="font-semibold">Người lớn:</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={adults}
+                      onChange={(e) => setAdults(parseInt(e.target.value) || 0)}
+                      className="border rounded px-2 py-1 w-20"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold">Trẻ em:</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={children}
+                      onChange={(e) => setChildren(parseInt(e.target.value) || 0)}
+                      className="border rounded px-2 py-1 w-20"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold">Trẻ nhỏ:</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={infants}
+                      onChange={(e) => setInfants(parseInt(e.target.value) || 0)}
+                      className="border rounded px-2 py-1 w-20"
+                    />
                   </div>
                 </div>
 

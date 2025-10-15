@@ -1,19 +1,22 @@
 // src/pages/Payment.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { TOURS } from "../data/tours";
 import { motion } from "framer-motion";
 import { FaMapMarkerAlt, FaCalendarAlt } from "react-icons/fa";
+import { useCart } from "../context/CartContext";
 import emailjs from "@emailjs/browser";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
+// Hàm định dạng tiền tệ
+const formatCurrency = (number) =>
+  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
+    number
+  );
+
 export default function Payment() {
   const navigate = useNavigate();
-
-  // ---------------- STATE ----------------
-  const [selectedTour, setSelectedTour] = useState(TOURS[0]);
-  const [adults, setAdults] = useState(1);
+  const { items } = useCart(); // Lấy tour trong giỏ
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -27,34 +30,48 @@ export default function Payment() {
     appointmentDate: new Date(),
   });
 
-  const total = selectedTour.price * adults;
+  if (!items || items.length === 0) {
+    return (
+      <motion.div className="text-center text-xl py-20">
+        Giỏ hàng trống. Vui lòng chọn tour trước khi thanh toán.
+      </motion.div>
+    );
+  }
 
-  // ---------------- HANDLE INPUT ----------------
+  // Lấy tour đầu tiên trong giỏ (có thể map nếu muốn hiển thị nhiều tour)
+  const selectedItem = items[0];
+  const { tour, month, adults, children, infants, priceAdult, priceChild, priceInfant, singleSupplement, image, location } =
+    selectedItem;
+
+  const total =
+    adults * priceAdult + children * priceChild + infants * priceInfant;
+
+  // Handle input
   const handleInput = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const handleDateChange = (date) =>
     setFormData({ ...formData, appointmentDate: date });
 
-  // ---------------- EMAILJS GỬI XÁC NHẬN ----------------
+  // Gửi email khi chọn offline
   const sendAppointmentEmail = async () => {
     try {
       setLoading(true);
       setMessage("⏳ Đang gửi email xác nhận...");
 
       await emailjs.send(
-        "service_8w8xy0f", // ✅ Service ID
-        "template_lph7t7t", // ✅ Template ID
+        "service_8w8xy0f", // Service ID
+        "template_lph7t7t", // Template ID
         {
           name: formData.name,
           email: formData.email,
           phone: formData.phone,
-          tour_name: selectedTour.title,
-          total_price: total.toLocaleString("vi-VN") + "₫",
+          tour_name: tour.title,
+          total_price: formatCurrency(total),
           location: formData.location,
           date: formData.appointmentDate.toLocaleDateString("vi-VN"),
         },
-        "mXugIgN4N-oD4WVZZ" // ✅ Public key
+        "mXugIgN4N-oD4WVZZ" // Public Key
       );
 
       setMessage("✅ Email xác nhận đã được gửi thành công!");
@@ -67,7 +84,7 @@ export default function Payment() {
     }
   };
 
-  // ---------------- HANDLE PAYMENT ----------------
+  // Xử lý thanh toán
   const handlePayment = () => {
     if (!formData.name || !formData.email || !formData.phone) {
       alert("⚠️ Vui lòng nhập đầy đủ thông tin liên hệ!");
@@ -75,22 +92,21 @@ export default function Payment() {
     }
 
     if (formData.paymentMethod === "vnpay") {
-      // ✅ VNPay sandbox test
+      // VNPay sandbox
       const sandboxURL = `https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?vnp_Amount=${
         total * 100
       }&vnp_OrderInfo=Thanh%20toan%20tour%20${encodeURIComponent(
-        selectedTour.title
+        tour.title
       )}&vnp_ReturnUrl=${encodeURIComponent(
         window.location.origin + "/payment/success"
       )}`;
       window.open(sandboxURL, "_blank");
     } else {
-      // ✅ Đặt lịch hẹn thanh toán tại cơ sở
+      // Đặt lịch offline
       sendAppointmentEmail();
     }
   };
 
-  // ---------------- UI ----------------
   return (
     <motion.div
       className="bg-gray-50 py-10 px-4 md:px-10 lg:px-20"
@@ -218,33 +234,31 @@ export default function Payment() {
           <h3 className="text-lg font-semibold mb-4 text-gray-800">
             TÓM TẮT CHUYẾN ĐI
           </h3>
-          <img
-            src={selectedTour.image}
-            alt={selectedTour.title}
-            className="rounded-lg mb-3"
-          />
-          <p className="font-medium text-gray-800">{selectedTour.title}</p>
+          <img src={image} alt={tour.title} className="rounded-lg mb-3" />
+          <p className="font-medium text-gray-800">{tour.title}</p>
           <p className="text-gray-500 flex items-center gap-2 mt-1">
-            <FaMapMarkerAlt /> {selectedTour.location}
+            <FaMapMarkerAlt /> {location}
           </p>
 
           <hr className="my-4" />
-          <div className="flex justify-between mb-3">
-            <span>Người lớn</span>
-            <input
-              type="number"
-              min="1"
-              value={adults}
-              onChange={(e) => setAdults(parseInt(e.target.value))}
-              className="border rounded-lg w-16 text-center"
-            />
-          </div>
 
-          <div className="flex justify-between font-semibold text-gray-800">
-            <span>Tổng tiền</span>
-            <span className="text-red-600 text-lg">
-              {total.toLocaleString("vi-VN")}₫
-            </span>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span>Người lớn</span>
+              <span>{adults}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Trẻ em</span>
+              <span>{children}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Trẻ nhỏ</span>
+              <span>{infants}</span>
+            </div>
+            <div className="flex justify-between font-semibold text-gray-800">
+              <span>Tổng tiền</span>
+              <span className="text-red-600 text-lg">{formatCurrency(total)}</span>
+            </div>
           </div>
         </div>
       </div>
