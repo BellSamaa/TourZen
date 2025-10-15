@@ -1,6 +1,6 @@
-// src/pages/api/send-voucher.js
 import { Resend } from "resend";
 
+// Khởi tạo Resend với API Key từ file .env
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export default async function handler(req, res) {
@@ -16,26 +16,37 @@ export default async function handler(req, res) {
     }
 
     // Gửi email
-    const message = {
-      from: "no-reply@yourdomain.com", // thay bằng email đã verified với Resend
-      to: email,
+    const { data, error } = await resend.emails.send({
+      // ✅ SỬA Ở ĐÂY: Dùng email mặc định của Resend để test
+      // Khi deploy thật, bạn cần thay bằng email đã xác thực với Resend (vd: voucher@tourzen.com)
+      from: 'TourZen <onboarding@resend.dev>', 
+      to: [email],
       subject: `Voucher ${promo.title} của bạn đã sẵn sàng!`,
+      // Sử dụng React component để tạo email cho đẹp hơn (tùy chọn)
+      // react: EmailTemplate({ name: name, promo: promo }),
       html: `
-        <div style="font-family: system-ui, sans-serif; line-height: 1.5; color: #111;">
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
           <h2>Xin chào ${name},</h2>
-          <p>Bạn vừa nhận voucher cho chương trình: <strong>${promo.title}</strong>.</p>
-          <p>Mã voucher của bạn là:</p>
-          <p style="font-size: 24px; font-weight: bold; background: #f0f0f0; padding: 10px; display: inline-block;">${promo.voucherCode}</p>
-          <p>SĐT của bạn: ${phone}</p>
-          <p>Voucher có giá trị giảm ${promo.discountPercent}% cho các tour liên quan.</p>
-          <p>Cảm ơn bạn đã sử dụng dịch vụ của chúng tôi!</p>
+          <p>Cảm ơn bạn đã quan tâm đến chương trình khuyến mãi: <strong>${promo.title}</strong>.</p>
+          <p>TourZen gửi tặng bạn mã voucher dưới đây:</p>
+          <div style="text-align: center; margin: 20px 0;">
+            <p style="font-size: 28px; font-weight: bold; background: #e0f2fe; color: #0c4a6e; padding: 15px 25px; display: inline-block; border-radius: 8px; border: 2px dashed #7dd3fc;">
+              ${promo.voucherCode}
+            </p>
+          </div>
+          <p>Voucher có giá trị giảm <strong>${promo.discountPercent}%</strong> cho các tour liên quan.</p>
+          <p>Chúc bạn có những chuyến đi tuyệt vời cùng TourZen!</p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="font-size: 0.8em; color: #777;">Email này được gửi tự động. Vui lòng không trả lời.</p>
         </div>
       `,
-    };
+    });
 
-    await resend.emails.send(message);
+    if (error) {
+        return res.status(400).json(error);
+    }
 
-    return res.status(200).json({ message: "Voucher đã gửi thành công!" });
+    return res.status(200).json({ message: "Voucher đã gửi thành công!", data });
   } catch (error) {
     console.error("Lỗi gửi voucher:", error);
     return res.status(500).json({ error: "Gửi thất bại, thử lại sau." });
