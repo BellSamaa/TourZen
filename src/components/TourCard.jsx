@@ -1,3 +1,5 @@
+// src/components/TourCard.jsx
+
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ShoppingCart, MapPin, Star, PlaneTakeoff } from "lucide-react";
@@ -9,13 +11,17 @@ export default function TourCard({ tour }) {
   const navigate = useNavigate();
   const [toast, setToast] = useState(false);
 
+  // ✅ SỬA Ở ĐÂY: Thêm tour vào giỏ và chuyển đến trang thanh toán
   const handleBookNow = () => {
-    addToCart(tour);
+    // Truyền vào một object { tour } để khớp với CartContext
+    addToCart({ tour }); 
     navigate("/payment");
   };
 
+  // ✅ SỬA Ở ĐÂY: Chỉ thêm tour vào giỏ
   const handleAddToCart = () => {
-    addToCart(tour);
+    // Truyền vào một object { tour } để khớp với CartContext
+    addToCart({ tour }); 
     setToast(true);
     setTimeout(() => setToast(false), 1500); // tự ẩn sau 1.5 giây
   };
@@ -29,8 +35,8 @@ export default function TourCard({ tour }) {
       {/* ẢNH TOUR */}
       <div className="relative h-60 w-full overflow-hidden">
         <img
-          src={tour.image}
-          alt={tour.name}
+          src={tour.image || "/images/default.jpg"} // Thêm ảnh mặc định
+          alt={tour.title} // Sửa từ name sang title cho nhất quán
           className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
         />
         <div className="absolute top-3 left-3 bg-sky-600/90 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-md">
@@ -45,7 +51,7 @@ export default function TourCard({ tour }) {
       {/* NỘI DUNG */}
       <div className="p-5 space-y-3">
         <h3 className="text-lg font-bold text-gray-800 line-clamp-2 hover:text-sky-600 transition-colors">
-          {tour.name}
+          {tour.title} {/* Sửa từ name sang title cho nhất quán */}
         </h3>
         <p className="text-sm text-gray-600 line-clamp-2">{tour.description}</p>
 
@@ -56,7 +62,7 @@ export default function TourCard({ tour }) {
             <span className="text-sm font-medium">{tour.rating || "4.8"}</span>
           </div>
           <span className="text-lg font-bold text-sky-700">
-            {tour.price.toLocaleString()}₫
+            {tour.price ? tour.price.toLocaleString() + "₫" : "Liên hệ"}
           </span>
         </div>
 
@@ -86,7 +92,7 @@ export default function TourCard({ tour }) {
           className="mt-4 w-full flex items-center justify-center gap-2 bg-gradient-to-r from-sky-500 to-blue-600 text-white font-semibold py-3 rounded-full shadow-md hover:shadow-lg transition-all"
         >
           <PlaneTakeoff size={18} />
-          Đặt tour ngay
+          Thanh toán ngay
         </motion.button>
       </div>
 
