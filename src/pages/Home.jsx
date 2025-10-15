@@ -101,7 +101,7 @@ export default function Home() {
         className="text-center py-16 px-6"
       >
         <h1 className="text-4xl font-bold text-blue-700 mb-4">
-          Khám phá thế giới cùng VietTravel
+          Khám phá thế giới cùng TourZen
         </h1>
         <p className="text-gray-600 max-w-2xl mx-auto">
           Những hành trình tuyệt vời đang chờ bạn — chọn tour, đặt ngay, và bắt đầu chuyến phiêu lưu đáng nhớ!
