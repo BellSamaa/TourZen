@@ -10,13 +10,11 @@ import "react-datepicker/dist/react-datepicker.css";
 
 // Hàm định dạng tiền tệ
 const formatCurrency = (number) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
-    number
-  );
+  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(number);
 
 export default function Payment() {
   const navigate = useNavigate();
-  const { items } = useCart(); // Lấy tour trong giỏ
+  const { items, updateItem } = useCart(); // updateItem để thay đổi số lượng trong context
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -38,20 +36,28 @@ export default function Payment() {
     );
   }
 
-  // Lấy tour đầu tiên trong giỏ (có thể map nếu muốn hiển thị nhiều tour)
-  const selectedItem = items[0];
-  const { tour, month, adults, children, infants, priceAdult, priceChild, priceInfant, singleSupplement, image, location } =
-    selectedItem;
+  // Tính tổng tiền toàn bộ tour
+  const totalAll = items.reduce(
+    (sum, item) =>
+      sum +
+      item.adults * item.monthData.prices.adult +
+      item.children * item.monthData.prices.child +
+      item.infants * item.monthData.prices.infant +
+      (item.singleSupplement || 0),
+    0
+  );
 
-  const total =
-    adults * priceAdult + children * priceChild + infants * priceInfant;
-
-  // Handle input
   const handleInput = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const handleDateChange = (date) =>
     setFormData({ ...formData, appointmentDate: date });
+
+  // Cập nhật số lượng trực tiếp
+  const handleQuantityChange = (index, type, value) => {
+    const newValue = parseInt(value) || 0;
+    updateItem(index, { [type]: newValue });
+  };
 
   // Gửi email khi chọn offline
   const sendAppointmentEmail = async () => {
@@ -59,19 +65,31 @@ export default function Payment() {
       setLoading(true);
       setMessage("⏳ Đang gửi email xác nhận...");
 
+      const tourDetails = items
+        .map(
+          (item, i) =>
+            `${i + 1}. ${item.tour.title} - Tháng ${item.monthData.month} - Người lớn: ${item.adults}, Trẻ em: ${item.children}, Trẻ nhỏ: ${item.infants} - Tổng: ${formatCurrency(
+              item.adults * item.monthData.prices.adult +
+                item.children * item.monthData.prices.child +
+                item.infants * item.monthData.prices.infant +
+                (item.singleSupplement || 0)
+            )}`
+        )
+        .join("\n");
+
       await emailjs.send(
-        "service_8w8xy0f", // Service ID
-        "template_lph7t7t", // Template ID
+        "service_8w8xy0f",
+        "template_lph7t7t",
         {
           name: formData.name,
           email: formData.email,
           phone: formData.phone,
-          tour_name: tour.title,
-          total_price: formatCurrency(total),
+          tour_name: tourDetails,
+          total_price: formatCurrency(totalAll),
           location: formData.location,
           date: formData.appointmentDate.toLocaleDateString("vi-VN"),
         },
-        "mXugIgN4N-oD4WVZZ" // Public Key
+        "mXugIgN4N-oD4WVZZ"
       );
 
       setMessage("✅ Email xác nhận đã được gửi thành công!");
@@ -92,17 +110,13 @@ export default function Payment() {
     }
 
     if (formData.paymentMethod === "vnpay") {
-      // VNPay sandbox
       const sandboxURL = `https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?vnp_Amount=${
-        total * 100
-      }&vnp_OrderInfo=Thanh%20toan%20tour%20${encodeURIComponent(
-        tour.title
-      )}&vnp_ReturnUrl=${encodeURIComponent(
+        totalAll * 100
+      }&vnp_OrderInfo=Thanh%20toan%20${encodeURIComponent("nhiều tour")}&vnp_ReturnUrl=${encodeURIComponent(
         window.location.origin + "/payment/success"
       )}`;
       window.open(sandboxURL, "_blank");
     } else {
-      // Đặt lịch offline
       sendAppointmentEmail();
     }
   };
@@ -229,36 +243,85 @@ export default function Payment() {
           )}
         </div>
 
-        {/* ==== TÓM TẮT TOUR ==== */}
-        <div className="bg-white rounded-2xl shadow p-6">
+        {/* ==== TÓM TẮT TOÀN BỘ GIỎ HÀNG ==== */}
+        <div className="bg-white rounded-2xl shadow p-6 max-h-[80vh] overflow-y-auto">
           <h3 className="text-lg font-semibold mb-4 text-gray-800">
-            TÓM TẮT CHUYẾN ĐI
+            TÓM TẮT GIỎ HÀNG
           </h3>
-          <img src={image} alt={tour.title} className="rounded-lg mb-3" />
-          <p className="font-medium text-gray-800">{tour.title}</p>
-          <p className="text-gray-500 flex items-center gap-2 mt-1">
-            <FaMapMarkerAlt /> {location}
-          </p>
 
-          <hr className="my-4" />
+          {items.map((item, idx) => (
+            <div key={idx} className="mb-4 border-b pb-2">
+              <img
+                src={item.tour.image}
+                alt={item.tour.title}
+                className="rounded-lg mb-2"
+              />
+              <p className="font-medium text-gray-800">{item.tour.title}</p>
+              <p className="text-gray-500 flex items-center gap-2 mt-1">
+                <FaMapMarkerAlt /> {item.tour.location}
+              </p>
 
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span>Người lớn</span>
-              <span>{adults}</span>
+              <div className="space-y-1 mt-2 text-sm">
+                <div className="flex justify-between items-center">
+                  <span>Người lớn</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={item.adults}
+                    onChange={(e) =>
+                      handleQuantityChange(idx, "adults", e.target.value)
+                    }
+                    className="border w-16 text-center rounded-lg p-1"
+                  />
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Trẻ em</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={item.children}
+                    onChange={(e) =>
+                      handleQuantityChange(idx, "children", e.target.value)
+                    }
+                    className="border w-16 text-center rounded-lg p-1"
+                  />
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Trẻ nhỏ</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={item.infants}
+                    onChange={(e) =>
+                      handleQuantityChange(idx, "infants", e.target.value)
+                    }
+                    className="border w-16 text-center rounded-lg p-1"
+                  />
+                </div>
+                {item.singleSupplement > 0 && (
+                  <div className="flex justify-between">
+                    <span>Phụ thu phòng đơn</span>
+                    <span>{formatCurrency(item.singleSupplement)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-semibold text-gray-800">
+                  <span>Tổng tiền tour</span>
+                  <span className="text-red-600 text-lg">
+                    {formatCurrency(
+                      item.adults * item.monthData.prices.adult +
+                        item.children * item.monthData.prices.child +
+                        item.infants * item.monthData.prices.infant +
+                        (item.singleSupplement || 0)
+                    )}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span>Trẻ em</span>
-              <span>{children}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Trẻ nhỏ</span>
-              <span>{infants}</span>
-            </div>
-            <div className="flex justify-between font-semibold text-gray-800">
-              <span>Tổng tiền</span>
-              <span className="text-red-600 text-lg">{formatCurrency(total)}</span>
-            </div>
+          ))}
+
+          <div className="flex justify-between font-bold text-lg mt-4 border-t pt-3">
+            <span>Tổng cộng</span>
+            <span className="text-red-600">{formatCurrency(totalAll)}</span>
           </div>
         </div>
       </div>
