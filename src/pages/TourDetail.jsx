@@ -58,8 +58,14 @@ const TourDetail = () => {
       return;
     }
 
-    // Thêm tour vào giỏ mà không cần mặc định số lượng
-    addToCart({ tour, monthData: activeMonthData });
+    // Thêm tour vào giỏ với số lượng mặc định
+    addToCart({
+      tour,
+      monthData: activeMonthData,
+      adults: 1,
+      children: 0,
+      infants: 0,
+    });
 
     // Chuyển sang trang Payment
     navigate("/payment");
@@ -68,23 +74,23 @@ const TourDetail = () => {
   return (
     <motion.div className="text-gray-800" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -30 }} transition={{ duration: 0.6, ease: "easeInOut" }}>
       {/* HERO PARALLAX */}
-      <ParallaxBanner layers={[{ image: tour.image, speed: -20 }]} className="h-[70vh] relative">
+      <ParallaxBanner layers={[{ image: tour.image || "/images/default.jpg", speed: -20 }]} className="h-[70vh] relative">
         <div className="absolute inset-0 bg-black/50 flex flex-col justify-center items-center text-white text-center p-4">
           <motion.h1 className="text-4xl md:text-5xl font-bold mb-2" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
-            {tour.title}
+            {tour.title || "Tour chưa có tiêu đề"}
           </motion.h1>
-          <p className="text-lg md:text-xl">{tour.location}</p>
+          <p className="text-lg md:text-xl">{tour.location || "Địa điểm chưa xác định"}</p>
         </div>
       </ParallaxBanner>
 
       {/* SLIDER ẢNH */}
       <motion.section className="max-w-5xl mx-auto py-10 px-4" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.8 }}>
         <Slider {...sliderSettings}>
-          {[tour.image, "/images/travel1.jpg", "/images/travel2.jpg"].map((src, i) => (
+          {[tour.image || "/images/default.jpg", "/images/travel1.jpg", "/images/travel2.jpg"].map((src, i) => (
             <div key={i}>
               <img
                 src={src}
-                alt={`${tour.title} - ảnh ${i + 1}`}
+                alt={`${tour.title || "Tour"} - ảnh ${i + 1}`}
                 className="rounded-xl mx-auto shadow-lg h-[300px] md:h-[500px] object-cover w-full"
               />
             </div>
@@ -121,25 +127,25 @@ const TourDetail = () => {
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-bold text-gray-800">Ngày khởi hành:</h3>
                     <div className="text-right font-semibold text-blue-600">
-                      {activeMonthData.departureDates.join(" | ")}
+                      {activeMonthData.departureDates?.join(" | ") || "Chưa xác định"}
                     </div>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center text-sm">
                     <div>
                       <p className="font-semibold text-gray-700">Người lớn</p>
-                      <p className="text-red-600 font-bold text-lg">{formatCurrency(activeMonthData.prices.adult)}</p>
+                      <p className="text-red-600 font-bold text-lg">{formatCurrency(activeMonthData.prices?.adult || 0)}</p>
                     </div>
                     <div>
                       <p className="font-semibold text-gray-700">Trẻ em</p>
-                      <p className="text-red-600 font-bold text-lg">{formatCurrency(activeMonthData.prices.child)}</p>
+                      <p className="text-red-600 font-bold text-lg">{formatCurrency(activeMonthData.prices?.child || 0)}</p>
                     </div>
                     <div>
                       <p className="font-semibold text-gray-700">Trẻ nhỏ</p>
-                      <p className="text-gray-500 font-bold text-lg">{formatCurrency(activeMonthData.prices.infant)}</p>
+                      <p className="text-gray-500 font-bold text-lg">{formatCurrency(activeMonthData.prices?.infant || 0)}</p>
                     </div>
                     <div>
                       <p className="font-semibold text-gray-700">Phụ thu phòng đơn</p>
-                      <p className="text-red-600 font-bold text-lg">{formatCurrency(activeMonthData.prices.singleSupplement)}</p>
+                      <p className="text-red-600 font-bold text-lg">{formatCurrency(activeMonthData.prices?.singleSupplement || 0)}</p>
                     </div>
                   </div>
                 </div>
@@ -149,23 +155,23 @@ const TourDetail = () => {
                   <div className="flex items-start">
                     <FaGift className="text-orange-500 text-base mr-3 mt-1 flex-shrink-0" />
                     <p>
-                      <span className="font-semibold">Ưu đãi tháng:</span> {activeMonthData.promotions}
+                      <span className="font-semibold">Ưu đãi tháng:</span> {activeMonthData.promotions || "Không có"}
                     </p>
                   </div>
                   <div className="flex items-start">
                     <MdFamilyRestroom className="text-green-500 text-base mr-3 mt-1 flex-shrink-0" />
                     <p>
-                      <span className="font-semibold">Phù hợp cho:</span> {activeMonthData.familySuitability}
+                      <span className="font-semibold">Phù hợp cho:</span> {activeMonthData.familySuitability || "Không xác định"}
                     </p>
                   </div>
                   <div className="flex items-start">
                     <FaPlaneDeparture className="text-sky-500 text-base mr-3 mt-1 flex-shrink-0" />
                     <p>
-                      <span className="font-semibold">Thông tin chuyến bay:</span> {activeMonthData.flightDeals}
+                      <span className="font-semibold">Thông tin chuyến bay:</span> {activeMonthData.flightDeals || "Chưa có"}
                     </p>
                   </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-4 pt-4 border-t italic">{activeMonthData.notes}</p>
+                <p className="text-xs text-gray-500 mt-4 pt-4 border-t italic">{activeMonthData.notes || ""}</p>
               </div>
             )}
           </div>
@@ -177,12 +183,16 @@ const TourDetail = () => {
       {/* LỊCH TRÌNH */}
       <motion.section className="max-w-6xl mx-auto p-6 mt-8 bg-white rounded-2xl shadow-lg" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}>
         <h2 className="text-2xl font-bold mb-6 text-center">LỊCH TRÌNH</h2>
-        {tour.itinerary.map((item, i) => (
-          <div key={i} className="mb-4">
-            <p className="font-semibold text-blue-600">Ngày {i + 1}</p>
-            <p className="text-gray-700">{item}</p>
-          </div>
-        ))}
+        {tour.itinerary?.length > 0 ? (
+          tour.itinerary.map((item, i) => (
+            <div key={i} className="mb-4">
+              <p className="font-semibold text-blue-600">Ngày {i + 1}</p>
+              <p className="text-gray-700">{item}</p>
+            </div>
+          ))
+        ) : (
+          <p className="text-gray-500 text-center">Chưa có lịch trình.</p>
+        )}
       </motion.section>
 
       {/* MAP */}
@@ -191,7 +201,7 @@ const TourDetail = () => {
         <div className="rounded-xl overflow-hidden shadow-lg">
           <iframe
             title="map"
-            src={`https://www.google.com/maps?q=${encodeURIComponent(tour.location)}&output=embed`}
+            src={`https://www.google.com/maps?q=${encodeURIComponent(tour.location || "")}&output=embed`}
             width="100%"
             height="350"
             loading="lazy"

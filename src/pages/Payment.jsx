@@ -1,5 +1,5 @@
 // src/pages/Payment.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Slider from "react-slick";
 import { FaGift, FaPlaneDeparture, FaCreditCard, FaPlus, FaMinus } from "react-icons/fa";
@@ -17,7 +17,7 @@ const formatCurrency = (number) =>
 
 const Payment = () => {
   const navigate = useNavigate();
-  const { cartItems, removeFromCart, updateCartItem } = useCart();
+  const { cartItems, updateCartItem } = useCart();
   const [notification, setNotification] = useState("");
 
   const sliderSettings = {
@@ -33,34 +33,35 @@ const Payment = () => {
 
   const handleQuantityChange = (index, type, delta) => {
     const item = cartItems[index];
-    let newValue = item[type] + delta;
+    if (!item) return;
+    let newValue = (item[type] || 0) + delta;
     if (newValue < 0) newValue = 0;
     updateCartItem(index, { ...item, [type]: newValue });
   };
 
   const calculateTotal = (item) => {
-    const { adults, children, infants, monthData } = item;
-    const prices = monthData.prices;
-    let total =
-      adults * prices.adult +
-      children * prices.child +
-      infants * prices.infant +
-      prices.singleSupplement;
-    return total;
+    const prices = item.monthData?.prices || { adult: 0, child: 0, infant: 0, singleSupplement: 0 };
+    return (
+      (item.adults || 0) * prices.adult +
+      (item.children || 0) * prices.child +
+      (item.infants || 0) * prices.infant +
+      (prices.singleSupplement || 0)
+    );
   };
 
   const handleCheckout = () => {
-    if (cartItems.length === 0) {
+    if (!cartItems || cartItems.length === 0) {
       setNotification("Giỏ hàng trống, không thể thanh toán.");
       setTimeout(() => setNotification(""), 3000);
       return;
     }
-    navigate("/checkout"); // giả định có trang checkout
+    navigate("/checkout");
   };
 
-  if (cartItems.length === 0) {
+  if (!cartItems || cartItems.length === 0) {
     return (
-      <motion.div className="text-center text-xl py-20 text-gray-500"
+      <motion.div
+        className="text-center text-xl py-20 text-gray-500"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
       >
@@ -70,7 +71,8 @@ const Payment = () => {
   }
 
   return (
-    <motion.div className="text-gray-800 max-w-6xl mx-auto p-4 md:p-6"
+    <motion.div
+      className="text-gray-800 max-w-6xl mx-auto p-4 md:p-6"
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -30 }}
@@ -78,20 +80,25 @@ const Payment = () => {
     >
       <h1 className="text-3xl font-bold mb-6 text-center text-blue-800">Thanh Toán Tour</h1>
 
-      {/* Hiển thị từng tour trong giỏ */}
-      {cartItems.map((item, index) => (
-        <motion.div key={index} className="mb-8 p-5 bg-white rounded-2xl shadow-lg"
+      {cartItems?.map((item, index) => (
+        <motion.div
+          key={index}
+          className="mb-8 p-5 bg-white rounded-2xl shadow-lg"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6 }}
         >
-          {/* Hero Slider */}
+          {/* Slider ảnh */}
           <Slider {...sliderSettings} className="mb-4">
-            {[item.tour.image, "/images/travel1.jpg", "/images/travel2.jpg"].map((src, i) => (
+            {[
+              item.tour?.image || "/images/default.jpg",
+              "/images/travel1.jpg",
+              "/images/travel2.jpg",
+            ].map((src, i) => (
               <div key={i}>
                 <img
                   src={src}
-                  alt={`${item.tour.title} - ảnh ${i + 1}`}
+                  alt={`${item.tour?.title || "Tour"} - ảnh ${i + 1}`}
                   className="rounded-xl mx-auto shadow-lg h-[300px] md:h-[500px] object-cover w-full"
                 />
               </div>
@@ -99,25 +106,43 @@ const Payment = () => {
           </Slider>
 
           {/* Thông tin tour */}
-          <h2 className="text-xl font-bold mb-2">{item.tour.title}</h2>
-          <p className="mb-2 text-gray-700">Tháng khởi hành: {item.monthData.month}</p>
+          <h2 className="text-xl font-bold mb-2">{item.tour?.title || "Tên tour không xác định"}</h2>
+          <p className="mb-2 text-gray-700">
+            Tháng khởi hành: {item.monthData?.month || "Chưa chọn tháng"}
+          </p>
 
           {/* Giá và số lượng */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
             {["adults", "children", "infants"].map((type) => (
               <div key={type}>
-                <p className="font-semibold text-gray-700">{type === "adults" ? "Người lớn" : type === "children" ? "Trẻ em" : "Trẻ nhỏ"}</p>
+                <p className="font-semibold text-gray-700">
+                  {type === "adults" ? "Người lớn" : type === "children" ? "Trẻ em" : "Trẻ nhỏ"}
+                </p>
                 <div className="flex justify-center items-center mt-1 gap-2">
-                  <button onClick={() => handleQuantityChange(index, type, -1)} className="px-2 py-1 bg-gray-200 rounded"><FaMinus /></button>
-                  <span className="font-bold">{item[type]}</span>
-                  <button onClick={() => handleQuantityChange(index, type, 1)} className="px-2 py-1 bg-gray-200 rounded"><FaPlus /></button>
+                  <button
+                    onClick={() => handleQuantityChange(index, type, -1)}
+                    className="px-2 py-1 bg-gray-200 rounded"
+                  >
+                    <FaMinus />
+                  </button>
+                  <span className="font-bold">{item[type] || 0}</span>
+                  <button
+                    onClick={() => handleQuantityChange(index, type, 1)}
+                    className="px-2 py-1 bg-gray-200 rounded"
+                  >
+                    <FaPlus />
+                  </button>
                 </div>
-                <p className="text-red-600 font-bold mt-1">{formatCurrency(item.monthData.prices[type] * item[type])}</p>
+                <p className="text-red-600 font-bold mt-1">
+                  {formatCurrency((item[type] || 0) * (item.monthData?.prices?.[type] || 0))}
+                </p>
               </div>
             ))}
             <div>
               <p className="font-semibold text-gray-700">Phụ thu phòng đơn</p>
-              <p className="text-red-600 font-bold mt-5">{formatCurrency(item.monthData.prices.singleSupplement)}</p>
+              <p className="text-red-600 font-bold mt-5">
+                {formatCurrency(item.monthData?.prices?.singleSupplement || 0)}
+              </p>
             </div>
           </div>
 
@@ -128,15 +153,24 @@ const Payment = () => {
           <div className="space-y-3 text-sm mt-4">
             <div className="flex items-start">
               <FaGift className="text-orange-500 text-base mr-3 mt-1 flex-shrink-0" />
-              <p><span className="font-semibold">Ưu đãi tháng:</span> {item.monthData.promotions}</p>
+              <p>
+                <span className="font-semibold">Ưu đãi tháng:</span>{" "}
+                {item.monthData?.promotions || "Không có"}
+              </p>
             </div>
             <div className="flex items-start">
               <MdFamilyRestroom className="text-green-500 text-base mr-3 mt-1 flex-shrink-0" />
-              <p><span className="font-semibold">Phù hợp cho:</span> {item.monthData.familySuitability}</p>
+              <p>
+                <span className="font-semibold">Phù hợp cho:</span>{" "}
+                {item.monthData?.familySuitability || "Không xác định"}
+              </p>
             </div>
             <div className="flex items-start">
               <FaPlaneDeparture className="text-sky-500 text-base mr-3 mt-1 flex-shrink-0" />
-              <p><span className="font-semibold">Thông tin chuyến bay:</span> {item.monthData.flightDeals}</p>
+              <p>
+                <span className="font-semibold">Thông tin chuyến bay:</span>{" "}
+                {item.monthData?.flightDeals || "Không có"}
+              </p>
             </div>
           </div>
 
@@ -144,7 +178,7 @@ const Payment = () => {
           <div className="rounded-xl overflow-hidden shadow-lg mt-4">
             <iframe
               title="map"
-              src={`https://www.google.com/maps?q=${encodeURIComponent(item.tour.location)}&output=embed`}
+              src={`https://www.google.com/maps?q=${encodeURIComponent(item.tour?.location || "")}&output=embed`}
               width="100%"
               height="350"
               loading="lazy"
