@@ -58,7 +58,7 @@ const TourDetail = () => {
       return;
     }
 
-    // Thêm tour vào giỏ mà không cần nhập số lượng
+    // Thêm tour vào giỏ mà không cần mặc định số lượng
     addToCart({ tour, monthData: activeMonthData });
 
     // Chuyển sang trang Payment
@@ -66,21 +66,11 @@ const TourDetail = () => {
   };
 
   return (
-    <motion.div
-      className="text-gray-800"
-      initial={{ opacity: 0, y: 30 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -30 }}
-      transition={{ duration: 0.6, ease: "easeInOut" }}
-    >
+    <motion.div className="text-gray-800" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -30 }} transition={{ duration: 0.6, ease: "easeInOut" }}>
       {/* HERO PARALLAX */}
       <ParallaxBanner layers={[{ image: tour.image, speed: -20 }]} className="h-[70vh] relative">
         <div className="absolute inset-0 bg-black/50 flex flex-col justify-center items-center text-white text-center p-4">
-          <motion.h1
-            className="text-4xl md:text-5xl font-bold mb-2"
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-          >
+          <motion.h1 className="text-4xl md:text-5xl font-bold mb-2" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
             {tour.title}
           </motion.h1>
           <p className="text-lg md:text-xl">{tour.location}</p>
@@ -88,12 +78,7 @@ const TourDetail = () => {
       </ParallaxBanner>
 
       {/* SLIDER ẢNH */}
-      <motion.section
-        className="max-w-5xl mx-auto py-10 px-4"
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        transition={{ duration: 0.8 }}
-      >
+      <motion.section className="max-w-5xl mx-auto py-10 px-4" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.8 }}>
         <Slider {...sliderSettings}>
           {[tour.image, "/images/travel1.jpg", "/images/travel2.jpg"].map((src, i) => (
             <div key={i}>
@@ -108,12 +93,7 @@ const TourDetail = () => {
       </motion.section>
 
       {/* LỊCH KHỞI HÀNH */}
-      <motion.section
-        className="max-w-6xl mx-auto p-4 md:p-6 bg-white rounded-2xl shadow-lg mt-5"
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-      >
+      <motion.section className="max-w-6xl mx-auto p-4 md:p-6 bg-white rounded-2xl shadow-lg mt-5" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
         <h2 className="text-3xl font-bold mb-6 text-center text-blue-800">LỊCH KHỞI HÀNH</h2>
         {tour.departureMonths && tour.departureMonths.length > 0 ? (
           <div className="flex flex-col md:flex-row gap-6">
@@ -195,11 +175,7 @@ const TourDetail = () => {
       </motion.section>
 
       {/* LỊCH TRÌNH */}
-      <motion.section
-        className="max-w-6xl mx-auto p-6 mt-8 bg-white rounded-2xl shadow-lg"
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-      >
+      <motion.section className="max-w-6xl mx-auto p-6 mt-8 bg-white rounded-2xl shadow-lg" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}>
         <h2 className="text-2xl font-bold mb-6 text-center">LỊCH TRÌNH</h2>
         {tour.itinerary.map((item, i) => (
           <div key={i} className="mb-4">
