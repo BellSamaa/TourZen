@@ -9,7 +9,6 @@ import { IoIosMail, IoIosCall } from "react-icons/io";
 
 // --- Helper Components ---
 
-// Component cho input có icon
 const InfoInput = ({ icon, ...props }) => (
   <div className="relative">
     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -22,7 +21,6 @@ const InfoInput = ({ icon, ...props }) => (
   </div>
 );
 
-// Component cho bộ đếm số lượng
 const QuantityCounter = ({ label, description, value, onDecrease, onIncrease }) => (
   <div className="flex justify-between items-center">
     <div>
@@ -48,7 +46,6 @@ export default function Payment() {
   const { items: cartItems, clearCart } = useCart();
   const tour = cartItems.length > 0 ? cartItems[0] : null;
 
-  // --- State Management ---
   const [step] = useState(1);
   const [contactInfo, setContactInfo] = useState({ name: "", phone: "", email: "", address: "" });
   const [passengers, setPassengers] = useState({ adults: 1, children: 0, infants: 0 });
@@ -60,8 +57,6 @@ export default function Payment() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notification, setNotification] = useState({ message: "", type: "" });
 
-  // --- Effects ---
-  // ✅ FIX: Sửa lỗi form hành khách bị trùng lặp dữ liệu
   useEffect(() => {
     const adultCount = passengers.adults;
     const currentDetailsCount = passengerDetails.length;
@@ -77,7 +72,6 @@ export default function Payment() {
     }
   }, [passengers.adults]);
 
-  // --- Memoized Calculations ---
   const paymentDeadline = useMemo(() => {
     if (!tour || !tour.departureDates || tour.departureDates.length === 0) {
       const today = new Date();
@@ -93,18 +87,16 @@ export default function Payment() {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   });
 
-  // ✅ IMPROVEMENT: Tính tổng tiền theo thời gian thực
   const displayTotal = useMemo(() => {
     if (!tour) return 0;
     const adultsTotal = passengers.adults * (tour.priceAdult || 0);
     const childrenTotal = passengers.children * (tour.priceChild || 0);
     const infantsTotal = passengers.infants * (tour.priceInfant || 0);
-    const discount = 800000; // Ưu đãi giờ chót
+    const discount = 800000;
 
     return adultsTotal + childrenTotal + infantsTotal - discount;
   }, [passengers, tour]);
 
-  // --- Handlers ---
   const handleInputChange = (e, setState) => {
     setState(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
@@ -127,74 +119,25 @@ export default function Payment() {
     setTimeout(() => setNotification({ message: "", type: "" }), 4000);
   };
 
+  // ✅ HÀM DÙNG ĐỂ KIỂM TRA LỖI
   const handleCheckout = async (e) => {
     e.preventDefault();
-    if (!contactInfo.name || !contactInfo.phone || !contactInfo.email) {
-      showNotification("Vui lòng điền đầy đủ thông tin liên lạc.");
-      return;
-    }
-    if (passengerDetails.some(p => !p.name || !p.dob)) {
-      showNotification("Vui lòng điền đầy đủ thông tin của tất cả hành khách.");
-      return;
-    }
-    if (!agreedToTerms) {
-      showNotification("Bạn phải đồng ý với các điều khoản và chính sách.");
-      return;
-    }
 
-    setIsSubmitting(true);
+    // Hiển thị dữ liệu hiện tại trong state để kiểm tra
+    alert(`
+      KIỂM TRA DỮ LIỆU:
+      -------------------
+      Tên: ${contactInfo.name}
+      SĐT: ${contactInfo.phone}
+      Email: ${contactInfo.email}
+      -------------------
+      Hãy kiểm tra xem email có hiển thị ở đây không.
+    `);
 
-    const templateParams = {
-      customer_name: contactInfo.name,
-      customer_email: contactInfo.email,
-      customer_phone: contactInfo.phone,
-      tour_title: tour.title,
-      tour_location: tour.location,
-      total_passengers: passengers.adults + passengers.children + passengers.infants,
-      passenger_list: passengerDetails.map(p => `- ${p.name} (${p.gender}, sinh ngày ${p.dob})`).join('\n'),
-      total_amount: new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(displayTotal),
-      notes: notes || "Không có",
-    };
-
-    try {
-      if (paymentMethod === 'direct') {
-        await emailjs.send(
-          'service_8w8xy0f',
-          'template_yqexxe9',
-          { ...templateParams, branch_address: selectedBranch, payment_deadline: formattedDeadline },
-          'mXugIgN4N-oD4WVZZ'
-        );
-        clearCart();
-        // ✅ FIX: Truyền state cho trang success
-        navigate("/payment-success", {
-          state: {
-            method: 'direct',
-            branch: selectedBranch,
-            deadline: formattedDeadline
-          }
-        });
-      } else { // VNPay
-        await emailjs.send(
-          'service_8w8xy0f',
-          'template_lph7t7t',
-          templateParams,
-          'mXugIgN4N-oD4WVZZ'
-        );
-        clearCart();
-        // ✅ FIX: Truyền state cho trang success
-        navigate("/payment-success", {
-          state: {
-            method: 'vnpay'
-          }
-        });
-      }
-    } catch (error) {
-      console.error("Lỗi khi gửi email:", error);
-      showNotification("Đã có lỗi xảy ra. Vui lòng thử lại sau.");
-    } finally {
-      setIsSubmitting(false);
-    }
+    // Dừng hàm tại đây, không gửi email
+    return;
   };
+
 
   if (!tour) {
     return (
@@ -204,7 +147,6 @@ export default function Payment() {
     );
   }
 
-  // --- Render ---
   return (
     <div className="bg-gray-100 min-h-screen py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
@@ -321,7 +263,6 @@ export default function Payment() {
 
               <div className="mt-4 pt-4 border-t flex justify-between items-center">
                 <span className="text-lg font-bold">Tổng tiền</span>
-                {/* ✅ IMPROVEMENT: Dùng displayTotal để hiển thị tổng tiền chính xác */}
                 <span className="text-2xl font-bold text-red-600">{new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(displayTotal)}</span>
               </div>
 
