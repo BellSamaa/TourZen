@@ -2,8 +2,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Slider from "react-slick";
-import { FaGift, FaPlaneDeparture, FaCreditCard, FaPlus, FaMinus } from "react-icons/fa";
-import { MdFamilyRestroom } from "react-icons/md";
+import { FaCreditCard, FaPlus, FaMinus } from "react-icons/fa";
 import { motion } from "framer-motion";
 import { useCart } from "../context/CartContext";
 import emailjs from "@emailjs/browser";
@@ -15,12 +14,22 @@ const formatCurrency = (number) =>
     ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(number)
     : "N/A";
 
-const Payment = () => {
+export default function Payment() {
   const navigate = useNavigate();
   const { items: cartItems, updateQty, clearCart } = useCart();
-  const [notification, setNotification] = useState("");
-  const [selectedBranch, setSelectedBranch] = useState("Hà Nội");
+
   const [paymentMethod, setPaymentMethod] = useState("vnpay"); // vnpay | direct
+  const [selectedBranch, setSelectedBranch] = useState("Hà Nội");
+
+  // Thông tin khách hàng
+  const [customer, setCustomer] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    birthYear: "",
+  });
+
+  const [notification, setNotification] = useState("");
 
   const sliderSettings = {
     dots: true,
@@ -58,25 +67,47 @@ const Payment = () => {
       return;
     }
 
+    // Kiểm tra thông tin khách hàng
+    if (!customer.name || !customer.email || !customer.phone || !customer.birthYear) {
+      setNotification("Vui lòng điền đầy đủ thông tin khách hàng.");
+      setTimeout(() => setNotification(""), 3000);
+      return;
+    }
+
     if (paymentMethod === "vnpay") {
-      // VNPay: redirect sang VNPay (thường gọi API server tạo link)
-      navigate("/vnpay"); // hoặc window.location.href = linkVNPay
+      // VNPay: redirect sang VNPay
+      navigate("/vnpay");
       return;
     }
 
     if (paymentMethod === "direct") {
-      // Thanh toán tại cơ sở: gửi email xác nhận
       try {
+        // Tính ngày hẹn thanh toán trước 7 ngày khởi hành (lấy ngày đầu tiên)
+        const scheduleDates = cartItems.map((i) =>
+          i.departureDates?.length ? new Date(i.departureDates[0]) : new Date()
+        );
+        const earliest = new Date(Math.min(...scheduleDates));
+        const paymentDeadline = new Date(earliest);
+        paymentDeadline.setDate(paymentDeadline.getDate() - 7);
+        const deadlineStr = paymentDeadline.toLocaleDateString("vi-VN");
+
         const templateParams = {
-          customer_email: "khachhang@example.com", // thay bằng email khách thực tế
+          customer_name: customer.name,
+          customer_email: customer.email,
+          customer_phone: customer.phone,
+          customer_birthYear: customer.birthYear,
           branch: selectedBranch,
+          payment_deadline: deadlineStr,
           tour_list: cartItems
-            .map((i) => `${i.title} - Tháng ${i.month} x${i.adults + i.children + i.infants}`)
+            .map(
+              (i) =>
+                `${i.title} - Tháng ${i.month} - Người lớn: ${i.adults}, Trẻ em: ${i.children}, Trẻ nhỏ: ${i.infants} - Tổng: ${formatCurrency(
+                  calculateTotal(i)
+                )}`
+            )
             .join("\n"),
-          total: cartItems.reduce(
-            (sum, i) =>
-              sum + (i.adults * i.priceAdult + i.children * i.priceChild + i.infants * i.priceInfant + i.singleSupplement),
-            0
+          total_amount: formatCurrency(
+            cartItems.reduce((sum, i) => sum + calculateTotal(i), 0)
           ),
         };
 
@@ -90,7 +121,7 @@ const Payment = () => {
         clearCart();
         navigate("/payment-success");
       } catch (err) {
-        console.error("Lỗi gửi email:", err);
+        console.error(err);
         setNotification("Có lỗi xảy ra khi gửi email. Vui lòng thử lại.");
         setTimeout(() => setNotification(""), 3000);
       }
@@ -99,83 +130,93 @@ const Payment = () => {
 
   if (!cartItems || cartItems.length === 0) {
     return (
-      <motion.div
-        className="text-center text-xl py-20 text-gray-500"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-      >
+      <motion.div className="text-center text-xl py-20 text-gray-500">
         Giỏ hàng trống. Vui lòng chọn tour trước.
       </motion.div>
     );
   }
 
   return (
-    <motion.div
-      className="text-gray-800 max-w-6xl mx-auto p-4 md:p-6"
-      initial={{ opacity: 0, y: 30 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -30 }}
-      transition={{ duration: 0.6 }}
-    >
-      <h1 className="text-3xl font-bold mb-6 text-center text-blue-800">Thanh Toán Tour</h1>
+    <motion.div className="max-w-6xl mx-auto p-4 md:p-6 text-gray-800" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <h1 className="text-3xl font-bold text-center text-blue-800 mb-6">Thanh Toán Tour</h1>
 
-      {/* Chọn phương thức thanh toán */}
-      <div className="mb-6 flex items-center gap-4">
-        <label className="font-semibold text-gray-700">Chọn phương thức:</label>
+      {/* Thông tin khách hàng */}
+      <div className="bg-white shadow-lg rounded-xl p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Thông tin khách hàng</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <input
+            placeholder="Họ và tên"
+            className="border rounded px-3 py-2"
+            value={customer.name}
+            onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
+          />
+          <input
+            placeholder="Email"
+            type="email"
+            className="border rounded px-3 py-2"
+            value={customer.email}
+            onChange={(e) => setCustomer({ ...customer, email: e.target.value })}
+          />
+          <input
+            placeholder="Số điện thoại"
+            className="border rounded px-3 py-2"
+            value={customer.phone}
+            onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
+          />
+          <input
+            placeholder="Năm sinh"
+            type="number"
+            className="border rounded px-3 py-2"
+            value={customer.birthYear}
+            onChange={(e) => setCustomer({ ...customer, birthYear: e.target.value })}
+          />
+        </div>
+      </div>
+
+      {/* Phương thức thanh toán */}
+      <div className="bg-white shadow-lg rounded-xl p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Chọn phương thức thanh toán</h2>
         <select
           value={paymentMethod}
           onChange={(e) => setPaymentMethod(e.target.value)}
-          className="border rounded px-3 py-2"
+          className="border rounded px-3 py-2 w-full mb-4"
         >
           <option value="vnpay">VNPay</option>
-          <option value="direct">Thanh toán tại cơ sở</option>
+          <option value="direct">Đặt lịch hẹn đến cơ sở</option>
         </select>
-      </div>
-
-      {/* Nếu thanh toán trực tiếp thì chọn chi nhánh */}
-      {paymentMethod === "direct" && (
-        <div className="mb-6 flex items-center gap-4">
-          <label className="font-semibold text-gray-700">Chọn cơ sở gần nhất:</label>
+        {paymentMethod === "direct" && (
           <select
             value={selectedBranch}
             onChange={(e) => setSelectedBranch(e.target.value)}
-            className="border rounded px-3 py-2"
+            className="border rounded px-3 py-2 w-full"
           >
             <option value="Hà Nội">Số A, Đường B, Hà Nội</option>
             <option value="Hồ Chí Minh">Số X, Đường Y, Hồ Chí Minh</option>
           </select>
-        </div>
-      )}
+        )}
+      </div>
 
+      {/* Danh sách tour trong giỏ */}
       {cartItems.map((item, index) => (
-        <motion.div
-          key={item.key}
-          className="mb-8 p-5 bg-white rounded-2xl shadow-lg"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6 }}
-        >
+        <motion.div key={item.key} className="bg-white shadow-lg rounded-xl p-6 mb-6">
           <Slider {...sliderSettings} className="mb-4">
             {[item.image || "/images/default.jpg"].map((src, i) => (
               <div key={i}>
                 <img
                   src={src}
                   alt={`${item.title} - ảnh ${i + 1}`}
-                  className="rounded-xl mx-auto shadow-lg h-[300px] md:h-[500px] object-cover w-full"
+                  className="rounded-xl mx-auto h-64 md:h-80 object-cover w-full"
                 />
               </div>
             ))}
           </Slider>
+          <h3 className="text-xl font-bold mb-2">{item.title}</h3>
+          <p className="text-gray-700 mb-2">Tháng khởi hành: {item.month}</p>
 
-          <h2 className="text-xl font-bold mb-2">{item.title}</h2>
-          <p className="mb-2 text-gray-700">Tháng khởi hành: {item.month}</p>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+          <div className="grid grid-cols-3 gap-4 text-center mb-4">
             {["adults", "children", "infants"].map((type) => (
               <div key={type}>
-                <p className="font-semibold text-gray-700">
-                  {type === "adults" ? "Người lớn" : type === "children" ? "Trẻ em" : "Trẻ nhỏ"}
-                </p>
+                <p className="font-semibold">{type === "adults" ? "Người lớn" : type === "children" ? "Trẻ em" : "Trẻ nhỏ"}</p>
                 <div className="flex justify-center items-center mt-1 gap-2">
                   <button
                     onClick={() => handleQuantityChange(index, type, -1)}
@@ -193,27 +234,23 @@ const Payment = () => {
                 </div>
                 <p className="text-red-600 font-bold mt-1">
                   {formatCurrency(
-                    (type === "adults"
-                      ? item.priceAdult
-                      : type === "children"
-                      ? item.priceChild
-                      : item.priceInfant) * (item[type] || 0)
+                    (type === "adults" ? item.priceAdult : type === "children" ? item.priceChild : item.priceInfant) *
+                      (item[type] || 0)
                   )}
                 </p>
               </div>
             ))}
           </div>
 
-          <p className="text-right font-bold text-lg mt-4">
-            Tổng: {formatCurrency(calculateTotal(item))}
-          </p>
+          <p className="text-right font-bold text-lg">Tổng: {formatCurrency(calculateTotal(item))}</p>
         </motion.div>
       ))}
 
-      <div className="flex justify-center mt-6 mb-16">
+      {/* Thanh toán */}
+      <div className="flex justify-center mb-16">
         <motion.button
           onClick={handleCheckout}
-          className="px-10 py-4 bg-gradient-to-r from-blue-600 to-sky-500 text-white text-lg font-semibold rounded-full shadow-lg hover:shadow-xl hover:from-blue-700 transition-all duration-300 flex items-center gap-3"
+          className="px-10 py-4 bg-gradient-to-r from-blue-600 to-sky-500 text-white text-lg font-semibold rounded-full shadow-lg hover:shadow-xl transition-all flex items-center gap-3"
           whileTap={{ scale: 0.95 }}
           whileHover={{ scale: 1.05 }}
         >
@@ -232,6 +269,4 @@ const Payment = () => {
       )}
     </motion.div>
   );
-};
-
-export default Payment;
+}
