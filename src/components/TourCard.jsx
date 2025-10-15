@@ -1,15 +1,23 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ShoppingCart, MapPin, Star, PlaneTakeoff } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useCart } from "../context/CartContext";
 
 export default function TourCard({ tour }) {
   const { addToCart } = useCart();
   const navigate = useNavigate();
+  const [toast, setToast] = useState(false);
 
   const handleBookNow = () => {
-    navigate("/checkout", { state: { tour } });
+    addToCart(tour);
+    navigate("/payment");
+  };
+
+  const handleAddToCart = () => {
+    addToCart(tour);
+    setToast(true);
+    setTimeout(() => setToast(false), 1500); // tự ẩn sau 1.5 giây
   };
 
   return (
@@ -62,7 +70,7 @@ export default function TourCard({ tour }) {
           </Link>
 
           <button
-            onClick={() => addToCart(tour)}
+            onClick={handleAddToCart}
             className="p-2 rounded-full bg-sky-500 hover:bg-sky-600 text-white transition-all"
             title="Thêm vào giỏ hàng"
           >
@@ -81,6 +89,20 @@ export default function TourCard({ tour }) {
           Đặt tour ngay
         </motion.button>
       </div>
+
+      {/* TOAST THÔNG BÁO */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-2 rounded-full shadow-lg text-sm z-50"
+          >
+            Đã thêm vào giỏ hàng!
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* HIỆU ỨNG ÁNH SÁNG */}
       <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-white/0 via-white/10 to-transparent opacity-0 hover:opacity-100 transition-all duration-700"></div>

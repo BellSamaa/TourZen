@@ -13,6 +13,7 @@ import Home from "./pages/Home.jsx";
 import TourList from "./pages/TourList.jsx";
 import TourDetail from "./pages/TourDetail.jsx";
 import Booking from "./pages/Booking.jsx";
+import VNPAYPage from "./pages/VNPAYPage";
 import Payment from "./pages/Payment.jsx";
 import PaymentSuccess from "./pages/PaymentSuccess.jsx";
 import CartPage from "./pages/Cart.jsx";
@@ -72,6 +73,7 @@ export default function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/admin/*" element={<AdminDashboard />} />
               <Route path="*" element={<NotFound />} />
+              <Route path="/vnpay" element={<VNPAYPage />} />
             </Routes>
           </AnimatePresence>
         </main>
