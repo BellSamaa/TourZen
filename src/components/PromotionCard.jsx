@@ -1,72 +1,43 @@
 // src/components/PromotionCard.jsx
-import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Clock, Tag } from "lucide-react";
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Clock, Tag } from 'lucide-react';
 
 export default function PromotionCard({ promo, onClaim }) {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
     <motion.div
-      className="relative rounded-2xl overflow-hidden shadow-md cursor-pointer border-2 border-transparent hover:border-blue-400 transition-all duration-300"
+      className="relative rounded-2xl overflow-hidden shadow-lg cursor-pointer border border-transparent transition-all duration-300 hover:scale-105"
       onClick={() => onClaim(promo)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      whileHover={{ scale: 1.03 }}
-      transition={{ type: "spring", stiffness: 250 }}
     >
-      {/* Image */}
       <img
         src={promo.image}
         alt={promo.title}
         className="w-full h-56 object-cover transition-transform duration-500 ease-in-out hover:scale-105"
       />
-      {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-      {/* Tag */}
-      <div className="absolute top-4 left-4">
-        <span className="bg-gradient-to-r from-blue-500 to-sky-400 text-white px-3 py-1 text-sm font-bold rounded-full flex items-center gap-1.5 shadow-md">
-          <Tag size={14} /> {promo.tag}
-        </span>
+      <div className="absolute top-4 left-4 bg-gradient-to-r from-blue-400 to-sky-400 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-sm flex items-center gap-1">
+        <Tag size={14} />
+        {promo.tag}
       </div>
-      {/* Info */}
-      <div className="absolute bottom-0 left-0 p-5 text-white w-full">
-        <h2 className="text-2xl font-bold">{promo.title}</h2>
-        <p className="text-sm mt-1">{promo.description}</p>
-        <div className="mt-2 flex items-center gap-3 text-xs font-semibold">
-          <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-sm px-2 py-1 rounded-full">
-            <Clock size={14} /> {promo.timeLimit}
-          </div>
-          {promo.quantityLimit && (
-            <span className="bg-red-600/70 px-2 py-1 rounded-full text-white font-bold animate-pulse">
-              Số lượng có hạn!
-            </span>
-          )}
-        </div>
+      <div className="absolute top-4 right-4 bg-white/70 text-blue-600 font-semibold px-2 py-1 rounded-md text-xs shadow-sm">
+        -{promo.discountPercent}%
       </div>
 
-      {/* Hover preview */}
-      <AnimatePresence>
-        {isHovered && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="absolute top-4 right-4 w-64 bg-white dark:bg-neutral-800 p-4 rounded-2xl shadow-xl text-black dark:text-white z-20 border border-gray-200"
+      <div className="p-5">
+        <h3 className="text-xl font-bold text-blue-800 mb-2">{promo.title}</h3>
+        <p className="text-gray-700 dark:text-gray-300 text-sm mb-4">{promo.description}</p>
+        <div className="flex justify-between items-center">
+          <span className="text-xs font-medium text-gray-500">{promo.timeLimit}</span>
+          <button
+            className="bg-gradient-to-r from-green-400 to-teal-400 text-white px-5 py-2 rounded-full font-semibold text-sm shadow hover:scale-105 transition-transform duration-300"
           >
-            <h3 className="font-bold text-lg mb-1">{promo.title}</h3>
-            <p className="text-sm mb-1">
-              Giảm ngay: <span className="font-semibold text-red-600">{promo.discountPercent}%</span>
-            </p>
-            <p className="text-xs mb-1 flex items-center gap-1">
-              <Clock size={14} /> {promo.timeLimit}
-            </p>
-            {promo.quantityLimit && (
-              <p className="text-xs font-bold text-red-500 animate-pulse">Số lượng có hạn!</p>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+            Săn Voucher
+          </button>
+        </div>
+      </div>
     </motion.div>
   );
 }
