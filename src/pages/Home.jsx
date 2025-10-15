@@ -13,7 +13,7 @@ import "swiper/css";
 import "swiper/css/pagination";
 import "swiper/css/navigation";
 
-// Dữ liệu cho các điểm đến
+// Dữ liệu cho các điểm đến (ĐÃ RÚT GỌN)
 const destinationsData = {
   mienBac: [
     { name: 'Quảng Ninh', image: '/images/destinations/quangninh.jpg', gridClass: 'md:col-span-2 md:row-span-2' },
@@ -34,25 +34,16 @@ const destinationsData = {
     { name: 'Nha Trang', image: '/images/destinations/nhatrang_dest.jpg', gridClass: '' },
     { name: 'Phan Thiết', image: '/images/destinations/phanthiet.jpg', gridClass: 'md:col-span-2' },
   ],
-  mienDongNamBo: [],
-  mienTayNamBo: [],
-  chauA: [],
-  chauAu: [],
-  chauMy: [],
-  chauUc: [],
-  chauPhi: [],
+  mienDongNamBo: [], // Bạn có thể thêm dữ liệu cho miền này
+  mienTayNamBo: [],  // Bạn có thể thêm dữ liệu cho miền này
 };
 
+// Danh sách các tab (ĐÃ RÚT GỌN)
 const tabs = [
   { key: 'mienBac', label: 'Miền Bắc' },
   { key: 'mienTrung', label: 'Miền Trung' },
   { key: 'mienDongNamBo', label: 'Miền Đông Nam Bộ' },
   { key: 'mienTayNamBo', label: 'Miền Tây Nam Bộ' },
-  { key: 'chauA', label: 'Châu Á' },
-  { key: 'chauAu', label: 'Châu Âu' },
-  { key: 'chauMy', label: 'Châu Mỹ' },
-  { key: 'chauUc', label: 'Châu Úc' },
-  { key: 'chauPhi', label: 'Châu Phi' },
 ];
 
 
@@ -266,20 +257,26 @@ export default function Home() {
           transition={{ duration: 0.5 }}
           className="grid grid-cols-2 md:grid-cols-4 md:grid-flow-row-dense gap-4 auto-rows-[250px]"
         >
-          {destinationsData[activeTab].map((dest, index) => (
-            <motion.div
-              key={`${activeTab}-${index}`}
-              className={`relative rounded-2xl overflow-hidden shadow-lg group cursor-pointer ${dest.gridClass}`}
-              whileHover={{ scale: 1.03 }}
-              transition={{ type: 'spring', stiffness: 300 }}
-            >
-              <img src={dest.image} alt={dest.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
-              <div className="absolute bottom-0 left-0 p-5">
-                <h3 className="text-white text-xl font-bold">{dest.name}</h3>
-              </div>
-            </motion.div>
-          ))}
+          {destinationsData[activeTab] && destinationsData[activeTab].length > 0 ? (
+             destinationsData[activeTab].map((dest, index) => (
+                <motion.div
+                key={`${activeTab}-${index}`}
+                className={`relative rounded-2xl overflow-hidden shadow-lg group cursor-pointer ${dest.gridClass}`}
+                whileHover={{ scale: 1.03 }}
+                transition={{ type: 'spring', stiffness: 300 }}
+                >
+                <img src={dest.image} alt={dest.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
+                <div className="absolute bottom-0 left-0 p-5">
+                    <h3 className="text-white text-xl font-bold">{dest.name}</h3>
+                </div>
+                </motion.div>
+            ))
+          ) : (
+            <div className="col-span-full text-center text-gray-500 py-10">
+              <p>Chưa có điểm đến nào cho khu vực này. Vui lòng quay lại sau.</p>
+            </div>
+          )}
         </motion.div>
       </motion.section>
 

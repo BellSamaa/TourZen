@@ -1,11 +1,11 @@
 // src/pages/TourDetail.jsx
+
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { TOURS } from "../data/tours_updated";
+import { TOURS } from "../data/tours_updated"; // Đảm bảo đường dẫn này đúng
 import { ParallaxBanner } from "react-scroll-parallax";
 import Slider from "react-slick";
-import { FaGift, FaPlaneDeparture, FaCreditCard } from "react-icons/fa";
-import { MdFamilyRestroom } from "react-icons/md";
+import { FaCreditCard } from "react-icons/fa";
 import { motion } from "framer-motion";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
@@ -20,35 +20,45 @@ const formatCurrency = (number) => {
 const TourDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const tour = TOURS.find((t) => t.id === parseInt(id));
   const { addToCart } = useCart();
+  const tour = TOURS.find((t) => t.id === parseInt(id));
 
   const [activeMonthData, setActiveMonthData] = useState(null);
   const [notification, setNotification] = useState("");
 
   useEffect(() => {
-    if (tour && tour.departureMonths && tour.departureMonths.length > 0) {
+    // Tự động chọn tháng đầu tiên khi component tải
+    if (tour?.departureMonths?.length > 0) {
       setActiveMonthData(tour.departureMonths[0]);
     }
+    // Cuộn lên đầu trang mỗi khi xem tour mới
+    window.scrollTo(0, 0);
   }, [tour]);
+
+  // ✅ CẢI TIẾN 1: Slider ảnh thông minh hơn
+  // Lấy ảnh từ gallery trong data, nếu không có thì fallback về ảnh chính
+  const galleryImages = tour?.galleryImages?.length > 0 ? tour.galleryImages : [tour?.image || "/images/default.jpg"];
 
   if (!tour) {
     return (
-      <motion.div className="text-center text-xl py-20" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-        Tour không tồn tại.
-      </motion.div>
+      <div className="flex items-center justify-center min-h-screen">
+        <motion.div className="text-center text-xl py-20" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          Tour không tồn tại hoặc đã bị xóa.
+        </motion.div>
+      </div>
     );
   }
 
   const sliderSettings = {
     dots: true,
-    infinite: true,
+    infinite: galleryImages.length > 1, // Chỉ lặp lại nếu có nhiều hơn 1 ảnh
     speed: 700,
     slidesToShow: 1,
     slidesToScroll: 1,
     autoplay: true,
     autoplaySpeed: 4000,
     fade: true,
+    arrows: false,
   };
 
   const handleBookNow = () => {
@@ -57,177 +67,186 @@ const TourDetail = () => {
       setTimeout(() => setNotification(""), 3000);
       return;
     }
-
-    // Thêm tour vào giỏ với số lượng mặc định
-    addToCart({
-      tour,
-      monthData: activeMonthData,
-      adults: 1,
-      children: 0,
-      infants: 0,
-    });
-
-    // Chuyển sang trang Payment
+    addToCart({ tour, monthData: activeMonthData, adults: 1, children: 0, infants: 0 });
     navigate("/payment");
   };
 
   return (
-    <motion.div className="text-gray-800" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -30 }} transition={{ duration: 0.6, ease: "easeInOut" }}>
-      {/* HERO PARALLAX */}
-      <ParallaxBanner layers={[{ image: tour.image || "/images/default.jpg", speed: -20 }]} className="h-[70vh] relative">
-        <div className="absolute inset-0 bg-black/50 flex flex-col justify-center items-center text-white text-center p-4">
-          <motion.h1 className="text-4xl md:text-5xl font-bold mb-2" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
-            {tour.title || "Tour chưa có tiêu đề"}
+    <motion.div
+      className="bg-gray-50 text-gray-800"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      {/* HERO SECTION */}
+      <ParallaxBanner
+        layers={[{ image: tour.image || "/images/default.jpg", speed: -20 }]}
+        className="h-[60vh] md:h-[70vh]"
+      >
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex flex-col justify-end items-start text-white p-6 md:p-12">
+          <motion.h1
+            className="text-4xl md:text-6xl font-bold drop-shadow-lg"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.2 }}
+          >
+            {tour.title}
           </motion.h1>
-          <p className="text-lg md:text-xl">{tour.location || "Địa điểm chưa xác định"}</p>
+          <motion.p
+            className="text-lg md:text-xl mt-2 drop-shadow-md"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.4 }}
+          >
+            {tour.location}
+          </motion.p>
         </div>
       </ParallaxBanner>
 
-      {/* SLIDER ẢNH */}
-      <motion.section className="max-w-5xl mx-auto py-10 px-4" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.8 }}>
-        <Slider {...sliderSettings}>
-          {[tour.image || "/images/default.jpg", "/images/travel1.jpg", "/images/travel2.jpg"].map((src, i) => (
-            <div key={i}>
-              <img
-                src={src}
-                alt={`${tour.title || "Tour"} - ảnh ${i + 1}`}
-                className="rounded-xl mx-auto shadow-lg h-[300px] md:h-[500px] object-cover w-full"
-              />
-            </div>
-          ))}
-        </Slider>
-      </motion.section>
+      <div className="max-w-7xl mx-auto px-4 py-10">
+        <div className="flex flex-col lg:flex-row gap-10">
+          {/* CỘT NỘI DUNG CHÍNH */}
+          <div className="lg:w-2/3">
+            {/* SLIDER ẢNH */}
+            <motion.section
+              className="mb-10"
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+            >
+              <Slider {...sliderSettings}>
+                {galleryImages.map((src, i) => (
+                  <div key={i}>
+                    <img
+                      src={src}
+                      alt={`${tour.title} - ảnh gallery ${i + 1}`}
+                      className="rounded-xl object-cover w-full h-[300px] md:h-[500px]"
+                    />
+                  </div>
+                ))}
+              </Slider>
+            </motion.section>
 
-      {/* LỊCH KHỞI HÀNH */}
-      <motion.section className="max-w-6xl mx-auto p-4 md:p-6 bg-white rounded-2xl shadow-lg mt-5" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-        <h2 className="text-3xl font-bold mb-6 text-center text-blue-800">LỊCH KHỞI HÀNH</h2>
-        {tour.departureMonths && tour.departureMonths.length > 0 ? (
-          <div className="flex flex-col md:flex-row gap-6">
-            {/* Chọn tháng */}
-            <div className="flex overflow-x-auto md:overflow-x-visible md:flex-col gap-3 md:w-[200px] pb-2 md:pb-0">
-              {tour.departureMonths.map((monthData) => (
-                <button
-                  key={monthData.month}
-                  onClick={() => setActiveMonthData(monthData)}
-                  className={`px-4 py-3 rounded-lg text-sm font-semibold border-2 w-full text-left transition duration-300 ease-in-out transform hover:-translate-y-1 ${
-                    activeMonthData?.month === monthData.month
-                      ? "bg-blue-600 text-white border-blue-600 shadow-md"
-                      : "bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:border-blue-300"
-                  }`}
-                >
-                  Tháng {monthData.month}
-                </button>
-              ))}
-            </div>
-
-            {/* Thông tin tháng chọn */}
-            {activeMonthData && (
-              <div className="flex-1 bg-gray-50 p-5 rounded-xl shadow-inner">
-                <div className="border-b pb-4 mb-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-bold text-gray-800">Ngày khởi hành:</h3>
-                    <div className="text-right font-semibold text-blue-600">
-                      {activeMonthData.departureDates?.join(" | ") || "Chưa xác định"}
+            {/* LỊCH TRÌNH */}
+            <motion.section
+              className="bg-white p-6 rounded-2xl shadow-lg"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+            >
+              <h2 className="text-3xl font-bold mb-6 text-center text-blue-800">Lịch Trình Chi Tiết</h2>
+              <div className="space-y-6">
+                {tour.itinerary?.length > 0 ? (
+                  tour.itinerary.map((item, i) => (
+                    <div key={i} className="flex gap-4">
+                      <div className="flex flex-col items-center">
+                        <div className="bg-blue-600 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold">{i + 1}</div>
+                        {i < tour.itinerary.length - 1 && <div className="w-0.5 flex-grow bg-gray-200 mt-2"></div>}
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-lg text-gray-800">{item.day || `Ngày ${i + 1}`}</h4>
+                        <p className="text-gray-600">{item.description || item}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center text-sm">
-                    <div>
-                      <p className="font-semibold text-gray-700">Người lớn</p>
-                      <p className="text-red-600 font-bold text-lg">{formatCurrency(activeMonthData.prices?.adult || 0)}</p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-700">Trẻ em</p>
-                      <p className="text-red-600 font-bold text-lg">{formatCurrency(activeMonthData.prices?.child || 0)}</p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-700">Trẻ nhỏ</p>
-                      <p className="text-gray-500 font-bold text-lg">{formatCurrency(activeMonthData.prices?.infant || 0)}</p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-700">Phụ thu phòng đơn</p>
-                      <p className="text-red-600 font-bold text-lg">{formatCurrency(activeMonthData.prices?.singleSupplement || 0)}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Thông tin thêm */}
-                <div className="space-y-3 text-sm">
-                  <div className="flex items-start">
-                    <FaGift className="text-orange-500 text-base mr-3 mt-1 flex-shrink-0" />
-                    <p>
-                      <span className="font-semibold">Ưu đãi tháng:</span> {activeMonthData.promotions || "Không có"}
-                    </p>
-                  </div>
-                  <div className="flex items-start">
-                    <MdFamilyRestroom className="text-green-500 text-base mr-3 mt-1 flex-shrink-0" />
-                    <p>
-                      <span className="font-semibold">Phù hợp cho:</span> {activeMonthData.familySuitability || "Không xác định"}
-                    </p>
-                  </div>
-                  <div className="flex items-start">
-                    <FaPlaneDeparture className="text-sky-500 text-base mr-3 mt-1 flex-shrink-0" />
-                    <p>
-                      <span className="font-semibold">Thông tin chuyến bay:</span> {activeMonthData.flightDeals || "Chưa có"}
-                    </p>
-                  </div>
-                </div>
-                <p className="text-xs text-gray-500 mt-4 pt-4 border-t italic">{activeMonthData.notes || ""}</p>
+                  ))
+                ) : (
+                  <p className="text-gray-500 text-center">Chưa có lịch trình chi tiết.</p>
+                )}
               </div>
-            )}
+            </motion.section>
+
+            {/* MAP */}
+            <motion.section
+              className="my-10"
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+            >
+              <h2 className="text-2xl font-semibold mb-4">Vị Trí Trên Bản Đồ</h2>
+              <div className="rounded-xl overflow-hidden shadow-lg border">
+                 {/* ✅ CẢI TIẾN 2: Sửa lại URL Google Maps cho đúng chuẩn */}
+                <iframe
+                  title="map"
+                  src={`https://maps.google.com/maps?q=${encodeURIComponent(tour.location || "")}&output=embed`}
+                  width="100%"
+                  height="400"
+                  loading="lazy"
+                  className="border-0"
+                ></iframe>
+              </div>
+            </motion.section>
           </div>
-        ) : (
-          <p className="text-center text-gray-500">Chưa có lịch khởi hành cho tour này. Vui lòng quay lại sau.</p>
-        )}
-      </motion.section>
 
-      {/* LỊCH TRÌNH */}
-      <motion.section className="max-w-6xl mx-auto p-6 mt-8 bg-white rounded-2xl shadow-lg" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}>
-        <h2 className="text-2xl font-bold mb-6 text-center">LỊCH TRÌNH</h2>
-        {tour.itinerary?.length > 0 ? (
-          tour.itinerary.map((item, i) => (
-            <div key={i} className="mb-4">
-              <p className="font-semibold text-blue-600">Ngày {i + 1}</p>
-              <p className="text-gray-700">{item}</p>
+          {/* ✅ CẢI TIẾN 3: WIDGET ĐẶT TOUR (STICKY) */}
+          <div className="lg:w-1/3">
+            <div className="sticky top-24">
+              <motion.div
+                className="bg-white rounded-2xl shadow-xl p-6"
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+              >
+                <h2 className="text-2xl font-bold mb-5 text-center text-blue-800">Thông Tin Đặt Tour</h2>
+                {tour.departureMonths?.length > 0 ? (
+                  <>
+                    <h3 className="font-semibold mb-2">Chọn tháng khởi hành:</h3>
+                    <div className="grid grid-cols-2 gap-2 mb-5">
+                      {tour.departureMonths.map((monthData) => (
+                        <button
+                          key={monthData.month}
+                          onClick={() => setActiveMonthData(monthData)}
+                          className={`px-3 py-2 rounded-lg text-sm font-semibold border-2 transition ${
+                            activeMonthData?.month === monthData.month
+                              ? "bg-blue-600 text-white border-blue-600"
+                              : "bg-white text-gray-700 border-gray-200 hover:border-blue-300"
+                          }`}
+                        >
+                          Tháng {monthData.month}
+                        </button>
+                      ))}
+                    </div>
+
+                    {activeMonthData && (
+                      <div className="bg-blue-50 p-4 rounded-lg space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Giá người lớn:</span>
+                          <span className="font-bold text-red-600 text-xl">{formatCurrency(activeMonthData.prices?.adult)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-600">Ngày khởi hành:</span>
+                          <span className="font-semibold text-blue-700">{activeMonthData.departureDates?.join(", ")}</span>
+                        </div>
+                        {activeMonthData.promotions && (
+                           <div className="text-xs text-orange-600 text-center pt-2 border-t">
+                             {activeMonthData.promotions}
+                           </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    <button
+                      onClick={handleBookNow}
+                      className="w-full mt-5 px-8 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white text-lg font-bold rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                    >
+                      <FaCreditCard className="inline mr-2" />
+                      Đặt Tour Ngay
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-center text-gray-500 py-10">Hiện chưa có lịch khởi hành.</p>
+                )}
+              </motion.div>
             </div>
-          ))
-        ) : (
-          <p className="text-gray-500 text-center">Chưa có lịch trình.</p>
-        )}
-      </motion.section>
-
-      {/* MAP */}
-      <motion.section className="max-w-5xl mx-auto my-10 p-5" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }}>
-        <h2 className="text-2xl font-semibold mb-4">Vị trí điểm đến</h2>
-        <div className="rounded-xl overflow-hidden shadow-lg">
-          <iframe
-            title="map"
-            src={`https://www.google.com/maps?q=${encodeURIComponent(tour.location || "")}&output=embed`}
-            width="100%"
-            height="350"
-            loading="lazy"
-          ></iframe>
+          </div>
         </div>
-      </motion.section>
-
-      {/* NÚT ĐẶT TOUR */}
-      <div className="flex justify-center mb-16">
-        <motion.button
-          onClick={handleBookNow}
-          className="px-10 py-4 bg-gradient-to-r from-blue-600 to-sky-500 text-white text-lg font-semibold rounded-full shadow-lg hover:shadow-xl hover:from-blue-700 transition-all duration-300 flex items-center gap-3"
-          whileTap={{ scale: 0.95 }}
-          whileHover={{ scale: 1.05 }}
-        >
-          <FaCreditCard />
-          Thanh Toán Tour
-        </motion.button>
       </div>
 
-      {/* Thông báo lỗi */}
       {notification && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-2 rounded-full shadow-lg text-sm z-50"
+          exit={{ opacity: 0 }}
+          className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-2 rounded-full shadow-lg text-sm z-50"
         >
           {notification}
         </motion.div>
