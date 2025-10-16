@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-// ✅ SỬA LỖI TẠI ĐÂY: Đổi "tours_updated" thành "tours" để dùng chung file dữ liệu
 import { TOURS } from "../data/tours"; 
 import { ParallaxBanner } from "react-scroll-parallax";
 import Slider from "react-slick";
