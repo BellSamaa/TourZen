@@ -109,7 +109,7 @@ export default function Payment() {
     `;
 
     try {
-     await fetch('/api/sendEmail', {
+ await fetch('/api/sendEmail', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
