@@ -109,15 +109,20 @@ export default function Payment() {
     `;
 
     try {
-      const response = await fetch("/api/sendEmail", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
+ await fetch('/api/sendEmail', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    to: contactInfo.email,
-    subject: "Xác nhận đặt tour thành công",
-    html: emailContent,
+    to: userEmail,
+    subject: 'Xác nhận đặt tour thành công',
+    html: `
+      <h2>Chúc mừng bạn đã đặt tour thành công!</h2>
+      <p>Cảm ơn bạn đã sử dụng dịch vụ TourZen.</p>
+      <p><b>Mã đơn:</b> ${orderId}</p>
+    `,
   }),
 });
+
 
       if (!response.ok) throw new Error("Không thể gửi email xác nhận.");
 
