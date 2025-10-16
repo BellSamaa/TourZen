@@ -11,6 +11,9 @@ export const TOURS = [
     people: 20,
     price: 4590000,
     discount: 10,
+    rating: 4.9,
+    isFeatured: true,
+    isBestseller: true,
     flight: {
       departDate: "13/10/2025",
       departTime: "05:45",
@@ -34,6 +37,9 @@ export const TOURS = [
     people: 25,
     price: 3290000,
     discount: 5,
+    rating: 4.8,
+    isFeatured: true,
+    isBestseller: false,
     flight: {
       departDate: "15/10/2025",
       departTime: "06:30",
@@ -57,6 +63,9 @@ export const TOURS = [
     people: 30,
     price: 5890000,
     discount: 12,
+    rating: 5.0,
+    isFeatured: true,
+    isBestseller: true,
     flight: {
       departDate: "20/10/2025",
       departTime: "07:00",
@@ -81,6 +90,9 @@ export const TOURS = [
     people: 20,
     price: 4790000,
     discount: 8,
+    rating: 4.9,
+    isFeatured: true,
+    isBestseller: false,
     flight: {
       departDate: "18/10/2025",
       departTime: "05:50",
@@ -105,6 +117,9 @@ export const TOURS = [
     people: 40,
     price: 6590000,
     discount: 10,
+    rating: 5.0,
+    isFeatured: true,
+    isBestseller: true,
     flight: {
       departDate: "10/11/2025",
       departTime: "06:10",
@@ -130,6 +145,9 @@ export const TOURS = [
     people: 25,
     price: 3690000,
     discount: 7,
+    rating: 4.7,
+    isFeatured: true,
+    isBestseller: false,
     flight: {
       departDate: "12/10/2025",
       departTime: "07:10",
@@ -153,6 +171,9 @@ export const TOURS = [
     people: 20,
     price: 4290000,
     discount: 9,
+    rating: 4.8,
+    isFeatured: false,
+    isBestseller: false,
     flight: {
       departDate: "18/11/2025",
       departTime: "08:00",
@@ -177,6 +198,9 @@ export const TOURS = [
     people: 25,
     price: 3790000,
     discount: 6,
+    rating: 4.9,
+    isFeatured: true,
+    isBestseller: false,
     flight: {
       departDate: "21/11/2025",
       departTime: "06:00",
@@ -200,6 +224,9 @@ export const TOURS = [
     people: 15,
     price: 5290000,
     discount: 10,
+    rating: 4.8,
+    isFeatured: false,
+    isBestseller: false,
     flight: {
       departDate: "25/11/2025",
       departTime: "07:45",
@@ -223,6 +250,9 @@ export const TOURS = [
     people: 30,
     price: 1990000,
     discount: 5,
+    rating: 4.7,
+    isFeatured: false,
+    isBestseller: false,
     flight: {
       departDate: "10/12/2025",
       departTime: "07:00",
@@ -245,6 +275,9 @@ export const TOURS = [
     people: 15,
     price: 4890000,
     discount: 7,
+    rating: 5.0,
+    isFeatured: true,
+    isBestseller: true,
     flight: {
       departDate: "05/12/2025",
       departTime: "05:45",
@@ -269,6 +302,9 @@ export const TOURS = [
     people: 20,
     price: 3390000,
     discount: 6,
+    rating: 4.6,
+    isFeatured: false,
+    isBestseller: false,
     flight: {
       departDate: "08/12/2025",
       departTime: "06:15",
@@ -292,6 +328,9 @@ export const TOURS = [
     people: 30,
     price: 1590000,
     discount: 4,
+    rating: 4.5,
+    isFeatured: false,
+    isBestseller: false,
     flight: {
       departDate: "12/12/2025",
       departTime: "08:00",
@@ -314,6 +353,9 @@ export const TOURS = [
     people: 20,
     price: 4290000,
     discount: 8,
+    rating: 4.8,
+    isFeatured: false,
+    isBestseller: false,
     flight: {
       departDate: "15/12/2025",
       departTime: "06:20",
@@ -337,6 +379,9 @@ export const TOURS = [
     people: 25,
     price: 3890000,
     discount: 5,
+    rating: 4.9,
+    isFeatured: false,
+    isBestseller: false,
     flight: {
       departDate: "20/12/2025",
       departTime: "07:00",
@@ -360,6 +405,9 @@ export const TOURS = [
     people: 20,
     price: 1890000,
     discount: 3,
+    rating: 4.7,
+    isFeatured: false,
+    isBestseller: false,
     flight: {
       departDate: "22/12/2025",
       departTime: "07:30",
@@ -382,6 +430,9 @@ export const TOURS = [
     people: 15,
     price: 3490000,
     discount: 5,
+    rating: 4.6,
+    isFeatured: false,
+    isBestseller: false,
     flight: {
       departDate: "28/12/2025",
       departTime: "06:45",
@@ -405,6 +456,9 @@ export const TOURS = [
     people: 30,
     price: 2890000,
     discount: 6,
+    rating: 4.7,
+    isFeatured: false,
+    isBestseller: false,
     flight: {
       departDate: "05/01/2026",
       departTime: "07:00",
@@ -428,6 +482,9 @@ export const TOURS = [
     people: 15,
     price: 4190000,
     discount: 7,
+    rating: 4.9,
+    isFeatured: false,
+    isBestseller: false,
     flight: {
       departDate: "10/01/2026",
       departTime: "07:30",
@@ -451,6 +508,9 @@ export const TOURS = [
     people: 25,
     price: 3890000,
     discount: 6,
+    rating: 4.8,
+    isFeatured: false,
+    isBestseller: false,
     flight: {
       departDate: "15/01/2026",
       departTime: "06:00",

@@ -48,8 +48,8 @@ export default function Home() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('mienBac');
 
-  // Lọc chính xác các tour được đánh dấu là "nổi bật"
-  const featuredTours = TOURS.filter(tour => tour.isFeatured).slice(0, 8);
+  // Lọc chính xác các tour được đánh dấu là "nổi bật", tăng giới hạn lên 12
+  const featuredTours = TOURS.filter(tour => tour.isFeatured).slice(0, 12);
   
   // Dữ liệu cho mục "Tại sao chọn chúng tôi"
   const features = [
