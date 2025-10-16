@@ -109,19 +109,15 @@ export default function Payment() {
     `;
 
     try {
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: "TourZen <noreply@tourzen.vn>",
-          to: contactInfo.email,
-          subject: "Xác nhận đặt tour thành công",
-          html: emailContent,
-        }),
-      });
+      const response = await fetch("/api/sendEmail", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    to: contactInfo.email,
+    subject: "Xác nhận đặt tour thành công",
+    html: emailContent,
+  }),
+});
 
       if (!response.ok) throw new Error("Không thể gửi email xác nhận.");
 
