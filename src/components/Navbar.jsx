@@ -33,7 +33,7 @@ export default function Navbar() {
             />
           </div>
           <span className="text-[11px] text-gray-500 font-medium mt-0.5">
-            Managed by Nhóm 5
+            Managed by Nhóm 4
           </span>
         </Link>
 
