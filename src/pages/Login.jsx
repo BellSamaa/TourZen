@@ -1,47 +1,74 @@
 // src/pages/Login.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaLock, FaEye, FaEyeSlash, FaCheckCircle, FaUser } from "react-icons/fa";
+import { FaLock, FaEye, FaEyeSlash, FaCheckCircle, FaUser, FaEnvelope } from "react-icons/fa";
+// THÊM: Import kết nối Supabase
+import { supabase } from "../lib/supabaseClient";
 
 export default function Login() {
   const navigate = useNavigate();
   const [isRegister, setIsRegister] = useState(false);
-  const [form, setForm] = useState({ name: "", phone: "", password: "", confirm: "" });
+  // SỬA: Thay `phone` bằng `email`
+  const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" });
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState(""); // Sửa thành string để hiển thị thông báo
+  const [loading, setLoading] = useState(false); // THÊM: State để xử lý loading
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const handleSubmit = (e) => {
+  // SỬA: Viết lại toàn bộ logic handleSubmit
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
+    setLoading(true);
 
+    // --- LOGIC ĐĂNG KÝ ---
     if (isRegister) {
-      if (!form.name || !form.phone || !form.password || !form.confirm) {
-        setError("Vui lòng điền đầy đủ thông tin");
-        return;
-      }
       if (form.password !== form.confirm) {
         setError("Mật khẩu không khớp");
+        setLoading(false);
         return;
       }
-      setSuccess(true);
-      setTimeout(() => {
-        setSuccess(false);
-        setIsRegister(false);
-        setForm({ name: "", phone: "", password: "", confirm: "" });
-      }, 1000);
+
+      // Gọi hàm signUp của Supabase
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password,
+        options: {
+          // Lưu thêm thông tin vào profile của người dùng
+          data: {
+            full_name: form.name,
+          }
+        }
+      });
+
+      if (signUpError) {
+        setError(signUpError.message);
+      } else {
+        setSuccess("Đăng ký thành công! Vui lòng kiểm tra email để xác nhận.");
+        // Xóa form sau khi thành công
+        setForm({ name: "", email: "", password: "", confirm: "" });
+      }
+
+    // --- LOGIC ĐĂNG NHẬP ---
     } else {
-      if (!form.phone || !form.password) {
-        setError("Vui lòng điền SĐT và mật khẩu");
-        return;
-      }
-      setSuccess(true);
-      setTimeout(() => {
-        setSuccess(false);
+      // Gọi hàm signInWithPassword của Supabase
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: form.email,
+        password: form.password,
+      });
+
+      if (signInError) {
+        setError("Email hoặc mật khẩu không đúng.");
+      } else {
+        // Đăng nhập thành công, Supabase sẽ tự quản lý session
+        // Chuyển hướng về trang chủ
         navigate("/");
-      }, 800);
+      }
     }
+
+    setLoading(false);
   };
 
   return (
@@ -54,9 +81,7 @@ export default function Login() {
         backgroundPosition: "center",
       }}
     >
-      {/* overlay dịu mắt */}
       <div className="absolute inset-0 bg-black/30"></div>
-
       <div className="w-full max-w-md p-6 relative z-10">
         <div
           className={`relative w-full transition-transform duration-700 transform-style-preserve-3d ${
@@ -66,13 +91,15 @@ export default function Login() {
           {/* Login */}
           <div className="absolute w-full backface-hidden glass-card p-8 rounded-xl shadow-2xl hover:shadow-3xl transition-all duration-300">
             <h2 className="text-3xl font-bold mb-6 text-center text-gray-900">Đăng nhập</h2>
-            {error && <div className="bg-red-200 text-red-800 p-2 mb-4 rounded">{error}</div>}
+            {error && <div className="bg-red-200 text-red-800 p-2 mb-4 rounded text-sm">{error}</div>}
+            {success && <div className="bg-green-200 text-green-800 p-2 mb-4 rounded text-sm">{success}</div>}
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* SỬA: Đổi input từ phone sang email */}
               <input
-                type="text"
-                placeholder="Số điện thoại"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                type="email"
+                placeholder="Email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
                 className="w-full pl-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 bg-white/80 text-gray-900 shadow-sm"
                 required
               />
@@ -85,29 +112,21 @@ export default function Login() {
                   className="w-full pl-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 bg-white/80 text-gray-900 shadow-sm"
                   required
                 />
-                <span
-                  className="absolute top-2 right-3 cursor-pointer text-gray-700"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
+                <span className="absolute top-2 right-3 cursor-pointer text-gray-700" onClick={() => setShowPassword(!showPassword)}>
                   {showPassword ? <FaEyeSlash /> : <FaEye />}
                 </span>
               </div>
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-green-400 to-yellow-300 hover:from-green-500 hover:to-yellow-400 text-white py-2 rounded-xl font-semibold shadow-lg transition-all duration-200"
+                disabled={loading} // THÊM: Vô hiệu hóa nút khi đang xử lý
+                className="w-full bg-gradient-to-r from-green-400 to-yellow-300 hover:from-green-500 hover:to-yellow-400 text-white py-2 rounded-xl font-semibold shadow-lg transition-all duration-200 disabled:opacity-50"
               >
-                Đăng nhập
+                {loading ? 'Đang xử lý...' : 'Đăng nhập'}
               </button>
             </form>
             <p className="mt-4 text-center text-gray-900">
               Chưa có tài khoản?{" "}
-              <span
-                className="text-green-600 cursor-pointer font-medium"
-                onClick={() => {
-                  setIsRegister(true);
-                  setError("");
-                }}
-              >
+              <span className="text-green-600 cursor-pointer font-medium" onClick={() => { setIsRegister(true); setError(""); setSuccess(""); }}>
                 Đăng ký
               </span>
             </p>
@@ -116,7 +135,8 @@ export default function Login() {
           {/* Register */}
           <div className="absolute w-full backface-hidden rotate-y-180 glass-card p-8 rounded-xl shadow-2xl hover:shadow-3xl transition-all duration-300">
             <h2 className="text-3xl font-bold mb-6 text-center text-gray-900">Đăng ký</h2>
-            {error && <div className="bg-red-200 text-red-800 p-2 mb-4 rounded">{error}</div>}
+            {error && <div className="bg-red-200 text-red-800 p-2 mb-4 rounded text-sm">{error}</div>}
+            {success && <div className="bg-green-200 text-green-800 p-2 mb-4 rounded text-sm">{success}</div>}
             <form onSubmit={handleSubmit} className="space-y-4">
               <input
                 type="text"
@@ -126,11 +146,12 @@ export default function Login() {
                 className="w-full pl-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 bg-white/80 text-gray-900 shadow-sm"
                 required
               />
+              {/* SỬA: Đổi input từ phone sang email */}
               <input
-                type="text"
-                placeholder="Số điện thoại"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                type="email"
+                placeholder="Email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
                 className="w-full pl-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 bg-white/80 text-gray-900 shadow-sm"
                 required
               />
@@ -143,10 +164,7 @@ export default function Login() {
                   className="w-full pl-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 bg-white/80 text-gray-900 shadow-sm"
                   required
                 />
-                <span
-                  className="absolute top-2 right-3 cursor-pointer text-gray-700"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
+                <span className="absolute top-2 right-3 cursor-pointer text-gray-700" onClick={() => setShowPassword(!showPassword)}>
                   {showPassword ? <FaEyeSlash /> : <FaEye />}
                 </span>
               </div>
@@ -159,29 +177,21 @@ export default function Login() {
                   className="w-full pl-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 bg-white/80 text-gray-900 shadow-sm"
                   required
                 />
-                <span
-                  className="absolute top-2 right-3 cursor-pointer text-gray-700"
-                  onClick={() => setShowConfirm(!showConfirm)}
-                >
+                <span className="absolute top-2 right-3 cursor-pointer text-gray-700" onClick={() => setShowConfirm(!showConfirm)}>
                   {showConfirm ? <FaEyeSlash /> : <FaEye />}
                 </span>
               </div>
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-green-400 to-yellow-300 hover:from-green-500 hover:to-yellow-400 text-white py-2 rounded-xl font-semibold shadow-lg transition-all duration-200"
+                disabled={loading} // THÊM: Vô hiệu hóa nút khi đang xử lý
+                className="w-full bg-gradient-to-r from-green-400 to-yellow-300 hover:from-green-500 hover:to-yellow-400 text-white py-2 rounded-xl font-semibold shadow-lg transition-all duration-200 disabled:opacity-50"
               >
-                Tạo tài khoản
+                {loading ? 'Đang tạo...' : 'Tạo tài khoản'}
               </button>
             </form>
             <p className="mt-4 text-center text-gray-900">
               Đã có tài khoản?{" "}
-              <span
-                className="text-green-600 cursor-pointer font-medium"
-                onClick={() => {
-                  setIsRegister(false);
-                  setError("");
-                }}
-              >
+              <span className="text-green-600 cursor-pointer font-medium" onClick={() => { setIsRegister(false); setError(""); setSuccess(""); }}>
                 Đăng nhập
               </span>
             </p>
@@ -189,12 +199,9 @@ export default function Login() {
         </div>
       </div>
 
-      {success && (
-        <FaCheckCircle className="absolute text-green-500 text-6xl top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 drop-shadow-xl animate-bounce" />
-      )}
+      {/* THÊM: Bỏ FaCheckCircle vì đã có thông báo thành công */}
 
       <style>{`
-        .perspective-1200 { perspective: 1200px; }
         .transform-style-preserve-3d { transform-style: preserve-3d; }
         .backface-hidden { backface-visibility: hidden; }
         .rotate-y-180 { transform: rotateY(180deg); }
