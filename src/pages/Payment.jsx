@@ -82,15 +82,19 @@ export default function Payment() {
 
     setIsSubmitting(true);
 
+    // THÊM: Tạo một mã đơn hàng duy nhất để khắc phục lỗi 'orderId is not defined'
+    const orderId = `TOURZEN-${Date.now()}`;
+
     const tour_details_html = `<ul>${cartItems
       .map(
         (item) =>
           `<li><b>${item.title}</b> (${item.adults} NL, ${item.children || 0} TE, ${item.infants || 0} EB)</li>`
       )
       .join("")}</ul>`;
-
+    
+    // (Biến emailContent này có thể dùng để gửi email cho admin)
     const emailContent = `
-      <h2>Thông tin đặt tour mới</h2>
+      <h2>Thông tin đặt tour mới - Mã đơn: ${orderId}</h2>
       <p><b>Khách hàng:</b> ${contactInfo.name}</p>
       <p><b>SĐT:</b> ${contactInfo.phone}</p>
       <p><b>Email:</b> ${contactInfo.email}</p>
@@ -109,22 +113,35 @@ export default function Payment() {
     `;
 
     try {
- await fetch('/api/sendEmail', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    to: userEmail,
-    subject: 'Xác nhận đặt tour thành công',
-    html: `
-      <h2>Chúc mừng bạn đã đặt tour thành công!</h2>
-      <p>Cảm ơn bạn đã sử dụng dịch vụ TourZen.</p>
-      <p><b>Mã đơn:</b> ${orderId}</p>
-    `,
-  }),
-});
+      // SỬA: Gán kết quả fetch vào biến 'response'
+      const response = await fetch("/api/sendEmail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          // SỬA: Thay 'userEmail' bằng 'contactInfo.email'
+          to: contactInfo.email,
+          subject: `TourZen - Xác nhận đặt tour thành công (Mã đơn: ${orderId})`,
+          // THÊM: Cải thiện nội dung email gửi cho khách hàng
+          html: `
+            <h2>Cảm ơn bạn đã đặt tour tại TourZen!</h2>
+            <p>Xin chào ${contactInfo.name},</p>
+            <p>Chúng tôi đã nhận được yêu cầu đặt tour của bạn. Đây là thông tin chi tiết:</p>
+            <p><b>Mã đơn hàng:</b> ${orderId}</p>
+            <p><b>Tổng thanh toán:</b> ${formatCurrency(finalTotal)}</p>
+            <h3>Chi tiết các tour đã đặt:</h3>
+            ${tour_details_html}
+            <p>Chúng tôi sẽ liên hệ với bạn trong thời gian sớm nhất để xác nhận. Cảm ơn bạn đã tin tưởng TourZen!</p>
+          `,
+        }),
+      });
 
+      // SỬA: Dòng kiểm tra response đã có thể hoạt động
+      if (!response.ok) {
+        throw new Error("Không thể gửi email xác nhận.");
+      }
 
-      if (!response.ok) throw new Error("Không thể gửi email xác nhận.");
+      // Thông báo thành công (tùy chọn)
+      showNotification("Đặt tour thành công! Vui lòng kiểm tra email.", "success");
 
       clearCart();
       navigate("/payment-success", {
@@ -382,7 +399,8 @@ export default function Payment() {
                     và{" "}
                     <a href="#" className="text-blue-600">
                       Điều khoản
-                    </a>.
+                    </a>
+                    .
                   </span>
                 </label>
               </div>
