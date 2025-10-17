@@ -3,10 +3,12 @@ import React from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 
-// ... (tất cả các import khác giữ nguyên)
+// Layout & Utility Components
 import Navbar from "./components/Navbar.jsx";
 import Footer from "./components/Footer.jsx";
 import ScrollToTop from "./components/ScrollToTop.jsx";
+
+// Page Components
 import Home from "./pages/Home.jsx";
 import TourList from "./pages/TourList.jsx";
 import TourDetail from "./pages/TourDetail.jsx";
@@ -22,13 +24,18 @@ import HotelPage from "./pages/HotelPage.jsx";
 import PromotionPage from "./pages/PromotionPage.jsx";
 import Checkout from "./pages/Checkout.jsx";
 import About from "./pages/About.jsx";
+
+// Context Providers
 import { CartProvider } from "./context/CartContext.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
+
+// CSS Imports
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 import "./index.css";
 
+// Component NotFound
 function NotFound() {
   return (
     <div className="flex items-center justify-center h-screen text-center">
@@ -51,12 +58,21 @@ export default function App() {
 
         <main className="pt-[76px] bg-white dark:bg-neutral-900 min-h-screen">
           
-          {/* ================= BÀI KIỂM TRA ================= */}
-          {/* Dòng này sẽ hiển thị giá trị của biến môi trường ra màn hình */}
-          <h1 style={{ background: 'yellow', color: 'black', padding: '10px', textAlign: 'center', fontWeight: 'bold' }}>
-            URL từ .env: {import.meta.env.VITE_SUPABASE_URL || "KHÔNG TÌM THẤY!"}
-          </h1>
-          {/* ================================================= */}
+          {/* ======================= BÀI KIỂM TRA LỖI ======================= */}
+          {/* Khối div này được thêm vào để kiểm tra xem Vite có đọc file .env.local không. */}
+          {/* Nó sẽ biến mất khi bạn xóa nó đi. */}
+          <div style={{
+            padding: '12px',
+            backgroundColor: '#ffc107',
+            color: '#333',
+            textAlign: 'center',
+            fontWeight: 'bold',
+            fontSize: '16px',
+            borderBottom: '2px solid #333'
+          }}>
+            DEBUG: VITE_SUPABASE_URL = {import.meta.env.VITE_SUPABASE_URL || "KHÔNG TÌM THẤY! Vui lòng kiểm tra file .env.local"}
+          </div>
+          {/* ================================================================ */}
 
           <AnimatePresence mode="wait">
             <Routes location={location} key={location.pathname}>
@@ -75,6 +91,7 @@ export default function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/admin/*" element={<AdminDashboard />} />
               <Route path="/vnpay" element={<VNPAYPage />} />
+
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AnimatePresence>
