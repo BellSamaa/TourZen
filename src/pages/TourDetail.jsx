@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { TOURS } from "../data/tours"; 
+import { TOURS } from "../data/tours";
 import { ParallaxBanner } from "react-scroll-parallax";
 import Slider from "react-slick";
 import { FaGift, FaPlaneDeparture, FaCreditCard } from "react-icons/fa";
@@ -20,7 +20,8 @@ const formatCurrency = (number) => {
 const TourDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { addToCart } = useCart();
+  // THÊM: Lấy thêm hàm clearCart từ context
+  const { addToCart, clearCart } = useCart();
   const tour = TOURS.find((t) => t.id === parseInt(id));
 
   const [activeMonthData, setActiveMonthData] = useState(null);
@@ -40,7 +41,7 @@ const TourDetail = () => {
       </motion.div>
     );
   }
- 
+
   const galleryImages = tour?.galleryImages?.length > 0 ? tour.galleryImages : [tour.image];
 
   const sliderSettings = {
@@ -54,16 +55,32 @@ const TourDetail = () => {
     fade: true,
   };
 
+  // SỬA: Cải thiện logic cho nút "Đặt Tour Ngay"
   const handleBookNow = () => {
     if (tour.departureMonths?.length > 0 && !activeMonthData) {
       setNotification("Vui lòng chọn tháng khởi hành.");
       setTimeout(() => setNotification(""), 3000);
       return;
     }
-    addToCart({ tour, monthData: activeMonthData, adults: 1, children: 0 });
-    
-    // Chuyển đến trang thanh toán
-    navigate("/checkout");
+
+    // 1. Xóa giỏ hàng cũ để đảm bảo chỉ thanh toán cho tour này
+    clearCart();
+
+    // 2. Tạo đối tượng tour hoàn chỉnh để thêm vào giỏ hàng
+    const cartItem = {
+      ...tour, // Lấy các thông tin cơ bản của tour (id, title, image...)
+      departureDates: activeMonthData.departureDates,
+      priceAdult: activeMonthData.prices.adult,
+      priceChild: activeMonthData.prices.child,
+      adults: 1, // Mặc định đặt cho 1 người lớn
+      children: 0,
+      infants: 0,
+    };
+
+    addToCart(cartItem);
+
+    // 3. Chuyển đến trang thanh toán
+    navigate("/payment");
   };
 
   return (
@@ -194,6 +211,7 @@ const TourDetail = () => {
       <motion.section className="max-w-5xl mx-auto my-10 p-5" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }}>
         <h2 className="text-2xl font-semibold mb-4">Vị trí điểm đến</h2>
         <div className="rounded-xl overflow-hidden shadow-lg">
+          {/* SỬA: URL của Google Maps đã được sửa lại cho đúng định dạng */}
           <iframe
             title="map"
             src={`https://maps.google.com/maps?q=${encodeURIComponent(tour.title + ", " + tour.location)}&output=embed`}
