@@ -3,12 +3,10 @@ import React from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 
-// Layout & Utility Components
+// ... (tất cả các import khác giữ nguyên)
 import Navbar from "./components/Navbar.jsx";
 import Footer from "./components/Footer.jsx";
 import ScrollToTop from "./components/ScrollToTop.jsx";
-
-// Page Components
 import Home from "./pages/Home.jsx";
 import TourList from "./pages/TourList.jsx";
 import TourDetail from "./pages/TourDetail.jsx";
@@ -24,18 +22,13 @@ import HotelPage from "./pages/HotelPage.jsx";
 import PromotionPage from "./pages/PromotionPage.jsx";
 import Checkout from "./pages/Checkout.jsx";
 import About from "./pages/About.jsx";
-
-// Context Providers
 import { CartProvider } from "./context/CartContext.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
-
-// CSS Imports
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 import "./index.css";
 
-// Component NotFound
 function NotFound() {
   return (
     <div className="flex items-center justify-center h-screen text-center">
@@ -57,6 +50,14 @@ export default function App() {
         <Navbar />
 
         <main className="pt-[76px] bg-white dark:bg-neutral-900 min-h-screen">
+          
+          {/* ================= BÀI KIỂM TRA ================= */}
+          {/* Dòng này sẽ hiển thị giá trị của biến môi trường ra màn hình */}
+          <h1 style={{ background: 'yellow', color: 'black', padding: '10px', textAlign: 'center', fontWeight: 'bold' }}>
+            URL từ .env: {import.meta.env.VITE_SUPABASE_URL || "KHÔNG TÌM THẤY!"}
+          </h1>
+          {/* ================================================= */}
+
           <AnimatePresence mode="wait">
             <Routes location={location} key={location.pathname}>
               <Route path="/" element={<Home />} />
@@ -74,8 +75,6 @@ export default function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/admin/*" element={<AdminDashboard />} />
               <Route path="/vnpay" element={<VNPAYPage />} />
-
-              {/* ✅ SỬA LỖI: Route bắt lỗi 404 (path="*") phải luôn nằm ở cuối cùng */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AnimatePresence>
