@@ -9,7 +9,7 @@ import { FaGift, FaPlaneDeparture, FaCreditCard } from "react-icons/fa";
 import { MdFamilyRestroom } from "react-icons/md";
 import { motion } from "framer-motion";
 import "slick-carousel/slick/slick.css";
-import "slick-carousel/slick-theme.css";
+import "slick-carousel/slick/slick-theme.css";
 // BẠN KHÔNG CẦN useCart ở đây cho chức năng "Đặt Ngay" nữa.
 // import { useCart } from "../context/CartContext"; 
 
