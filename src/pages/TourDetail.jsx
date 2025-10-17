@@ -9,8 +9,9 @@ import { FaGift, FaPlaneDeparture, FaCreditCard } from "react-icons/fa";
 import { MdFamilyRestroom } from "react-icons/md";
 import { motion } from "framer-motion";
 import "slick-carousel/slick/slick.css";
-import "slick-carousel/slick/slick-theme.css";
-import { useCart } from "../context/CartContext";
+import "slick-carousel/slick-theme.css";
+// BẠN KHÔNG CẦN useCart ở đây cho chức năng "Đặt Ngay" nữa.
+// import { useCart } from "../context/CartContext"; 
 
 const formatCurrency = (number) => {
   if (typeof number !== "number") return "N/A";
@@ -20,8 +21,7 @@ const formatCurrency = (number) => {
 const TourDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  // THÊM: Lấy thêm hàm clearCart từ context
-  const { addToCart, clearCart } = useCart();
+  // Bỏ các hàm của useCart đi
   const tour = TOURS.find((t) => t.id === parseInt(id));
 
   const [activeMonthData, setActiveMonthData] = useState(null);
@@ -55,7 +55,7 @@ const TourDetail = () => {
     fade: true,
   };
 
-  // SỬA: Cải thiện logic cho nút "Đặt Tour Ngay"
+  // SỬA: Logic của nút "Đặt Tour Ngay" được làm lại hoàn toàn
   const handleBookNow = () => {
     if (tour.departureMonths?.length > 0 && !activeMonthData) {
       setNotification("Vui lòng chọn tháng khởi hành.");
@@ -63,24 +63,22 @@ const TourDetail = () => {
       return;
     }
 
-    // 1. Xóa giỏ hàng cũ để đảm bảo chỉ thanh toán cho tour này
-    clearCart();
-
-    // 2. Tạo đối tượng tour hoàn chỉnh để thêm vào giỏ hàng
-    const cartItem = {
-      ...tour, // Lấy các thông tin cơ bản của tour (id, title, image...)
+    // 1. Tạo một đối tượng chứa đầy đủ thông tin tour cần thanh toán
+    const itemToPurchase = {
+      ...tour,
+      key: `${tour.id}-${activeMonthData.month}`, // Thêm key duy nhất
       departureDates: activeMonthData.departureDates,
       priceAdult: activeMonthData.prices.adult,
       priceChild: activeMonthData.prices.child,
-      adults: 1, // Mặc định đặt cho 1 người lớn
+      priceInfant: activeMonthData.prices.infant,
+      adults: 1, // Mặc định là 1 người lớn
       children: 0,
       infants: 0,
     };
 
-    addToCart(cartItem);
-
-    // 3. Chuyển đến trang thanh toán
-    navigate("/payment");
+    // 2. Chuyển đến trang payment và "gửi kèm" dữ liệu của tour này
+    //    Dữ liệu được truyền qua thuộc tính 'state'
+    navigate("/payment", { state: { items: [itemToPurchase] } });
   };
 
   return (
@@ -91,6 +89,7 @@ const TourDetail = () => {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.5 }}
     >
+      {/* ...Phần còn lại của component giữ nguyên... */}
       <ParallaxBanner layers={[{ image: tour.image || "/images/default.jpg", speed: -20 }]} className="h-[70vh] relative">
         <div className="absolute inset-0 bg-black/50 flex flex-col justify-center items-center text-white text-center p-4">
           <motion.h1 className="text-4xl md:text-5xl font-bold mb-2" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
@@ -185,7 +184,8 @@ const TourDetail = () => {
           <p className="text-center text-gray-500">Chưa có lịch khởi hành cho tour này.</p>
         )}
       </motion.section>
-
+      
+      {/* ... Phần lịch trình và bản đồ giữ nguyên ... */}
       <motion.section className="max-w-6xl mx-auto p-6 mt-8 bg-white rounded-2xl shadow-lg" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}>
         <h2 className="text-3xl font-bold mb-6 text-center text-blue-800">Lịch Trình Chi Tiết</h2>
         <div className="space-y-6">
@@ -211,7 +211,6 @@ const TourDetail = () => {
       <motion.section className="max-w-5xl mx-auto my-10 p-5" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }}>
         <h2 className="text-2xl font-semibold mb-4">Vị trí điểm đến</h2>
         <div className="rounded-xl overflow-hidden shadow-lg">
-          {/* SỬA: URL của Google Maps đã được sửa lại cho đúng định dạng */}
           <iframe
             title="map"
             src={`https://maps.google.com/maps?q=${encodeURIComponent(tour.title + ", " + tour.location)}&output=embed`}
