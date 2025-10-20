@@ -1,14 +1,23 @@
 // src/lib/supabaseClient.js
 import { createClient } from '@supabase/supabase-js'
 
-console.log("!!! ĐANG TẢI FILE supabaseClient.js !!!");
+const isServer = typeof window === 'undefined'
 
-const supabaseUrl = "https://zdwpjgpysxxqpvhovct.supabase.co";
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkdndwamdweXN4eHFwdmhvdmN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2NjQzODUsImV4cCI6MjA3NjI0MDM4NX0.tmFvDXSUdJlJKBuYoqvuJArZ5apYpb-eNQ90uYBJf0";
+const supabaseUrl = isServer
+  ? process.env.SUPABASE_URL
+  : import.meta.env.VITE_SUPABASE_URL
 
-if (!supabaseUrl) {
-  // Dừng ứng dụng ngay lập tức nếu URL bị thiếu
-  throw new Error("DỪNG LẠI: supabaseUrl BỊ THIẾU TRONG supabaseClient.js");
+const supabaseAnonKey = isServer
+  ? process.env.SUPABASE_ANON_KEY
+  : import.meta.env.VITE_SUPABASE_ANON_KEY
+
+// Kiểm tra lại lần cuối xem biến có giá trị không
+if (!supabaseUrl || !supabaseAnonKey) {
+   console.error("LỖI NGHIÊM TRỌNG: Supabase URL hoặc Key bị thiếu sau khi đọc env!");
+   console.error("URL:", supabaseUrl); // In ra để xem giá trị
+   console.error("Key loaded:", supabaseAnonKey ? "Yes" : "NO!"); // In ra để xem giá trị
+   // Ném lỗi ở đây sẽ rõ ràng hơn
+   throw new Error("Supabase URL hoặc Anon Key không được tải đúng cách từ biến môi trường.");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
