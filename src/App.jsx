@@ -56,24 +56,8 @@ export default function App() {
         <ScrollToTop />
         <Navbar />
 
+        {/* Khối div kiểm tra lỗi đã được xóa khỏi đây */}
         <main className="pt-[76px] bg-white dark:bg-neutral-900 min-h-screen">
-          
-          {/* ======================= BÀI KIỂM TRA LỖI ======================= */}
-          {/* Khối div này được thêm vào để kiểm tra xem Vite có đọc file .env.local không. */}
-          {/* Nó sẽ biến mất khi bạn xóa nó đi. */}
-          <div style={{
-            padding: '12px',
-            backgroundColor: '#ffc107',
-            color: '#333',
-            textAlign: 'center',
-            fontWeight: 'bold',
-            fontSize: '16px',
-            borderBottom: '2px solid #333'
-          }}>
-            DEBUG: VITE_SUPABASE_URL = {import.meta.env.VITE_SUPABASE_URL || "KHÔNG TÌM THẤY! Vui lòng kiểm tra file .env.local"}
-          </div>
-          {/* ================================================================ */}
-
           <AnimatePresence mode="wait">
             <Routes location={location} key={location.pathname}>
               <Route path="/" element={<Home />} />
