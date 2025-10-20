@@ -1,10 +1,14 @@
 // src/lib/supabaseClient.js
-
 import { createClient } from '@supabase/supabase-js'
 
-// Code sẽ tự động lấy thông tin từ file .env.local của bạn
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+console.log("!!! ĐANG TẢI FILE supabaseClient.js !!!");
 
-// Tạo và export kết nối để sử dụng trong toàn bộ dự án
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+const supabaseUrl = "https://zdwpjgpysxxqpvhovct.supabase.co";
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkdndwamdweXN4eHFwdmhvdmN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2NjQzODUsImV4cCI6MjA3NjI0MDM4NX0.tmFvDXSUdJlJKBuYoqvuJArZ5apYpb-eNQ90uYBJf0";
+
+if (!supabaseUrl) {
+  // Dừng ứng dụng ngay lập tức nếu URL bị thiếu
+  throw new Error("DỪNG LẠI: supabaseUrl BỊ THIẾU TRONG supabaseClient.js");
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
