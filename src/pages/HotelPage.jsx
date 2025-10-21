@@ -1,6 +1,6 @@
 // src/pages/HotelPage.jsx
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient'; // Đảm bảo bạn đã import supabase client
+import { getSupabase } from "../lib/supabaseClient";
 import HotelCard from '../components/HotelCard.jsx';
 import { CircleNotch } from '@phosphor-icons/react'; // Thêm icon loading
 
