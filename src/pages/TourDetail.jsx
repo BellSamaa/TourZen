@@ -4,7 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { getSupabase } from "../lib/supabaseClient";
 import { ParallaxBanner } from "react-scroll-parallax";
 import Slider from "react-slick";
-import { FaCreditCard, FaSpinner, FaMapMarkerAlt, FaClock, FaInfoCircle } from "react-icons/fa"; // Thêm icons
+import { FaCreditCard, FaSpinner, FaMapMarkerAlt, FaClock, FaInfoCircle } from "react-icons/fa";
 import { motion } from "framer-motion";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
@@ -12,9 +12,27 @@ import "slick-carousel/slick/slick-theme.css";
 const supabase = getSupabase();
 
 const formatCurrency = (number) => {
-    if (typeof number !== "number" || isNaN(number)) return "Liên hệ"; // Sửa lỗi NaN
+    if (typeof number !== "number" || isNaN(number)) return "Liên hệ";
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(number);
 };
+
+// --- Component con cho Loading ---
+const LoadingComponent = () => (
+    <div className="flex justify-center items-center min-h-[70vh]">
+        <FaSpinner className="animate-spin text-4xl text-sky-500" />
+    </div>
+);
+
+// --- Component con cho Lỗi/Không tìm thấy ---
+const ErrorComponent = ({ message }) => (
+    <motion.div
+        className="text-center text-xl py-20 text-red-600"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+    >
+        {message}
+    </motion.div>
+);
 
 const TourDetail = () => {
     const { id } = useParams();
@@ -30,8 +48,7 @@ const TourDetail = () => {
             setError(null);
             const { data, error: fetchError } = await supabase
                 .from("Products")
-                // Lấy thêm tên NCC nếu có
-                .select("*, supplier_name:Suppliers(name)")
+                .select("*, supplier_name:Suppliers(name)") // Giữ nguyên alias nếu bạn dùng ở ManageProducts
                 .eq("id", id)
                 .single();
 
@@ -51,37 +68,70 @@ const TourDetail = () => {
         window.scrollTo(0, 0);
     }, [id]);
 
-    if (loading) { /* ... Loading spinner ... */ }
-    if (error || !tour) { /* ... Error/Not Found message ... */ }
+    // --- Xử lý trạng thái Loading ---
+    if (loading) {
+        return <LoadingComponent />;
+    }
 
-    const galleryImages = tour?.galleryImages && tour.galleryImages.length > 0
+    // --- Xử lý trạng thái Lỗi hoặc Không tìm thấy ---
+    if (error || !tour) {
+        return <ErrorComponent message={error || "Tour không tồn tại."} />;
+    }
+
+    // --- Từ đây trở đi, 'tour' chắc chắn có dữ liệu ---
+
+    const galleryImages = tour.galleryImages && tour.galleryImages.length > 0
         ? tour.galleryImages
-        : tour.image_url ? [tour.image_url] : ['/images/default.jpg'];
+        : tour.image_url ? [tour.image_url] : ['/images/default.jpg']; // Ảnh mặc định
 
-    const sliderSettings = { /* ... sliderSettings ... */ };
+    const sliderSettings = {
+        dots: true,
+        infinite: galleryImages.length > 1,
+        speed: 700,
+        slidesToShow: 1,
+        slidesToScroll: 1,
+        autoplay: true,
+        autoplaySpeed: 4000,
+        fade: true,
+     }; // <-- Dấu chấm phẩy bị thiếu ở đây
 
      const handleBookNow = () => {
-         const itemToPurchase = { /* ... itemToPurchase logic ... */ };
+         const itemToPurchase = {
+            tourId: tour.id,
+            title: tour.name,
+            priceAdult: tour.price,
+            priceChild: (tour.price / 2) || 0,
+            priceInfant: 0,
+            image: tour.image_url || "/images/default.jpg",
+            location: tour.location || "",
+            adults: 1,
+            children: 0,
+            infants: 0,
+            key: `${tour.id}-default`,
+            month: 'any',
+            departureDates: [],
+         };
          navigate("/payment", { state: { items: [itemToPurchase] } });
      };
 
+    // --- Phần JSX chính để hiển thị tour ---
     return (
         <motion.div
-            className="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200" // Nền mới
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            className="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200"
+            // Bỏ initial/animate ở đây để tránh nháy khi load xong
+            // initial={{ opacity: 0 }}
+            // animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.5 }}
         >
             {/* === Banner === */}
             <ParallaxBanner
-                layers={[{ image: tour.image_url || "/images/default.jpg", speed: -15 }]} // Giảm speed
+                layers={[{ image: tour.image_url || "/images/default.jpg", speed: -15 }]}
                 className="h-[50vh] md:h-[65vh] relative"
             >
-                {/* Lớp phủ tối hơn để chữ rõ hơn */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col justify-end items-center text-white text-center p-6 md:p-12">
                     <motion.h1
-                        className="text-3xl sm:text-4xl md:text-5xl font-extrabold mb-2 drop-shadow-lg leading-tight" // Font đậm hơn
+                        className="text-3xl sm:text-4xl md:text-5xl font-extrabold mb-2 drop-shadow-lg leading-tight"
                         initial={{ y: 30, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         transition={{ delay: 0.2, duration: 0.6 }}
@@ -101,7 +151,7 @@ const TourDetail = () => {
 
             {/* === Gallery Slider === */}
             <motion.section
-               className="max-w-6xl mx-auto py-10 px-4 -mt-16 md:-mt-24 relative z-10" // Tăng max-w
+               className="max-w-6xl mx-auto py-10 px-4 -mt-16 md:-mt-24 relative z-10"
                initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }}
             >
               <div className="rounded-2xl overflow-hidden shadow-2xl border-4 border-white dark:border-slate-800">
@@ -111,7 +161,7 @@ const TourDetail = () => {
                       <img
                         src={src}
                         alt={`${tour.name} - ảnh ${i + 1}`}
-                        className="h-[350px] md:h-[600px] object-cover w-full" // Tăng chiều cao
+                        className="h-[350px] md:h-[600px] object-cover w-full"
                         onError={(e) => { e.target.onerror = null; e.target.src="/images/default.jpg" }}
                       />
                     </div>
@@ -145,7 +195,7 @@ const TourDetail = () => {
                             <FaMapMarkerAlt className="text-sky-500" size={18} />
                             <span><strong>Điểm đến:</strong> {tour.location || 'N/A'}</span>
                         </div>
-                         {/* Hiển thị tên NCC nếu có */}
+                         {/* Hiển thị tên NCC nếu có (dùng supplier_name từ alias) */}
                          {tour.supplier_name && (
                             <div className="flex items-center gap-3">
                                 <FaInfoCircle className="text-sky-500" size={18} />
@@ -161,7 +211,7 @@ const TourDetail = () => {
 
                 {/* --- Cột Đặt vé --- */}
                 <motion.div
-                    className="lg:col-span-1 bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-lg lg:sticky lg:top-24 self-start" // Thêm sticky
+                    className="lg:col-span-1 bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-lg lg:sticky lg:top-24 self-start"
                     variants={{ hidden: { opacity: 0, x: 50 }, visible: { opacity: 1, x: 0 } }}
                 >
                     <p className="text-slate-500 dark:text-slate-400 text-sm mb-1 font-medium">Giá chỉ từ</p>
@@ -169,10 +219,9 @@ const TourDetail = () => {
                         {formatCurrency(tour.price)}
                     </p>
                     <p className="text-sm text-slate-600 dark:text-slate-400 mb-5">
-                        Chọn tháng và ngày khởi hành để xem giá chính xác và đặt tour.
+                        Nhấn nút bên dưới để tiến hành đặt tour.
                     </p>
                     {/* //TODO: Thêm lại phần chọn tháng khi có dữ liệu */}
-                    {/* <div className="mb-5"> <SelectMonthComponent data={tour.departure_info} /> </div> */}
 
                     <motion.button
                         onClick={handleBookNow}
@@ -199,9 +248,7 @@ const TourDetail = () => {
                        Lịch Trình Dự Kiến
                    </h2>
                    <div className="relative pl-6 border-l-2 border-sky-200 dark:border-sky-800 space-y-8">
-                     {/* Đường line dọc */}
                      <div className="absolute top-0 left-0 h-full w-0.5 bg-gradient-to-b from-sky-500 to-transparent -translate-x-[1px]"></div>
-
                      {tour.itinerary.map((item, i) => (
                        <motion.div
                            key={i}
@@ -211,13 +258,10 @@ const TourDetail = () => {
                            viewport={{ once: true }}
                            transition={{ duration: 0.5, delay: i * 0.1 }}
                        >
-                         {/* Chấm tròn trên timeline */}
                          <div className="absolute top-1 left-[-1.1rem] w-6 h-6 bg-white dark:bg-slate-800 border-4 border-sky-500 rounded-full z-10 flex items-center justify-center">
                             <span className="text-xs font-bold text-sky-600 dark:text-sky-400">{i + 1}</span>
                          </div>
-                         {/* Nội dung */}
                          <h4 className="font-semibold text-lg md:text-xl text-slate-800 dark:text-slate-100 mb-1">
-                           {/* Cố gắng tách Ngày và Tiêu đề (nếu có dấu ':') */}
                            {item.includes(':') ? item.split(':')[0] : `Ngày ${i + 1}`}
                          </h4>
                          <p className="text-slate-600 dark:text-slate-300 text-base leading-relaxed">
@@ -231,7 +275,7 @@ const TourDetail = () => {
 
             {/* === Bản đồ === */}
             <motion.section
-                className="max-w-5xl mx-auto my-12 p-5" // Tăng max-w
+                className="max-w-5xl mx-auto my-12 p-5"
                 initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ duration: 0.6 }}
             >
               <h2 className="text-2xl font-semibold mb-5 text-center dark:text-white">Vị trí trên Bản đồ</h2>
@@ -240,27 +284,14 @@ const TourDetail = () => {
                   title="map"
                   src={`https://maps.google.com/maps?q=${encodeURIComponent(tour.name + ", " + tour.location)}&output=embed`}
                   width="100%"
-                  height="400" // Tăng chiều cao bản đồ
+                  height="400"
                   loading="lazy"
                   className="border-0"
                 ></iframe>
               </div>
             </motion.section>
-
         </motion.div>
     );
 };
 
 export default TourDetail;
-
-// --- Loading và Error Components (nếu bạn muốn tách ra) ---
-// const LoadingComponent = () => (
-//   <div className="flex justify-center items-center min-h-[70vh]">
-//     <FaSpinner className="animate-spin text-4xl text-sky-500" />
-//   </div>
-// );
-// const ErrorComponent = ({ message }) => (
-//   <motion.div className="text-center text-xl py-20 text-red-600" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-//     {message}
-//   </motion.div>
-// );
