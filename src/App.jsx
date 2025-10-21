@@ -18,12 +18,12 @@ import Payment from "./pages/Payment.jsx";
 import PaymentSuccess from "./pages/PaymentSuccess.jsx";
 import CartPage from "./pages/Cart.jsx";
 import Login from "./pages/Login.jsx";
-// import Register from "./pages/Register.jsx"; // <-- ĐÃ XÓA DÒNG NÀY
 import AdminDashboard from "./pages/AdminDashboard.jsx";
 import HotelPage from "./pages/HotelPage.jsx";
 import PromotionPage from "./pages/PromotionPage.jsx";
 import Checkout from "./pages/Checkout.jsx";
 import About from "./pages/About.jsx";
+import AdminHotels from "./pages/AdminHotels.jsx"; // <-- 1. IMPORT TRANG MỚI
 
 // Context Providers
 import { CartProvider } from "./context/CartContext.jsx";
@@ -73,11 +73,16 @@ export default function App() {
               <Route path="/payment/*" element={<Payment />} />
               <Route path="/payment-success" element={<PaymentSuccess />} />
               <Route path="/login" element={<Login />} />
-              {/* SỬA ĐỔI Ở ĐÂY: Dùng component Login cho cả route /register */}
               <Route path="/register" element={<Login />} />
-              <Route path="/admin/*" element={<AdminDashboard />} />
-              <Route path="/vnpay" element={<VNPAYPage />} />
+              
+              {/* --- VÙNG ADMIN --- */}
+              {/* 2. THÊM ROUTE CỤ THỂ CHO QUẢN LÝ KHÁCH SẠN */}
+              <Route path="/admin/hotels" element={<AdminHotels />} /> 
 
+              {/* Route chung cho dashboard admin phải đặt sau */}
+              <Route path="/admin/*" element={<AdminDashboard />} />
+
+              <Route path="/vnpay" element={<VNPAYPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AnimatePresence>
