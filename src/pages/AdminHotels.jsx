@@ -1,6 +1,6 @@
 // src/pages/AdminHotels.jsx
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient';
+import { getSupabase } from "../lib/supabaseClient";
 import toast from 'react-hot-toast';
 import { Plus, Pencil, Trash, CircleNotch, X } from '@phosphor-icons/react';
 
