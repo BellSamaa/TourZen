@@ -1,8 +1,11 @@
 // src/pages/AdminHotels.jsx
 import React, { useState, useEffect } from 'react';
-import { getSupabase } from "../lib/supabaseClient";
+import { getSupabase } from "../lib/supabaseClient"; // <- Dòng import
 import toast from 'react-hot-toast';
 import { Plus, Pencil, Trash, CircleNotch, X } from '@phosphor-icons/react';
+
+// 👇 THÊM DÒNG NÀY 👇
+const supabase = getSupabase();
 
 // State khởi tạo cho một khách sạn mới
 const initialState = {
@@ -19,9 +22,8 @@ export default function AdminHotels() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // currentHotel sẽ lưu trữ dữ liệu form (hoặc là rỗng, hoặc là dữ liệu khách sạn đang sửa)
   const [currentHotel, setCurrentHotel] = useState(initialState);
-  
+
   // Tải tất cả khách sạn khi component mount
   useEffect(() => {
     fetchHotels();
@@ -29,8 +31,9 @@ export default function AdminHotels() {
 
   async function fetchHotels() {
     setLoading(true);
+    // Giờ đây 'supabase' đã được định nghĩa
     const { data, error } = await supabase
-      .from('hotels')
+      .from('hotels') // ⚠️ LƯU Ý: Tên bảng này có đúng không?
       .select('*')
       .order('created_at', { ascending: false });
 
@@ -43,25 +46,22 @@ export default function AdminHotels() {
     setLoading(false);
   }
 
-  // Mở modal
-  // Nếu không truyền hotel, là 'Thêm mới'
-  // Nếu truyền hotel, là 'Chỉnh sửa'
+  // ... (Phần code còn lại của component giữ nguyên) ...
+
   const handleOpenModal = (hotel = null) => {
     if (hotel) {
-      setCurrentHotel(hotel); // Chế độ sửa
+      setCurrentHotel(hotel);
     } else {
-      setCurrentHotel(initialState); // Chế độ thêm mới
+      setCurrentHotel(initialState);
     }
     setIsModalOpen(true);
   };
 
-  // Đóng modal và reset form
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setCurrentHotel(initialState);
   };
 
-  // Cập nhật state khi gõ vào form
   const handleChange = (e) => {
     const { name, value, type } = e.target;
     setCurrentHotel(prev => ({
@@ -70,25 +70,21 @@ export default function AdminHotels() {
     }));
   };
 
-  // Xử lý khi submit form (Thêm hoặc Sửa)
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     let error;
 
     if (currentHotel.id) {
-      // --- Chế độ Sửa (UPDATE) ---
       const { error: updateError } = await supabase
-        .from('hotels')
+        .from('hotels') // ⚠️ Tên bảng?
         .update(currentHotel)
         .eq('id', currentHotel.id);
       error = updateError;
     } else {
-      // --- Chế độ Thêm (INSERT) ---
-      // Bỏ 'id' (vì nó tự tạo) trước khi insert
-      const { id, ...newHotelData } = currentHotel; 
+      const { id, ...newHotelData } = currentHotel;
       const { error: insertError } = await supabase
-        .from('hotels')
+        .from('hotels') // ⚠️ Tên bảng?
         .insert(newHotelData);
       error = insertError;
     }
@@ -98,16 +94,15 @@ export default function AdminHotels() {
     } else {
       toast.success(currentHotel.id ? 'Cập nhật thành công!' : 'Thêm mới thành công!');
       handleCloseModal();
-      await fetchHotels(); // Tải lại danh sách
+      await fetchHotels();
     }
     setIsSubmitting(false);
   };
 
-  // Xử lý Xóa
   const handleDelete = async (hotelId, hotelName) => {
     if (window.confirm(`Bạn có chắc muốn xóa khách sạn "${hotelName}"?`)) {
       const { error } = await supabase
-        .from('hotels')
+        .from('hotels') // ⚠️ Tên bảng?
         .delete()
         .eq('id', hotelId);
 
@@ -115,12 +110,11 @@ export default function AdminHotels() {
         toast.error(error.message);
       } else {
         toast.success('Xóa thành công!');
-        await fetchHotels(); // Tải lại danh sách
+        await fetchHotels();
       }
     }
   };
 
-  // Format tiền
   const formatPrice = (price) => new Intl.NumberFormat('vi-VN').format(price) + '₫';
 
   return (
@@ -224,8 +218,8 @@ export default function AdminHotels() {
                 <button type="button" onClick={handleCloseModal} className="px-4 py-2 bg-neutral-200 dark:bg-neutral-600 rounded-md font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-500">
                   Hủy
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   disabled={isSubmitting}
                   className="px-4 py-2 bg-primary-blue text-white rounded-md font-semibold hover:bg-primary-blue-dark disabled:opacity-50 flex items-center gap-2"
                 >
