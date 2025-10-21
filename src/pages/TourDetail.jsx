@@ -1,17 +1,17 @@
 // src/pages/TourDetail.jsx
-
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { TOURS } from "../data/tours";
+// --- 1. Import Supabase ---
+import { getSupabase } from "../lib/supabaseClient";
 import { ParallaxBanner } from "react-scroll-parallax";
 import Slider from "react-slick";
-import { FaGift, FaPlaneDeparture, FaCreditCard } from "react-icons/fa";
-import { MdFamilyRestroom } from "react-icons/md";
+import { FaCreditCard, FaSpinner } from "react-icons/fa"; // Bỏ các icon không dùng
 import { motion } from "framer-motion";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
-// BẠN KHÔNG CẦN useCart ở đây cho chức năng "Đặt Ngay" nữa.
-// import { useCart } from "../context/CartContext"; 
+
+// --- 2. Khởi tạo Supabase ---
+const supabase = getSupabase();
 
 const formatCurrency = (number) => {
   if (typeof number !== "number") return "N/A";
@@ -19,30 +19,79 @@ const formatCurrency = (number) => {
 };
 
 const TourDetail = () => {
-  const { id } = useParams();
+  const { id } = useParams(); // id này là UUID từ Supabase
   const navigate = useNavigate();
-  // Bỏ các hàm của useCart đi
-  const tour = TOURS.find((t) => t.id === parseInt(id));
 
-  const [activeMonthData, setActiveMonthData] = useState(null);
-  const [notification, setNotification] = useState("");
+  // --- 3. State để lưu tour từ database ---
+  const [tour, setTour] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
+  // --- 4. useEffect để fetch dữ liệu từ Supabase ---
   useEffect(() => {
-    if (tour && tour.departureMonths && tour.departureMonths.length > 0) {
-      setActiveMonthData(tour.departureMonths[0]);
-    }
-    window.scrollTo(0, 0);
-  }, [tour]);
+    async function fetchTour() {
+      setLoading(true);
+      setError(null);
 
-  if (!tour) {
+      // Lấy dữ liệu từ bảng Products dựa trên ID (uuid) từ URL
+      const { data, error: fetchError } = await supabase
+        .from("Products")
+        .select("*") // Lấy tất cả các cột
+        .eq("id", id) // Lọc theo cột 'id' (UUID)
+        .single(); // Chỉ lấy 1 kết quả
+
+      if (fetchError) {
+        console.error("Lỗi fetch chi tiết tour:", fetchError);
+        setError("Không thể tải thông tin tour.");
+        setTour(null); // Đảm bảo tour là null nếu lỗi
+      } else if (data) {
+        setTour(data);
+      } else {
+        // Không tìm thấy dữ liệu (ID không tồn tại trong DB)
+        setTour(null);
+      }
+      setLoading(false);
+    }
+
+    // Chỉ fetch nếu id hợp lệ (là UUID)
+    if (id) {
+       fetchTour();
+    } else {
+       setError("ID tour không hợp lệ.");
+       setLoading(false);
+    }
+
+    window.scrollTo(0, 0);
+  }, [id]); // Chạy lại khi ID trên URL thay đổi
+
+  // --- 5. Xử lý trạng thái Loading ---
+  if (loading) {
     return (
-      <motion.div className="text-center text-xl py-20" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-        Tour không tồn tại.
+      <div className="flex justify-center items-center min-h-[70vh]">
+        <FaSpinner className="animate-spin text-4xl text-sky-500" />
+      </div>
+    );
+  }
+
+  // --- 6. Xử lý trạng thái Lỗi hoặc Không tìm thấy ---
+  if (error || !tour) {
+    return (
+      <motion.div
+        className="text-center text-xl py-20 text-red-600"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        {error || "Tour không tồn tại."}
       </motion.div>
     );
   }
 
-  const galleryImages = tour?.galleryImages?.length > 0 ? tour.galleryImages : [tour.image];
+  // --- 7. Hiển thị thông tin tour (đã fetch được) ---
+
+  // Xử lý gallery images (ưu tiên galleryImages, nếu không có thì dùng image_url)
+  const galleryImages = tour?.galleryImages && tour.galleryImages.length > 0
+    ? tour.galleryImages
+    : tour.image_url ? [tour.image_url] : ['/images/default.jpg']; // Ảnh mặc định
 
   const sliderSettings = {
     dots: true,
@@ -55,165 +104,139 @@ const TourDetail = () => {
     fade: true,
   };
 
-  // SỬA: Logic của nút "Đặt Tour Ngay" được làm lại hoàn toàn
+  // --- 8. Logic nút "Đặt Tour Ngay" (đã đơn giản hóa) ---
+  //    (Logic chọn tháng phức tạp cần CSDL hỗ trợ, tạm thời bỏ qua)
   const handleBookNow = () => {
-    if (tour.departureMonths?.length > 0 && !activeMonthData) {
-      setNotification("Vui lòng chọn tháng khởi hành.");
-      setTimeout(() => setNotification(""), 3000);
-      return;
-    }
-
-    // 1. Tạo một đối tượng chứa đầy đủ thông tin tour cần thanh toán
+    // Tạo item dựa trên dữ liệu tour đã fetch
     const itemToPurchase = {
-      ...tour,
-      key: `${tour.id}-${activeMonthData.month}`, // Thêm key duy nhất
-      departureDates: activeMonthData.departureDates,
-      priceAdult: activeMonthData.prices.adult,
-      priceChild: activeMonthData.prices.child,
-      priceInfant: activeMonthData.prices.infant,
-      adults: 1, // Mặc định là 1 người lớn
+      // Dùng tên thuộc tính khớp với CartContext của bạn
+      tourId: tour.id, // ID là UUID
+      title: tour.name,
+      priceAdult: tour.price,
+      priceChild: (tour.price / 2) || 0, // Giá trẻ em tạm tính = 50%
+      priceInfant: 0,
+      image: tour.image_url || "/images/default.jpg",
+      location: tour.location || "",
+      // Các thông tin khác CartContext cần
+      adults: 1, // Mặc định 1 người lớn
       children: 0,
       infants: 0,
+      key: `${tour.id}-default`, // Key tạm thời
+      month: 'any', // Tháng tạm thời
+      departureDates: [], // Ngày khởi hành tạm thời
     };
 
-    // 2. Chuyển đến trang payment và "gửi kèm" dữ liệu của tour này
-    //    Dữ liệu được truyền qua thuộc tính 'state'
+    // Chuyển đến trang payment với dữ liệu tour này
     navigate("/payment", { state: { items: [itemToPurchase] } });
   };
 
   return (
     <motion.div
-      className="text-gray-800"
+      className="text-gray-800 dark:text-neutral-200"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.5 }}
     >
-      {/* ...Phần còn lại của component giữ nguyên... */}
-      <ParallaxBanner layers={[{ image: tour.image || "/images/default.jpg", speed: -20 }]} className="h-[70vh] relative">
-        <div className="absolute inset-0 bg-black/50 flex flex-col justify-center items-center text-white text-center p-4">
-          <motion.h1 className="text-4xl md:text-5xl font-bold mb-2" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
-            {tour.title}
+      {/* Banner */}
+      <ParallaxBanner layers={[{ image: tour.image_url || "/images/default.jpg", speed: -20 }]} className="h-[60vh] md:h-[70vh] relative">
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent flex flex-col justify-end items-center text-white text-center p-6 md:p-10">
+          <motion.h1
+            className="text-3xl md:text-5xl font-bold mb-2 drop-shadow-lg"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.2 }}
+          >
+            {tour.name} {/* Sửa thành tour.name */}
           </motion.h1>
-          <p className="text-lg md:text-xl">{tour.location}</p>
+          <p className="text-lg md:text-xl drop-shadow-md">{tour.location}</p>
         </div>
       </ParallaxBanner>
 
-      <motion.section className="max-w-5xl mx-auto py-10 px-4" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.8 }}>
-        <Slider {...sliderSettings}>
-          {galleryImages.map((src, i) => (
-            <div key={i}>
-              <img
-                src={src}
-                alt={`${tour.title} - ảnh ${i + 1}`}
-                className="rounded-xl mx-auto shadow-lg h-[300px] md:h-[500px] object-cover w-full"
-              />
-            </div>
-          ))}
-        </Slider>
-      </motion.section>
-
-      <motion.section className="max-w-6xl mx-auto p-4 md:p-6 bg-white rounded-2xl shadow-lg mt-5" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}>
-        <h2 className="text-3xl font-bold mb-6 text-center text-blue-800">LỊCH KHỞI HÀNH</h2>
-        {tour.departureMonths?.length > 0 ? (
-          <div className="flex flex-col md:flex-row gap-6">
-            <div className="flex overflow-x-auto md:overflow-x-visible md:flex-col gap-3 md:w-[200px] pb-2 md:pb-0">
-              {tour.departureMonths.map((monthData) => (
-                <button
-                  key={monthData.month}
-                  onClick={() => setActiveMonthData(monthData)}
-                  className={`px-4 py-3 rounded-lg text-sm font-semibold border-2 w-full text-left transition duration-300 ease-in-out transform hover:-translate-y-1 ${
-                    activeMonthData?.month === monthData.month
-                      ? "bg-blue-600 text-white border-blue-600 shadow-md"
-                      : "bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:border-blue-300"
-                  }`}
-                >
-                  Tháng {monthData.month}
-                </button>
-              ))}
-            </div>
-
-            {activeMonthData && (
-              <div className="flex-1 bg-gray-50 p-5 rounded-xl shadow-inner">
-                <div className="border-b pb-4 mb-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-bold text-gray-800">Ngày khởi hành:</h3>
-                    <div className="text-right font-semibold text-blue-600">
-                      {activeMonthData.departureDates?.join(" | ") || "Chưa xác định"}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center text-sm">
-                    <div>
-                      <p className="font-semibold text-gray-700">Người lớn</p>
-                      <p className="text-red-600 font-bold text-lg">{formatCurrency(activeMonthData.prices?.adult)}</p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-700">Trẻ em</p>
-                      <p className="text-red-600 font-bold text-lg">{formatCurrency(activeMonthData.prices?.child)}</p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-700">Trẻ nhỏ</p>
-                      <p className="text-gray-500 font-bold text-lg">{formatCurrency(activeMonthData.prices?.infant)}</p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-700">Phụ thu phòng đơn</p>
-                      <p className="text-red-600 font-bold text-lg">{formatCurrency(activeMonthData.prices?.singleSupplement)}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3 text-sm">
-                  <div className="flex items-start">
-                    <FaGift className="text-orange-500 text-base mr-3 mt-1 flex-shrink-0" />
-                    <p><span className="font-semibold">Ưu đãi tháng:</span> {activeMonthData.promotions}</p>
-                  </div>
-                  <div className="flex items-start">
-                    <MdFamilyRestroom className="text-green-500 text-base mr-3 mt-1 flex-shrink-0" />
-                    <p><span className="font-semibold">Phù hợp cho:</span> {activeMonthData.familySuitability}</p>
-                  </div>
-                  <div className="flex items-start">
-                    <FaPlaneDeparture className="text-sky-500 text-base mr-3 mt-1 flex-shrink-0" />
-                    <p><span className="font-semibold">Thông tin chuyến bay:</span> {activeMonthData.flightDeals}</p>
-                  </div>
-                </div>
-                <p className="text-xs text-gray-500 mt-4 pt-4 border-t italic">{activeMonthData.notes}</p>
+      {/* Gallery Slider */}
+      <motion.section
+         className="max-w-5xl mx-auto py-10 px-4 -mt-16 md:-mt-24 relative z-10"
+         initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.8 }}
+      >
+        <div className="rounded-2xl overflow-hidden shadow-2xl border-4 border-white dark:border-neutral-800">
+          <Slider {...sliderSettings}>
+            {galleryImages.map((src, i) => (
+              <div key={i}>
+                <img
+                  src={src}
+                  alt={`${tour.name} - ảnh ${i + 1}`}
+                  className="h-[300px] md:h-[550px] object-cover w-full"
+                  // Thêm onError để hiển thị ảnh mặc định nếu ảnh gốc lỗi
+                  onError={(e) => { e.target.onerror = null; e.target.src="/images/default.jpg" }}
+                />
               </div>
-            )}
-          </div>
-        ) : (
-          <p className="text-center text-gray-500">Chưa có lịch khởi hành cho tour này.</p>
-        )}
-      </motion.section>
-      
-      {/* ... Phần lịch trình và bản đồ giữ nguyên ... */}
-      <motion.section className="max-w-6xl mx-auto p-6 mt-8 bg-white rounded-2xl shadow-lg" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}>
-        <h2 className="text-3xl font-bold mb-6 text-center text-blue-800">Lịch Trình Chi Tiết</h2>
-        <div className="space-y-6">
-          {tour.itinerary?.length > 0 ? (
-            tour.itinerary.map((item, i) => (
-              <div key={i} className="flex gap-4">
-                <div className="flex flex-col items-center">
-                  <div className="bg-blue-600 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold">{i + 1}</div>
-                  {i < tour.itinerary.length - 1 && <div className="w-0.5 flex-grow bg-gray-200 mt-2"></div>}
-                </div>
-                <div>
-                  <h4 className="font-semibold text-lg text-gray-800">{item.day}</h4>
-                  <p className="text-gray-600">{item.description}</p>
-                </div>
-              </div>
-            ))
-          ) : (
-            <p className="text-gray-500 text-center">Chưa có lịch trình chi tiết.</p>
-          )}
+            ))}
+          </Slider>
         </div>
       </motion.section>
 
-      <motion.section className="max-w-5xl mx-auto my-10 p-5" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }}>
-        <h2 className="text-2xl font-semibold mb-4">Vị trí điểm đến</h2>
-        <div className="rounded-xl overflow-hidden shadow-lg">
+      {/* Thông tin chính và nút Đặt */}
+      <motion.section
+        className="max-w-4xl mx-auto p-6 md:p-8 bg-white dark:bg-neutral-800 rounded-2xl shadow-lg mt-8"
+        initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+      >
+         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+            <div className="md:col-span-2">
+               <h2 className="text-2xl md:text-3xl font-bold mb-4 text-sky-700 dark:text-sky-400">Thông tin chi tiết</h2>
+               <p className="text-gray-600 dark:text-gray-300 mb-2"><strong>Thời gian:</strong> {tour.duration || 'N/A'}</p>
+               <p className="text-gray-600 dark:text-gray-300 mb-4"><strong>Điểm đến:</strong> {tour.location || 'N/A'}</p>
+               <p className="text-gray-700 dark:text-gray-200 leading-relaxed">{tour.description || "Chưa có mô tả chi tiết."}</p>
+            </div>
+            <div className="text-center md:text-right border-t md:border-t-0 md:border-l pt-6 md:pt-0 md:pl-6 border-gray-200 dark:border-neutral-700">
+                <p className="text-gray-500 dark:text-gray-400 text-sm mb-1">Giá chỉ từ</p>
+                <p className="text-3xl md:text-4xl font-bold text-red-600 mb-5">{formatCurrency(tour.price)}</p>
+                <motion.button
+                  onClick={handleBookNow}
+                  className="w-full px-8 py-3 bg-gradient-to-r from-sky-500 to-blue-600 text-white text-lg font-semibold rounded-lg shadow-md hover:shadow-lg hover:from-sky-600 transition-all duration-300 flex items-center justify-center gap-3"
+                  whileTap={{ scale: 0.95 }}
+                  whileHover={{ scale: 1.05 }}
+                >
+                  <FaCreditCard />
+                  Đặt Tour Ngay
+                </motion.button>
+            </div>
+         </div>
+      </motion.section>
+
+
+      {/* Lịch trình (Giả sử bạn có cột itinerary kiểu text[]) */}
+      {tour.itinerary && tour.itinerary.length > 0 && (
+         <motion.section
+            className="max-w-4xl mx-auto p-6 mt-8 bg-white dark:bg-neutral-800 rounded-2xl shadow-lg"
+            initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+         >
+           <h2 className="text-2xl font-bold mb-6 text-center text-sky-700 dark:text-sky-400">Lịch Trình Chi Tiết</h2>
+           <div className="space-y-6">
+             {tour.itinerary.map((item, i) => (
+               <div key={i} className="flex gap-4">
+                 <div className="flex flex-col items-center">
+                   <div className="bg-sky-600 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold">{i + 1}</div>
+                   {i < tour.itinerary.length - 1 && <div className="w-0.5 flex-grow bg-gray-200 dark:bg-neutral-700 mt-2"></div>}
+                 </div>
+                 <div>
+                   {/* Giả sử item là string "Ngày 1: Mô tả..." */}
+                   <h4 className="font-semibold text-lg text-gray-800 dark:text-white">{item.split(':')[0]}</h4>
+                   <p className="text-gray-600 dark:text-gray-300">{item.split(':').slice(1).join(':').trim()}</p>
+                 </div>
+               </div>
+             ))}
+           </div>
+         </motion.section>
+      )}
+
+      {/* Bản đồ (Giữ nguyên) */}
+      <motion.section className="max-w-4xl mx-auto my-10 p-5" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }}>
+        <h2 className="text-2xl font-semibold mb-4 dark:text-white">Vị trí điểm đến</h2>
+        <div className="rounded-xl overflow-hidden shadow-lg border dark:border-neutral-700">
           <iframe
             title="map"
-            src={`https://maps.google.com/maps?q=${encodeURIComponent(tour.title + ", " + tour.location)}&output=embed`}
+            // Cập nhật src để tìm kiếm chính xác hơn
+            src={`https://maps.google.com/maps?q=${encodeURIComponent(tour.name + ", " + tour.location)}&output=embed`}
             width="100%"
             height="350"
             loading="lazy"
@@ -222,27 +245,6 @@ const TourDetail = () => {
         </div>
       </motion.section>
 
-      <div className="flex justify-center mb-16">
-        <motion.button
-          onClick={handleBookNow}
-          className="px-10 py-4 bg-gradient-to-r from-blue-600 to-sky-500 text-white text-lg font-semibold rounded-full shadow-lg hover:shadow-xl hover:from-blue-700 transition-all duration-300 flex items-center gap-3"
-          whileTap={{ scale: 0.95 }}
-          whileHover={{ scale: 1.05 }}
-        >
-          <FaCreditCard />
-          Đặt Tour Ngay
-        </motion.button>
-      </div>
-
-      {notification && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-2 rounded-full shadow-lg text-sm z-50"
-        >
-          {notification}
-        </motion.div>
-      )}
     </motion.div>
   );
 };
