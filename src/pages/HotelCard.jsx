@@ -1,96 +1,93 @@
 // src/components/HotelCard.jsx
-import React, { useState } from 'react';
+import React from 'react'; // Bỏ useState vì không cần nữa
 import { Link } from 'react-router-dom';
-import { StarIcon, MapPinIcon } from '@heroicons/react/24/solid';
-import { supabase } from '../supabaseClient'; // Import supabase
-import toast from 'react-hot-toast'; // Dùng react-hot-toast để thông báo
+import { StarIcon, MapPinIcon } from '@heroicons/react/24/solid'; // Giữ nguyên icon
+// 1. Import useAuth và icon Edit
+import { useAuth } from "../context/AuthContext";
+import { FaEdit } from "react-icons/fa";
+// 2. KHÔNG import supabase trực tiếp ở đây
 
-export default function HotelCard({ hotel }) {
-  const [isBooking, setIsBooking] = useState(false);
-  const formattedPrice = new Intl.NumberFormat('vi-VN').format(hotel.price) + '₫';
+// Giữ nguyên hàm format tiền
+const formatCurrency = (number) => {
+    if (typeof number !== 'number' || isNaN(number)) return "Liên hệ";
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(number);
+};
 
-  const handleBooking = async () => {
-    setIsBooking(true);
-    const loadingToast = toast.loading('Đang xử lý đặt phòng...');
+// 3. Thêm prop onEdit
+export default function HotelCard({ hotel, onEdit }) {
+    // 4. Lấy trạng thái admin
+    const { isAdmin } = useAuth();
+    // Lấy giá và format (thêm kiểm tra null)
+    const formattedPrice = formatCurrency(hotel?.price);
 
-    // 1. Lấy thông tin người dùng đang đăng nhập
-    const { data: { user } } = await supabase.auth.getUser();
+    // 5. Bỏ hàm handleBooking và state isBooking
 
-    if (!user) {
-        toast.error('Bạn cần đăng nhập để đặt phòng!');
-        setIsBooking(false);
-        toast.dismiss(loadingToast);
-        return;
-    }
+    // Đảm bảo hotel có dữ liệu cơ bản
+    if (!hotel) return null;
 
-    // 2. Chuẩn bị dữ liệu để insert vào bảng 'bookings'
-    const bookingData = {
-        user_id: user.id,
-        item_id: hotel.id,
-        item_type: 'hotel',
-        item_name: hotel.name,
-        total_price: hotel.price
-    };
+    return (
+        <div className="flex flex-col bg-white dark:bg-neutral-800 rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 h-full relative group"> {/* Thêm relative và group */}
 
-    // 3. Insert vào Supabase
-    const { error } = await supabase
-        .from('bookings')
-        .insert(bookingData);
-
-    toast.dismiss(loadingToast);
-
-    if (error) {
-        console.error('Lỗi đặt phòng:', error);
-        toast.error(`Đặt phòng thất bại: ${error.message}`);
-    } else {
-        // Đây là nơi "auto đặt thành công"
-        toast.success(`Đặt ${hotel.name} thành công!`);
-        // Bạn có thể thêm dữ liệu này vào bảng 'Supplier' như yêu cầu
-        // Ví dụ: await supabase.from('Supplier').insert({ ... })
-        // Nhưng logic đúng là nên insert vào bảng 'bookings'
-    }
-
-    setIsBooking(false);
-  };
-
-  return (
-    <div className="flex flex-col md:flex-row bg-white dark:bg-neutral-800 rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-all duration-300">
-      <img src={hotel.image} alt={hotel.name} className="w-full md:w-1/3 h-52 md:h-auto object-cover" />
-      <div className="p-4 md:p-6 flex flex-col flex-grow">
-        <div>
-          <div className="flex items-center text-sm text-neutral-500 dark:text-neutral-400">
-            <MapPinIcon className="h-4 w-4 mr-1 text-neutral-400" />
-            {hotel.location}
-          </div>
-          <h3 className="text-xl font-bold text-neutral-800 dark:text-white my-1 hover:text-primary-blue transition-colors">
-            <Link to={`/hotel/${hotel.id}`}>{hotel.name}</Link>
-          </h3>
-          <div className="flex items-center">
-            {Array.from({ length: hotel.rating }).map((_, i) => (
-              <StarIcon key={i} className="h-5 w-5 text-yellow-400" />
-            ))}
-            <span className="ml-2 text-xs text-neutral-600 dark:text-neutral-300">({hotel.reviews} đánh giá)</span>
-          </div>
-        </div>
-        <div className="mt-auto pt-4 flex flex-col md:flex-row md:items-end md:justify-between">
-            <div className='mb-4 md:mb-0 text-left'>
-                <span className="text-sm text-neutral-500 dark:text-neutral-400">Giá mỗi đêm từ</span>
-                <p className="font-bold text-2xl text-accent-orange-dark">{formattedPrice}</p>
-            </div>
-            <div className="flex gap-2">
-                <Link to={`/hotel/${hotel.id}`} className="inline-block bg-neutral-200 dark:bg-neutral-700 hover:bg-neutral-300 dark:hover:bg-neutral-600 text-neutral-800 dark:text-white font-semibold px-4 py-2 rounded-lg text-sm transition-colors">
-                    Xem chi tiết
-                </Link>
+            {/* 6. THÊM NÚT EDIT CHO ADMIN */}
+            {isAdmin && onEdit && (
                 <button
-                    onClick={handleBooking}
-                    disabled={isBooking}
-                    className="inline-block bg-primary-blue hover:bg-primary-blue-dark text-white font-semibold px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={() => onEdit(hotel)}
+                    className="absolute top-3 right-3 z-20 bg-sky-600 text-white p-2.5 rounded-full shadow-lg hover:bg-sky-700 transition-transform transform hover:scale-110"
+                    title="Chỉnh sửa Khách sạn"
                 >
-                    {isBooking ? 'Đang đặt...' : 'Đặt ngay'}
+                    <FaEdit size={14} />
                 </button>
-            </div>
+            )}
+
+            {/* Link bao quanh ảnh và phần text */}
+            <Link to={`/hotel/${hotel.id}`} className="flex flex-col flex-grow"> {/* Giả sử link chi tiết */}
+                {/* 7. Sửa hotel.image thành hotel.image_url */}
+                <img
+                    src={hotel.image_url || '/images/default-hotel.jpg'} // Dùng ảnh mặc định nếu không có
+                    alt={hotel.name || 'Khách sạn'}
+                    className="w-full h-52 object-cover group-hover:scale-105 transition-transform" // Bỏ md:w-1/3, md:h-auto
+                    onError={(e) => { e.target.onerror = null; e.target.src="/images/default-hotel.jpg" }} // Thêm fallback nếu ảnh lỗi
+                />
+                <div className="p-4 md:p-6 flex flex-col flex-grow"> {/* Thống nhất padding */}
+                    <div>
+                        <div className="flex items-center text-sm text-neutral-500 dark:text-neutral-400 mb-1">
+                            <MapPinIcon className="h-4 w-4 mr-1 text-neutral-400 flex-shrink-0" />
+                            {/* Thêm kiểm tra hotel.location */}
+                            <span>{hotel.location || 'Chưa rõ vị trí'}</span>
+                        </div>
+                        {/* Thêm kiểm tra hotel.name */}
+                        <h3 className="text-xl font-bold text-neutral-800 dark:text-white my-1 group-hover:text-sky-600 transition-colors line-clamp-2">
+                           {hotel.name || 'Khách sạn chưa đặt tên'}
+                        </h3>
+                        {/* Rating (kiểm tra hotel.rating) */}
+                        {hotel.rating && hotel.rating > 0 && (
+                            <div className="flex items-center mt-1">
+                                {Array.from({ length: Math.floor(hotel.rating) }).map((_, i) => (
+                                    <StarIcon key={i} className="h-5 w-5 text-yellow-400" />
+                                ))}
+                                {/* Bỏ phần reviews vì chưa có */}
+                                {/* <span className="ml-2 text-xs text-neutral-600 dark:text-neutral-300">({hotel.reviews} đánh giá)</span> */}
+                                <span className="ml-2 text-xs text-neutral-600 dark:text-neutral-300">{hotel.rating.toFixed(1)} sao</span>
+                            </div>
+                        )}
+                    </div>
+                    {/* Phần giá và nút */}
+                    <div className="mt-auto pt-4 flex items-end justify-between">
+                        <div className='text-left'>
+                            <span className="text-sm text-neutral-500 dark:text-neutral-400">Giá mỗi đêm từ</span>
+                            <p className="font-bold text-2xl text-accent-orange-dark">{formattedPrice}</p>
+                        </div>
+                        {/* 8. Sửa nút "Đặt ngay" thành "Xem chi tiết" (như nút bên cạnh) */}
+                        <button
+                           onClick={(e) => { e.preventDefault(); navigate(`/hotel/${hotel.id}`); }} // Dùng navigate khi click
+                           className="inline-block bg-primary-blue hover:bg-primary-blue-dark text-white font-semibold px-4 py-2 rounded-lg text-sm transition-colors"
+                        >
+                           Xem chi tiết
+                        </button>
+                         {/* Bỏ nút "Xem chi tiết" cũ */}
+                    </div>
+                </div>
+            </Link> {/* Đóng Link */}
         </div>
-      </div>
-    </div>
-  );
+    );
 }
