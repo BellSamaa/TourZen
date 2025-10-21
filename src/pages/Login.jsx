@@ -1,17 +1,75 @@
-// src/pages/Login.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaLock, FaEye, FaEyeSlash, FaUser, FaEnvelope } from "react-icons/fa";
-// SỬA: Thay đổi cách import để giải quyết lỗi "Multiple instances"
+import { FaLock, FaEye, FaEyeSlash, FaUser, FaEnvelope, FaSignInAlt } from "react-icons/fa";
 import { getSupabase } from "../lib/supabaseClient";
 
-// Lấy client bằng cách gọi hàm một lần duy nhất
+// Lấy client Supabase một lần duy nhất
 const supabase = getSupabase();
 
+// --- Component con để hiển thị độ mạnh mật khẩu ---
+const PasswordStrengthMeter = ({ password }) => {
+  const [strength, setStrength] = useState({ score: 0, label: '', color: '' });
+
+  useEffect(() => {
+    let score = 0;
+    let label = 'Yếu';
+    let color = 'bg-red-500';
+
+    if (password.length >= 8) score++;
+    if (/[A-Z]/.test(password)) score++;
+    if (/[a-z]/.test(password)) score++;
+    if (/[0-9]/.test(password)) score++;
+    if (/[^A-Za-z0-9]/.test(password)) score++;
+
+    switch (score) {
+      case 5:
+        label = 'Rất mạnh';
+        color = 'bg-emerald-500';
+        break;
+      case 4:
+        label = 'Mạnh';
+        color = 'bg-green-500';
+        break;
+      case 3:
+        label = 'Trung bình';
+        color = 'bg-yellow-500';
+        break;
+      default:
+        label = 'Yếu';
+        color = 'bg-red-500';
+        break;
+    }
+    
+    // Chỉ hiển thị khi người dùng bắt đầu nhập
+    if(password.length > 0) {
+        setStrength({ score, label, color });
+    } else {
+        setStrength({ score: 0, label: '', color: '' });
+    }
+
+  }, [password]);
+
+  if (!password) return null;
+
+  return (
+    <div className="w-full mt-2">
+      <div className="relative w-full h-2 bg-gray-600 rounded-full overflow-hidden">
+        <div 
+          className={`absolute top-0 left-0 h-full rounded-full transition-all duration-300 ${strength.color}`}
+          style={{ width: `${(strength.score / 5) * 100}%` }}
+        ></div>
+      </div>
+      <p className={`text-xs text-right mt-1 ${strength.color.replace('bg-', 'text-')}`}>{strength.label}</p>
+    </div>
+  );
+};
+
+
+// --- Component chính ---
 export default function Login() {
   const navigate = useNavigate();
-  const [isRegister, setIsRegister] = useState(false);
-  // Thay `phone` bằng `email` để tương thích với Supabase
+  // Sử dụng 'login' hoặc 'register' để quản lý tab
+  const [mode, setMode] = useState('login'); 
   const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -19,7 +77,6 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  // Sửa lại toàn bộ logic handleSubmit để kết nối với Supabase
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -27,14 +84,13 @@ export default function Login() {
     setLoading(true);
 
     // --- LOGIC ĐĂNG KÝ TÀI KHOẢN MỚI ---
-    if (isRegister) {
+    if (mode === 'register') {
       if (form.password !== form.confirm) {
-        setError("Mật khẩu không khớp");
+        setError("Mật khẩu không khớp.");
         setLoading(false);
         return;
       }
-
-      // 1. Gọi hàm signUp của Supabase để tạo người dùng trong hệ thống Auth
+      
       const { data: { user }, error: signUpError } = await supabase.auth.signUp({
         email: form.email,
         password: form.password,
@@ -43,189 +99,168 @@ export default function Login() {
       if (signUpError) {
         setError(signUpError.message);
       } else if (user) {
-        // 2. (Quan trọng) Sau khi tạo user thành công, lưu thông tin công khai
-        //    của họ vào bảng 'Users' mà chúng ta đã tạo.
+        // Sau khi tạo user, lưu thông tin công khai vào bảng 'Users'
+        // Cột 'role' sẽ tự động nhận giá trị mặc định là 'user' mà ta đã cài đặt ở Bước 1
         const { error: insertError } = await supabase
           .from('Users')
           .insert({
-            id: user.id, // Dùng ID từ user vừa tạo
+            id: user.id,
             full_name: form.name,
-            email: form.email
+            email: form.email,
           });
         
         if (insertError) {
-            setError(`Tạo tài khoản thành công nhưng không thể lưu thông tin: ${insertError.message}`);
+          setError(`Tài khoản đã được tạo nhưng không thể lưu thông tin: ${insertError.message}`);
         } else {
-            setSuccess("Đăng ký thành công! Vui lòng kiểm tra email để xác nhận tài khoản.");
-            setForm({ name: "", email: "", password: "", confirm: "" });
+          setSuccess("Đăng ký thành công! Vui lòng kiểm tra email để xác nhận.");
+          setForm({ name: "", email: "", password: "", confirm: "" });
         }
       }
-
+    
     // --- LOGIC ĐĂNG NHẬP ---
     } else {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data: { user }, error: signInError } = await supabase.auth.signInWithPassword({
         email: form.email,
         password: form.password,
       });
 
       if (signInError) {
         setError("Email hoặc mật khẩu không đúng.");
-      } else {
-        // Đăng nhập thành công, Supabase tự quản lý session. Chuyển về trang chủ.
-        navigate("/");
+      } else if (user) {
+        // Đăng nhập thành công, KIỂM TRA VAI TRÒ (ROLE)
+        const { data: userData, error: userError } = await supabase
+          .from('Users')
+          .select('role')
+          .eq('id', user.id)
+          .single(); // Lấy một dòng duy nhất
+
+        if (userError) {
+          setError("Không thể lấy thông tin vai trò người dùng.");
+        } else if (userData) {
+          // Chuyển hướng dựa trên vai trò
+          if (userData.role === 'admin') {
+            navigate("/admin/dashboard");
+          } else {
+            navigate("/");
+          }
+        }
       }
     }
 
     setLoading(false);
   };
+  
+  const handleModeChange = (newMode) => {
+    setMode(newMode);
+    setError('');
+    setSuccess('');
+    setForm({ name: "", email: "", password: "", confirm: "" });
+  }
 
+  // --- Giao diện (JSX) ---
   return (
-    <div
-      className="min-h-screen flex items-center justify-center relative overflow-hidden"
-      style={{
-        backgroundImage:
-          "url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1470&q=80')",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }}
-    >
-      <div className="absolute inset-0 bg-black/30"></div>
-      <div className="w-full max-w-md p-6 relative z-10">
-        <div
-          className={`relative w-full transition-transform duration-700 transform-style-preserve-3d ${
-            isRegister ? "rotate-y-180" : ""
-          }`}
-        >
-          {/* Login */}
-          <div className="absolute w-full backface-hidden glass-card p-8 rounded-xl shadow-2xl">
-            <h2 className="text-3xl font-bold mb-6 text-center text-gray-900">Đăng nhập</h2>
-            {error && <div className="bg-red-200 text-red-800 p-2 mb-4 rounded text-sm">{error}</div>}
-            {success && <div className="bg-green-200 text-green-800 p-2 mb-4 rounded text-sm">{success}</div>}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="relative">
-                <FaEnvelope className="absolute top-3 left-4 text-gray-400" />
-                <input
-                  type="email"
-                  placeholder="Email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full pl-10 pr-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 bg-white/80 text-gray-900 shadow-sm"
-                  required
-                />
-              </div>
-              <div className="relative">
-                <FaLock className="absolute top-3 left-4 text-gray-400" />
-                <input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Mật khẩu"
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  className="w-full pl-10 pr-10 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 bg-white/80 text-gray-900 shadow-sm"
-                  required
-                />
-                <span className="absolute top-2 right-3 cursor-pointer text-gray-700" onClick={() => setShowPassword(!showPassword)}>
-                  {showPassword ? <FaEyeSlash /> : <FaEye />}
-                </span>
-              </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-green-400 to-yellow-300 hover:from-green-500 hover:to-yellow-400 text-white py-2 rounded-xl font-semibold shadow-lg transition-all duration-200 disabled:opacity-50"
-              >
-                {loading ? 'Đang xử lý...' : 'Đăng nhập'}
-              </button>
-            </form>
-            <p className="mt-4 text-center text-gray-900">
-              Chưa có tài khoản?{" "}
-              <span className="text-green-600 cursor-pointer font-medium" onClick={() => { setIsRegister(true); setError(""); setSuccess(""); }}>
-                Đăng ký
-              </span>
-            </p>
-          </div>
-
-          {/* Register */}
-          <div className="absolute w-full backface-hidden rotate-y-180 glass-card p-8 rounded-xl shadow-2xl">
-            <h2 className="text-3xl font-bold mb-6 text-center text-gray-900">Đăng ký</h2>
-            {error && <div className="bg-red-200 text-red-800 p-2 mb-4 rounded text-sm">{error}</div>}
-            {success && <div className="bg-green-200 text-green-800 p-2 mb-4 rounded text-sm">{success}</div>}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="relative">
-                 <FaUser className="absolute top-3 left-4 text-gray-400" />
-                 <input
-                  type="text"
-                  placeholder="Họ và tên"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full pl-10 pr-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 bg-white/80 text-gray-900 shadow-sm"
-                  required
-                />
-              </div>
-              <div className="relative">
-                <FaEnvelope className="absolute top-3 left-4 text-gray-400" />
-                <input
-                  type="email"
-                  placeholder="Email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full pl-10 pr-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 bg-white/80 text-gray-900 shadow-sm"
-                  required
-                />
-              </div>
-              <div className="relative">
-                <FaLock className="absolute top-3 left-4 text-gray-400" />
-                <input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Mật khẩu"
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  className="w-full pl-10 pr-10 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 bg-white/80 text-gray-900 shadow-sm"
-                  required
-                />
-                <span className="absolute top-2 right-3 cursor-pointer text-gray-700" onClick={() => setShowPassword(!showPassword)}>
-                  {showPassword ? <FaEyeSlash /> : <FaEye />}
-                </span>
-              </div>
-              <div className="relative">
-                <FaLock className="absolute top-3 left-4 text-gray-400" />
-                <input
-                  type={showConfirm ? "text" : "password"}
-                  placeholder="Nhập lại mật khẩu"
-                  value={form.confirm}
-                  onChange={(e) => setForm({ ...form, confirm: e.target.value })}
-                  className="w-full pl-10 pr-10 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 bg-white/80 text-gray-900 shadow-sm"
-                  required
-                />
-                <span className="absolute top-2 right-3 cursor-pointer text-gray-700" onClick={() => setShowConfirm(!showConfirm)}>
-                  {showConfirm ? <FaEyeSlash /> : <FaEye />}
-                </span>
-              </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-green-400 to-yellow-300 hover:from-green-500 hover:to-yellow-400 text-white py-2 rounded-xl font-semibold shadow-lg transition-all duration-200 disabled:opacity-50"
-              >
-                {loading ? 'Đang tạo...' : 'Tạo tài khoản'}
-              </button>
-            </form>
-            <p className="mt-4 text-center text-gray-900">
-              Đã có tài khoản?{" "}
-              <span className="text-green-600 cursor-pointer font-medium" onClick={() => { setIsRegister(false); setError(""); setSuccess(""); }}>
-                Đăng nhập
-              </span>
-            </p>
-          </div>
+    <div className="min-h-screen w-full flex items-center justify-center bg-gray-900 text-white p-4">
+       <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-black animate-gradient-xy"></div>
+      <div className="w-full max-w-md p-8 relative z-10 bg-gray-800 bg-opacity-50 backdrop-blur-lg border border-gray-700 rounded-2xl shadow-2xl">
+        <div className="flex justify-center mb-6">
+            <div className="inline-flex rounded-lg bg-gray-700/50 p-1">
+                <button onClick={() => handleModeChange('login')} className={`px-6 py-2 text-sm font-medium rounded-md transition-colors ${mode === 'login' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:text-white'}`}>Đăng nhập</button>
+                <button onClick={() => handleModeChange('register')} className={`px-6 py-2 text-sm font-medium rounded-md transition-colors ${mode === 'register' ? 'bg-purple-600 text-white' : 'text-gray-300 hover:text-white'}`}>Đăng ký</button>
+            </div>
         </div>
+
+        <h2 className="text-3xl font-bold mb-2 text-center text-gray-100">{mode === 'login' ? 'Chào mừng trở lại!' : 'Tạo tài khoản mới'}</h2>
+        <p className="text-center text-gray-400 mb-6">{mode === 'login' ? 'Đăng nhập để tiếp tục' : 'Bắt đầu hành trình của bạn'}</p>
+
+        {error && <div className="bg-red-500/20 border border-red-500 text-red-300 p-3 mb-4 rounded-lg text-sm text-center">{error}</div>}
+        {success && <div className="bg-green-500/20 border border-green-500 text-green-300 p-3 mb-4 rounded-lg text-sm text-center">{success}</div>}
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+            {/* --- Các ô nhập liệu --- */}
+            {mode === 'register' && (
+                <div className="relative">
+                    <FaUser className="absolute top-3.5 left-4 text-gray-400" />
+                    <input type="text" placeholder="Họ và tên" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field" required />
+                </div>
+            )}
+            
+            <div className="relative">
+                <FaEnvelope className="absolute top-3.5 left-4 text-gray-400" />
+                <input type="email" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input-field" required />
+            </div>
+            
+            <div className="relative">
+                <FaLock className="absolute top-3.5 left-4 text-gray-400" />
+                <input type={showPassword ? "text" : "password"} placeholder="Mật khẩu" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="input-field pr-10" required />
+                <span className="absolute top-3 right-3 cursor-pointer text-gray-400 hover:text-white" onClick={() => setShowPassword(!showPassword)}>
+                    {showPassword ? <FaEyeSlash /> : <FaEye />}
+                </span>
+            </div>
+             {/* Thước đo mật khẩu chỉ hiện khi đăng ký */}
+             {mode === 'register' && <PasswordStrengthMeter password={form.password} />}
+
+            {mode === 'register' && (
+                <div className="relative">
+                    <FaLock className="absolute top-3.5 left-4 text-gray-400" />
+                    <input type={showConfirm ? "text" : "password"} placeholder="Nhập lại mật khẩu" value={form.confirm} onChange={(e) => setForm({ ...form, confirm: e.target.value })} className="input-field pr-10" required />
+                     <span className="absolute top-3 right-3 cursor-pointer text-gray-400 hover:text-white" onClick={() => setShowConfirm(!showConfirm)}>
+                        {showConfirm ? <FaEyeSlash /> : <FaEye />}
+                    </span>
+                </div>
+            )}
+            
+            {/* --- Nút Submit --- */}
+            <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 rounded-lg font-semibold shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2">
+                {loading ? (
+                    <>
+                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Đang xử lý...</span>
+                    </>
+                ) : (
+                    <>
+                       {mode === 'login' ? <FaSignInAlt /> : <FaUser />}
+                       <span>{mode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}</span>
+                    </>
+                )}
+            </button>
+        </form>
       </div>
 
       <style>{`
-        .transform-style-preserve-3d { transform-style: preserve-3d; }
-        .backface-hidden { backface-visibility: hidden; }
-        .rotate-y-180 { transform: rotateY(180deg); }
-        .glass-card {
-          background: rgba(255,255,255,0.75);
-          backdrop-filter: blur(15px);
-          position: relative;
-          overflow: hidden;
+        .input-field {
+          width: 100%;
+          padding-left: 2.5rem;
+          padding-top: 0.75rem;
+          padding-bottom: 0.75rem;
+          border: 1px solid #4A5568;
+          border-radius: 0.5rem;
+          background-color: rgba(31, 41, 55, 0.5);
+          color: #E5E7EB;
+          transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        .input-field:focus {
+          outline: none;
+          border-color: #6366F1;
+          box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.5);
+        }
+        .input-field::placeholder {
+          color: #9CA3AF;
+        }
+        @keyframes gradient-xy {
+            0%, 100% {
+                background-size: 400% 400%;
+                background-position: top center;
+            }
+            50% {
+                background-size: 200% 200%;
+                background-position: bottom center;
+            }
+        }
+        .animate-gradient-xy {
+            animation: gradient-xy 15s ease infinite;
         }
       `}</style>
     </div>
