@@ -1,13 +1,15 @@
 // src/pages/AddToursFromData.jsx
 import React, { useState, useEffect } from 'react';
 import { getSupabase } from '../lib/supabaseClient';
-import { TOURS_DATA } from '../data/tours_updated'; // 1. Import dữ liệu tour mẫu
+// 👇 SỬA DÒNG NÀY 👇
+import { TOURS } from '../data/tours'; // 1. Import dữ liệu tour mẫu
 import { FaPlus, FaCheckCircle, FaSpinner, FaExclamationCircle } from 'react-icons/fa';
 
 const supabase = getSupabase();
 
 export default function AddToursFromData() {
-  const [localTours, setLocalTours] = useState(TOURS_DATA);
+  // 👇 SỬA DÒNG NÀY 👇
+  const [localTours, setLocalTours] = useState(TOURS);
   const [suppliers, setSuppliers] = useState([]);
   const [addingStatus, setAddingStatus] = useState({}); // Lưu trạng thái: 'idle', 'adding', 'added', 'error', 'exists'
   const [loadingSuppliers, setLoadingSuppliers] = useState(true);
@@ -42,7 +44,8 @@ export default function AddToursFromData() {
 
   // 3. Hàm xử lý khi bấm nút "+"
   const handleAddTour = async (tourToAdd) => {
-    const tourCode = tourToAdd.id; // Dùng id làm tour_code
+    // SỬA: Lấy tour_code từ id kiểu số, chuyển thành string nếu cần
+    const tourCode = String(tourToAdd.id); 
 
     // Kiểm tra nhanh xem đã tồn tại trong DB chưa (dựa vào state đã fetch)
     if (dbTourCodes.has(tourCode)) {
@@ -76,7 +79,7 @@ export default function AddToursFromData() {
     // Chuẩn bị dữ liệu để insert
     const productData = {
       name: tourToAdd.title,
-      tour_code: tourCode,
+      tour_code: tourCode, // Đã sửa thành string
       price: tourToAdd.price || 0,
       inventory: tourToAdd.inventory || 10,
       product_type: 'tour',
@@ -96,7 +99,14 @@ export default function AddToursFromData() {
     if (insertError) {
       console.error('Lỗi insert tour:', insertError);
       setAddingStatus((prev) => ({ ...prev, [tourCode]: 'error' }));
-      alert(`Lỗi khi thêm tour "${tourToAdd.title}": ${insertError.message}`);
+      // Hiển thị lỗi chi tiết hơn nếu là lỗi trùng tour_code
+      if (insertError.code === '23505') { // Postgres unique violation code
+          alert(`Lỗi khi thêm tour "${tourToAdd.title}": Mã Tour "${tourCode}" đã tồn tại.`);
+          setAddingStatus((prev) => ({ ...prev, [tourCode]: 'exists' })); // Cập nhật lại trạng thái
+          setDbTourCodes(prev => new Set(prev).add(tourCode)); // Cập nhật Set
+      } else {
+          alert(`Lỗi khi thêm tour "${tourToAdd.title}": ${insertError.message}`);
+      }
     } else {
       // Thêm thành công
       setAddingStatus((prev) => ({ ...prev, [tourCode]: 'added' }));
@@ -121,7 +131,8 @@ export default function AddToursFromData() {
         <div className="bg-white dark:bg-neutral-800 shadow-xl rounded-lg overflow-hidden">
           <ul className="divide-y divide-gray-200 dark:divide-gray-700">
             {localTours.map((tour) => {
-              const status = addingStatus[tour.id] || (dbTourCodes.has(tour.id) ? 'exists' : 'idle'); // Kiểm tra trạng thái hiện tại hoặc đã tồn tại
+              const tourCodeString = String(tour.id); // Chuyển id thành string để check
+              const status = addingStatus[tourCodeString] || (dbTourCodes.has(tourCodeString) ? 'exists' : 'idle');
 
               return (
                 <li key={tour.id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-neutral-700">
@@ -158,7 +169,9 @@ export default function AddToursFromData() {
                        <span className="text-xs text-gray-400 italic" title="Tour này đã có trong database">Đã tồn tại</span>
                      )}
                      {status === 'error' && (
-                       <FaExclamationCircle className="text-red-500" title="Có lỗi xảy ra" />
+                       <button onClick={() => handleAddTour(tour)} className="text-red-500 hover:text-red-700" title="Lỗi! Bấm để thử lại">
+                         <FaExclamationCircle />
+                       </button>
                      )}
                   </div>
                 </li>
