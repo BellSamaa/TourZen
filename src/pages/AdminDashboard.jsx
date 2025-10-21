@@ -1,9 +1,10 @@
 // src/pages/AdminDashboard.jsx
 import React from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { 
-  FaHome, FaUserFriends, FaTruckLoading, FaUmbrellaBeach, 
-  FaShoppingCart, FaChartBar, FaHotel, FaPlane, FaCar 
+import {
+  FaHome, FaUserFriends, FaTruckLoading, FaUmbrellaBeach,
+  FaShoppingCart, FaChartBar, FaHotel, FaPlane, FaCar,
+  FaPlus // <-- 1. Import thêm icon FaPlus
 } from 'react-icons/fa';
 
 // Import các trang
@@ -11,10 +12,11 @@ import ManageCustomers from './ManageCustomers';
 import ManageSuppliers from './ManageSuppliers';
 import Reports from './Reports';
 import DashboardHome from './DashboardHome';
-import ManageProducts from './ManageProducts'; // <-- Component quản lý chung (MỚI)
+import ManageProducts from './ManageProducts';
 import ManageBookings from './ManageBookings';
+// 2. Import component mới
+import AddToursFromData from './AddToursFromData';
 
-// (Component AdminSidebar... giữ nguyên như file nâng cấp)
 const AdminSidebar = () => {
   const location = useLocation();
   const navItems = [
@@ -23,11 +25,13 @@ const AdminSidebar = () => {
     { path: '/admin/suppliers', label: 'Nhà cung cấp', icon: <FaTruckLoading /> },
     { path: '/admin/bookings', label: 'Quản lý Đặt chỗ', icon: <FaShoppingCart /> },
     { path: '/admin/reports', label: 'Báo cáo', icon: <FaChartBar /> },
-    { type: 'divider', label: 'Sản phẩm' }, // Thêm divider
+    { type: 'divider', label: 'Sản phẩm' },
     { path: '/admin/tours', label: 'Quản lý Tours', icon: <FaUmbrellaBeach /> },
     { path: '/admin/hotels', label: 'Quản lý Khách sạn', icon: <FaHotel /> },
     { path: '/admin/flights', label: 'Quản lý Chuyến bay', icon: <FaPlane /> },
     { path: '/admin/cars', label: 'Quản lý Xe', icon: <FaCar /> },
+    // 👇 3. THÊM LINK MỚI VÀO SIDEBAR 👇
+    { path: '/admin/add-from-data', label: 'Thêm nhanh Tour', icon: <FaPlus /> },
   ];
 
   const isActive = (path) => location.pathname.startsWith(path) && path !== '/admin' || location.pathname === path;
@@ -77,12 +81,16 @@ export default function AdminDashboard() {
           <Route path="suppliers" element={<ManageSuppliers />} />
           <Route path="bookings" element={<ManageBookings />} />
           <Route path="reports" element={<Reports />} />
-          
-          {/* SỬA Ở ĐÂY: Dùng component chung cho tất cả sản phẩm */}
+
+          {/* Dùng component chung cho tất cả sản phẩm */}
           <Route path="tours" element={<ManageProducts productType="tour" />} />
           <Route path="hotels" element={<ManageProducts productType="hotel" />} />
           <Route path="flights" element={<ManageProducts productType="flight" />} />
           <Route path="cars" element={<ManageProducts productType="car_rental" />} />
+
+          {/* 👇 4. THÊM ROUTE MỚI CHO TRANG THÊM NHANH 👇 */}
+          <Route path="add-from-data" element={<AddToursFromData />} />
+
         </Routes>
       </main>
     </div>
