@@ -18,7 +18,7 @@ import Payment from "./pages/Payment.jsx";
 import PaymentSuccess from "./pages/PaymentSuccess.jsx";
 import CartPage from "./pages/Cart.jsx";
 import Login from "./pages/Login.jsx";
-import Register from "./pages/Register.jsx";
+// import Register from "./pages/Register.jsx"; // <-- ĐÃ XÓA DÒNG NÀY
 import AdminDashboard from "./pages/AdminDashboard.jsx";
 import HotelPage from "./pages/HotelPage.jsx";
 import PromotionPage from "./pages/PromotionPage.jsx";
@@ -41,7 +41,9 @@ function NotFound() {
     <div className="flex items-center justify-center h-screen text-center">
       <div>
         <h2 className="text-4xl font-bold">404</h2>
-        <p className="text-neutral-500 mt-2">Không tìm thấy trang bạn yêu cầu.</p>
+        <p className="text-neutral-500 mt-2">
+          Không tìm thấy trang bạn yêu cầu.
+        </p>
       </div>
     </div>
   );
@@ -56,7 +58,6 @@ export default function App() {
         <ScrollToTop />
         <Navbar />
 
-        {/* Khối div kiểm tra lỗi đã được xóa khỏi đây */}
         <main className="pt-[76px] bg-white dark:bg-neutral-900 min-h-screen">
           <AnimatePresence mode="wait">
             <Routes location={location} key={location.pathname}>
@@ -72,7 +73,8 @@ export default function App() {
               <Route path="/payment/*" element={<Payment />} />
               <Route path="/payment-success" element={<PaymentSuccess />} />
               <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
+              {/* SỬA ĐỔI Ở ĐÂY: Dùng component Login cho cả route /register */}
+              <Route path="/register" element={<Login />} />
               <Route path="/admin/*" element={<AdminDashboard />} />
               <Route path="/vnpay" element={<VNPAYPage />} />
 
