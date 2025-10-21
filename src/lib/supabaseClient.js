@@ -1,32 +1,21 @@
 // src/lib/supabaseClient.js
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from "@supabase/supabase-js";
 
-console.log("--- Loading supabaseClient.js (Singleton Pattern) ---");
+// Thông tin Supabase của bạn
+// URL BỊ SAI LÀ: "https://zdwpjgpysxxqpvhovct.supabase.co"
+// URL ĐÚNG LÀ:
+const supabaseUrl = "https://zdwvpjgypsxxqpvhovct.supabase.co"; 
 
-const isServer = typeof window === 'undefined'
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkdndwamdweXN4eHFwdmhvdmN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2NjQzODUsImV4cCI6MjA3NjI0MDM4NX0.tmFvQDXSUdJlJKBuYoqvuJArZ5apYpb-eNQ90uYBJf0";
 
-const supabaseUrl = isServer
-  ? process.env.SUPABASE_URL
-  : import.meta.env.VITE_SUPABASE_URL
+let supabaseClient;
 
-const supabaseAnonKey = isServer
-  ? process.env.SUPABASE_ANON_KEY
-  : import.meta.env.VITE_SUPABASE_ANON_KEY
-
-if (!supabaseUrl) {
-  throw new Error("Supabase URL is required but was not found in environment variables.");
+export function getSupabase() {
+  // Những dòng log này bạn có thể giữ hoặc xóa đi
+  console.log("--- Loading supabaseClient.js (Singleton Pattern) ---");
+  if (!supabaseClient) {
+    supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+    console.log("--- Supabase client instance created (Singleton) ---");
+  }
+  return supabaseClient;
 }
-if (!supabaseAnonKey) {
-  throw new Error("Supabase Anon Key is required but was not found in environment variables.");
-}
-
-// 1. Tạo instance client MỘT LẦN DUY NHẤT
-const supabaseClientInstance = createClient(supabaseUrl, supabaseAnonKey)
-
-console.log("--- Supabase client instance created (Singleton) ---");
-
-// 2. Export một hàm LUÔN TRẢ VỀ instance đã tạo đó
-export const getSupabase = () => supabaseClientInstance
-
-// Tùy chọn: Bạn có thể export trực tiếp instance nếu muốn dùng như cũ
-// export const supabase = supabaseClientInstance;
