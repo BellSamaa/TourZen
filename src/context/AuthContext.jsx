@@ -1,99 +1,99 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+// src/context/AuthContext.jsx
+import React, { createContext, useState, useEffect, useContext } from "react";
+import { getSupabase } from "../lib/supabaseClient";
 
-const KEY = "tourzen_auth_v2";
+// Khởi tạo Supabase client
+const supabase = getSupabase();
 const AuthContext = createContext();
 
+/**
+ * Hook tùy chỉnh để sử dụng AuthContext
+ */
 export function useAuth() {
   return useContext(AuthContext);
 }
 
+/**
+ * AuthProvider: Component này sẽ bọc toàn bộ ứng dụng của bạn
+ */
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    try {
-      const raw = localStorage.getItem(KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [session, setSession] = useState(null); // Lưu session của Supabase auth
+  const [user, setUser] = useState(null); // Lưu thông tin từ bảng 'Users' (full_name, role)
+  const [isAdmin, setIsAdmin] = useState(false); // Biến quan trọng nhất: có phải admin không?
+  const [loading, setLoading] = useState(true); // Trạng thái loading
 
   useEffect(() => {
-    if (user) localStorage.setItem(KEY, JSON.stringify(user));
-    else localStorage.removeItem(KEY);
-  }, [user]);
-
-  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
-
-  // --- LOGIN email/password ---
-  async function login({ email, password }) {
-    try {
-      const res = await fetch(`${API_BASE}/api/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        const u = { ...data.user, token: data.token };
-        setUser(u);
-        return { success: true, user: u };
+    // 1. Lấy session (phiên đăng nhập) hiện tại ngay khi tải trang
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) {
+        // 2. Nếu có session, lấy thông tin chi tiết (bao gồm role)
+        getUserDetails(session.user.id);
       } else {
-        return { success: false, message: data.message };
+        // Không có session, không cần làm gì thêm
+        setLoading(false);
       }
-    } catch {
-      return { success: false, message: "Lỗi server" };
-    }
-  }
+    });
 
-  // --- REGISTER ---
-  async function register({ name, email, password }) {
-    try {
-      const res = await fetch(`${API_BASE}/api/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        const u = { ...data.user, token: data.token };
-        setUser(u);
-        return { success: true, user: u };
+    // 3. Lắng nghe các thay đổi về trạng thái xác thực (Đăng nhập, Đăng xuất)
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setSession(session);
+
+        if (event === "SIGNED_IN") {
+          // Khi người dùng vừa ĐĂNG NHẬP
+          getUserDetails(session.user.id);
+        } else if (event === "SIGNED_OUT") {
+          // Khi người dùng vừa ĐĂNG XUẤT
+          setUser(null);
+          setIsAdmin(false);
+        }
+      }
+    );
+
+    // Dọn dẹp listener khi component bị unmount
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  /**
+   * Hàm lấy thông tin chi tiết (tên, vai trò) từ bảng 'Users' của chúng ta
+   */
+  const getUserDetails = async (userId) => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("Users")
+      .select("*")
+      .eq("id", userId)
+      .single(); // Lấy một dòng duy nhất
+
+    if (error) {
+      console.error("Lỗi khi lấy thông tin vai trò người dùng:", error);
+    } else if (data) {
+      // Lưu thông tin (full_name, email, role)
+      setUser(data);
+      
+      // KIỂM TRA QUYỀN ADMIN
+      if (data.role === "admin") {
+        setIsAdmin(true);
       } else {
-        return { success: false, message: data.message };
+        setIsAdmin(false);
       }
-    } catch {
-      return { success: false, message: "Lỗi server" };
     }
-  }
+    setLoading(false);
+  };
 
-  // --- LOGIN FACEBOOK ---
-  async function loginWithFacebook(accessToken) {
-    try {
-      const res = await fetch(`${API_BASE}/api/login/facebook`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accessToken }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        const u = { ...data.user, token: data.token };
-        setUser(u);
-        return { success: true, user: u };
-      } else {
-        return { success: false, message: data.message };
-      }
-    } catch {
-      return { success: false, message: "Lỗi server" };
-    }
-  }
+  // Giá trị (value) mà chúng ta cung cấp cho toàn bộ ứng dụng
+  const value = {
+    session,  // Thông tin session (supabase.auth.session)
+    user,     // Thông tin profile (từ bảng 'Users')
+    isAdmin,  // Biến cờ (true/false) báo admin
+    loading,  // Báo trạng thái loading
+    // Lưu ý: hàm login, logout, register giờ nằm trong component Login.jsx
+    // Nếu muốn gọi logout từ nơi khác, bạn có thể thêm hàm vào đây:
+    logout: () => supabase.auth.signOut(), 
+  };
 
-  function logout() {
-    setUser(null);
-  }
-
-  return (
-    <AuthContext.Provider value={{ user, login, logout, register, loginWithFacebook }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
