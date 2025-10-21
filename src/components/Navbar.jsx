@@ -14,11 +14,9 @@ import {
   Moon,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAuth } from "../context/AuthContext"; // 1. Import useAuth
-// Giả sử bạn có useCart (vì bạn import icon ShoppingCart)
+import { useAuth } from "../context/AuthContext";
 // import { useCart } from "../context/CartContext"; 
 
-// --- Component con: Nút Dark Mode (Tùy chọn) ---
 const ThemeToggle = () => {
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
 
@@ -46,7 +44,6 @@ const ThemeToggle = () => {
   );
 };
 
-// --- Component con: Menu cho User đã đăng nhập ---
 const ProfileMenu = ({ user, isAdmin }) => {
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -54,7 +51,7 @@ const ProfileMenu = ({ user, isAdmin }) => {
 
   const handleLogout = async () => {
     await logout();
-    navigate("/"); // Về trang chủ sau khi logout
+    navigate("/"); 
   };
 
   return (
@@ -64,7 +61,6 @@ const ProfileMenu = ({ user, isAdmin }) => {
         className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-white hover:text-sky-600 dark:hover:text-sky-400"
       >
         <User size={18} />
-        {/* Chào tên khách hàng */}
         <span className="hidden md:inline">Chào, {user.full_name}!</span>
       </button>
 
@@ -81,7 +77,6 @@ const ProfileMenu = ({ user, isAdmin }) => {
               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
             </div>
             <nav className="p-2">
-              {/* Link tới trang Admin chỉ Admin thấy */}
               {isAdmin && (
                 <Link
                   to="/admin"
@@ -108,37 +103,30 @@ const ProfileMenu = ({ user, isAdmin }) => {
 };
 
 export default function Navbar() {
-  // 2. Lấy thông tin xác thực từ Context
   const { session, user, isAdmin, loading } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  // const { cart } = useCart(); // Bỏ comment nếu bạn có CartContext
+  // const { cart } = useCart(); 
   
-  // Tính tổng số lượng trong giỏ hàng (ví dụ)
-  // const cartItemCount = cart ? cart.reduce((total, item) => total + item.adults + item.children, 0) : 0;
-  const cartItemCount = 0; // Tạm thời
+  const cartItemCount = 0; 
 
-  // 3. Sửa lại navLinks, tách Giỏ hàng ra riêng
   const navLinks = [
     { name: "Du lịch", path: "/tours", icon: <Plane size={18} /> },
     { name: "Khách sạn", path: "/hotels", icon: <Hotel size={18} /> },
     { name: "Khuyến mãi", path: "/promotions", icon: <Percent size={18} /> },
   ];
 
-  // 4. Hàm render phần Đăng nhập/Profile
-  const renderAuthSection = ()_ => {
+  // 4. Hàm render phần Đăng nhập/Profile (ĐÃ SỬA LỖI)
+  const renderAuthSection = () => {
     if (loading) {
-      // Đang tải...
       return (
         <div className="w-24 h-8 bg-gray-200 dark:bg-neutral-700 rounded-full animate-pulse"></div>
       );
     }
 
     if (session && user) {
-      // Đã đăng nhập
       return <ProfileMenu user={user} isAdmin={isAdmin} />;
     }
 
-    // Chưa đăng nhập (giữ nguyên nút của bạn)
     return (
       <Link
         to="/login"
@@ -153,7 +141,7 @@ export default function Navbar() {
   return (
     <header className="fixed top-0 left-0 w-full z-50 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-md shadow-sm border-b border-gray-200 dark:border-neutral-800">
       <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-3">
-        {/* ===== Logo Section (Giữ nguyên) ===== */}
+        {/* ===== Logo Section ===== */}
         <Link to="/" className="flex flex-col items-start leading-none group">
           <div className="flex items-center gap-2">
             <span className="text-3xl font-extrabold bg-gradient-to-r from-sky-500 to-blue-700 bg-clip-text text-transparent tracking-tight group-hover:scale-105 transition-transform duration-300">
@@ -171,7 +159,7 @@ export default function Navbar() {
           </span>
         </Link>
 
-        {/* ===== Navigation Links (Giữ nguyên) ===== */}
+        {/* ===== Navigation Links ===== */}
         <nav className="hidden md:flex items-center gap-6">
           {navLinks.map((link) => (
             <NavLink
@@ -191,11 +179,10 @@ export default function Navbar() {
           ))}
         </nav>
 
-        {/* ===== Right Section: Icons & Auth (Đã sửa) ===== */}
+        {/* ===== Right Section: Icons & Auth ===== */}
         <div className="flex items-center gap-3">
           <ThemeToggle />
           
-          {/* Giỏ hàng (tách riêng) */}
           <Link
             to="/cart"
             className="relative p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700"
@@ -208,12 +195,10 @@ export default function Navbar() {
             )}
           </Link>
 
-          {/* Nút Auth (Đã sửa) */}
           <div className="hidden md:block">
             {renderAuthSection()}
           </div>
           
-          {/* Nút Mobile Menu */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className="md:hidden p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700"
@@ -223,7 +208,7 @@ export default function Navbar() {
         </div>
       </div>
       
-      {/* ===== Mobile Menu Dropdown (Thêm mới) ===== */}
+      {/* ===== Mobile Menu Dropdown ===== */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div
@@ -238,7 +223,8 @@ export default function Navbar() {
                   key={link.name}
                   to={link.path}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className={({ isActive })R =>
+                  // Sửa lỗi cú pháp 'isActive'R'
+                  className={({ isActive }) => 
                     `flex items-center gap-3 text-base font-medium ${
                       isActive ? "text-sky-600" : "text-gray-700 dark:text-gray-200"
                     }`
@@ -268,6 +254,8 @@ export default function Navbar() {
                   )}
                   <button
                     onClick={() => {
+                      // Gọi hàm logout từ context
+                      const { logout } = useAuth(); 
                       logout();
                       setIsMobileMenuOpen(false);
                     }}
