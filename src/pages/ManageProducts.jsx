@@ -21,10 +21,10 @@ export default function ManageProducts({ productType = "tour" }) {
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   // State cho Modal
   const [showModal, setShowModal] = useState(false);
-  const [productToEdit, setProductToEdit] = useState(null); // Nếu có data, là chế độ Sửa
+  const [productToEdit, setProductToEdit] = useState(null);
 
   const { icon, title } = getProductTypeDetails(productType);
 
@@ -36,58 +36,66 @@ export default function ManageProducts({ productType = "tour" }) {
     const [productResponse, supplierResponse] = await Promise.all([
       supabase
         .from("Products")
-        .select(`*, Suppliers ( name )`) // Join với bảng Suppliers
-        .eq("product_type", productType), // Lọc theo loại sản phẩm
+        // 👇 SỬA Ở ĐÂY: Đổi tên cột name của Suppliers thành supplier_name 👇
+        .select(`*, supplier_name:Suppliers(name)`)
+        .eq("product_type", productType),
       supabase.from("Suppliers").select("id, name"),
     ]);
 
     if (productResponse.error) {
-      setError("Lỗi fetch sản phẩm: " + productResponse.error.message);
+       // Kiểm tra lỗi ambiguous và đưa ra gợi ý cụ thể
+       if (productResponse.error.code === '42702') { // Postgres ambiguous column code
+            setError("Lỗi truy vấn: Cột 'name' bị trùng lặp giữa Products và Suppliers. Hãy kiểm tra lại câu lệnh select.");
+            console.error("Ambiguous column error details:", productResponse.error);
+       } else {
+            setError("Lỗi fetch sản phẩm: " + productResponse.error.message);
+       }
+      setProducts([]); // Set rỗng nếu có lỗi
     } else {
-      setProducts(productResponse.data);
+      setProducts(productResponse.data || []);
     }
 
+    // Luôn set suppliers dù có lỗi ở product hay không
     if (supplierResponse.error) {
-      setSuppliers(supplierResponse.data);
+         console.error("Lỗi fetch suppliers:", supplierResponse.error);
+         // Không cần set lỗi chính ở đây, ưu tiên lỗi product
+         setSuppliers([]);
+    } else {
+         setSuppliers(supplierResponse.data || []);
     }
-    
+
     setLoading(false);
-  }, [productType]); // Chỉ chạy lại khi productType thay đổi
+  }, [productType]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
   // --- HÀNH ĐỘNG THÊM / SỬA / XÓA ---
-
-  // Mở modal Thêm mới
   const handleAddNew = () => {
-    setProductToEdit(null); // Đảm bảo là null (chế độ thêm)
+    setProductToEdit(null);
     setShowModal(true);
   };
 
-  // Mở modal Sửa
   const handleEdit = (product) => {
     setProductToEdit(product);
     setShowModal(true);
   };
 
-  // Xử lý Xóa
   const handleDelete = async (productId) => {
     if (window.confirm("Bạn có chắc muốn xóa sản phẩm này?")) {
       const { error } = await supabase.from("Products").delete().eq("id", productId);
-      
+
       if (error) {
         alert("Lỗi xóa sản phẩm: " + error.message);
       } else {
         alert("Xóa thành công!");
-        fetchData(); // Tải lại danh sách
+        fetchData();
       }
     }
   };
 
   // --- RENDER ---
-
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -115,7 +123,6 @@ export default function ManageProducts({ productType = "tour" }) {
         </button>
       </div>
 
-      {/* Bảng dữ liệu chuyên nghiệp */}
       <div className="bg-white dark:bg-neutral-800 shadow-xl rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -135,16 +142,17 @@ export default function ManageProducts({ productType = "tour" }) {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-white">{product.tour_code}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{product.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                    {product.Suppliers ? product.Suppliers.name : <span className="text-red-500">N/A</span>}
+                    {/* 👇 SỬA Ở ĐÂY: Dùng tên mới là supplier_name 👇 */}
+                    {product.supplier_name ? product.supplier_name : <span className="text-red-500">N/A</span>}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{product.price.toLocaleString("vi-VN")} VNĐ</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     {product.inventory > 0 ? (
-                      <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                      <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                         Còn hàng ({product.inventory})
                       </span>
                     ) : (
-                      <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                      <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
                         Hết hàng
                       </span>
                     )}
@@ -164,7 +172,6 @@ export default function ManageProducts({ productType = "tour" }) {
         </div>
       </div>
 
-      {/* Modal Thêm/Sửa */}
       {showModal && (
         <ProductModal
           show={showModal}
