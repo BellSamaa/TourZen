@@ -97,7 +97,7 @@ const AddSupplierModal = ({ show, onClose, onSuccess }) => {
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Tên nhà cung cấp (Tên công ty/brand)</label>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:bg-neutral-700 dark:border-gray-600 dark:text-white" required />
-E       </div>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Email liên hệ</label>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:bg-neutral-700 dark:border-gray-600 dark:text-white" />
@@ -112,7 +112,7 @@ E       </div>
               <option value="hotel">Khách sạn</option>
               <option value="flight">Chuyến bay</option>
               <option value="car_rental">Thuê xe</option>
-s           <option value="restaurant">Nhà hàng</option>
+              <option value="restaurant">Nhà hàng</option>
               <option value="other">Khác</option>
             </select>
           </div>
@@ -129,7 +129,7 @@ s           <option value="restaurant">Nhà hàng</option>
               required // Bắt buộc phải chọn 1 user để liên kết
             >
               <option value="">-- Chọn tài khoản để liên kết --</option>
-S           {loadingUsers ? (
+              {loadingUsers ? (
                 <option disabled>Đang tải user...</option>
               ) : (
                 users.map(user => (
@@ -137,7 +137,7 @@ S           {loadingUsers ? (
                     {user.full_name || user.email}
                   </option>
                 ))
-    F         )}
+              )}
             </select>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Chỉ hiển thị các tài khoản có vai trò 'supplier'.
@@ -146,11 +146,11 @@ S           {loadingUsers ? (
           {/* ------------------------------------------- */}
 
           <div className="flex justify-end space-x-3">
-S         <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400" >
+            <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400" >
               Hủy
             </button>
             <button type="submit" disabled={submitting || loadingUsers} className="px-4 py-2 bg-sky-600 text-white rounded-md hover:bg-sky-700 disabled:opacity-50" >
-              {submitting ? "Đang lưu..." : "Lưu"}
+G           {submitting ? "Đang lưu..." : "Lưu"}
             </button>
           </div>
         </form>
@@ -173,7 +173,7 @@ export default function ManageSuppliers() {
     setError(null);
     
     // --- SỬA: Dùng 'join' để lấy thông tin user liên kết ---
-OS     const { data, error } = await supabase
+    const { data, error } = await supabase
       .from("Suppliers")
       // Lấy tất cả cột từ Suppliers, và 2 cột từ bảng Users
       .select("*, Users(full_name, email)"); 
@@ -202,7 +202,7 @@ OS     const { data, error } = await supabase
 
   if (error) {
     return <div className="text-red-500 text-center p-8">Lỗi: {error}</div>;
-s }
+  }
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -226,52 +226,52 @@ s }
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-S               Tên NCC (Brand)
+                  Tên NCC (Brand)
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Email liên hệ
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-E               Điện thoại
+                  Điện thoại
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Loại Dịch Vụ
                 </th>
                 {/* --- MỚI: Thêm cột Tài khoản --- */}
-S             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Tài khoản liên kết
                 </th>
               </tr>
             </thead>
-    t       <tbody className="bg-white dark:bg-neutral-800 divide-y divide-gray-200 dark:divide-gray-700">
+            <tbody className="bg-white dark:bg-neutral-800 divide-y divide-gray-200 dark:divide-gray-700">
               {suppliers.map((supplier) => (
                 <tr key={supplier.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                     {supplier.name}
                   </td>
-OS               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                     {supplier.email}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-source               {supplier.phone}
+                    {supplier.phone}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                     {supplier.service_type}
-                S </td>
+                </td>
                   {/* --- MỚI: Hiển thị user đã liên kết --- */}
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                     {supplier.Users ? (
-                      // Nếu có liên kết (Users không phải null)
-s                   <span className="font-medium text-blue-600 dark:text-blue-400">
+                  f   // Nếu có liên kết (Users không phải null)
+                      <span className="font-medium text-blue-600 dark:text-blue-400">
                         {supplier.Users.full_name || supplier.Users.email}
-  t               </span>
+                    </a></span>
                     ) : (
-  ar                 // Nếu user_id là null
+                      // Nếu user_id là null
                       <span className="italic text-red-500">Chưa liên kết</span>
                     )}
                   </td>
                 </tr>
-OS           ))}
+              ))}
             </tbody>
           </table>
         </div>
@@ -281,10 +281,11 @@ OS           ))}
         show={showModal}
         onClose={() => setShowModal(false)}
         onSuccess={() => {
-  s         // Khi thêm thành công, fetch lại danh sách
-          fetchSuppliers();
+          // Khi thêm thành công, fetch lại danh sách
+s         fetchSuppliers();
         }}
       />
     </div>
   );
 }
+
