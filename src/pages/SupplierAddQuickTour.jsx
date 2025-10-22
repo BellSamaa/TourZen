@@ -9,6 +9,12 @@ import { FaPlus, FaCheckCircle, FaSpinner, FaExclamationCircle } from "react-ico
 
 const supabase = getSupabase();
 
+// --- Hàm format tiền tệ ---
+const formatCurrency = (number) => {
+    if (typeof number !== "number" || isNaN(number)) return "Liên hệ"; // Hoặc "0 ₫"
+    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(number);
+};
+
 // --- Component con Loading ---
 const LoadingComponent = () => (
     <div className="flex justify-center items-center h-64">
@@ -44,7 +50,6 @@ export default function SupplierAddQuickTour() {
             // Xử lý product codes
             if (productRes.error) {
                 console.error('Lỗi fetch existing tour codes:', productRes.error);
-                // Có thể không cần báo lỗi nghiêm trọng ở đây
             } else if (productRes.data) {
                 setDbTourCodes(new Set(productRes.data.map(p => p.tour_code)));
             }
@@ -52,13 +57,11 @@ export default function SupplierAddQuickTour() {
             // Xử lý supplier ID
             if (supplierRes.error) {
                 console.error('Lỗi fetch supplier ID for user:', supplierRes.error);
-                // Không tìm thấy NCC liên kết -> Báo lỗi quan trọng
                 alert("Lỗi: Không tìm thấy thông tin Nhà cung cấp liên kết với tài khoản của bạn. Vui lòng liên hệ Admin.");
-                setLoggedInSupplierId(null); // Đảm bảo là null
+                setLoggedInSupplierId(null);
             } else if (supplierRes.data) {
-                setLoggedInSupplierId(supplierRes.data.id); // Lưu lại ID
+                setLoggedInSupplierId(supplierRes.data.id);
             } else {
-                 // Dữ liệu trả về null -> User này chưa liên kết
                  alert("Lỗi: Tài khoản của bạn chưa được liên kết với Nhà cung cấp nào. Vui lòng liên hệ Admin.");
                  setLoggedInSupplierId(null);
             }
@@ -76,14 +79,13 @@ export default function SupplierAddQuickTour() {
 
     // Hàm xử lý thêm tour
     const handleAddTour = async (tourToAdd) => {
-        const tourCode = String(tourToAdd.id); // Dùng id từ data làm tour_code
+        const tourCode = String(tourToAdd.id);
 
         if (!user || !loggedInSupplierId) {
             alert("Lỗi: Không thể xác định Nhà cung cấp. Vui lòng đăng nhập lại hoặc liên hệ Admin.");
             return;
         }
 
-        // Kiểm tra lại lần nữa phòng trường hợp state chưa kịp cập nhật
         if (dbTourCodes.has(tourCode)) {
            setAddingStatus((prev) => ({ ...prev, [tourCode]: 'exists' }));
            return;
@@ -91,26 +93,23 @@ export default function SupplierAddQuickTour() {
 
         setAddingStatus((prev) => ({ ...prev, [tourCode]: 'adding' }));
 
-        // Chuẩn bị dữ liệu để insert
         const productData = {
             name: tourToAdd.title,
             tour_code: tourCode,
             price: tourToAdd.price || 0,
-            inventory: tourToAdd.inventory || 10, // Số lượng tồn kho mặc định
+            inventory: tourToAdd.inventory || 10,
             product_type: 'tour',
-            supplier_id: loggedInSupplierId, // ID của NCC đang đăng nhập
-            approval_status: 'pending', // Trạng thái chờ duyệt
+            supplier_id: loggedInSupplierId,
+            approval_status: 'pending',
             image_url: tourToAdd.image,
             description: tourToAdd.description,
             duration: tourToAdd.duration,
             location: tourToAdd.location,
             rating: tourToAdd.rating,
             galleryImages: tourToAdd.galleryImages,
-            // Chuyển itinerary sang mảng text (nếu cột itinerary là text[])
             itinerary: tourToAdd.itinerary?.map(day => `${day.day}: ${day.description}`),
         };
 
-        // Thực hiện INSERT
         const { error: insertError } = await supabase
             .from('Products')
             .insert(productData);
@@ -144,7 +143,6 @@ export default function SupplierAddQuickTour() {
      if (loadingData) {
          return <LoadingComponent />;
      }
-     // Quan trọng: Kiểm tra lại loggedInSupplierId sau khi loading xong
      if (!loggedInSupplierId) {
           return (
              <div className="p-6 text-center text-red-500 dark:text-red-400">
@@ -155,11 +153,11 @@ export default function SupplierAddQuickTour() {
 
 
     return (
-        <div className="p-6 max-w-4xl mx-auto"> {/* Thêm max-w */}
+        <div className="p-6 max-w-4xl mx-auto">
             <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-4">
                 Thêm Nhanh Tour Mẫu
             </h1>
-            <p className="text-md text-gray-600 dark:text-gray-400 mb-8"> {/* Tăng cỡ chữ, mb */}
+            <p className="text-md text-gray-600 dark:text-gray-400 mb-8">
                 Chọn các tour mẫu có sẵn dưới đây để thêm vào danh mục sản phẩm của bạn. Các tour mới sẽ cần được Admin phê duyệt trước khi hiển thị công khai.
             </p>
 
@@ -174,35 +172,35 @@ export default function SupplierAddQuickTour() {
 
                         return (
                             <li key={tour.id} className={`px-6 py-4 flex items-center justify-between transition-colors duration-200 ${status === 'added' ? 'bg-green-50 dark:bg-green-900/20' : 'hover:bg-gray-50 dark:hover:bg-neutral-700/50'}`}>
-                                <div className="flex items-center space-x-4 min-w-0 flex-1 mr-4"> {/* Thêm flex-1, mr-4 */}
+                                <div className="flex items-center space-x-4 min-w-0 flex-1 mr-4">
                                     <img
-                                        src={tour.image || 'https://placehold.co/80x80/eee/ccc?text=Img'} // Ảnh lớn hơn
+                                        src={tour.image || 'https://placehold.co/80x80/eee/ccc?text=Img'}
                                         alt={tour.title}
-                                        className="w-20 h-20 object-cover rounded-lg flex-shrink-0 shadow-sm" // Tăng kích thước, thêm shadow
+                                        className="w-20 h-20 object-cover rounded-lg flex-shrink-0 shadow-sm"
                                     />
                                     <div className="min-w-0">
                                         <p className="text-base font-semibold text-gray-900 dark:text-white truncate">{tour.title}</p>
                                         <p className="text-sm text-gray-500 dark:text-gray-400">Mã: {tour.id}</p>
-                                        <p className="text-sm text-red-600 font-medium">{formatCurrency(tour.price)}</p> {/* Hiển thị giá */}
+                                        {/* Sử dụng formatCurrency */}
+                                        <p className="text-sm text-red-600 font-medium">{formatCurrency(tour.price)}</p>
                                     </div>
                                 </div>
-
                                 {/* Nút Thêm và Trạng thái */}
-                                <div className="flex items-center space-x-3 flex-shrink-0 ml-4"> {/* Tăng space */}
+                                <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
                                     {status === 'idle' && (
                                         <button
                                             onClick={() => handleAddTour(tour)}
-                                            className="p-3 rounded-full bg-sky-100 text-sky-600 hover:bg-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 transition-all transform hover:scale-110" // Nút to hơn, hiệu ứng
+                                            className="p-3 rounded-full bg-sky-100 text-sky-600 hover:bg-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 transition-all transform hover:scale-110"
                                             title="Thêm tour này (chờ duyệt)"
                                         >
                                             <FaPlus size={16} />
                                         </button>
                                     )}
                                     {status === 'adding' && (
-                                        <FaSpinner className="animate-spin text-sky-500 text-2xl" /> // Icon to hơn
+                                        <FaSpinner className="animate-spin text-sky-500 text-2xl" />
                                     )}
                                     {status === 'added' && (
-                                        <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400 text-sm font-medium"> {/* Style đẹp hơn */}
+                                        <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400 text-sm font-medium">
                                              <FaCheckCircle size={18}/>
                                              <span>Đã thêm</span>
                                         </div>
