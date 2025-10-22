@@ -1,9 +1,13 @@
+// src/pages/TourDetail.jsx
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getSupabase } from "../lib/supabaseClient";
 import { ParallaxBanner, useParallax } from "react-scroll-parallax";
 import Slider from "react-slick";
-import { FaCreditCard, FaSpinner, FaMapMarkerAlt, FaClock, FaInfoCircle } from "react-icons/fa";
+import { 
+    FaCreditCard, FaSpinner, FaMapMarkerAlt, FaClock, FaInfoCircle,
+    FaCalendarAlt, FaMoneyBillWave, FaChild, FaUser, FaPlus, FaGift, FaPlane, FaStickyNote 
+} from "react-icons/fa"; // Thêm icon mới
 import { motion, useScroll, useTransform } from "framer-motion";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
@@ -59,6 +63,8 @@ const TourDetail = () => {
     const [tour, setTour] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    {/* *** THÊM STATE CHO TAB LỊCH TRÌNH *** */}
+    const [activeScheduleTab, setActiveScheduleTab] = useState(0);
 
     const { ref: bannerRef, scrollYProgress } = useScroll();
     const bannerTextY = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
@@ -67,23 +73,23 @@ const TourDetail = () => {
         async function fetchTour() {
             setLoading(true);
             setError(null);
-            try { // Thêm try...catch
+            try { 
                 const { data, error: fetchError } = await supabase
                     .from("Products")
+                      // Select * sẽ tự động lấy cột "departure_months" mới
                     .select("*, supplier_name:Suppliers(name)")
                     .eq("id", id)
                     .single();
 
-                if (fetchError) throw fetchError; // Ném lỗi để catch bắt
+                if (fetchError) throw fetchError; 
                 if (data) {
                     setTour(data);
                 } else {
-                    setError("Tour không tồn tại."); // Set lỗi cụ thể
+                    setError("Tour không tồn tại."); 
                     setTour(null);
                 }
             } catch (err) {
                  console.error("Lỗi fetch chi tiết tour:", err);
-                 // Xử lý lỗi RLS hoặc lỗi mạng cụ thể hơn nếu cần
                  if (err.message.includes('Row level security policy')) {
                     setError("Bạn không có quyền xem tour này hoặc RLS đang bật.");
                  } else {
@@ -104,7 +110,6 @@ const TourDetail = () => {
     }, [id]);
 
     if (loading) { return <LoadingComponent />; }
-    // Lỗi được xử lý riêng, chỉ cần kiểm tra !tour ở đây
     if (!tour) { return <ErrorComponent message={error || "Tour không tồn tại."} />; }
 
     // --- Xử lý Ảnh ---
@@ -115,25 +120,35 @@ const TourDetail = () => {
 
     const sliderSettings = {
         dots: true,
-        appendDots: dots => ( <div style={{ bottom: "-45px" }}><ul style={{ margin: "0px" }}> {dots} </ul></div> ), // Tăng bottom
-        customPaging: i => ( <div className="w-2.5 h-2.5 bg-gray-300 dark:bg-gray-600 rounded-full transition-colors duration-300 slick-dot-active:bg-sky-500"></div> ), // Giảm size dot
+        appendDots: dots => ( <div style={{ bottom: "-45px" }}><ul style={{ margin: "0px" }}> {dots} </ul></div> ), 
+        customPaging: i => ( <div className="w-2.5 h-2.5 bg-gray-300 dark:bg-gray-600 rounded-full transition-colors duration-300 slick-dot-active:bg-sky-500"></div> ), 
         infinite: galleryImages.length > 1,
         speed: 700, slidesToShow: 1, slidesToScroll: 1,
-        autoplay: true, autoplaySpeed: 4500, // Chậm lại chút
+        autoplay: true, autoplaySpeed: 4500, 
         fade: true, pauseOnHover: true,
      };
 
-     const handleBookNow = () => { /* ... giữ nguyên ... */ };
+    {/* *** SỬA LỖI NÚT ĐẶT TOUR (Tái áp dụng) *** */}
+    const handleBookNow = () => {
+        if (!tour) return;
+        navigate('/payment', {
+            state: {
+                item: tour,       
+                itemType: 'tour', 
+                quantity: 1       
+            }
+        });
+    };
 
     // --- Animation Variants ---
-    const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.1 } } }; // Giảm delay
-    const itemVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } } }; // Giảm y, duration
+    const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.1 } } }; 
+    const itemVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } } }; 
 
     return (
         <motion.div
             className="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-200 overflow-x-hidden"
             initial="hidden" animate="visible" exit={{ opacity: 0 }}
-            variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { duration: 0.4 } } }} // Nhanh hơn
+            variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { duration: 0.4 } } }} 
         >
             {/* === Banner === */}
             <div ref={bannerRef} className="relative overflow-hidden">
@@ -173,10 +188,9 @@ const TourDetail = () => {
                          <div className="flex items-start gap-4"> <FaClock className="text-sky-500 mt-1 flex-shrink-0" size={20} /> <div> <strong className="font-semibold block text-slate-800 dark:text-slate-100">Thời gian:</strong> <span>{tour.duration || 'N/A'}</span> </div> </div>
                          <div className="flex items-start gap-4"> <FaMapMarkerAlt className="text-sky-500 mt-1 flex-shrink-0" size={20} /> <div> <strong className="font-semibold block text-slate-800 dark:text-slate-100">Điểm đến:</strong> <span>{tour.location || 'N/A'}</span> </div> </div>
                          {tour.supplier_name && ( <div className="flex items-start gap-4"> <FaInfoCircle className="text-sky-500 mt-1 flex-shrink-0" size={20} /> <div> <strong className="font-semibold block text-slate-800 dark:text-slate-100">Nhà cung cấp:</strong> 
-                                {/* *** *** SỬA LỖI #31 TẠI ĐÂY ***
-                                    *** */}
-                                <span>{tour.supplier_name?.name}</span> 
-                            </div> </div> )}
+                                {/* *** SỬA LỖI #31 (Tái áp dụng) *** */}
+                                <span>{tour.supplier_name?.name}</span> 
+                            </div> </div> )}
                          <div className="pt-5 mt-5 border-t dark:border-slate-600">
                             <h3 className="text-xl font-semibold mb-3 text-slate-800 dark:text-slate-100">Mô tả chi tiết</h3>
                             <div className="prose prose-slate dark:prose-invert max-w-none text-base leading-relaxed">
@@ -190,13 +204,97 @@ const TourDetail = () => {
                 <motion.div className="lg:col-span-1 bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border dark:border-slate-700 lg:sticky lg:top-24 self-start" variants={itemVariants}>
                     <p className="text-slate-500 dark:text-slate-400 text-sm mb-1 font-medium">Giá chỉ từ</p>
                     <p className="text-4xl md:text-5xl font-bold text-red-600 mb-6 pb-6 border-b dark:border-slate-600"> {formatCurrency(tour.price)} </p>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-6"> Nhấn nút bên dưới để tiến hành đặt tour. </p>
+Â                 <p className="text-sm text-slate-600 dark:text-slate-400 mb-6"> Nhấn nút bên dưới để tiến hành đặt tour. </p>
                     <motion.button onClick={handleBookNow} className="w-full px-6 py-4 bg-gradient-to-r from-orange-500 to-red-600 text-white text-lg font-bold rounded-xl shadow-lg hover:shadow-xl hover:from-orange-600 focus:outline-none focus:ring-4 focus:ring-orange-300 dark:focus:ring-orange-800 transition-all duration-300 flex items-center justify-center gap-3 transform active:scale-95" whileHover={{ scale: 1.03, y: -3, boxShadow: "0 10px 20px rgba(0,0,0,0.2)" }}>
                         <FaCreditCard /> Đặt Tour Ngay
                     </motion.button>
                      <p className="text-xs text-slate-500 mt-4 text-center"> Nhân viên sẽ liên hệ xác nhận sau khi bạn đặt. </p>
-                </motion.div>
+A               </motion.div>
             </motion.section>
+
+            {/* *** *** *** *** *** *** *** *** *** *** *** BẮT ĐẦU KHU VỰC MỚI   *** *** LỊCH KHỞI HÀNH & BẢNG GIÁ ***
+            *** *** *** *** *** *** *** *** *** *** */}
+            {tour.departure_months && tour.departure_months.length > 0 && (
+                <motion.section 
+                    className="max-w-6xl mx-auto p-6 md:p-10 mt-8 mb-16 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border dark:border-slate-700" 
+                    initial={{ opacity: 0, y: 50 }} 
+                    whileInView={{ opacity: 1, y: 0 }} 
+                    viewport={{ once: true }} 
+                    transition={{ duration: 0.6 }}
+                >
+                    <h2 className="text-2xl md:text-3xl font-bold mb-8 text-center text-sky-700 dark:text-sky-400"> Lịch khởi hành & Giá </h2>
+                    
+                    {/* --- Tabs chọn tháng --- */}
+                    <div className="flex border-b border-gray-200 dark:border-slate-700 mb-6 flex-wrap">
+                        {tour.departure_months.map((item, index) => (
+                            <button
+                                key={index}
+                                onClick={() => setActiveScheduleTab(index)}
+                                className={`py-3 px-5 text-sm md:text-base font-semibold flex items-center gap-2 -mb-px whitespace-nowrap ${
+                                    activeScheduleTab === index
+                                    ? 'border-b-2 border-sky-500 text-sky-600 dark:text-sky-400'
+                                    : 'border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                                }`}
+                            >
+                                <FaCalendarAlt /> {item.month}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* --- Nội dung Tab --- */}
+                    {tour.departure_months.map((item, index) => (
+                        <div key={index} className={activeScheduleTab === index ? 'block' : 'hidden'}>
+                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+                                {/* Ngày khởi hành */}
+                                <div className="mb-6">
+                                    <h4 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-3">Ngày khởi hành (dự kiến):</h4>
+                                    <div className="flex flex-wrap gap-2">
+                                        {item.departureDates.map((date, i) => (
+                                            <span key={i} className="bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-300 text-sm font-medium px-3 py-1.5 rounded-full">
+                                                {date}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Bảng giá */}
+                                <div className="mb-6">
+                                    <h4 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-3">Chi tiết giá (VNĐ/khách):</h4>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        <div className="p-4 bg-slate-50 dark:bg-slate-700 rounded-lg">
+                                            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"><FaUser /> Người lớn</div>
+                                            <div className="text-lg font-bold text-red-600 mt-1">{formatCurrency(item.prices.adult)}</div>
+                                        </div>
+                                        <div className="p-4 bg-slate-50 dark:bg-slate-700 rounded-lg">
+                                            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"><FaChild /> Trẻ em</div>
+                                            <div className="text-lg font-bold text-red-600 mt-1">{formatCurrency(item.prices.child)}</div>
+                                        </div>
+                                        <div className="p-4 bg-slate-50 dark:bg-slate-700 rounded-lg">
+                                            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">Em bé</div>
+                                            <div className="text-lg font-bold text-red-600 mt-1">{formatCurrency(item.prices.infant)}</div>
+                                        </div>
+                                        <div className="p-4 bg-slate-50 dark:bg-slate-700 rounded-lg">
+                                            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"><FaPlus /> Phụ thu phòng đơn</div>
+                                            <div className="text-lg font-bold text-red-600 mt-1">{formatCurrency(item.prices.singleSupplement)}</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Thông tin thêm */}
+                                <div className="space-y-3 text-sm text-slate-700 dark:text-slate-300">
+                                    <p className="flex items-start gap-2.5"><span className="mt-0.5">{item.promotions || '🎁 Đang cập nhật ưu đãi...'}</span></p>
+                                    <p className="flex items-start gap-2.5"><span className="mt-0.5">{item.familySuitability || '👨‍👩‍👧‍👦 Phù hợp với mọi gia đình.'}</span></p>
+                                    <p className="flex items-start gap-2.5"><span className="mt-0.5">{item.flightDeals || '✈️ Giá tour chưa bao gồm vé máy bay.'}</span></p>
+                                    <p className="flex items-start gap-2.5"><span className="mt-0.5 opacity-80">{item.notes || '* Giá có thể thay đổi nhẹ tùy thời điểm.'}</span></p>
+                                </div>
+                            </motion.div>
+                        </div>
+                    ))}
+                </motion.section>
+            )}
+            {/* *** *** *** *** *** *** *** *** *** *** *** KẾT THÚC KHU VỰC MỚI     ***
+            *** *** *** *** *** *** *** *** *** *** */}
+
 
             {/* === Lịch trình === */}
             {tour.itinerary && tour.itinerary.length > 0 && (
@@ -207,30 +305,29 @@ const TourDetail = () => {
                        <motion.div key={i} className="relative pl-10" initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: i * 0.15 }}>
                          <div className="absolute top-1 left-[-1.45rem] w-8 h-8 bg-sky-500 border-4 border-white dark:border-slate-800 rounded-full z-10 flex items-center justify-center shadow"> <span className="text-sm font-bold text-white">{i + 1}</span> </div>
                          <h4 className="font-semibold text-lg md:text-xl text-slate-800 dark:text-slate-100 mb-1.5"> {item.includes(':') ? item.split(':')[0] : `Ngày ${i + 1}`} </h4>
-                    _    <p className="text-slate-600 dark:text-slate-300 text-base leading-relaxed"> {item.includes(':') ? item.split(':').slice(1).join(':').trim() : item} </p>
+                         <p className="text-slate-600 dark:text-slate-300 text-base leading-relaxed"> {item.includes(':') ? item.split(':').slice(1).join(':').trim() : item} </p>
                        </motion.div>
                      ))}
                    </div>
                 </motion.section>
-            )}
+G         )}
 
             {/* === Bản đồ === */}
             <motion.section className="max-w-5xl mx-auto my-16 px-4" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
               <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center dark:text-white">Vị trí trên Bản đồ</h2>
               <div className="rounded-2xl overflow-hidden shadow-xl border dark:border-slate-700 aspect-video md:aspect-[16/6]">
-                {/* *** *** SỬA LỖI LINK MAP BỊ HỎNG TẠI ĐÂY ***
-                        *** */}
+                {/* *** SỬA LỖI LINK MAP (Tái áp dụng) *** */}
                 <iframe 
-                        title="map" 
-                        src={`https://maps.google.com/maps?q=${encodeURIComponent(tour.name + ", " + (tour.location || ''))}&output=embed`} 
-                        width="100%" 
-                        height="100%" 
-                        loading="lazy" 
-                        className="border-0">
-                    </iframe>
+              D         title="map" 
+                        src={`https://maps.google.com/maps?q=${encodeURIComponent(tour.name + ", " + (tour.location || ''))}&output=embed`} 
+                        width="100%" 
+                        height="100%" 
+S                       loading="lazy" 
+                        className="border-0">
+                    </iframe>
               </div>
             </motion.section>
-        </motion.div>
+s       </motion.div>
     );
 };
 
