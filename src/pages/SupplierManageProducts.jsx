@@ -1,7 +1,13 @@
 // src/pages/SupplierManageProducts.jsx
 import React, { useState, useEffect, useCallback } from "react";
 import { getSupabase } from "../lib/supabaseClient";
-import { FaSpinner, FaPlus, FaEdit, FaTrash, FaUmbrellaBeach } from "react-icons/fa";
+import {
+  FaSpinner,
+  FaPlus,
+  FaEdit,
+  FaTrash,
+  FaUmbrellaBeach,
+} from "react-icons/fa";
 import ProductModal from "./ProductModal";
 
 const supabase = getSupabase();
@@ -17,6 +23,30 @@ const InventoryStatus = ({ inventory }) => {
       Hết chỗ
     </span>
   );
+};
+
+// Trạng thái phê duyệt
+const ApprovalStatus = ({ status }) => {
+  switch (status) {
+    case "approved":
+      return (
+        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-800/20 dark:text-green-300">
+          Đã duyệt
+        </span>
+      );
+    case "rejected":
+      return (
+        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-800/20 dark:text-red-300">
+          Bị từ chối
+        </span>
+      );
+    default:
+      return (
+        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-800/20 dark:text-yellow-300">
+          Đang chờ duyệt
+        </span>
+      );
+  }
 };
 
 export default function SupplierManageProducts() {
@@ -64,7 +94,6 @@ export default function SupplierManageProducts() {
   };
 
   const handleEdit = (product) => {
-    // Chuẩn hóa ngày (nếu null thì không truyền)
     const normalized = {
       ...product,
       start_date: product.start_date ? product.start_date.split("T")[0] : null,
@@ -113,26 +142,27 @@ export default function SupplierManageProducts() {
             <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
               <thead className="bg-gray-50 dark:bg-slate-700">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Mã Tour
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Tên Tour
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Nhà Cung Cấp
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Giá
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Số Chỗ
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Số chỗ
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Trạng thái
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                     Hành động
                   </th>
                 </tr>
               </thead>
+
               <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
                 {products.length > 0 ? (
                   products.map((p) => (
@@ -143,34 +173,38 @@ export default function SupplierManageProducts() {
                       <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
                         {p.name}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
-                        {p.supplier_name?.name || <i className="text-gray-400">N/A</i>}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-semibold text-gray-800 dark:text-gray-200">
+                      <td className="px-6 py-4 text-sm text-gray-800 dark:text-gray-200 font-semibold">
                         {p.price ? p.price.toLocaleString("vi-VN") : 0} VNĐ
                       </td>
                       <td className="px-6 py-4 text-sm">
                         <InventoryStatus inventory={p.inventory || 0} />
                       </td>
+                      <td className="px-6 py-4 text-sm">
+                        <ApprovalStatus status={p.approval_status} />
+                      </td>
                       <td className="px-6 py-4 text-right text-sm space-x-3">
-                        <button
-                          onClick={() => handleEdit(p)}
-                          className="p-2 text-blue-500 hover:text-blue-700 dark:text-blue-400 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/30"
-                        >
-                          <FaEdit size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(p.id)}
-                          className="p-2 text-red-500 hover:text-red-700 dark:text-red-400 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30"
-                        >
-                          <FaTrash size={16} />
-                        </button>
+                        {p.approval_status !== "approved" && (
+                          <>
+                            <button
+                              onClick={() => handleEdit(p)}
+                              className="p-2 text-blue-500 hover:text-blue-700 dark:text-blue-400 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                            >
+                              <FaEdit size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(p.id)}
+                              className="p-2 text-red-500 hover:text-red-700 dark:text-red-400 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30"
+                            >
+                              <FaTrash size={16} />
+                            </button>
+                          </>
+                        )}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-6 py-10 text-center text-gray-500 dark:text-gray-400 italic">
+                    <td colSpan={6} className="px-6 py-10 text-center text-gray-500 italic">
                       Không có tour nào được tìm thấy.
                     </td>
                   </tr>

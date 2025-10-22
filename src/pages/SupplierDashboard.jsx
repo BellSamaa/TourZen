@@ -1,5 +1,6 @@
-import React from 'react';
-import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
+// src/pages/SupplierDashboard.jsx
+import React from "react";
+import { Routes, Route, NavLink, useNavigate } from "react-router-dom";
 import {
   Bed,
   CarSimple,
@@ -7,34 +8,36 @@ import {
   CurrencyDollar,
   SignOut,
   House,
-  MapTrifold, // icon cho Tour
-} from '@phosphor-icons/react';
-import { useAuth } from '../context/AuthContext';
+  PlusCircle,
+} from "@phosphor-icons/react";
+import { useAuth } from "../context/AuthContext";
 
-// --- Import các trang riêng cho Supplier ---
-import SupplierManageProducts from './SupplierManageProducts';
-import ManageTransport from './ManageTransport';
-import ManageFlights from './ManageFlights';
-import Payment from './Payment';
-import DashboardHome from './DashboardHome';
+// --- Import các trang dành riêng cho Supplier ---
+import SupplierManageProducts from "./SupplierManageProducts";
+import ManageTransport from "./ManageTransport";
+import ManageFlights from "./ManageFlights";
+import Payment from "./Payment";
+import DashboardHome from "./DashboardHome";
+import SupplierAddQuickTour from "./SupplierAddQuickTour"; // ✅ thêm mới
 
 const SupplierSidebar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const navItems = [
-    { path: '/supplier', label: 'Tổng quan', icon: House },
-    { type: 'divider', label: 'Dịch vụ cung cấp' },
-    { path: '/supplier/tours', label: 'Quản lý Tour Du lịch', icon: MapTrifold },
-    { path: '/supplier/hotels', label: 'Quản lý Khách sạn', icon: Bed },
-    { path: '/supplier/transport', label: 'TourZenExpress (Xe)', icon: CarSimple },
-    { path: '/supplier/flights', label: 'Quản lý Chuyến bay', icon: AirplaneTilt },
-    { path: '/supplier/payment', label: 'Giá dịch vụ & Thanh toán', icon: CurrencyDollar },
+    { path: "/supplier", label: "Tổng quan", icon: House },
+    { type: "divider", label: "Dịch vụ cung cấp" },
+    { path: "/supplier/hotels", label: "Quản lý Khách sạn", icon: Bed },
+    { path: "/supplier/transport", label: "TourZenExpress (Xe)", icon: CarSimple },
+    { path: "/supplier/flights", label: "Quản lý Chuyến bay", icon: AirplaneTilt },
+    { path: "/supplier/payment", label: "Giá dịch vụ & Thanh toán", icon: CurrencyDollar },
+    { type: "divider", label: "Tiện ích mở rộng" },
+    { path: "/supplier/add-quick-tour", label: "Thêm Tour nhanh", icon: PlusCircle }, // ✅ thêm nút
   ];
 
   const handleLogout = async () => {
     await logout();
-    navigate('/');
+    navigate("/");
   };
 
   return (
@@ -48,7 +51,7 @@ const SupplierSidebar = () => {
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {navItems.map((item, index) => {
-          if (item.type === 'divider') {
+          if (item.type === "divider") {
             return (
               <h3
                 key={index}
@@ -63,12 +66,12 @@ const SupplierSidebar = () => {
             <NavLink
               key={item.path}
               to={item.path}
-              end={item.path === '/supplier'}
+              end={item.path === "/supplier"}
               className={({ isActive }) =>
                 `flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-colors duration-200 ${
                   isActive
-                    ? 'bg-sky-700 text-white font-medium shadow-inner'
-                    : 'hover:bg-slate-700 hover:text-white'
+                    ? "bg-sky-700 text-white font-medium shadow-inner"
+                    : "hover:bg-slate-700 hover:text-white"
                 }`
               }
             >
@@ -107,17 +110,18 @@ export default function SupplierDashboard() {
       <SupplierSidebar />
       <main className="flex-1 p-8 bg-slate-100 dark:bg-slate-950 overflow-y-auto">
         <Routes>
-          {/* Tổng quan */}
           <Route path="/" element={<DashboardHome />} />
 
           {/* Quản lý dịch vụ */}
-          <Route path="tours" element={<SupplierManageProducts />} />
           <Route path="hotels" element={<SupplierManageProducts productType="hotel" />} />
           <Route path="transport" element={<ManageTransport />} />
           <Route path="flights" element={<ManageFlights />} />
 
-          {/* Thanh toán */}
+          {/* Thanh toán & Giá */}
           <Route path="payment" element={<Payment />} />
+
+          {/* ✅ Route thêm mới - Thêm Tour nhanh */}
+          <Route path="add-quick-tour" element={<SupplierAddQuickTour />} />
         </Routes>
       </main>
     </div>

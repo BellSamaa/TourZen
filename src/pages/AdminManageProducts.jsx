@@ -1,157 +1,199 @@
-import React, { useEffect, useState } from 'react';
+// src/pages/AdminManageProducts.jsx
+import React, { useState, useEffect, useCallback } from "react";
 import { getSupabase } from "../lib/supabaseClient";
-import { SpinnerGap, CheckCircle, XCircle, MagnifyingGlass } from '@phosphor-icons/react';
+import {
+  FaSpinner,
+  FaCheckCircle,
+  FaTimesCircle,
+  FaSyncAlt,
+} from "react-icons/fa";
+
+const supabase = getSupabase();
 
 export default function AdminManageProducts() {
   const [products, setProducts] = useState([]);
-  const [filter, setFilter] = useState('all');
-  const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [refresh, setRefresh] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // --- Lấy dữ liệu ---
-  useEffect(() => {
-    const fetchProducts = async () => {
-      setLoading(true);
-      let query = supabase.from('Products').select('*');
+  // --- Lấy danh sách sản phẩm ---
+  const fetchProducts = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-      if (filter !== 'all') query = query.eq('category', filter);
-      if (search) query = query.ilike('product_name', `%${search}%`);
+    try {
+      const { data, error } = await supabase
+        .from("Products")
+        .select(`*, supplier_name:Suppliers(name)`)
+        .order("created_at", { ascending: false });
 
-      const { data, error } = await query.order('created_at', { ascending: false });
-      if (error) console.error('Lỗi khi lấy dữ liệu:', error);
-      else setProducts(data);
+      if (error) throw error;
+      setProducts(data || []);
+    } catch (err) {
+      console.error("Lỗi fetch products:", err);
+      setError(err.message);
+    } finally {
       setLoading(false);
-    };
+    }
+  }, []);
 
+  useEffect(() => {
     fetchProducts();
-  }, [filter, search, refresh]);
+  }, [fetchProducts]);
 
-  // --- Duyệt sản phẩm ---
-  const approveProduct = async (id, status) => {
-    const { error } = await supabase
-      .from('Products')
-      .update({ approval_status: status })
-      .eq('id', id);
-    if (error) {
-      alert('Lỗi khi cập nhật trạng thái!');
-      console.error(error);
-    } else {
-      setRefresh(!refresh);
+  // --- Hàm xử lý phê duyệt / từ chối ---
+  const handleApproval = async (id, status) => {
+    try {
+      const { error } = await supabase
+        .from("Products")
+        .update({ approval_status: status })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      alert(
+        status === "approved"
+          ? "✅ Tour đã được phê duyệt!"
+          : "❌ Tour đã bị từ chối!"
+      );
+      fetchProducts();
+    } catch (err) {
+      alert("Lỗi khi cập nhật trạng thái: " + err.message);
+    }
+  };
+
+  // --- Render trạng thái phê duyệt ---
+  const renderApprovalStatus = (status) => {
+    switch (status) {
+      case "approved":
+        return (
+          <span className="px-2 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full dark:bg-green-800/30 dark:text-green-300">
+            Đã duyệt
+          </span>
+        );
+      case "rejected":
+        return (
+          <span className="px-2 py-1 text-xs font-semibold text-red-700 bg-red-100 rounded-full dark:bg-red-800/30 dark:text-red-300">
+            Bị từ chối
+          </span>
+        );
+      default:
+        return (
+          <span className="px-2 py-1 text-xs font-semibold text-yellow-700 bg-yellow-100 rounded-full dark:bg-yellow-800/30 dark:text-yellow-300">
+            Đang chờ duyệt
+          </span>
+        );
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* --- Tiêu đề --- */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">
-          Quản lý Sản phẩm
+    <div className="p-4 md:p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+          <FaSyncAlt className="text-sky-600" /> Quản lý Tour & Phê duyệt
         </h1>
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            placeholder="Tìm theo tên sản phẩm..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200"
-          />
-          <MagnifyingGlass size={20} className="text-slate-500" />
+        <button
+          onClick={fetchProducts}
+          className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg flex items-center gap-2 transition-all"
+        >
+          <FaSyncAlt className="animate-spin-slow" />
+          Làm mới
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <FaSpinner className="animate-spin text-4xl text-sky-600" />
         </div>
-      </div>
-
-      {/* --- Bộ lọc loại sản phẩm --- */}
-      <div className="flex flex-wrap gap-2">
-        {['all', 'tour', 'hotel', 'flight', 'car'].map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setFilter(cat)}
-            className={`px-4 py-2 rounded-full text-sm font-medium border ${
-              filter === cat
-                ? 'bg-sky-600 text-white border-sky-600'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-200 dark:hover:bg-slate-700'
-            }`}
-          >
-            {cat === 'all' ? 'Tất cả' :
-             cat === 'tour' ? 'Tour' :
-             cat === 'hotel' ? 'Khách sạn' :
-             cat === 'flight' ? 'Chuyến bay' : 'Xe'}
-          </button>
-        ))}
-      </div>
-
-      {/* --- Bảng sản phẩm --- */}
-      <div className="bg-white dark:bg-slate-900 shadow rounded-xl overflow-hidden">
-        <table className="min-w-full text-sm">
-          <thead className="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 uppercase text-xs">
-            <tr>
-              <th className="px-4 py-3 text-left">Tên sản phẩm</th>
-              <th className="px-4 py-3 text-left">Loại</th>
-              <th className="px-4 py-3 text-left">Điểm đến</th>
-              <th className="px-4 py-3 text-left">Ngày bắt đầu</th>
-              <th className="px-4 py-3 text-left">Trạng thái</th>
-              <th className="px-4 py-3 text-center">Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan="6" className="text-center py-8 text-slate-500">
-                  <SpinnerGap size={24} className="animate-spin inline-block mr-2" />
-                  Đang tải dữ liệu...
-                </td>
-              </tr>
-            ) : products.length === 0 ? (
-              <tr>
-                <td colSpan="6" className="text-center py-8 text-slate-500">
-                  Không có sản phẩm nào.
-                </td>
-              </tr>
-            ) : (
-              products.map((p) => (
-                <tr
-                  key={p.id}
-                  className="border-t border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
-                >
-                  <td className="px-4 py-3">{p.product_name}</td>
-                  <td className="px-4 py-3 capitalize">{p.category || '-'}</td>
-                  <td className="px-4 py-3">{p.destination || '-'}</td>
-                  <td className="px-4 py-3">{p.start_date || '-'}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
-                        p.approval_status === 'approved'
-                          ? 'bg-green-100 text-green-700'
-                          : p.approval_status === 'rejected'
-                          ? 'bg-red-100 text-red-700'
-                          : 'bg-yellow-100 text-yellow-700'
-                      }`}
-                    >
-                      {p.approval_status || 'pending'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center flex justify-center gap-2">
-                    <button
-                      onClick={() => approveProduct(p.id, 'approved')}
-                      className="text-green-600 hover:text-green-800"
-                      title="Duyệt"
-                    >
-                      <CheckCircle size={20} />
-                    </button>
-                    <button
-                      onClick={() => approveProduct(p.id, 'rejected')}
-                      className="text-red-500 hover:text-red-700"
-                      title="Từ chối"
-                    >
-                      <XCircle size={20} />
-                    </button>
-                  </td>
+      ) : error ? (
+        <div className="text-red-500 text-center bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
+          Lỗi: {error}
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-slate-800 shadow-xl rounded-lg overflow-hidden border dark:border-slate-700">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+              <thead className="bg-gray-50 dark:bg-slate-700">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Tên Tour
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Nhà Cung Cấp
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Giá
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Trạng thái
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Hành động
+                  </th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+
+              <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
+                {products.length > 0 ? (
+                  products.map((tour) => (
+                    <tr
+                      key={tour.id}
+                      className="hover:bg-gray-50 dark:hover:bg-slate-700/50"
+                    >
+                      <td className="px-4 py-3 text-sm font-medium text-gray-800 dark:text-white">
+                        {tour.name}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
+                        {tour.supplier_name?.name || "N/A"}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200 font-semibold">
+                        {tour.price
+                          ? tour.price.toLocaleString("vi-VN") + " VNĐ"
+                          : "0 VNĐ"}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {renderApprovalStatus(tour.approval_status)}
+                      </td>
+                      <td className="px-4 py-3 text-right space-x-2">
+                        {tour.approval_status === "pending" && (
+                          <>
+                            <button
+                              onClick={() =>
+                                handleApproval(tour.id, "approved")
+                              }
+                              className="p-2 bg-green-500 hover:bg-green-600 text-white rounded-full"
+                              title="Phê duyệt"
+                            >
+                              <FaCheckCircle size={16} />
+                            </button>
+                            <button
+                              onClick={() =>
+                                handleApproval(tour.id, "rejected")
+                              }
+                              className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-full"
+                              title="Từ chối"
+                            >
+                              <FaTimesCircle size={16} />
+                            </button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="px-4 py-8 text-center text-gray-500 dark:text-gray-400 italic"
+                    >
+                      Không có tour nào trong hệ thống.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
