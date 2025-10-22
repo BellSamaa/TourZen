@@ -1,13 +1,11 @@
-// src/pages/SupplierDashboard.jsx
 import React from 'react';
 import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
 import {
-  Buildings, Bed, CarSimple, AirplaneTilt, CurrencyDollar, SignOut, House
+  Bed, CarSimple, AirplaneTilt, CurrencyDollar, SignOut, House
 } from '@phosphor-icons/react';
 import { useAuth } from '../context/AuthContext';
 
 // --- Import các trang riêng cho Supplier ---
-import ManageSuppliers from './ManageSuppliers';
 import ManageProducts from './ManageProducts';
 import ManageTransport from './ManageTransport';
 import ManageFlights from './ManageFlights';
@@ -20,8 +18,7 @@ const SupplierSidebar = () => {
 
   const navItems = [
     { path: '/supplier', label: 'Tổng quan', icon: House },
-    { type: 'divider', label: 'Đối tác & Dịch vụ' },
-    { path: '/supplier/suppliers', label: 'Nhà Cung Cấp', icon: Buildings },
+    { type: 'divider', label: 'Dịch vụ cung cấp' },
     { path: '/supplier/hotels', label: 'Quản lý Khách sạn', icon: Bed },
     { path: '/supplier/transport', label: 'TourZenExpress (Xe)', icon: CarSimple },
     { path: '/supplier/flights', label: 'Quản lý Chuyến bay', icon: AirplaneTilt },
@@ -105,8 +102,7 @@ export default function SupplierDashboard() {
         <Routes>
           <Route path="/" element={<DashboardHome />} />
 
-          {/* Quản lý đối tác */}
-          <Route path="suppliers" element={<ManageSuppliers />} />
+          {/* Quản lý dịch vụ */}
           <Route path="hotels" element={<ManageProducts productType="hotel" />} />
           <Route path="transport" element={<ManageTransport />} />
           <Route path="flights" element={<ManageFlights />} />
