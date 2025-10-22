@@ -3,21 +3,19 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, NavLink, useLocation, useNavigate } from 'react-router-dom';
 // --- Icons ---
 import {
-    House, UserList, Buildings, ShoppingCartSimple,
-    ChartBar, SignOut, CheckSquare // Bỏ SuitcaseSimple và PlusCircle
+    House, UserList, Buildings, ShoppingCartSimple, // Giữ ShoppingCartSimple
+    ChartBar, SignOut, CheckSquare 
 } from '@phosphor-icons/react';
 import { useAuth } from '../context/AuthContext';
-import { FaSpinner, FaCheckCircle, FaTimesCircle, FaSyncAlt, FaUmbrellaBeach, FaHotel, FaPlane, FaCar, FaTags } from "react-icons/fa"; // Thêm icon
+import { FaSpinner, FaCheckCircle, FaTimesCircle, FaSyncAlt, FaUmbrellaBeach, FaHotel, FaPlane, FaCar, FaTags } from "react-icons/fa"; 
 import { getSupabase } from "../lib/supabaseClient";
 
 // --- Import các trang ---
-import ManageCustomers from './ManageCustomers';
+import ManageCustomers from './ManageCustomers'; // <<< Trang "Quản lý Tài khoản"
 import ManageSuppliers from './ManageSuppliers';
 import Reports from './Reports';
 import DashboardHome from './DashboardHome';
-// Bỏ import ManageProducts
-import ManageBookings from './ManageBookings';
-// (Đã xóa import AddToursFromData)
+import ManageBookings from './ManageBookings'; // <<< Trang "Quản lý Khách hàng" (đã nâng cấp)
 
 const supabase = getSupabase();
 
@@ -30,10 +28,11 @@ const AdminSidebar = () => {
     // Cấu trúc Nav mới - GỌN GÀNG
     const navItems = [
         { path: '/admin', label: 'Tổng quan', icon: House },
-        { path: '/admin/customers', label: 'Tài khoản & Khách hàng', icon: UserList },
+        // <<< THAY ĐỔI: Trỏ 'customers' tới "Quản lý Tài khoản"
+        { path: '/admin/customers', label: 'Quản lý Tài khoản', icon: UserList }, 
         { path: '/admin/suppliers', label: 'Đối tác (Nhà Cung Cấp)', icon: Buildings },
-        { path: '/admin/bookings', label: 'Quản lý Đặt chỗ', icon: ShoppingCartSimple },
-        // Gộp Sản phẩm và Phê duyệt làm một
+        // <<< THAY ĐỔI: Trỏ 'bookings' tới "Quản lý Khách hàng"
+        { path: '/admin/bookings', label: 'Quản lý Khách hàng', icon: ShoppingCartSimple }, 
         { path: '/admin/products', label: 'Phê duyệt Sản phẩm', icon: CheckSquare }, 
         { path: '/admin/reports', label: 'Báo cáo & Thống kê', icon: ChartBar },
     ];
@@ -91,12 +90,13 @@ const AdminSidebar = () => {
     );
 };
 
-// --- Component Phê duyệt (Đổi tên thành AdminProductApproval) ---
+// --- Component Phê duyệt (AdminProductApproval) ---
+// (Giữ nguyên không thay đổi)
 const AdminProductApproval = () => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [filter, setFilter] = useState('all'); // State mới để lọc
+    const [filter, setFilter] = useState('all'); 
 
     const fetchProducts = useCallback(async () => {
         setLoading(true);
@@ -104,8 +104,7 @@ const AdminProductApproval = () => {
         try {
             let query = supabase
                 .from("Products")
-                // 👇 SỬA LẠI CÂU SELECT NÀY (Bỏ alias) 👇
-                .select(`*, Suppliers(name)`) // Chỉ cần JOIN
+                .select(`*, Suppliers(name)`) 
                 .order("created_at", { ascending: false });
 
             if (filter !== 'all') {
@@ -125,7 +124,6 @@ const AdminProductApproval = () => {
     useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
     const updateStatus = async (id, status) => { 
-        // Logic update... (giữ nguyên)
         try {
             const { error } = await supabase
                 .from('Products')
@@ -134,7 +132,6 @@ const AdminProductApproval = () => {
 
             if (error) throw error;
 
-            // Cập nhật lại state local để UI thay đổi ngay lập tức
             setProducts(prevProducts =>
                 prevProducts.map(p =>
                     p.id === id ? { ...p, approval_status: status } : p
@@ -142,12 +139,9 @@ const AdminProductApproval = () => {
             );
         } catch (err) {
             console.error("Lỗi cập nhật trạng thái:", err);
-            // Có thể thêm state để báo lỗi cho user
         }
     };
 
-
-    // Helper icon cho loại sản phẩm
     const ProductIcon = ({ type }) => {
         switch (type) {
             case 'hotel': return <FaHotel className="text-blue-500" title="Khách sạn"/>;
@@ -226,7 +220,6 @@ const AdminProductApproval = () => {
                                     </td>
                                     <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{product.name}</td>
                                     <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
-                                        {/* 👇 SỬA LẠI CÁCH TRUY CẬP TÊN NCC 👇 */}
                                         {product.Suppliers?.name || "—"} 
                                     </td>
                                     <td className="px-6 py-4 text-sm font-semibold text-gray-800 dark:text-gray-200">{product.price?.toLocaleString("vi-VN") || 0} VNĐ</td>
@@ -261,15 +254,17 @@ export default function AdminDashboard() {
             <main className="flex-1 p-6 md:p-8 lg:p-10 overflow-y-auto">
                 <Routes>
                     <Route path="/" element={<DashboardHome />} />
-                    <Route path="customers" element={<ManageCustomers />} />
-                    <Route path="suppliers" element={<ManageSuppliers />} />
-                    <Route path="bookings" element={<ManageBookings />} />
-                    <Route path="reports" element={<Reports />} />
                     
-                    {/* 👇 Sửa Route /products và /approve-tours thành /approvals 👇 */}
+                    {/* <<< THAY ĐỔI: "Quản lý Tài khoản" trỏ đến ManageCustomers */}
+                    <Route path="customers" element={<ManageCustomers />} /> 
+                    
+                    <Route path="suppliers" element={<ManageSuppliers />} />
+                    
+                    {/* <<< THAY ĐỔI: "Quản lý Khách hàng" trỏ đến ManageBookings */}
+                    <Route path="bookings" element={<ManageBookings />} /> 
+                    
+                    <Route path="reports" element={<Reports />} />
                     <Route path="products" element={<AdminProductApproval />} /> 
-
-                    {/* (Đã xóa các route không cần nữa) */}
                 </Routes>
             </main>
         </div>

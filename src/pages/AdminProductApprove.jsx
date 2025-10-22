@@ -1,0 +1,120 @@
+// src/pages/AdminApproveTours.jsx
+import React, { useState, useEffect, useCallback } from "react";
+import { getSupabase } from "../lib/supabaseClient";
+import { FaSpinner, FaCheckCircle, FaTimesCircle, FaSyncAlt, FaUmbrellaBeach } from "react-icons/fa";
+
+const supabase = getSupabase();
+
+export default function AdminApproveTours() {
+  const [tours, setTours] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchTours = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error } = await supabase
+        .from("Products")
+        .select(`*, supplier_name:Suppliers(name)`)
+        .eq("product_type", "tour")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setTours(data || []);
+    } catch (err) {
+      console.error(err);
+      setError("Không thể tải danh sách tour: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTours();
+  }, [fetchTours]);
+
+  const updateStatus = async (id, status) => {
+    if (status === "pending" || window.confirm(`Xác nhận đổi trạng thái thành "${status}"?`)) {
+      const { error } = await supabase
+        .from("Products")
+        .update({ approval_status: status })
+        .eq("id", id);
+      if (error) alert("Lỗi: " + error.message);
+      else fetchTours();
+    }
+  };
+
+  const ApprovalBadge = ({ status }) => {
+    const base = "px-2 py-1 text-xs font-semibold rounded-full inline-flex items-center gap-1";
+    switch (status) {
+      case "approved":
+        return <span className={`${base} bg-green-100 text-green-800`}><FaCheckCircle />Đã duyệt</span>;
+      case "rejected":
+        return <span className={`${base} bg-red-100 text-red-800`}><FaTimesCircle />Từ chối</span>;
+      default:
+        return <span className={`${base} bg-yellow-100 text-yellow-800`}><FaSyncAlt className="animate-spin-slow" />Đang chờ</span>;
+    }
+  };
+
+  return (
+    <div className="p-6 md:p-8 space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+          <FaUmbrellaBeach className="text-sky-600" /> Phê duyệt Tour từ Nhà Cung Cấp
+        </h1>
+        <button onClick={fetchTours} className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800">
+          <FaSyncAlt /> Làm mới
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center items-center min-h-[200px]">
+          <FaSpinner className="animate-spin text-4xl text-sky-600" />
+        </div>
+      ) : error ? (
+        <div className="text-red-500 text-center bg-red-50 p-6 rounded-lg">{error}</div>
+      ) : (
+        <div className="overflow-x-auto bg-white dark:bg-slate-800 shadow-xl rounded-lg border dark:border-slate-700">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+            <thead className="bg-gray-50 dark:bg-slate-700">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500">Mã Tour</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500">Tên Tour</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500">Nhà Cung Cấp</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500">Giá</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500">Trạng thái</th>
+                <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500">Hành động</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
+              {tours.length ? tours.map(tour => (
+                <tr key={tour.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
+                  <td className="px-6 py-4 font-mono text-sm text-gray-500">{tour.tour_code || "N/A"}</td>
+                  <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{tour.name}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{tour.supplier_name?.name || "—"}</td>
+                  <td className="px-6 py-4 text-sm font-semibold text-gray-800 dark:text-gray-200">{tour.price?.toLocaleString("vi-VN") || 0} VNĐ</td>
+                  <td className="px-6 py-4 text-sm"><ApprovalBadge status={tour.approval_status} /></td>
+                  <td className="px-6 py-4 text-right text-sm space-x-2">
+                    {tour.approval_status === "pending" ? (
+                      <>
+                        <button onClick={() => updateStatus(tour.id, "approved")} className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">Duyệt</button>
+                        <button onClick={() => updateStatus(tour.id, "rejected")} className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700">Từ chối</button>
+                      </>
+                    ) : (
+                      <button onClick={() => updateStatus(tour.id, "pending")} className="px-3 py-1 bg-gray-400 text-white rounded hover:bg-gray-500">Đặt lại</button>
+                    )}
+                  </td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan={6} className="px-6 py-10 text-center text-gray-500 italic">Không có tour nào cần phê duyệt.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
