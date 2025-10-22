@@ -12,7 +12,7 @@ import {
   FaUmbrellaBeach,
   FaTags,
 } from "react-icons/fa";
-import ProductModal from "./ProductModal";
+import ProductModal from "./ProductModal"; // Đảm bảo bạn đã có file này
 
 const supabase = getSupabase();
 
@@ -28,14 +28,15 @@ const productTypes = [
 // Helper để lấy Icon/Title
 const getProductTypeDetails = (type) => {
   const details = productTypes.find((pt) => pt.type === type);
-  return details || { icon: FaUmbrellaBeach, label: "Sản phẩm" }; // Sửa 'title' thành 'label'
+  return details || { icon: FaUmbrellaBeach, label: "Sản phẩm" };
 };
 
 // --- Component con hiển thị Tồn kho ---
 const InventoryStatus = ({ inventory }) => {
-  return inventory > 0 ? (
+  const inv = parseInt(inventory, 10); // Đảm bảo là số
+  return inv > 0 ? (
     <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-800/20 dark:text-green-300">
-      Còn hàng ({inventory})
+      Còn hàng ({inv})
     </span>
   ) : (
     <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-800/20 dark:text-red-300">
@@ -200,13 +201,13 @@ export default function ManageProducts() {
                       className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
                     >
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500 dark:text-gray-400">
-                        {product.tour_code}
+                        {product.tour_code || "N/A"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                         {product.name}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                        {* --- 🚨 ĐÂY LÀ CHỖ SỬA LỖI --- *}
+                        {/* --- ĐÃ XÓA DÒNG COMMENT LỖI Ở ĐÂY --- */}
                         {product.supplier_name?.name ? (
                           <span className="font-medium text-blue-600 dark:text-blue-400">
                             {product.supplier_name.name}
@@ -216,36 +217,36 @@ export default function ManageProducts() {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-800 dark:text-gray-200">
-                        {product.price.toLocaleString("vi-VN")} VNĐ
-                    T </td>
+                        {product.price ? product.price.toLocaleString("vi-VN") : 0} VNĐ
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <InventoryStatus inventory={product.inventory} />
+                        <InventoryStatus inventory={product.inventory || 0} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
                         <button
-                          onClick={() => handleEdit(product)}
-                          className="p-2 text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors rounded-full"
+                    t     onClick={() => handleEdit(product)}
+                          className="p-2 text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/30"
                           title="Chỉnh sửa"
                         >
                           <FaEdit size={16} />
                         </button>
-                        <button
+                    t   <button
                           onClick={() => handleDelete(product.id)}
-                          className="p-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors rounded-full"
+                          className="p-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors rounded-full hover:bg-red-100 dark:hover:bg-red-900/30"
                           title="Xóa"
                         >
                           <FaTrash size={16} />
-                        </button>
+t                     </button>
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
                     <td
-        t             colSpan={6}
-                      className="px-6 py-10 text-center text-gray-500 dark:text-gray-400 italic"
+                      colSpan={6}
+s                     className="px-6 py-10 text-center text-gray-500 dark:text-gray-400 italic"
                     >
-                      Không có sản phẩm nào thuộc loại "
+                t     Không có sản phẩm nào thuộc loại "
                       {currentProductDetails.label}".
                     </td>
                   </tr>
@@ -260,13 +261,13 @@ export default function ManageProducts() {
       {showModal && (
         <ProductModal
           show={showModal}
-    *       onClose={() => setShowModal(false)}
+    fs     onClose={() => setShowModal(false)}
           onSuccess={fetchData}
           productToEdit={productToEdit}
           productType={selectedType !== "all" ? selectedType : "tour"}
           suppliers={suppliers}
         />
-    s )}
+      )}
     </div>
   );
 }
