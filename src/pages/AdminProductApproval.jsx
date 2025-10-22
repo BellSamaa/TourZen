@@ -16,6 +16,7 @@ const ApprovalBadge = ({ status }) => {
         default: return <span className={`${base} bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300`}><FaSyncAlt className="animate-spin" /> Đang chờ</span>;
     }
 };
+export { ApprovalBadge };
 
 // --- Component Chính (Đã sửa logic) ---
 const AdminProductApproval = () => {
