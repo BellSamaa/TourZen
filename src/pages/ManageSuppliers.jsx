@@ -1,15 +1,30 @@
-import React, { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
-import { Loader2, Plus, Building } from "lucide-react"; // Thay thế icon libraries
+import React, { useState, useEffect, useCallback } from "react";
+// --- SỬA LỖI: Chuyển trở lại Supabase và dùng Key bạn cung cấp ---
 
-// --- Khởi tạo Supabase Client ---
-// BẠN CẦN THAY THẾ 'YOUR_SUPABASE_URL' VÀ 'YOUR_SUPABASE_ANON_KEY' BẰNG THÔNG TIN CỦA BẠN
-const supabaseUrl = 'YOUR_SUPABASE_URL';
-const supabaseKey = 'YOUR_SUPABASE_ANON_KEY';
-const supabase = createClient(supabaseUrl, supabaseKey);
+// ------------------------------------------------
+import { Loader2, Plus, Building } from "lucide-react"; // Giữ lại icon libraries
+
+// --- KHỞI TẠO SUPABASE CLIENT ---
+// Sử dụng thông tin bạn đã cung cấp
+const supabaseUrl = "https://zdvwpjgpysxxqpvhovct.supabase.co";
+const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkdndwamdweXN4eHFwdmhvdmN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2NjQzODUsImV4cCI6MjA3NjI0MDM4NX0.tmFvQDXSUdJlJKBuYoqvuJArZ5apYpb-eNQ90uYBJf0";
+
+let supabase;
+try {
+  // Giả định 'window.supabase' được cung cấp bởi môi trường
+  if (window.supabase) {
+    supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+  } else {
+    console.error("Supabase client not found on window object.");
+  }
+} catch (e) {
+  console.error("Lỗi khởi tạo Supabase client:", e);
+}
 // ---------------------------------
 
+
 // --- Component Modal để Thêm Mới ---
+// SỬA: Xóa props db, appId. Component này sẽ dùng biến 'supabase' toàn cục
 const AddSupplierModal = ({ show, onClose, onSuccess }) => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -17,28 +32,32 @@ const AddSupplierModal = ({ show, onClose, onSuccess }) => {
   const [serviceType, setServiceType] = useState("hotel");
   const [submitting, setSubmitting] = useState(false);
 
-  // --- MỚI: State để chứa user và user được chọn ---
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("");
 
-  // --- MỚI: Fetch các user có role 'supplier' khi modal mở ---
+  // --- SỬA: Fetch user từ Supabase ---
   useEffect(() => {
     async function fetchSupplierUsers() {
-      if (show) {
+      // Chỉ fetch khi modal mở và supabase đã sẵn sàng
+      if (show && supabase) {
         setLoadingUsers(true);
-        // Lấy tất cả user có role là 'supplier'
-        const { data, error } = await supabase
-          .from("Users")
-          .select("id, full_name, email")
-          .eq("role", "supplier")
-          .order("full_name", { ascending: true });
+        try {
+          // Lấy tất cả user có role là 'supplier'
+          const { data, error } = await supabase
+            .from("Users")
+            .select("id, full_name, email")
+            .eq("role", "supplier")
+            .order("full_name", { ascending: true });
 
-        if (error) {
-          alert("Lỗi tải danh sách user: " + error.message);
-        } else {
-          // Lọc ra những user chưa được liên kết (nếu cần, nhưng đơn giản là cứ hiển thị)
+          if (error) {
+            throw error;
+          }
+          
           setUsers(data || []);
+
+        } catch (error) {
+          alert("Lỗi tải danh sách user: " + error.message);
         }
         setLoadingUsers(false);
       }
@@ -46,46 +65,53 @@ const AddSupplierModal = ({ show, onClose, onSuccess }) => {
     fetchSupplierUsers();
   }, [show]); // Chạy lại mỗi khi modal được mở
 
+  // --- SỬA: Submit dữ liệu lên Supabase ---
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // --- 👇 ĐÂY LÀ CODE ĐƯỢC THÊM VÀO 👇 ---
-    // Kiểm tra xem user đã chọn tài khoản liên kết chưa
+    if (!supabase) {
+      alert("Lỗi: Kết nối cơ sở dữ liệu chưa sẵn sàng.");
+      return;
+    }
+
     if (!selectedUserId || selectedUserId === "") {
       alert("Bạn phải chọn một tài khoản để liên kết!");
-      return; // Dừng lại, không cho submit
+      return;
     }
-    // --- ------------------------------------ ---
-
+    
     setSubmitting(true);
     
-    // --- SỬA: Thêm 'user_id' vào lúc insert ---
-    const { error } = await supabase.from("Suppliers").insert({
-      name: name,
-      email: email,
-      phone: phone,
-      service_type: serviceType,
-      user_id: selectedUserId, // <-- Đây là khóa ngoại liên kết
-    });
+    try {
+      const { error } = await supabase.from("Suppliers").insert({
+        name: name,
+        email: email,
+        phone: phone,
+        service_type: serviceType,
+        user_id: selectedUserId, // <-- Đây là khóa ngoại liên kết
+      });
 
-    if (error) {
-      // Báo lỗi nếu user này đã được link rồi (lỗi unique)
-      if (error.code === '23505') { 
-         alert("Lỗi: Tài khoản này đã được liên kết với một nhà cung cấp khác.");
+      if (error) {
+         // Báo lỗi nếu user này đã được link rồi (lỗi unique)
+         if (error.code === '23505') { 
+           alert("Lỗi: Tài khoản này đã được liên kết với một nhà cung cấp khác.");
+         } else {
+           throw error;
+         }
       } else {
-         alert("Lỗi thêm nhà cung cấp: " + error.message);
+        alert("Thêm và liên kết thành công!");
+        // Reset form
+        setName("");
+        setEmail("");
+        setPhone("");
+        setServiceType("hotel");
+        setSelectedUserId("");
+        
+        onSuccess(); // Gọi hàm fetch lại dữ liệu ở component cha
+        onClose();
       }
-    } else {
-      alert("Thêm và liên kết thành công!");
-      // Reset form
-      setName("");
-      setEmail("");
-      setPhone("");
-      setServiceType("hotel");
-      setSelectedUserId(""); // <-- Reset user đã chọn
-      
-      onSuccess();
-      onClose();
+
+    } catch (error) {
+      alert("Lỗi thêm nhà cung cấp: " + error.message);
     }
     setSubmitting(false);
   };
@@ -121,7 +147,7 @@ const AddSupplierModal = ({ show, onClose, onSuccess }) => {
             </select>
           </div>
 
-          {/* --- MỚI: Thêm Dropdown để LIÊN KẾT USER --- */}
+          {/* --- Dropdown để LIÊN KẾT USER (Không đổi) --- */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Liên kết với Tài khoản (User)
@@ -130,7 +156,7 @@ const AddSupplierModal = ({ show, onClose, onSuccess }) => {
               value={selectedUserId}
               onChange={(e) => setSelectedUserId(e.target.value)}
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:bg-neutral-700 dark:border-gray-600 dark:text-white"
-              required // Bắt buộc phải chọn 1 user để liên kết
+              required
             >
               <option value="">-- Chọn tài khoản để liên kết --</option>
               {loadingUsers ? (
@@ -147,7 +173,6 @@ const AddSupplierModal = ({ show, onClose, onSuccess }) => {
               Chỉ hiển thị các tài khoản có vai trò 'supplier'.
             </p>
           </div>
-          {/* ------------------------------------------- */}
 
           <div className="flex justify-end space-x-3">
             <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400" >
@@ -171,31 +196,51 @@ export default function ManageSuppliers() {
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
 
-  // Hàm fetch dữ liệu
-  async function fetchSuppliers() {
+  // --- SỬA: Xóa state của Firebase ---
+
+  // --- SỬA: Kiểm tra Supabase khi component mount ---
+  useEffect(() => {
+    if (!supabase) {
+      setError("Lỗi: Không thể khởi tạo Supabase client. 'window.supabase' không tồn tại.");
+      setLoading(false);
+    }
+  }, []);
+
+  // --- SỬA: Hàm fetch dữ liệu từ Supabase ---
+  const fetchData = useCallback(async () => {
+    if (!supabase) {
+      // Đợi Supabase sẵn sàng
+      return;
+    }
+
     setLoading(true);
     setError(null);
-    
-    // --- SỬA: Dùng 'join' để lấy thông tin user liên kết ---
-    const { data, error } = await supabase
-      .from("Suppliers")
-      // Lấy tất cả cột từ Suppliers, và 2 cột từ bảng Users
-      // SỬA LỖI: Chỉ định rõ join bằng cột 'user_id' và đặt tên là 'Users'
-      .select("*, Users:user_id(full_name, email)"); 
+    try {
+      // Dùng cú pháp join rõ ràng (đã sửa ở lần trước)
+      const { data, error } = await supabase
+        .from("Suppliers")
+        .select("*, Users:user_id(full_name, email)");
 
-    if (error) {
-      console.error("Lỗi fetch nhà cung cấp:", error);
-      setError(error.message);
-    } else {
+      if (error) {
+        throw error;
+      }
+      
       setSuppliers(data);
+
+    } catch (err) {
+      console.error("Lỗi fetch dữ liệu:", err);
+      setError(err.message);
     }
     setLoading(false);
-  }
+  }, []); // Không còn phụ thuộc db, appId, userId
 
-  // Chạy hàm fetch khi component được tải
+  // --- SỬA: Chạy hàm fetch khi Supabase sẵn sàng ---
   useEffect(() => {
-    fetchSuppliers();
-  }, []);
+    if (supabase) {
+      fetchData();
+    }
+  }, [fetchData]); // Chạy lại khi hàm fetchData thay đổi
+
 
   if (loading) {
     return (
@@ -242,7 +287,6 @@ export default function ManageSuppliers() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Loại Dịch Vụ
                 </th>
-                {/* --- MỚI: Thêm cột Tài khoản --- */}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Tài khoản liên kết
                 </th>
@@ -254,7 +298,7 @@ export default function ManageSuppliers() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                     {supplier.name}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                  <td className="px-6 py-4 whitespace-nowstatic/wave.png-nowrap text-sm text-gray-500 dark:text-gray-300">
                     {supplier.email}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
@@ -263,15 +307,13 @@ export default function ManageSuppliers() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                     {supplier.service_type}
                   </td>
-                  {/* --- MỚI: Hiển thị user đã liên kết --- */}
+                  {/* --- Hiển thị user đã liên kết (Không đổi) --- */}
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                     {supplier.Users ? (
-                      // Nếu có liên kết (Users không phải null)
                       <span className="font-medium text-blue-600 dark:text-blue-400">
                         {supplier.Users.full_name || supplier.Users.email}
                       </span>
                     ) : (
-                      // Nếu user_id là null
                       <span className="italic text-red-500">Chưa liên kết</span>
                     )}
                   </td>
@@ -287,8 +329,9 @@ export default function ManageSuppliers() {
         onClose={() => setShowModal(false)}
         onSuccess={() => {
           // Khi thêm thành công, fetch lại danh sách
-          fetchSuppliers();
+          fetchData(); 
         }}
+        // --- SỬA: Không cần truyền props db, appId ---
       />
     </div>
   );
