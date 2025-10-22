@@ -90,14 +90,24 @@ export default function SupplierAddQuickTour() {
       product_type: "tour",
     };
 
-    const { error } = await supabase.from("Products").insert([payload]);
-    setSaving(false);
+    try {
+      // Insert và lấy luôn record vừa tạo để lấy id
+      const { data: insertedData, error } = await supabase
+        .from("Products")
+        .insert([payload])
+        .select()
+        .single();
 
-    if (error) {
-      alert("Lỗi khi gửi yêu cầu phê duyệt: " + error.message);
-    } else {
-      alert("Đã gửi tour chờ phê duyệt! Quản trị viên sẽ kiểm tra sớm.");
-      navigate("/supplier/hotels"); // Hoặc trang dashboard nào bạn muốn
+      if (error) throw error;
+
+      alert("Đã gửi tour chờ phê duyệt!");
+      // Chuyển sang trang chi tiết tour mới
+      navigate(`/tour/${insertedData.id}`);
+    } catch (err) {
+      alert("Lỗi khi gửi yêu cầu phê duyệt: " + err.message);
+      console.error(err);
+    } finally {
+      setSaving(false);
     }
   };
 
