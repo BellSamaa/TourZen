@@ -7,7 +7,7 @@ import {
     ChartBar, SignOut, CheckSquare // Bỏ SuitcaseSimple và PlusCircle
 } from '@phosphor-icons/react';
 import { useAuth } from '../context/AuthContext';
-import { FaSpinner, FaCheckCircle, FaTimesCircle, FaSyncAlt, FaUmbrellaBeach, FaHotel, FaPlane, FaCar } from "react-icons/fa"; // Thêm icon
+import { FaSpinner, FaCheckCircle, FaTimesCircle, FaSyncAlt, FaUmbrellaBeach, FaHotel, FaPlane, FaCar, FaTags } from "react-icons/fa"; // Thêm icon
 import { getSupabase } from "../lib/supabaseClient";
 
 // --- Import các trang ---
@@ -15,7 +15,7 @@ import ManageCustomers from './ManageCustomers';
 import ManageSuppliers from './ManageSuppliers';
 import Reports from './Reports';
 import DashboardHome from './DashboardHome';
-// Bỏ import ManageProducts
+// Bỏ import ManageProducts (dùng file này làm trang phê duyệt)
 import ManageBookings from './ManageBookings';
 // Bỏ import AddToursFromData
 
@@ -34,15 +34,18 @@ const AdminSidebar = () => {
         { path: '/admin/suppliers', label: 'Đối tác (Nhà Cung Cấp)', icon: Buildings },
         { path: '/admin/bookings', label: 'Quản lý Đặt chỗ', icon: ShoppingCartSimple },
         // Gộp Sản phẩm và Phê duyệt làm một
-        { path: '/admin/approvals', label: 'Phê duyệt Sản phẩm', icon: CheckSquare }, 
+        { path: '/admin/products', label: 'Phê duyệt Sản phẩm', icon: CheckSquare }, 
         { path: '/admin/reports', label: 'Báo cáo & Thống kê', icon: ChartBar },
     ];
 
-    const handleLogout = async () => { /* ... */ };
+    const handleLogout = async () => { 
+        await logout();
+        navigate("/");
+     };
 
     return (
         <div className="flex flex-col w-64 min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 text-slate-300 shadow-lg">
-            {/* ... Header Sidebar ... */}
+            {/* Header Sidebar */}
             <div className="px-5 py-6 flex items-center gap-3 border-b border-slate-700">
                 <img src="/logo-icon.png" alt="Logo" className="w-8 h-8" onError={(e) => {e.target.style.display='none'}}/>
                  <h2 className="text-xl font-bold text-sky-400">TourZen Admin</h2>
@@ -69,7 +72,7 @@ const AdminSidebar = () => {
                 ))}
             </nav>
 
-            {/* ... User Info & Logout ... */}
+            {/* User Info & Logout */}
             {user && (
                  <div className="px-3 py-4 border-t border-slate-700 mt-auto">
                       <p className="text-sm font-medium text-white truncate mb-2 px-2" title={user.email}>
@@ -122,28 +125,48 @@ const AdminProductApproval = () => {
 
     useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
-    const updateStatus = async (id, status) => { /* ... giữ nguyên ... */ };
+    const updateStatus = async (id, status) => {
+        if (status === "pending" || window.confirm(`Xác nhận đổi trạng thái thành "${status}"?`)) {
+            const { error } = await supabase
+                .from("Products")
+                .update({ approval_status: status })
+                .eq("id", id);
+            if (error) {
+                alert("Lỗi: " + error.message);
+            } else {
+                 alert(status === "approved" ? "✅ Đã phê duyệt" : status === "rejected" ? "❌ Đã từ chối" : "Đã đặt lại");
+                 fetchProducts(); // Tải lại danh sách
+            }
+        }
+     };
 
-    const ApprovalBadge = ({ status }) => { /* ... giữ nguyên ... */ };
+    const ApprovalBadge = ({ status }) => {
+       const base = "px-2 py-1 text-xs font-semibold rounded-full inline-flex items-center gap-1";
+       switch (status) {
+           case "approved": return <span className={`${base} bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300`}><FaCheckCircle />Đã duyệt</span>;
+           case "rejected": return <span className={`${base} bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300`}><FaTimesCircle />Từ chối</span>;
+           default: return <span className={`${base} bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300`}><FaSyncAlt className="animate-spin" /> Đang chờ</span>; // Sửa animate-spin-slow
+       }
+    };
 
     // Helper icon cho loại sản phẩm
     const ProductIcon = ({ type }) => {
         switch (type) {
-            case 'hotel': return <FaHotel className="text-blue-500" />;
-            case 'flight': return <FaPlane className="text-indigo-500" />;
-            case 'car_rental': return <FaCar className="text-orange-500" />;
+            case 'hotel': return <FaHotel className="text-blue-500" title="Khách sạn"/>;
+            case 'flight': return <FaPlane className="text-indigo-500" title="Chuyến bay"/>;
+            case 'car_rental': return <FaCar className="text-orange-500" title="Xe"/>;
             case 'tour':
-            default: return <FaUmbrellaBeach className="text-teal-500" />;
+            default: return <FaUmbrellaBeach className="text-teal-500" title="Tour"/>;
         }
     };
 
     return (
-        <div className="p-6 md:p-8 space-y-6">
+        <div className="p-4 md:p-6 space-y-6"> {/* Sửa lại padding */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <h1 className="text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
                     <CheckSquare weight="duotone" className="text-sky-600" /> Phê duyệt Sản phẩm
                 </h1>
-                <button onClick={fetchProducts} /* ... Nút Làm mới ... */>
+                <button onClick={fetchProducts} disabled={loading} className={`flex items-center gap-2 px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}>
                     <FaSyncAlt className={loading ? "animate-spin" : ""} /> Làm mới
                 </button>
             </div>
@@ -178,9 +201,13 @@ const AdminProductApproval = () => {
             </div>
 
 
-            {loading && products.length === 0 ? ( /* ... Loading ... */ )
-             : error ? ( /* ... Error ... */ )
-             : ( /* Bảng dữ liệu */
+            {loading && products.length === 0 ? ( 
+                <div className="flex justify-center items-center min-h-[200px]">
+                    <FaSpinner className="animate-spin text-4xl text-sky-600" />
+                </div>
+             ) : error ? ( 
+                <div className="text-red-500 text-center bg-red-50 dark:bg-red-900/20 p-6 rounded-lg">{error}</div>
+             ) : ( 
                 <div className="overflow-x-auto bg-white dark:bg-slate-800 shadow-xl rounded-lg border dark:border-slate-700">
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
                         <thead className="bg-gray-50 dark:bg-slate-700">
@@ -194,7 +221,7 @@ const AdminProductApproval = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
-                            {products.length > 0 ? products.map(product => ( // Dùng 'product'
+                            {products.length > 0 ? products.map(product => ( 
                                 <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <ProductIcon type={product.product_type} />
@@ -204,14 +231,14 @@ const AdminProductApproval = () => {
                                     <td className="px-6 py-4 text-sm font-semibold text-gray-800 dark:text-gray-200">{product.price?.toLocaleString("vi-VN") || 0} VNĐ</td>
                                     <td className="px-6 py-4 text-sm"><ApprovalBadge status={product.approval_status} /></td>
                                     <td className="px-6 py-4 text-right text-sm space-x-2">
-                                        {/* Logic nút Duyệt/Từ chối/Đặt lại */}
                                         {product.approval_status === "pending" ? (
                                              <>
                                                  <button onClick={() => updateStatus(product.id, "approved")} className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs">Duyệt</button>
                                                  <button onClick={() => updateStatus(product.id, "rejected")} className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs">Từ chối</button>
                                              </>
                                          ) : (
-                                             <button onClick={() => updateStatus(product.id, "pending")} className="px-3 py-1 bg-gray-400 text-white rounded hover:bg-gray-500 text-xs">Đặt lại</g>
+                                            // 👇 SỬA LỖI Ở ĐÂY 👇
+                                            <button onClick={() => updateStatus(product.id, "pending")} className="px-3 py-1 bg-gray-400 text-white rounded hover:bg-gray-500 text-xs">Đặt lại</button>
                                          )}
                                     </td>
                                 </tr>
@@ -238,14 +265,13 @@ export default function AdminDashboard() {
                     <Route path="suppliers" element={<ManageSuppliers />} />
                     <Route path="bookings" element={<ManageBookings />} />
                     <Route path="reports" element={<Reports />} />
+                    
                     {/* 👇 Sửa Route /products và /approve-tours thành /approvals 👇 */}
-                    <Route path="approvals" element={<AdminProductApproval />} />
-                    {/* Bỏ Route /products (vì đã gộp vào /approvals)
-                       <Route path="products" element={<ManageProducts />} />
-                    */}
-                    {/* Bỏ Route /add-tours-from-data */}
+                    {/* Gộp chung vào /products */}
+                    <Route path="products" element={<AdminProductApproval />} /> 
+
+                    {/* Bỏ các route không cần nữa */}
                     {/* <Route path="add-tours-from-data" element={<AddToursFromData />} /> */}
-                    {/* Bỏ Route /approve-tours */}
                     {/* <Route path="approve-tours" element={<AdminApproveTours />} /> */}
                 </Routes>
             </main>
@@ -254,11 +280,4 @@ export default function AdminDashboard() {
 }
 
 // ApprovalBadge (nếu giữ ở đây)
-const ApprovalBadge = ({ status }) => {
-    const base = "px-2 py-1 text-xs font-semibold rounded-full inline-flex items-center gap-1";
-    switch (status) {
-        case "approved": return <span className={`${base} bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300`}><FaCheckCircle />Đã duyệt</span>;
-        case "rejected": return <span className={`${base} bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300`}><FaTimesCircle />Từ chối</span>;
-        default: return <span className={`${base} bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300`}><FaSyncAlt className="animate-spin" /> Đang chờ</span>; // Sửa animate-spin-slow
-    }
-};
+// const ApprovalBadge = ({ status }) => { /* ... */ };
