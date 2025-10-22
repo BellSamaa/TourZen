@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../supabaseClient';
+import { getSupabase } from "../lib/supabaseClient";
 import { SpinnerGap, CheckCircle, XCircle, MagnifyingGlass } from '@phosphor-icons/react';
 
 export default function AdminManageProducts() {
