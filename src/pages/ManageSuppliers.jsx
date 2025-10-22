@@ -20,12 +20,12 @@ export default function ManageSuppliers() {
   const [formData, setFormData] = useState(initialFormData);
   const [editingId, setEditingId] = useState(null); 
 
-  // Hàm tải danh sách Users (Giữ nguyên)
+  // Hàm tải danh sách Users (ĐÃ SỬA LỖI 400 - Bỏ .order())
   const fetchUsers = async () => {
     const { data, error } = await supabase
         .from('Users')
-        .select('user_id, full_name, email, role')
-        .order('full_name', { ascending: true });
+        .select('user_id, full_name, email, role');
+        // .order('full_name', { ascending: true }); // <-- Dòng này gây lỗi 400
     
     if (error) {
         toast.error('Lỗi tải danh sách người dùng!');
@@ -199,7 +199,7 @@ export default function ManageSuppliers() {
                           </div>
                       ) : (
                           <span className="text-xs italic text-neutral-500">Chưa liên kết</span>
-                      )}
+                          )}
                   </td>
                   <td className="px-6 py-4">{getStatusBadge(supplier.approval_status)}</td>
                   <td className="px-6 py-4 text-right flex gap-2 justify-end">
