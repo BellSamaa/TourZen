@@ -1,18 +1,13 @@
 import React, { useState, useEffect } from "react";
--import { getSupabase } from "../lib/supabaseClient";
--import { FaSpinner, FaPlus } from "react-icons/fa";
--import { Buildings } from "@phosphor-icons/react"; // Thêm icon tiêu đề
-+import { createClient } from "@supabase/supabase-js";
-+import { Loader2, Plus, Building } from "lucide-react"; // Thay thế icon libraries
+import { createClient } from "@supabase/supabase-js";
+import { Loader2, Plus, Building } from "lucide-react"; // Thay thế icon libraries
 
--const supabase = getSupabase();
-+
-+// --- Khởi tạo Supabase Client ---
-+// BẠN CẦN THAY THẾ 'YOUR_SUPABASE_URL' VÀ 'YOUR_SUPABASE_ANON_KEY' BẰNG THÔNG TIN CỦA BẠN
-+const supabaseUrl = 'YOUR_SUPABASE_URL';
-+const supabaseKey = 'YOUR_SUPABASE_ANON_KEY';
-+const supabase = createClient(supabaseUrl, supabaseKey);
-+// ---------------------------------
+// --- Khởi tạo Supabase Client ---
+// BẠN CẦN THAY THẾ 'YOUR_SUPABASE_URL' VÀ 'YOUR_SUPABASE_ANON_KEY' BẰNG THÔNG TIN CỦA BẠN
+const supabaseUrl = 'YOUR_SUPABASE_URL';
+const supabaseKey = 'YOUR_SUPABASE_ANON_KEY';
+const supabase = createClient(supabaseUrl, supabaseKey);
+// ---------------------------------
 
 // --- Component Modal để Thêm Mới ---
 const AddSupplierModal = ({ show, onClose, onSuccess }) => {
@@ -205,8 +200,7 @@ export default function ManageSuppliers() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
--        <FaSpinner className="animate-spin text-4xl text-sky-600" />
-+        <Loader2 className="animate-spin text-4xl text-sky-600" />
+        <Loader2 className="animate-spin text-4xl text-sky-600" />
       </div>
     );
   }
@@ -219,16 +213,14 @@ export default function ManageSuppliers() {
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl md:text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
--          <Buildings size={28} weight="duotone" className="text-blue-600" />
-+          <Building size={28} className="text-blue-600" />
+          <Building size={28} className="text-blue-600" />
           Quản lý Nhà Cung Cấp
         </h1>
         <button
           onClick={() => setShowModal(true)}
           className="flex items-center space-x-2 bg-sky-600 text-white px-4 py-2 rounded-md hover:bg-sky-700 transition-colors"
         >
--          <FaPlus />
-+          <Plus className="h-5 w-5" />
+          <Plus className="h-5 w-5" />
           <span>Thêm Mới</span>
         </button>
       </div>
@@ -301,6 +293,4 @@ export default function ManageSuppliers() {
     </div>
   );
 }
-
-
 
