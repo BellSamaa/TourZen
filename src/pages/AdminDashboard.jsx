@@ -15,7 +15,7 @@ import ManageCustomers from './ManageCustomers';
 import ManageSuppliers from './ManageSuppliers';
 import Reports from './Reports';
 import DashboardHome from './DashboardHome';
-import ManageProducts from './ManageProducts';
+import ManageProducts from "./AdminManageProducts";
 import ManageBookings from './ManageBookings';
 import AddToursFromData from './AddToursFromData';
 
