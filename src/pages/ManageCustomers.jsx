@@ -1,211 +1,276 @@
 // src/pages/ManageCustomers.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { getSupabase } from "../lib/supabaseClient";
-// --- Đổi sang icon Phosphor (nếu bạn đã cài @phosphor-icons/react) ---
-// import { Spinner, Users, UserGear, Buildings, Trash } from "@phosphor-icons/react";
-// Hoặc giữ lại react-icons
-import { FaSpinner, FaUsers, FaUserCog, FaBuilding, FaTrash } from "react-icons/fa";
-import { UserList } from "@phosphor-icons/react"; // Dùng icon tiêu đề
+import {
+  FaSpinner,
+  FaUsers,
+  FaUserCog,
+  FaBuilding,
+  FaTrash,
+  FaSearch,
+  FaFilter,
+} from "react-icons/fa";
+import { UserList } from "@phosphor-icons/react";
 
 const supabase = getSupabase();
 
-// --- Helper lấy icon và màu cho Role ---
+// --- Badge + Icon theo vai trò ---
 const getRoleStyle = (role) => {
-    switch (role) {
-        case 'admin':
-            // return { icon: <UserGear size={18} className="text-red-500 flex-shrink-0" />, color: "text-red-600 dark:text-red-400 font-semibold" };
-            return { icon: <FaUserCog className="text-red-500 flex-shrink-0" />, color: "text-red-600 dark:text-red-400 font-semibold" };
-        case 'supplier':
-            // return { icon: <Buildings size={18} className="text-blue-500 flex-shrink-0" />, color: "text-blue-600 dark:text-blue-400 font-semibold" };
-            return { icon: <FaBuilding className="text-blue-500 flex-shrink-0" />, color: "text-blue-600 dark:text-blue-400 font-semibold" };
-        case 'user':
-        default:
-            // return { icon: <Users size={18} className="text-green-500 flex-shrink-0" />, color: "text-green-600 dark:text-green-400" };
-            return { icon: <FaUsers className="text-green-500 flex-shrink-0" />, color: "text-green-600 dark:text-green-400" };
-    }
+  switch (role) {
+    case "admin":
+      return {
+        label: "Admin",
+        icon: <FaUserCog className="text-red-500" />,
+        badge: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+      };
+    case "supplier":
+      return {
+        label: "Supplier",
+        icon: <FaBuilding className="text-blue-500" />,
+        badge:
+          "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+      };
+    case "user":
+    default:
+      return {
+        label: "User",
+        icon: <FaUsers className="text-green-500" />,
+        badge:
+          "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
+      };
+  }
 };
 
-
 export default function ManageCustomers() {
-    const [customers, setCustomers] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+  const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [search, setSearch] = useState("");
+  const [filterRole, setFilterRole] = useState("all");
 
-    // Hàm fetch dữ liệu khách hàng
-    async function fetchCustomers() {
-        setLoading(true);
-        setError(null);
-        const { data, error: fetchError } = await supabase.from("Users")
-                                        .select("*")
-                                        .order('full_name', { ascending: true });
+  async function fetchCustomers() {
+    setLoading(true);
+    setError(null);
+    const { data, error: fetchError } = await supabase
+      .from("Users")
+      .select("*")
+      .order("full_name", { ascending: true });
 
-        if (fetchError) {
-            console.error("Lỗi fetch khách hàng:", fetchError);
-            setError("Không thể tải danh sách khách hàng: " + fetchError.message);
-        } else {
-            setCustomers(data || []);
-        }
-        setLoading(false);
-    }
+    if (fetchError) {
+      console.error("Lỗi fetch khách hàng:", fetchError);
+      setError("Không thể tải danh sách khách hàng: " + fetchError.message);
+    } else {
+      setCustomers(data || []);
+    }
+    setLoading(false);
+  }
 
-    useEffect(() => {
-        fetchCustomers();
-    }, []);
+  useEffect(() => {
+    fetchCustomers();
+  }, []);
 
-    // Hàm thay đổi vai trò (có xác nhận)
-    const handleRoleChange = async (customerId, currentRole, newRole) => {
-        // Không cho phép đổi vai trò của chính mình (nếu cần)
-        // const { data: { user } } = await supabase.auth.getUser();
-        // if (user && user.id === customerId) {
-        //     alert("Bạn không thể thay đổi vai trò của chính mình.");
-        //     // Reset select box
-        //     setCustomers(customers.map((cust) => cust.id === customerId ? { ...cust, role: currentRole } : cust));
-        //     return;
-        // }
+  const handleRoleChange = async (customerId, currentRole, newRole) => {
+    if (
+      !window.confirm(
+        `Bạn có chắc muốn đổi vai trò từ '${currentRole}' thành '${newRole}'?`
+      )
+    ) {
+      setCustomers(
+        customers.map((c) =>
+          c.id === customerId ? { ...c, role: currentRole } : c
+        )
+      );
+      return;
+    }
 
+    setCustomers(
+      customers.map((c) =>
+        c.id === customerId ? { ...c, role: newRole } : c
+      )
+    );
 
-        if (!window.confirm(`Bạn có chắc muốn đổi vai trò của người dùng này từ '${currentRole}' thành '${newRole}'?`)) {
-            // Nếu hủy, reset lại select box về giá trị cũ (quan trọng!)
-             setCustomers(customers.map((cust) => cust.id === customerId ? { ...cust, role: currentRole } : cust));
-             return;
-        }
+    const { error } = await supabase
+      .from("Users")
+      .update({ role: newRole })
+      .eq("id", customerId);
 
-        // Cập nhật state trước để UI phản hồi nhanh
-        setCustomers(customers.map((cust) => cust.id === customerId ? { ...cust, role: newRole } : cust));
+    if (error) {
+      alert("Lỗi cập nhật vai trò: " + error.message);
+      fetchCustomers();
+    } else {
+      alert("Cập nhật vai trò thành công!");
+    }
+  };
 
+  const handleDeleteUser = async (userId, userName) => {
+    if (
+      !window.confirm(
+        `XÓA HỒ SƠ NGƯỜI DÙNG?\nBạn có chắc muốn xóa "${userName}"?\n(Hành động này chỉ xóa hồ sơ, không xóa tài khoản đăng nhập.)`
+      )
+    )
+      return;
 
-        const { error } = await supabase
-            .from("Users")
-            .update({ role: newRole })
-            .eq("id", customerId);
+    setLoading(true);
+    const { error: deleteProfileError } = await supabase
+      .from("Users")
+      .delete()
+      .eq("id", userId);
 
-        if (error) {
-            alert("Lỗi cập nhật vai trò: " + error.message);
-            // Nếu lỗi, rollback state và fetch lại
-            setCustomers(customers.map((cust) => cust.id === customerId ? { ...cust, role: currentRole } : cust)); // Rollback
-            fetchCustomers(); // Fetch lại cho chắc
-        } else {
-             alert("Cập nhật vai trò thành công!");
-             // State đã được cập nhật trước đó
-        }
+    if (deleteProfileError) {
+      alert("Lỗi khi xóa hồ sơ: " + deleteProfileError.message);
+    } else {
+      alert(`Đã xóa hồ sơ người dùng "${userName}"!`);
+      fetchCustomers();
+    }
+    setLoading(false);
+  };
 
-        // Gợi ý: Kiểm tra liên kết Supplier
-        if (newRole === 'supplier') {
-            const { data: supplierLink, error: checkError } = await supabase
-                .from('Suppliers')
-                .select('id')
-                .eq('user_id', customerId)
-                .maybeSingle(); // Lấy 0 hoặc 1
+  // --- Bộ lọc & tìm kiếm ---
+  const filteredCustomers = useMemo(() => {
+    return customers.filter((c) => {
+      const matchSearch =
+        c.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+        c.email?.toLowerCase().includes(search.toLowerCase());
+      const matchRole =
+        filterRole === "all" ? true : c.role === filterRole;
+      return matchSearch && matchRole;
+    });
+  }, [customers, search, filterRole]);
 
-            if (!checkError && !supplierLink) {
-                 alert(`Lưu ý: Người dùng này đã được gán vai trò Supplier, nhưng chưa được liên kết với hồ sơ Nhà cung cấp nào. Bạn cần vào mục "Đối tác (Nhà Cung Cấp)" để tạo hoặc cập nhật liên kết.`);
-            }
-        }
-    };
+  // --- Loading ---
+  if (loading && customers.length === 0) {
+    return (
+      <div className="flex flex-col justify-center items-center p-24 text-center">
+        <FaSpinner className="animate-spin text-sky-500" size={40} />
+        <p className="text-slate-500 mt-3 font-medium">
+          Đang tải danh sách khách hàng...
+        </p>
+      </div>
+    );
+  }
 
-    // Hàm xử lý xóa user (Cơ bản - chỉ xóa profile)
-    const handleDeleteUser = async (userId, userName) => {
-         if (!window.confirm(`XÓA HỒ SƠ NGƯỜI DÙNG?\nBạn có chắc muốn xóa hồ sơ của "${userName}"? \n(Lưu ý: Hành động này chỉ xóa thông tin profile, không xóa tài khoản đăng nhập. Để xóa hoàn toàn, cần thực hiện trong Supabase Auth hoặc dùng Edge Function.)`)) {
-             return;
-         }
+  // --- Error ---
+  if (error) {
+    return (
+      <div className="max-w-2xl mx-auto mt-10 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 p-6 rounded-xl text-center shadow-md">
+        {error}
+      </div>
+    );
+  }
 
-         setLoading(true);
-         const { error: deleteProfileError } = await supabase
-             .from('Users')
-             .delete()
-          T  .eq('id', userId);
+  return (
+    <div className="p-6 space-y-6">
+      {/* --- Tiêu đề --- */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+          <UserList size={30} weight="duotone" className="text-sky-600" />
+          Quản lý tài khoản & khách hàng
+        </h1>
+      </div>
 
-         if (deleteProfileError) {
-              alert("Lỗi khi xóa hồ sơ người dùng: " + deleteProfileError.message);
-         } else {
-              alert(`Đã xóa hồ sơ người dùng "${userName}"!`);
-              fetchCustomers(); // Tải lại danh sách
-         }
-         setLoading(false);
-    };
+      {/* --- Thanh tìm kiếm và lọc --- */}
+      <div className="flex flex-wrap items-center gap-3 bg-white dark:bg-slate-800 p-4 rounded-xl shadow border border-gray-200 dark:border-slate-700">
+        <div className="relative flex-1 min-w-[250px]">
+          <FaSearch className="absolute left-3 top-3 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Tìm theo tên hoặc email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-sky-400 outline-none transition"
+          />
+        </div>
 
-    // --- SỬA LỖI Ở ĐÂY ---
-    // Hiển thị spinner khi đang tải và chưa có dữ liệu
-    if (loading && customers.length === 0) {
-        return (
-            <div className="flex justify-center items-center p-20">
-                <FaSpinner className="animate-spin text-sky-500" size={40} />
-            </div>
-        );
-    }
+        <div className="flex items-center gap-2">
+          <FaFilter className="text-gray-400" />
+          <select
+            value={filterRole}
+            onChange={(e) => setFilterRole(e.target.value)}
+            className="px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-sky-400 outline-none transition"
+          >
+            <option value="all">Tất cả vai trò</option>
+            <option value="user">User</option>
+            <option value="supplier">Supplier</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+      </div>
 
-    if (error) {
-        return <div className="text-red-500 text-center p-8 bg-red-50 dark:bg-red-900/20 rounded-lg">{error}</div>;
-    }
+      {/* --- Bảng khách hàng --- */}
+      <div className="bg-white dark:bg-slate-800 shadow-lg rounded-xl overflow-hidden border border-gray-200 dark:border-slate-700">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+          <thead className="bg-gray-50 dark:bg-slate-700/40">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">
+                Tên đầy đủ
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">
+                Email
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">
+                Vai trò
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">
+                Hành động
+              </th>
+            </tr>
+          </thead>
 
-    return (
-        <div className="p-4 md:p-6 space-y-6">
-            <h1 className="text-2xl md:text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
-                <UserList size={28} weight="duotone" className="text-sky-600"/> {/* Thay icon */}
-                Quản lý Tài khoản & Khách hàng
-            </h1>
+          <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+            {filteredCustomers.map((c) => {
+              const role = getRoleStyle(c.role);
+              return (
+                <tr
+                  key={c.id}
+                  className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors"
+                >
+                  <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
+                    {c.full_name || (
+                      <span className="italic text-gray-400">Chưa cập nhật</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
+                    {c.email}
+                  </td>
+                  <td className="px-6 py-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      {role.icon}
+                      <select
+                        value={c.role}
+                        onChange={(e) =>
+                          handleRoleChange(c.id, c.role, e.target.value)
+                        }
+                        className={`rounded-lg px-2 py-1 text-sm border-none focus:ring-2 focus:ring-sky-400 transition ${role.badge}`}
+                      >
+                        <option value="user">User</option>
+                        <option value="supplier">Supplier</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <button
+                      onClick={() =>
+                        handleDeleteUser(c.id, c.full_name || c.email)
+                      }
+                      className="p-2 text-red-500 hover:text-red-700 dark:hover:text-red-300 transition-all rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30"
+                      title="Xóa người dùng"
+                    >
+                      <FaTrash size={16} />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
 
-            {/* Thêm ô tìm kiếm (ví dụ) */}
-            {/* <input type="text" placeholder="Tìm kiếm theo tên hoặc email..." className="w-full md:w-1/2 p-2 border rounded-md dark:bg-slate-700 dark:border-slate-600"/> */}
-
-            <div className="bg-white dark:bg-slate-800 shadow-xl rounded-lg overflow-hidden border dark:border-slate-700">
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
-                        <thead className="bg-gray-50 dark:bg-slate-700">
-                            <tr>
-                    nbsp;           {/* ... th ... */}
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"> Tên đầy đủ </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"> Email </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"> Vai trò (Role) </th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"> Hành động </th>
-s                         </tr>
-                        </thead>
-                        <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
-                            {customers.map((customer) => { // Mở map
-                                const roleStyle = getRoleStyle(customer.role);
-                                return ( // Mở return tr
-                                    <tr key={customer.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                                            {customer.full_name || <span className="italic text-gray-400">Chưa cập nhật</span>}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                                            {customer.email}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                            <div className="flex items-center gap-2">
-                                                 {roleStyle.icon}
-                                                <select
-                                                    value={customer.role}
-                                                    // Truyền cả role cũ vào handleRoleChange để rollback nếu lỗi
-                                                    onChange={(e) => handleRoleChange(customer.id, customer.role, e.target.value)}
-                                                    className={`p-1.5 rounded-md text-xs border bg-transparent focus:outline-none focus:ring-2 focus:ring-sky-500 ${roleStyle.color} border-current appearance-none pr-6`} // Thêm appearance-none, pr-6
-                                                    style={{ backgroundImage: 'none' }} // Bỏ mũi tên mặc định (nếu cần)
-                                                >
-                                                    <option value="user">User</option>
-C                                                 <option value="admin">Admin</option>
-                                                    {/* 👇 THÊM TÙY CHỌN SUPPLIER 👇 */}
-                                                    <option value="supplier">Supplier</option>
-                                                </select>
-f                                       </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-s                                           {/* Nút Xóa (nên có xác nhận) */}
-                                            <button
-                                                onClick={() => handleDeleteUser(customer.id, customer.full_name || customer.email)}
-                                                className="p-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
-                                                title="Xóa hồ sơ người dùng"
-                                            >
-                                                {/* <Trash size={18} /> */}
-                                                 <FaTrash size={16}/>
-                                          T </button>
-                                        </td>
-                                    </tr>
-                                ); // Đóng return tr
-                            })} {/* Đóng map */}
-                        </tbody>
-                    </table>
-      t           </div>
-            </div>
-        </div>
-    ); // Đóng return div chính
-} // Đóng component ManageCustomers
+        {filteredCustomers.length === 0 && (
+          <div className="text-center py-10 text-gray-500 dark:text-gray-400 text-sm">
+            Không có khách hàng nào phù hợp với bộ lọc.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
