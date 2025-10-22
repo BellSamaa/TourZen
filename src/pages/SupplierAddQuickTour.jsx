@@ -17,36 +17,54 @@ export default function SupplierAddQuickTour() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Fetch hoặc khởi tạo dữ liệu tour
   useEffect(() => {
     const fetchTour = async () => {
-      if (!tourId) return;
       setLoading(true);
 
-      const { data, error } = await supabase
-        .from("Products")
-        .select("*")
-        .eq("id", tourId)
-        .single();
+      try {
+        if (tourId) {
+          const { data, error } = await supabase
+            .from("Products")
+            .select("*")
+            .eq("id", tourId)
+            .single();
 
-      if (error) {
-        alert("Lỗi khi tải dữ liệu tour: " + error.message);
-      } else if (data) {
-        // Bỏ các trường hệ thống và gắn hậu tố “(Bản sao)”
-        const { id, created_at, updated_at, approval_status, supplier_id, ...rest } = data;
+          if (error) throw error;
+          if (!data) {
+            alert("Không tìm thấy tour gốc.");
+          }
 
-        setTourData({
-          ...rest,
-          name: `${rest.name || "Tour mới"} (Bản sao)`,
-          approval_status: "pending",
-          supplier_id: user?.id || null,
-          start_date: rest.start_date ? rest.start_date.split("T")[0] : "",
-          end_date: rest.end_date ? rest.end_date.split("T")[0] : "",
-          image_url: rest.image_url?.startsWith("/images/")
-            ? rest.image_url
-            : `/images/default.jpg`,
-        });
+          const { id, created_at, updated_at, approval_status, supplier_id, ...rest } = data;
+
+          setTourData({
+            ...rest,
+            name: `${rest.name || "Tour mới"} (Bản sao)`,
+            approval_status: "pending",
+            supplier_id: user?.id || null,
+            start_date: rest.start_date?.split("T")[0] || "",
+            end_date: rest.end_date?.split("T")[0] || "",
+            image_url: rest.image_url?.startsWith("/images/") ? rest.image_url : "/images/default.jpg",
+          });
+        } else {
+          // Khởi tạo form mặc định nếu không có tourId
+          setTourData({
+            name: "Tour mới",
+            destination: "",
+            description: "",
+            price: 0,
+            inventory: 10,
+            start_date: "",
+            end_date: "",
+            image_url: "/images/default.jpg",
+          });
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Lỗi khi tải dữ liệu tour: " + err.message);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchTour();
@@ -63,13 +81,12 @@ export default function SupplierAddQuickTour() {
 
     setSaving(true);
 
-    // Đảm bảo dữ liệu hợp lệ tối thiểu
     const payload = {
       ...tourData,
       supplier_id: user.id,
       approval_status: "pending",
       created_at: new Date().toISOString(),
-      destination: tourData.destination || tourData.location || "Chưa xác định",
+      destination: tourData.destination || "Chưa xác định",
       product_type: "tour",
     };
 
@@ -80,7 +97,7 @@ export default function SupplierAddQuickTour() {
       alert("Lỗi khi gửi yêu cầu phê duyệt: " + error.message);
     } else {
       alert("Đã gửi tour chờ phê duyệt! Quản trị viên sẽ kiểm tra sớm.");
-      navigate("/supplier/hotels");
+      navigate("/supplier/hotels"); // Hoặc trang dashboard nào bạn muốn
     }
   };
 
@@ -95,14 +112,14 @@ export default function SupplierAddQuickTour() {
   if (!tourData)
     return (
       <p className="text-center text-gray-500 dark:text-gray-400 mt-10">
-        Không tìm thấy dữ liệu tour.
+        Không thể khởi tạo form.
       </p>
     );
 
   return (
     <div className="max-w-2xl mx-auto bg-white dark:bg-slate-800 shadow-xl rounded-lg p-6 mt-6 border dark:border-slate-700">
       <h2 className="text-2xl font-bold mb-4 text-sky-600">
-        Sao chép Tour & Gửi phê duyệt
+        Thêm Tour Nhanh & Gửi phê duyệt
       </h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">
