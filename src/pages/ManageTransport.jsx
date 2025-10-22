@@ -195,7 +195,9 @@ export default function ManageTransport() {
               />
             </div>
             <div>
-              <label htmlFor="price" className="block text-sm font-medium mb-1 dark:text-neutral-300">Giá (VNĐ) *</LabeL>
+              {/* --- SỬA LỖI Ở ĐÂY --- */}
+              <label htmlFor="price" className="block text-sm font-medium mb-1 dark:text-neutral-300">Giá (VNĐ) *</label>
+              {/* --- KẾT THÚC SỬA LỖI --- */}
               <input
                 id="price"
                 type="number"
