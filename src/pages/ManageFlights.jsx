@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { getSupabase } from "../lib/supabaseClient";
 import { useAuth } from "../context/AuthContext";
 import toast from 'react-hot-toast';
-import { Plus, Trash, CircleNotch, AirplaneTilt } from '@phosphor-icons/react'; // Bỏ Pencil, X
+import { Plus, Trash, CircleNotch, AirplaneTilt } from '@phosphor-icons/react';
 
 const supabase = getSupabase();
 const productType = 'flight'; 
@@ -33,7 +33,7 @@ const initialFormData = {
   },
 };
 
-// Helper hiển thị trạng thái (Giữ nguyên)
+// Helper hiển thị trạng thái
 const ApprovalBadge = ({ status }) => {
     const base = "px-2 py-1 text-xs font-semibold rounded-full inline-flex items-center gap-1";
     switch (status) {
@@ -50,9 +50,8 @@ export default function ManageFlights() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState(initialFormData);
-  // Bỏ isModalOpen và editingId
 
-  // Tìm Supplier ID từ User ID (Giữ nguyên)
+  // Tìm Supplier ID từ User ID
   useEffect(() => {
     if (!user) return;
     const fetchSupplierLink = async () => {
@@ -72,7 +71,7 @@ export default function ManageFlights() {
     fetchSupplierLink();
   }, [user]);
 
-  // Tải danh sách chuyến bay (Giữ nguyên)
+  // Tải danh sách chuyến bay
   const fetchFlights = useCallback(async () => {
     if (!supplierId) {
         setLoading(false);
@@ -98,7 +97,7 @@ export default function ManageFlights() {
     fetchFlights();
   }, [fetchFlights]);
 
-  // Xử lý thay đổi input (hỗ trợ nested details) - Giữ nguyên
+  // Xử lý thay đổi input (hỗ trợ nested details)
   const handleChange = (e) => {
     const { name, value, type: inputType } = e.target;
     if (name === 'name' || name === 'price') {
@@ -131,14 +130,21 @@ export default function ManageFlights() {
     }
     setIsSubmitting(true);
 
+    // --- SỬA LỖI 400 TẠI ĐÂY ---
     const dataToSubmit = {
         name: formData.name,
         product_type: productType,
         supplier_id: supplierId,
         price: formData.price === '' ? null : formData.price, 
         details: formData.details,
-        approval_status: 'pending', // Luôn chờ duyệt
+        approval_status: 'pending', 
+        
+        // Bổ sung các trường NOT NULL
+        tour_code: formData.details.code, // Lấy mã chuyến bay làm tour_code
+        inventory: 99, // Đặt số lượng mặc định
+        image_url: 'https://placehold.co/600x400/0ea5e9/white?text=Flight', // Ảnh mặc định
     };
+    // --- KẾT THÚC SỬA ---
 
     // Chỉ thực hiện INSERT
     const { error } = await supabase
@@ -147,6 +153,7 @@ export default function ManageFlights() {
 
     if (error) {
       toast.error("Có lỗi xảy ra: " + error.message);
+      console.error("Lỗi Submit Flights:", error);
     } else {
       toast.success('Thêm mới thành công! Chờ duyệt.');
       setFormData(initialFormData); // Reset form
@@ -155,7 +162,7 @@ export default function ManageFlights() {
     setIsSubmitting(false);
   };
 
-  // Xử lý xóa (Giữ nguyên)
+  // Xử lý xóa
   const handleDelete = async (productId, productName) => {
     if (window.confirm(`Bạn có chắc muốn xóa chuyến bay "${productName}"?`)) {
       const { error } = await supabase
@@ -185,7 +192,6 @@ export default function ManageFlights() {
           <AirplaneTilt size={32} className="text-sky-500" />
           Quản lý Chuyến bay
         </h1>
-        {/* Bỏ nút Thêm modal */}
       </div>
 
       {!supplierId && !loading && (
@@ -195,32 +201,27 @@ export default function ManageFlights() {
         </div>
       )}
 
-      {/* --- FORM THÊM NHANH MỚI --- */}
+      {/* FORM THÊM NHANH */}
       {supplierId && (
         <form onSubmit={handleSubmit} className="bg-white dark:bg-neutral-800 p-6 rounded-lg shadow-md mb-8 border dark:border-neutral-700">
             <h2 className="text-xl font-semibold mb-4">Thêm nhanh Chuyến bay</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Tên hiển thị */}
                 <div className="md:col-span-1">
                     <label htmlFor="name" className="block text-sm font-medium mb-1 dark:text-neutral-300">Tên hiển thị *</label>
                     <input id="name" type="text" name="name" placeholder="VD: Vé máy bay + Xe đưa đón" value={formData.name} onChange={handleChange} required className="w-full p-2 border rounded-md dark:bg-neutral-700 dark:border-neutral-600 focus:ring-sky-500 focus:border-sky-500 dark:text-white" />
                 </div>
-                {/* Giá */}
                 <div>
                     <label htmlFor="price" className="block text-sm font-medium mb-1 dark:text-neutral-300">Giá (VNĐ)</label>
                     <input id="price" type="number" name="price" placeholder="Giá vé (hoặc giá combo)" value={formData.price} onChange={handleChange} className="w-full p-2 border rounded-md dark:bg-neutral-700 dark:border-neutral-600 focus:ring-sky-500 focus:border-sky-500 dark:text-white" />
                 </div>
-                {/* Mã chuyến bay */}
                 <div>
                     <label htmlFor="code" className="block text-sm font-medium mb-1 capitalize dark:text-neutral-300">{getDetailLabel('code')} *</label>
                     <input id="code" type="text" name="code" value={formData.details.code} onChange={handleChange} required className="w-full p-2 border rounded-md dark:bg-neutral-700 dark:border-neutral-600 focus:ring-sky-500 focus:border-sky-500 dark:text-white" />
                 </div>
-                {/* Hãng bay */}
                 <div>
                     <label htmlFor="airline" className="block text-sm font-medium mb-1 capitalize dark:text-neutral-300">{getDetailLabel('airline')}</label>
                     <input id="airline" type="text" name="airline" value={formData.details.airline} onChange={handleChange} className="w-full p-2 border rounded-md dark:bg-neutral-700 dark:border-neutral-600 focus:ring-sky-500 focus:border-sky-500 dark:text-white" />
                 </div>
-                {/* Tuyến bay */}
                 <div className="md:col-span-2">
                     <label htmlFor="route" className="block text-sm font-medium mb-1 capitalize dark:text-neutral-300">{getDetailLabel('route')} *</label>
                     <input id="route" type="text" name="route" value={formData.details.route} onChange={handleChange} required className="w-full p-2 border rounded-md dark:bg-neutral-700 dark:border-neutral-600 focus:ring-sky-500 focus:border-sky-500 dark:text-white" />
@@ -236,8 +237,6 @@ export default function ManageFlights() {
             </button>
         </form>
       )}
-      {/* --- KẾT THÚC FORM --- */}
-
 
       {/* Bảng dữ liệu */}
       {loading ? (
@@ -269,14 +268,13 @@ export default function ManageFlights() {
                   <td className="px-6 py-4">{formatPrice(flight.price)}</td>
                   <td className="px-6 py-4"><ApprovalBadge status={flight.approval_status} /></td>
                   <td className="px-6 py-4 text-right flex gap-2 justify-end">
-                    {/* Bỏ nút Sửa */}
                     <button onClick={() => handleDelete(flight.id, flight.name)} className="p-2 text-red-500 hover:text-red-700 dark:hover:text-red-400" title="Xóa">
                       <Trash size={18} />
                     </button>
                   </td>
                 </tr>
               ))}
-  S             {flights.length === 0 && (
+              {flights.length === 0 && (
                 <tr>
                     <td colSpan="7" className="text-center py-10 text-neutral-500 italic">Bạn chưa thêm chuyến bay nào.</td>
                 </tr>
@@ -286,8 +284,6 @@ export default function ManageFlights() {
         </div>
         )
       )}
-
-      {/* Bỏ Modal Form */}
     </div>
   );
 }

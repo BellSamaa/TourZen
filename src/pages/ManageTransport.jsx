@@ -11,9 +11,10 @@ const productType = 'transport';
 // State khởi tạo cho form
 const initialFormData = {
   name: "",
-  vehicle_type: "", // Đổi 'type' thành 'vehicle_type'
+  vehicle_type: "",
   price: "",
   seats: "",
+  code: "", // <-- Thêm 'code'
 };
 
 // Helper hiển thị trạng thái
@@ -96,12 +97,14 @@ export default function ManageTransport() {
         toast.error("Không thể thêm vì tài khoản chưa liên kết NCC.");
         return;
     }
-    if (!formData.name || !formData.vehicle_type || !formData.price) {
-        toast.error('Vui lòng nhập Tên xe, Loại xe và Giá.');
+    // --- SỬA LỖI 400 (Validation) ---
+    if (!formData.name || !formData.vehicle_type || !formData.price || !formData.code) {
+        toast.error('Vui lòng nhập Tên xe, Loại xe, Giá và Mã dịch vụ.');
         return;
     }
     setIsSubmitting(true);
 
+    // --- SỬA LỖI 400 (Data) ---
     const dataToSubmit = {
         name: formData.name,
         product_type: productType,
@@ -111,13 +114,20 @@ export default function ManageTransport() {
             vehicle_type: formData.vehicle_type,
             seats: formData.seats === '' ? null : parseInt(formData.seats)
         },
-        approval_status: 'pending', // Chờ duyệt
+        approval_status: 'pending',
+        
+        // Bổ sung các trường NOT NULL
+        tour_code: formData.code, // Lấy mã dịch vụ từ form
+        inventory: 99, // Đặt số lượng mặc định
+        image_url: 'https://placehold.co/600x400/0ea5e9/white?text=Transport', // Ảnh mặc định
     };
+    // --- KẾT THÚC SỬA ---
 
     const { error } = await supabase.from('Products').insert(dataToSubmit);
 
     if (error) {
       toast.error("Có lỗi xảy ra: " + error.message);
+      console.error("Lỗi Submit Transport:", error);
     } else {
       toast.success('Thêm xe thành công! Chờ duyệt.');
       setFormData(initialFormData); // Reset form
@@ -167,6 +177,7 @@ export default function ManageTransport() {
       {supplierId && (
         <form onSubmit={handleSubmit} className="bg-white dark:bg-neutral-800 p-6 rounded-lg shadow-md mb-8 border dark:border-neutral-700">
           <h2 className="text-xl font-semibold mb-4">Thêm xe mới</h2>
+          {/* --- SỬA LỖI 400 (Layout) --- */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="md:col-span-2">
               <label htmlFor="name" className="block text-sm font-medium mb-1 dark:text-neutral-300">Tên xe *</label>
@@ -195,9 +206,7 @@ export default function ManageTransport() {
               />
             </div>
             <div>
-              {/* --- SỬA LỖI Ở ĐÂY --- */}
               <label htmlFor="price" className="block text-sm font-medium mb-1 dark:text-neutral-300">Giá (VNĐ) *</label>
-              {/* --- KẾT THÚC SỬA LỖI --- */}
               <input
                 id="price"
                 type="number"
@@ -209,7 +218,22 @@ export default function ManageTransport() {
                 className="w-full p-2 border rounded-md dark:bg-neutral-700 dark:border-neutral-600 focus:ring-sky-500 focus:border-sky-500 dark:text-white"
               />
             </div>
-            <div>
+
+            {/* Hàng thứ 2 */}
+            <div className="md:col-span-2">
+              <label htmlFor="code" className="block text-sm font-medium mb-1 dark:text-neutral-300">Mã Dịch vụ *</label>
+              <input
+                id="code"
+                type="text"
+                name="code"
+                placeholder="VD: XE-SAN-BAY-01"
+                value={formData.code}
+                onChange={handleChange}
+                required
+                className="w-full p-2 border rounded-md dark:bg-neutral-700 dark:border-neutral-600 focus:ring-sky-500 focus:border-sky-500 dark:text-white"
+              />
+            </div>
+            <div className="md:col-span-2">
               <label htmlFor="seats" className="block text-sm font-medium mb-1 dark:text-neutral-300">Số chỗ</label>
               <input
                 id="seats"
@@ -222,6 +246,7 @@ export default function ManageTransport() {
               />
             </div>
           </div>
+          {/* --- KẾT THÚC SỬA --- */}
           <button
             type="submit"
             disabled={isSubmitting}
