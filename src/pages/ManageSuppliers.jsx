@@ -190,21 +190,66 @@ export default function ManageSuppliers() {
   // SỬA: Thêm state để lưu trữ Supabase client
   const [supabase, setSupabase] = useState(null);
 
-  // --- SỬA: Kiểm tra Supabase khi component mount ---
+  // --- SỬA: Kiểm tra Supabase và TẢI SCRIPT NẾU CẦN ---
   useEffect(() => {
-    // SỬA: Di chuyển logic khởi tạo vào trong useEffect
-    try {
-      // Giả định 'window.supabase' được cung cấp bởi môi trường
-      if (window.supabase) {
+    // Sửa lỗi: Tự động tải script Supabase nếu không tìm thấy
+    
+    // 1. Kiểm tra xem Supabase đã tồn tại chưa
+    if (window.supabase) {
+      console.log("Supabase client found on window object.");
+      try {
         const client = window.supabase.createClient(supabaseUrl, supabaseKey);
-        setSupabase(client); // <-- Lưu client vào state
-      } else {
-        console.error("Supabase client not found on window object.");
-        setError("Lỗi: Không thể khởi tạo Supabase client. 'window.supabase' không tồn tại.");
+        setSupabase(client);
+      } catch (e) {
+        console.error("Lỗi khởi tạo Supabase client (đã tồn tại):", e);
+        setError("Lỗi: " + e.message);
         setLoading(false);
       }
+      return; // Đã xong
+    }
+
+    // 2. Nếu không, kiểm tra xem script đã được thêm vào chưa
+    const SCRIPT_ID = "supabase-js-cdn";
+    if (document.getElementById(SCRIPT_ID)) {
+      console.log("Supabase script tag already injected, waiting for load...");
+      // Script đã được tiêm, chờ nó tải
+      return; 
+    }
+
+    // 3. Nếu chưa, tạo và tiêm script vào
+    console.log("Supabase client not found. Injecting script...");
+    setLoading(true); // Hiển thị loading trong khi tải script
+    try {
+      const script = document.createElement("script");
+      script.id = SCRIPT_ID;
+      script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"; // Dùng CDN
+      script.async = true;
+
+      // 4. Thêm event listener cho khi script tải xong
+      script.onload = () => {
+        console.log("Supabase script loaded successfully.");
+        if (window.supabase) {
+          const client = window.supabase.createClient(supabaseUrl, supabaseKey);
+          setSupabase(client); // <-- Lưu client vào state
+        } else {
+          console.error("Script loaded, but 'window.supabase' is still not found.");
+          setError("Lỗi: Tải script Supabase thành công nhưng không tìm thấy 'window.supabase'.");
+          setLoading(false);
+        }
+      };
+
+      // 5. Thêm event listener cho khi script tải lỗi
+      script.onerror = () => {
+        console.error("Failed to load Supabase script from CDN.");
+        setError("Lỗi: Không thể tải thư viện Supabase. Vui lòng kiểm tra kết nối mạng.");
+        setLoading(false);
+      };
+
+      // 6. Thêm script vào body
+      document.body.appendChild(script);
+
     } catch (e) {
-      console.error("Lỗi khởi tạo Supabase client:", e);
+      console.error("Lỗi khi tiêm script Supabase:", e);
       setError("Lỗi: " + e.message);
       setLoading(false);
     }
