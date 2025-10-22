@@ -8,24 +8,23 @@ const supabase = getSupabase();
 
 const initialFormData = {
   name: '',
-  user_id: '', // Chỉ giữ lại tên và user_id
+  user_id: '',
 };
 
 export default function ManageSuppliers() {
   const [suppliers, setSuppliers] = useState([]);
-  const [users, setUsers] = useState([]); // Giữ lại: Để chứa danh sách Users
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState(initialFormData);
   const [editingId, setEditingId] = useState(null); 
 
-  // Hàm tải danh sách Users (ĐÃ SỬA LỖI 400 - Bỏ .order())
+  // Hàm tải danh sách Users (Đã sửa lỗi 400 - Bỏ .order())
   const fetchUsers = async () => {
     const { data, error } = await supabase
         .from('Users')
         .select('user_id, full_name, email, role');
-        // .order('full_name', { ascending: true }); // <-- Dòng này gây lỗi 400
     
     if (error) {
         toast.error('Lỗi tải danh sách người dùng!');
@@ -35,12 +34,13 @@ export default function ManageSuppliers() {
     }
   };
 
-  // Hàm tải danh sách NCC (Giữ nguyên query join)
+  // Hàm tải danh sách NCC
   const fetchSuppliers = useCallback(async () => {
     setLoading(true);
+    // Bỏ `approval_status` khỏi select nếu muốn, nhưng `*` vẫn lấy
     const { data, error } = await supabase
       .from('Suppliers')
-      .select('*, Users(full_name, email)') // Giữ join để lấy tên
+      .select('*, Users(full_name, email)') 
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -54,10 +54,10 @@ export default function ManageSuppliers() {
 
   useEffect(() => {
     fetchSuppliers();
-    fetchUsers(); // Gọi hàm fetch Users
+    fetchUsers();
   }, [fetchSuppliers]);
 
-  // Mở modal (form) - ĐÃ ĐƠN GIẢN HÓA
+  // Mở modal (Giữ nguyên)
   const handleOpenModal = (supplier = null) => {
     if (supplier) { // Chế độ sửa
       setFormData({
@@ -79,7 +79,7 @@ export default function ManageSuppliers() {
     setEditingId(null);
   };
 
-  // Xử lý thay đổi input trong form - ĐÃ ĐƠN GIẢN HÓA
+  // Xử lý thay đổi input (Giữ nguyên)
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -88,7 +88,7 @@ export default function ManageSuppliers() {
     }));
   };
 
-  // Xử lý submit form (thêm mới hoặc cập nhật) - ĐÃ ĐƠN GIẢN HÓA
+  // Xử lý submit (ĐÃ BỎ `approval_status`)
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name) {
@@ -98,20 +98,19 @@ export default function ManageSuppliers() {
     setIsSubmitting(true);
     let error;
 
-    // Chuẩn bị dữ liệu gửi đi - Bỏ type, price, details
+    // Chuẩn bị dữ liệu (ĐÃ BỎ `approval_status`)
     const dataToSubmit = {
         name: formData.name,
         user_id: formData.user_id === '' ? null : formData.user_id, 
-        approval_status: 'pending', // Giữ lại, đây là trạng thái của NCC, không phải sản phẩm
     };
 
-    if (editingId) { // Cập nhật NCC
+    if (editingId) { // Cập nhật NCC (Cần RLS Policy 'UPDATE')
       const { error: updateError } = await supabase
         .from('Suppliers')
         .update(dataToSubmit)
         .eq('id', editingId);
       error = updateError;
-    } else { // Thêm NCC mới
+    } else { // Thêm NCC mới (Cần RLS Policy 'INSERT')
       const { error: insertError } = await supabase
         .from('Suppliers')
         .insert(dataToSubmit);
@@ -122,7 +121,8 @@ export default function ManageSuppliers() {
       toast.error("Có lỗi xảy ra: " + error.message);
       console.error("Lỗi Submit:", error);
     } else {
-      toast.success(editingId ? 'Cập nhật thành công!' : 'Thêm mới thành công! Chờ duyệt.');
+      // Cập nhật thông báo
+      toast.success(editingId ? 'Cập nhật thành công!' : 'Thêm mới thành công!');
       handleCloseModal(); 
       await fetchSuppliers(); 
     }
@@ -146,14 +146,7 @@ export default function ManageSuppliers() {
     }
   };
 
-  // Hàm Helper (Giữ lại status)
-  const getStatusBadge = (status) => {
-      switch (status) {
-          case 'approved': return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">Đã duyệt</span>;
-          case 'rejected': return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">Từ chối</span>;
-          default: return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">Đang chờ</span>;
-      }
-  };
+  // --- ĐÃ XÓA HÀM getStatusBadge ---
 
   return (
     <div className="container mx-auto px-6 py-12 bg-neutral-50 dark:bg-neutral-950 min-h-screen text-neutral-800 dark:text-neutral-200">
@@ -170,7 +163,7 @@ export default function ManageSuppliers() {
         </button>
       </div>
 
-      {/* Bảng dữ liệu - ĐÃ ĐƠN GIẢN HÓA */}
+      {/* Bảng dữ liệu - ĐÃ BỎ CỘT TRẠNG THÁI */}
       {loading ? (
         <div className="flex justify-center py-10">
           <CircleNotch size={32} className="animate-spin text-sky-500" />
@@ -182,7 +175,7 @@ export default function ManageSuppliers() {
               <tr>
                 <th scope="col" className="px-6 py-3">Tên</th>
                 <th scope="col" className="px-6 py-3">Tài khoản liên kết</th>
-                <th scope="col" className="px-6 py-3">Trạng thái</th>
+                {/* <th scope="col" className="px-6 py-3">Trạng thái</th> <-- ĐÃ XÓA */}
                 <th scope="col" className="px-6 py-3 text-right">Hành động</th>
               </tr>
             </thead>
@@ -190,7 +183,6 @@ export default function ManageSuppliers() {
               {suppliers.map((supplier) => (
                 <tr key={supplier.id} className="hover:bg-neutral-50 dark:hover:bg-neutral-700/50">
                   <td className="px-6 py-4 font-medium whitespace-nowrap">{supplier.name}</td>
-                  {/* Dữ liệu Tài khoản (Giữ nguyên) */}
                   <td className="px-6 py-4">
                       {supplier.Users ? (
                           <div className='flex items-center gap-1.5' title={supplier.Users.email}>
@@ -201,7 +193,7 @@ export default function ManageSuppliers() {
                           <span className="text-xs italic text-neutral-500">Chưa liên kết</span>
                           )}
                   </td>
-                  <td className="px-6 py-4">{getStatusBadge(supplier.approval_status)}</td>
+                  {/* <td className="px-6 py-4">{getStatusBadge(supplier.approval_status)}</td> <-- ĐÃ XÓA */}
                   <td className="px-6 py-4 text-right flex gap-2 justify-end">
                     <button onClick={() => handleOpenModal(supplier)} className="p-2 text-blue-500 hover:text-blue-700 dark:hover:text-blue-400" title="Sửa">
                       <Pencil size={18} />
@@ -214,8 +206,8 @@ export default function ManageSuppliers() {
               ))}
               {suppliers.length === 0 && (
                 <tr>
-                    {/* Cập nhật colSpan */}
-                    <td colSpan="4" className="text-center py-10 text-neutral-500 italic">Chưa có nhà cung cấp nào.</td>
+                    {/* Cập nhật colSpan từ 4 -> 3 */}
+                    <td colSpan="3" className="text-center py-10 text-neutral-500 italic">Chưa có nhà cung cấp nào.</td>
                 </tr>
               )}
             </tbody>
@@ -223,12 +215,11 @@ export default function ManageSuppliers() {
         </div>
       )}
 
-      {/* Modal Form Thêm/Sửa - ĐÃ ĐƠN GIẢN HÓA */}
+      {/* Modal Form (Giữ nguyên) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-40 flex justify-center items-center p-4 transition-opacity duration-300">
           <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto transform transition-transform duration-300 scale-100">
             <form onSubmit={handleSubmit}>
-              {/* Header Modal */}
               <div className="flex justify-between items-center p-4 border-b dark:border-neutral-700 sticky top-0 bg-white dark:bg-neutral-800 z-10">
                 <h3 className="text-xl font-semibold">
                   {editingId ? 'Chỉnh sửa Nhà cung cấp' : 'Thêm Nhà cung cấp mới'}
@@ -238,15 +229,11 @@ export default function ManageSuppliers() {
                 </button>
               </div>
 
-              {/* Form Inputs */}
               <div className="p-6 grid grid-cols-1 gap-y-4">
-                
                 <div>
                   <label htmlFor="name" className="block text-sm font-medium mb-1 dark:text-neutral-300">Tên Nhà cung cấp *</label>
                   <input id="name" type="text" name="name" value={formData.name} onChange={handleChange} required className="w-full p-2 border rounded-md dark:bg-neutral-700 dark:border-neutral-600 focus:ring-sky-500 focus:border-sky-500 dark:text-white" />
                 </div>
-
-                {/* Trường chọn User (Giữ nguyên) */}
                 <div>
                     <label htmlFor="user_id" className="block text-sm font-medium mb-1 dark:text-neutral-300">Tài khoản liên kết</label>
                     <select 
@@ -264,12 +251,8 @@ export default function ManageSuppliers() {
                         ))}
                     </select>
                 </div>
-
-                {/* ĐÃ XÓA TẤT CẢ CÁC TRƯỜNG TYPE, PRICE, DETAILS */}
-
               </div>
 
-              {/* Nút bấm ở Footer Modal (Giữ nguyên) */}
               <div className="p-4 border-t dark:border-neutral-700 flex justify-end gap-3 sticky bottom-0 bg-white dark:bg-neutral-800 z-10">
                 <button type="button" onClick={handleCloseModal} className="px-4 py-2 bg-neutral-200 dark:bg-neutral-600 rounded-md font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-500 dark:text-neutral-100">
                   Hủy
@@ -280,7 +263,8 @@ export default function ManageSuppliers() {
                   className="px-4 py-2 bg-sky-600 text-white rounded-md font-semibold hover:bg-sky-700 disabled:opacity-50 flex items-center gap-2"
                 >
                   {isSubmitting && <CircleNotch size={20} className="animate-spin" />}
-                  {editingId ? 'Lưu thay đổi' : 'Thêm & Chờ duyệt'}
+                  {/* Cập nhật text nút */}
+                  {editingId ? 'Lưu thay đổi' : 'Thêm mới'}
                 </button>
               </div>
             </form>
