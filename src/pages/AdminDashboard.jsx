@@ -17,7 +17,6 @@ import Reports from './Reports';
 import DashboardHome from './DashboardHome';
 import ManageProducts from "./AdminManageProducts";
 import ManageBookings from './ManageBookings';
-import AddToursFromData from './AddToursFromData';
 
 const supabase = getSupabase();
 
