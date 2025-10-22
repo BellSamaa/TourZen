@@ -5,7 +5,7 @@ import {
   Bed,
   CarSimple,
   AirplaneTilt,
-  CurrencyDollar,
+  // CurrencyDollar, // <- XÓA
   SignOut,
   House,
   PlusCircle,
@@ -16,9 +16,9 @@ import { useAuth } from "../context/AuthContext";
 import SupplierManageProducts from "./SupplierManageProducts";
 import ManageTransport from "./ManageTransport";
 import ManageFlights from "./ManageFlights";
-import Payment from "./Payment";
+// import Payment from "./Payment"; // <- XÓA
 import DashboardHome from "./DashboardHome";
-import SupplierAddQuickTour from "./SupplierAddQuickTour"; // ✅ thêm mới
+import SupplierAddQuickTour from "./SupplierAddQuickTour"; 
 
 const SupplierSidebar = () => {
   const { user, logout } = useAuth();
@@ -30,9 +30,9 @@ const SupplierSidebar = () => {
     { path: "/supplier/hotels", label: "Quản lý sản phẩm Tour", icon: Bed },
     { path: "/supplier/transport", label: "TourZenExpress (Xe)", icon: CarSimple },
     { path: "/supplier/flights", label: "Quản lý Chuyến bay", icon: AirplaneTilt },
-    { path: "/supplier/payment", label: "Giá dịch vụ & Thanh toán", icon: CurrencyDollar },
+    // { path: "/supplier/payment", label: "Giá dịch vụ & Thanh toán", icon: CurrencyDollar }, // <- XÓA
     { type: "divider", label: "Tiện ích mở rộng" },
-    { path: "/supplier/add-quick-tour", label: "Thêm Tour nhanh", icon: PlusCircle }, // ✅ thêm nút
+    { path: "/supplier/add-quick-tour", label: "Thêm Tour nhanh", icon: PlusCircle }, 
   ];
 
   const handleLogout = async () => {
@@ -44,7 +44,7 @@ const SupplierSidebar = () => {
     <div className="flex flex-col w-64 min-h-screen bg-slate-900 text-slate-300 shadow-lg">
       {/* Header Sidebar */}
       <div className="px-5 py-6 flex items-center gap-3 border-b border-slate-700">
-        <img src="/logo-icon.png" alt="Logo" className="w-8 h-8" />
+        <img src="/logo-icon.png" alt="Logo" className="w-8 h-8" onError={(e) => {e.target.style.display='none'}} />
         <h2 className="text-xl font-bold text-sky-400">Supplier Panel</h2>
       </div>
 
@@ -118,9 +118,9 @@ export default function SupplierDashboard() {
           <Route path="flights" element={<ManageFlights />} />
 
           {/* Thanh toán & Giá */}
-          <Route path="payment" element={<Payment />} />
+          {/* <Route path="payment" element={<Payment />} /> */} {/* <- XÓA */}
 
-          {/* ✅ Route thêm mới - Thêm Tour nhanh */}
+          {/* Route thêm mới - Thêm Tour nhanh */}
           <Route path="add-quick-tour" element={<SupplierAddQuickTour />} />
         </Routes>
       </main>
