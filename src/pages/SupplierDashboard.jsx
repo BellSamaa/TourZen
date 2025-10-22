@@ -12,6 +12,9 @@ import ManageTransport from './ManageTransport';
 import ManageFlights from './ManageFlights';
 import Payment from './Payment';
 import DashboardHome from './DashboardHome';
+import ManageTransport from './ManageTransport';
+import ManageFlights from './ManageFlights';
+
 
 const SupplierSidebar = () => {
   const { user, logout } = useAuth();
