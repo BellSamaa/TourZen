@@ -27,7 +27,7 @@ const SupplierSidebar = () => {
   const navItems = [
     { path: "/supplier", label: "Tổng quan", icon: House },
     { type: "divider", label: "Dịch vụ cung cấp" },
-    { path: "/supplier/hotels", label: "Quản lý Khách sạn", icon: Bed },
+    { path: "/supplier/hotels", label: "Quản lý sản phẩm Tour", icon: Bed },
     { path: "/supplier/transport", label: "TourZenExpress (Xe)", icon: CarSimple },
     { path: "/supplier/flights", label: "Quản lý Chuyến bay", icon: AirplaneTilt },
     { path: "/supplier/payment", label: "Giá dịch vụ & Thanh toán", icon: CurrencyDollar },
