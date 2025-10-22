@@ -17,7 +17,11 @@ import SupplierManageProducts from "./SupplierManageProducts";
 import ManageTransport from "./ManageTransport";
 import ManageFlights from "./ManageFlights";
 // import Payment from "./Payment"; // <- XÓA
-import DashboardHome from "./DashboardHome";
+
+// --- SỬA Ở ĐÂY ---
+import SupplierHome from "./SupplierHome"; // Thay vì DashboardHome
+// --- KẾT THÚC SỬA ---
+
 import SupplierAddQuickTour from "./SupplierAddQuickTour"; 
 
 const SupplierSidebar = () => {
@@ -90,7 +94,7 @@ const SupplierSidebar = () => {
             title={user.email}
           >
             Xin chào, {user.full_name}!
-          </p>
+          </p> { /* <-- ĐÃ SỬA LỖI TỪ </div> THÀNH </p> */ }
           <button
             onClick={handleLogout}
             className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-red-400 hover:bg-red-900/50 hover:text-red-300 transition-colors"
@@ -110,7 +114,9 @@ export default function SupplierDashboard() {
       <SupplierSidebar />
       <main className="flex-1 p-8 bg-slate-100 dark:bg-slate-950 overflow-y-auto">
         <Routes>
-          <Route path="/" element={<DashboardHome />} />
+          {/* --- SỬA Ở ĐÂY --- */}
+          <Route path="/" element={<SupplierHome />} />
+          {/* --- KẾT THÚC SỬA --- */}
 
           {/* Quản lý dịch vụ */}
           <Route path="hotels" element={<SupplierManageProducts productType="hotel" />} />

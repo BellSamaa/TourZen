@@ -10,7 +10,7 @@ const supabase = getSupabase();
 export default function AddHotelsFromData() {
   // 👇 2. Sử dụng HOTELS_DATA 👇
   const [localHotels, setLocalHotels] = useState(HOTELS_DATA);
-  const [suppliers, setSuppliers] = useState([]); // Vẫn cần NCC nếu khách sạn có NCC
+  const [suppliers, setSuppliers] = useState([]);
   const [addingStatus, setAddingStatus] = useState({});
   const [loadingSuppliers, setLoadingSuppliers] = useState(true);
   const [dbHotelCodes, setDbHotelCodes] = useState(new Set()); // Lưu mã khách sạn đã có
@@ -20,7 +20,7 @@ export default function AddHotelsFromData() {
       setLoadingSuppliers(true);
       const [supplierRes, productRes] = await Promise.all([
         supabase.from('Suppliers').select('id, name'),
-        // 👇 3. Lấy mã của KHÁCH SẠN đã có 👇
+        // 👇 3. Lấy mã của KHÁCH SẠN đã có từ bảng Products 👇
         supabase.from('Products').select('tour_code').eq('product_type', 'hotel')
       ]);
 
@@ -43,7 +43,7 @@ export default function AddHotelsFromData() {
   // 4. Đổi tên hàm thành handleAddHotel
   const handleAddHotel = async (hotelToAdd) => {
     // 👇 5. Dùng id khách sạn làm mã (tour_code) 👇
-    const hotelCode = String(hotelToAdd.id);
+    const hotelCode = String(hotelToAdd.id); // Đảm bảo là string
 
     if (dbHotelCodes.has(hotelCode)) {
        setAddingStatus((prev) => ({ ...prev, [hotelCode]: 'exists' }));
@@ -52,7 +52,7 @@ export default function AddHotelsFromData() {
 
     setAddingStatus((prev) => ({ ...prev, [hotelCode]: 'adding' }));
 
-    // Vẫn có thể chọn Nhà cung cấp nếu cần
+    // Logic chọn NCC giữ nguyên
     let selectedSupplierId = null;
     if (suppliers.length > 0) {
         const supplierChoice = prompt(
@@ -60,7 +60,6 @@ export default function AddHotelsFromData() {
           suppliers.map((s, index) => `${index + 1}. ${s.name}`).join('\n') +
           `\n(Bỏ trống nếu không muốn chọn)`
         );
-        // ... (logic chọn supplier giữ nguyên) ...
          if (supplierChoice && !isNaN(supplierChoice)) {
            const index = parseInt(supplierChoice, 10) - 1;
            if (index >= 0 && index < suppliers.length) {
@@ -69,31 +68,37 @@ export default function AddHotelsFromData() {
          }
     }
 
-    // 👇 6. Chuẩn bị dữ liệu khách sạn 👇
+    // 👇 6. Chuẩn bị dữ liệu khách sạn CHO BẢNG PRODUCTS 👇
     const productData = {
       name: hotelToAdd.name,
-      tour_code: hotelCode, // Mã khách sạn
-      price: hotelToAdd.price || 0,
+      tour_code: hotelCode, // Mã khách sạn (duy nhất)
+      price: hotelToAdd.price || null, // Giá (có thể null)
       inventory: hotelToAdd.inventory || 50, // Số phòng mặc định
       product_type: 'hotel', // <-- QUAN TRỌNG
       supplier_id: selectedSupplierId, // NCC nếu có
-      image_url: hotelToAdd.image_url, // Đảm bảo dùng đúng tên cột ảnh
-      description: hotelToAdd.description,
-      duration: hotelToAdd.duration, // Có thể là 'Giá / đêm'
-      location: hotelToAdd.location,
-      rating: hotelToAdd.rating,
-      galleryImages: hotelToAdd.galleryImages, // Thêm gallery nếu có
+      image_url: hotelToAdd.image_url || null, // Ảnh chính
+      description: hotelToAdd.description || null,
+      duration: hotelToAdd.duration || 'Giá / đêm', // Có thể là 'Giá / đêm'
+      location: hotelToAdd.location || null,
+      rating: hotelToAdd.rating || null,
+      galleryImages: hotelToAdd.galleryImages || null, // Thư viện ảnh
+      approval_status: 'pending', // <-- MẶC ĐỊNH LÀ CHỜ DUYỆT
+      // Thêm các cột khác của Products nếu cần (ví dụ: details)
+      details: { // Ví dụ lưu rating, tiện nghi vào details (jsonb)
+          rating: hotelToAdd.rating || null,
+          amenities: hotelToAdd.amenities || [], // Giả sử hotels.js có amenities
+      }
     };
 
-    // Thực hiện INSERT
+    // Thực hiện INSERT vào bảng Products
     const { error: insertError } = await supabase
-      .from('Products') // Vẫn insert vào bảng Products
+      .from('Products') // <-- Bảng Products
       .insert(productData);
 
     if (insertError) {
       console.error('Lỗi insert hotel:', insertError);
       setAddingStatus((prev) => ({ ...prev, [hotelCode]: 'error' }));
-      if (insertError.code === '23505') {
+      if (insertError.code === '23505') { // Lỗi trùng mã (tour_code)
           alert(`Lỗi khi thêm khách sạn "${hotelToAdd.name}": Mã "${hotelCode}" đã tồn tại.`);
           setAddingStatus((prev) => ({ ...prev, [hotelCode]: 'exists' }));
           setDbHotelCodes(prev => new Set(prev).add(hotelCode));
@@ -103,6 +108,7 @@ export default function AddHotelsFromData() {
     } else {
       setAddingStatus((prev) => ({ ...prev, [hotelCode]: 'added' }));
       setDbHotelCodes(prev => new Set(prev).add(hotelCode));
+      alert(`Đã thêm "${hotelToAdd.name}" vào danh sách chờ duyệt.`);
     }
   };
 
@@ -110,7 +116,7 @@ export default function AddHotelsFromData() {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">
-        Thêm nhanh Khách sạn từ Dữ liệu mẫu
+        Thêm nhanh Khách sạn từ Dữ liệu mẫu (Chờ duyệt)
       </h1>
 
       {loadingSuppliers ? (
@@ -137,7 +143,7 @@ export default function AddHotelsFromData() {
                     <div>
                       {/* 👇 Hiển thị tên khách sạn 👇 */}
                       <p className="text-sm font-medium text-gray-900 dark:text-white">{hotel.name}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">ID/Code: {hotel.id} - Giá: {hotel.price?.toLocaleString('vi-VN')} VNĐ</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">ID/Code: {hotel.id} - Giá: {(hotel.price || 0).toLocaleString('vi-VN')} VNĐ</p>
                     </div>
                   </div>
 
@@ -147,17 +153,16 @@ export default function AddHotelsFromData() {
                        <button
                          onClick={() => handleAddHotel(hotel)} // Gọi handleAddHotel
                          className="p-2 rounded-full bg-sky-100 text-sky-600 hover:bg-sky-200"
-                         title="Thêm vào database"
+                         title="Thêm vào database (Chờ duyệt)"
                        >
                          <FaPlus size={14} />
                        </button>
                      )}
-                     {/* ... (Các trạng thái khác giữ nguyên) ... */}
-                      {status === 'adding' && (
+                     {status === 'adding' && (
                        <FaSpinner className="animate-spin text-sky-500" />
                      )}
                      {status === 'added' && (
-                       <FaCheckCircle className="text-green-500" title="Đã thêm thành công" />
+                       <FaCheckCircle className="text-green-500" title="Đã thêm (Chờ duyệt)" />
                      )}
                       {status === 'exists' && (
                        <span className="text-xs text-gray-400 italic" title="Khách sạn này đã có trong database">Đã tồn tại</span>
