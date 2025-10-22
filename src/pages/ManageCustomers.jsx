@@ -140,12 +140,10 @@ export default function ManageCustomers() {
 
     return (
         <div className="p-4 md:p-6 space-y-6">
-// ...
             <h1 className="text-2xl md:text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
-                <UserList size={28} weight="duotone" className="text-sky-600"/>
-                Quản lý Tài khoản & Khách hàng TEST 123 {/* <--- THÊM CHỮ NÀY VÀO */}
+                <UserList size={28} weight="duotone" className="text-sky-600"/> {/* Thay icon */}
+                Quản lý Tài khoản & Khách hàng
             </h1>
-// ...
 
             {/* Thêm ô tìm kiếm (ví dụ) */}
             {/* <input type="text" placeholder="Tìm kiếm theo tên hoặc email..." className="w-full md:w-1/2 p-2 border rounded-md dark:bg-slate-700 dark:border-slate-600"/> */}
