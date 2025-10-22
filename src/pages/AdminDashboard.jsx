@@ -17,7 +17,7 @@ import Reports from './Reports';
 import DashboardHome from './DashboardHome';
 // Bỏ import ManageProducts
 import ManageBookings from './ManageBookings';
-// Bỏ import AddToursFromData
+// (Đã xóa import AddToursFromData)
 
 const supabase = getSupabase();
 
@@ -41,14 +41,14 @@ const AdminSidebar = () => {
     const handleLogout = async () => { 
         await logout();
         navigate("/");
-     };
+   };
 
     return (
         <div className="flex flex-col w-64 min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 text-slate-300 shadow-lg">
             {/* Header Sidebar */}
             <div className="px-5 py-6 flex items-center gap-3 border-b border-slate-700">
                 <img src="/logo-icon.png" alt="Logo" className="w-8 h-8" onError={(e) => {e.target.style.display='none'}}/>
-                 <h2 className="text-xl font-bold text-sky-400">TourZen Admin</h2>
+                  <h2 className="text-xl font-bold text-sky-400">TourZen Admin</h2>
             </div>
 
             {/* Navigation */}
@@ -66,26 +66,26 @@ const AdminSidebar = () => {
                             }`
                         }
                     >
-                         {item.icon && <item.icon size={22} weight="duotone" className={`transition-transform duration-200 ${location.pathname.startsWith(item.path) && item.path !== '/admin' || location.pathname === item.path ? 'scale-110' : 'group-hover:scale-110'}`} />}
-                         <span className="text-sm">{item.label}</span>
+                          {item.icon && <item.icon size={22} weight="duotone" className={`transition-transform duration-200 ${location.pathname.startsWith(item.path) && item.path !== '/admin' || location.pathname === item.path ? 'scale-110' : 'group-hover:scale-110'}`} />}
+                          <span className="text-sm">{item.label}</span>
                     </NavLink>
                 ))}
             </nav>
 
             {/* User Info & Logout */}
             {user && (
-                 <div className="px-3 py-4 border-t border-slate-700 mt-auto">
-                      <p className="text-sm font-medium text-white truncate mb-2 px-2" title={user.email}>
-                         Xin chào, {user.full_name}!
-                     </p>
-                     <button
-                         onClick={handleLogout}
-                         className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-red-400 hover:bg-red-900/50 hover:text-red-300 transition-colors"
-                     >
-                         <SignOut size={20} weight="duotone" />
-                         <span>Đăng xuất</span>
-                     </button>
-                 </div>
+                  <div className="px-3 py-4 border-t border-slate-700 mt-auto">
+                        <p className="text-sm font-medium text-white truncate mb-2 px-2" title={user.email}>
+                            Xin chào, {user.full_name}!
+                       </p>
+                      <button
+                          onClick={handleLogout}
+                          className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-red-400 hover:bg-red-900/50 hover:text-red-300 transition-colors"
+                      >
+                          <SignOut size={20} weight="duotone" />
+                          <span>Đăng xuất</span>
+                      </button>
+                  </div>
             )}
         </div>
     );
@@ -124,9 +124,28 @@ const AdminProductApproval = () => {
 
     useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
-    const updateStatus = async (id, status) => { /* ... giữ nguyên ... */ };
+    const updateStatus = async (id, status) => { 
+        // Logic update... (giữ nguyên)
+        try {
+            const { error } = await supabase
+                .from('Products')
+                .update({ approval_status: status, updated_at: new Date().toISOString() })
+                .eq('id', id);
 
-    const ApprovalBadge = ({ status }) => { /* ... giữ nguyên ... */ };
+            if (error) throw error;
+
+            // Cập nhật lại state local để UI thay đổi ngay lập tức
+            setProducts(prevProducts =>
+                prevProducts.map(p =>
+                    p.id === id ? { ...p, approval_status: status } : p
+                )
+            );
+        } catch (err) {
+            console.error("Lỗi cập nhật trạng thái:", err);
+            // Có thể thêm state để báo lỗi cho user
+        }
+    };
+
 
     // Helper icon cho loại sản phẩm
     const ProductIcon = ({ type }) => {
@@ -215,8 +234,8 @@ const AdminProductApproval = () => {
                                     <td className="px-6 py-4 text-right text-sm space-x-2">
                                         {product.approval_status === "pending" ? (
                                              <>
-                                                 <button onClick={() => updateStatus(product.id, "approved")} className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs">Duyệt</button>
-                                                 <button onClick={() => updateStatus(product.id, "rejected")} className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs">Từ chối</button>
+                                                <button onClick={() => updateStatus(product.id, "approved")} className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs">Duyệt</button>
+                                                <button onClick={() => updateStatus(product.id, "rejected")} className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs">Từ chối</button>
                                              </>
                                          ) : (
                                             <button onClick={() => updateStatus(product.id, "pending")} className="px-3 py-1 bg-gray-400 text-white rounded hover:bg-gray-500 text-xs">Đặt lại</button>
@@ -229,7 +248,7 @@ const AdminProductApproval = () => {
                         </tbody>
                     </table>
                 </div>
-            )}
+             )}
         </div>
     );
 };
@@ -250,9 +269,7 @@ export default function AdminDashboard() {
                     {/* 👇 Sửa Route /products và /approve-tours thành /approvals 👇 */}
                     <Route path="products" element={<AdminProductApproval />} /> 
 
-                    {/* Bỏ các route không cần nữa */}
-                    {/* <Route path="add-tours-from-data" element={<AddToursFromData />} /> */}
-                    {/* <Route path="approve-tours" element={<AdminApproveTours />} /> */}
+                    {/* (Đã xóa các route không cần nữa) */}
                 </Routes>
             </main>
         </div>
