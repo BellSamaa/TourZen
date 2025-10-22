@@ -6,7 +6,7 @@ import { FaSpinner, FaPlus } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
 import ProductModal from "./ProductModal";
 // --- SỬA LỖI ĐƯỜNG DẪN IMPORT ---
-import { ApprovalBadge } from './AdminProductApproval'; // Bỏ dấu './' nếu chúng cùng cấp
+import { ApprovalBadge } from './AdminProductApproval.jsx'; // Add .jsx
 // --- KẾT THÚC SỬA ---
 
 const supabase = getSupabase();
