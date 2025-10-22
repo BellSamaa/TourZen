@@ -12,6 +12,14 @@ export function useCart() {
   return useContext(CartContext);
 }
 
+// --- SỬA Ở ĐÂY: Thêm hàm slugify ---
+// (Copy từ file TourDetail.jsx)
+function slugify(text) {
+  if (!text) return '';
+  return text.toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-').replace(/[^\w-]+/g, '').replace(/--+/g, '-').replace(/^-+/, '').replace(/-+$/, '');
+}
+// --- KẾT THÚC SỬA ---
+
 // ✅ Provider bao quanh App
 export function CartProvider({ children }) {
   const [items, setItems] = useState(() => {
@@ -56,13 +64,19 @@ export function CartProvider({ children }) {
         );
       }
 
+      // --- SỬA Ở ĐÂY: Logic lấy ảnh động ---
+      const tourName = tour.title || tour.name || "";
+      const slug = slugify(tourName);
+      const dynamicImage = slug ? `/images/tour-${slug}.jpg` : "/images/default.jpg";
+      // --- KẾT THÚC SỬA ---
+
       // Thêm mới
       return [
         ...prev,
         {
           key,
           tourId: tour.id,
-          title: tour.title || tour.name || "Tour chưa đặt tên",
+          title: tourName, // <-- Sửa: Dùng tourName
           month: monthData.month,
           departureDates: monthData.departureDates || [],
           adults: Math.max(adults, 0),
@@ -72,7 +86,9 @@ export function CartProvider({ children }) {
           priceChild: monthData.prices?.child || 0,
           priceInfant: monthData.prices?.infant || 0,
           singleSupplement: monthData.prices?.singleSupplement || 0,
-          image: tour.image || "/images/default.jpg",
+          // --- SỬA Ở ĐÂY: Ưu tiên image_url, rồi đến ảnh động, cuối cùng là ảnh tour.image
+          image: tour.image_url || tour.image || dynamicImage,
+          // --- KẾT THÚC SỬA ---
           location: tour.location || "",
         },
       ];

@@ -10,6 +10,13 @@ import toast from 'react-hot-toast';
 
 const supabase = getSupabase();
 
+// --- SỬA Ở ĐÂY: Thêm hàm slugify ---
+function slugify(text) {
+  if (!text) return '';
+  return text.toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-').replace(/[^\w-]+/g, '').replace(/--+/g, '-').replace(/^-+/, '').replace(/-+$/, '');
+}
+// --- KẾT THÚC SỬA ---
+
 const InfoInput = ({ icon: Icon, ...props }) => (
     <div className="relative">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -28,14 +35,53 @@ export default function Payment() {
     const location = useLocation();
     const { items: cartItemsFromContext, clearCart, total: totalFromContext } = useCart();
 
+    // --- SỬA Ở ĐÂY: Logic "Buy Now" để nhận đúng giá và ảnh ---
     const buyNowItem = location.state?.item;
+    const selectedMonthData = location.state?.selectedMonthData; // Lấy data tháng từ TourDetail
     const isBuyNow = !!buyNowItem;
+
     const cartItems = useMemo(() => {
-        if (isBuyNow) {
-            return [{ ...buyNowItem, key: `buy-now-${buyNowItem.id}`, title: buyNowItem.name, image: buyNowItem.image_url || (buyNowItem.galleryImages && buyNowItem.galleryImages[0]) || "/images/default.jpg", priceAdult: buyNowItem.price, price: buyNowItem.price, adults: 1, children: 0, infants: 0, singleSupplement: 0 }];
+        if (isBuyNow && buyNowItem) {
+            // Dùng data tháng đã chọn (từ TourDetail)
+            // Hoặc fallback về giá "từ" nếu không có
+            const monthData = selectedMonthData || {
+                month: "Chưa chọn",
+                prices: { adult: buyNowItem.price, child: 0, infant: 0, singleSupplement: 0 },
+                departureDates: []
+            };
+
+            // Logic lấy ảnh (copy từ TourDetail.jsx)
+            const slug = buyNowItem.name ? slugify(buyNowItem.name) : '';
+            const image = buyNowItem.image_url || 
+                          (buyNowItem.galleryImages && buyNowItem.galleryImages[0]) || 
+                          (slug ? `/images/tour-${slug}.jpg` : "/images/default.jpg");
+
+            // Trả về một mảng item giỏ hàng chuẩn
+            return [{
+                // ...buyNowItem, // Bỏ dòng này để tránh ghi đè giá sai
+                key: `buy-now-${buyNowItem.id}_${monthData.month}`,
+                title: buyNowItem.name,
+                image: image,
+                // Lấy giá ĐÚNG từ monthData
+                priceAdult: monthData.prices.adult,
+                priceChild: monthData.prices.child,
+                priceInfant: monthData.prices.infant,
+                singleSupplement: monthData.prices.singleSupplement,
+                // Lấy tháng và ngày đi
+                month: monthData.month,
+                departureDates: monthData.departureDates || [],
+                // Mặc định
+                adults: 1,
+                children: 0,
+                infants: 0,
+                tourId: buyNowItem.id, // Đảm bảo tourId tồn tại
+                id: buyNowItem.id, // Đảm bảo id tồn tại
+                location: buyNowItem.location,
+            }];
         }
         return cartItemsFromContext;
-    }, [isBuyNow, buyNowItem, cartItemsFromContext]);
+    }, [isBuyNow, buyNowItem, selectedMonthData, cartItemsFromContext]);
+    // --- KẾT THÚC SỬA ---
 
     const [currentUser, setCurrentUser] = useState(null);
     const [loadingUser, setLoadingUser] = useState(true);
@@ -59,6 +105,7 @@ export default function Payment() {
         return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(num);
     };
 
+    // Logic tính tổng này VẪN ĐÚNG vì nó đọc từ cartItems đã được useMemo xử lý
     const total = useMemo(() => {
         const calculateTotal = (items) => items.reduce((sum, item) => {
             const adultPrice = item.priceAdult ?? item.price ?? 0;
@@ -66,9 +113,11 @@ export default function Payment() {
             const itemTotal = (item.adults * adultPrice) + ((item.children || 0) * childPrice) + (item.singleSupplement || 0);
             return sum + itemTotal;
         }, 0);
-        if (isBuyNow) return calculateTotal(cartItems);
-        if (totalFromContext !== undefined) return totalFromContext;
+
+        // Bỏ if (isBuyNow) vì cartItems đã là nguồn dữ liệu duy nhất
+        if (totalFromContext !== undefined && !isBuyNow) return totalFromContext;
         return calculateTotal(cartItems);
+
     }, [cartItems, isBuyNow, totalFromContext]);
 
     const totalPassengers = useMemo(
@@ -106,21 +155,19 @@ export default function Payment() {
             setCurrentUser(user);
             if (user) {
                 setContactInfo(prev => ({ ...prev, email: user.email }));
-                // Giả sử bảng public là 'Users' và PK là 'id'
                 const { data: userData, error } = await supabase.from('Users').select('full_name').eq('id', user.id).single();
                 if (userData) { setContactInfo(prev => ({ ...prev, name: userData.full_name || prev.name })); }
-                if (error) { console.warn("Lỗi lấy full_name:", error.message)} // Thêm log nếu không tìm thấy
+                if (error) { console.warn("Lỗi lấy full_name:", error.message)} 
             }
             setLoadingUser(false);
         }
 
         async function getApprovedServices() {
             setLoadingServices(true);
-            // Sửa lại: Lấy từ bảng 'Products' thay vì 'Suppliers'
             const { data: servicesData, error } = await supabase
-                .from('Products') // <-- SỬA TÊN BẢNG
+                .from('Products') 
                 .select('*')
-                .in('product_type', ['transport', 'flight']) // <-- SỬA TÊN CỘT
+                .in('product_type', ['transport', 'flight']) 
                 .eq('approval_status', 'approved');
 
             if (error) {
@@ -157,7 +204,9 @@ export default function Payment() {
             const adultPrice = item.priceAdult ?? item.price ?? 0;
             const childPrice = item.priceChild ?? 0;
             const itemTotalPrice = (item.adults * adultPrice) + ((item.children || 0) * childPrice) + (item.singleSupplement || 0);
-            const productId = item.tourId ?? item.id;
+            // --- SỬA Ở ĐÂY: Đảm bảo luôn lấy đúng ID ---
+            const productId = item.tourId ?? item.id; 
+            // --- KẾT THÚC SỬA ---
 
             if (!productId) {
                  console.error(`Item "${item.title}" thiếu ID sản phẩm.`); showNotification(`Sản phẩm "${item.title}" trong giỏ hàng bị lỗi ID.`); bookingErrorOccurred = true; break;
@@ -173,23 +222,38 @@ export default function Payment() {
                 num_adults: item.adults,
                 num_children: item.children || 0,
                 num_infants: item.infants || 0,
-                
-                // Đổi tên cột cho khớp với file Manage...jsx (ID của product, không phải supplier)
                 transport_product_id: selectedTransport || null, 
                 flight_product_id: selectedFlight || null, 
+                // --- SỬA Ở ĐÂY: Thêm thông tin tháng/ngày đi (Cần thêm cột này ở Supabase) ---
+                // booking_details: { 
+                //    month: item.month,
+                //    departureDates: item.departureDates 
+                // }
+                // Tạm thời comment out, nếu bạn cần thì hãy thêm cột 'booking_details' (jsonb)
+                // vào bảng Bookings giống như đã làm với cột 'details' (jsonb) ở bảng Products
+                // --- KẾT THÚC SỬA ---
             };
             
-            // --- SỬA LỖI 400 TẠI ĐÂY ---
+            // Lệnh insert này ĐÃ ĐÚNG (giả định bạn đã chạy SQL ở bước trước)
             const { data: bookingData, error: insertError } = await supabase
                 .from('Bookings')
                 .insert(bookingPayload) 
-                .select() // <-- Đã sửa: Bỏ 'id' để tránh lỗi ':1'
+                .select() 
                 .single();
-            // --- KẾT THÚC SỬA ---
 
             if (insertError) {
                 console.error(`Lỗi khi lưu booking cho sản phẩm ${productId}:`, insertError); 
-                toast.error(`Lỗi lưu đặt chỗ cho "${item.title}": ${insertError.message}`); // Hiển thị lỗi chi tiết
+                // --- SỬA Ở ĐÂY: Hiển thị lỗi rõ ràng hơn ---
+                let friendlyMessage = insertError.message;
+                if (insertError.message.includes("violates row-level security policy")) {
+                    friendlyMessage = "Lỗi bảo mật: Bạn không có quyền đặt tour.";
+                } else if (insertError.code === "23503") { // Foreign key violation
+                     friendlyMessage = `Lỗi dữ liệu: Tour (ID: ${productId}) không tồn tại.`;
+                } else if (insertError.code === "42703") { // Column does not exist
+                     friendlyMessage = "Lỗi DB: Cột không tồn tại. (Hãy kiểm tra lại các cột 'notes', 'transport_product_id'...).";
+                }
+                toast.error(`Lỗi lưu đặt chỗ cho "${item.title}": ${friendlyMessage}`);
+                // --- KẾT THÚC SỬA ---
                 bookingErrorOccurred = true; 
                 break;
             } else if (bookingData) {
@@ -199,7 +263,7 @@ export default function Payment() {
 
         if (bookingErrorOccurred) { setIsSubmitting(false); return; }
 
-        // --- Gửi Email Xác Nhận (Cập nhật để thêm thông tin dịch vụ) ---
+        // --- Gửi Email Xác Nhận ---
         const selectedTransportInfo = availableTransport.find(t => t.id === selectedTransport);
         const selectedFlightInfo = availableFlights.find(f => f.id === selectedFlight);
 
@@ -209,7 +273,7 @@ export default function Payment() {
         `;
 
         const tour_details_html = `<ul>${cartItems
-          .map(item => `<li><b>${item.title}</b> (${item.adults} NL, ${item.children || 0} TE, ${item.infants || 0} EB)</li>`)
+          .map(item => `<li><b>${item.title}</b> (${item.adults} NL, ${item.children || 0} TE, ${item.infants || 0} EB) - Tháng: ${item.month || 'N/A'}</li>`) // Thêm tháng
           .join("")} ${service_details_html} </ul>`;
 
         try {
@@ -277,41 +341,21 @@ export default function Payment() {
                                      </div>
                                  ) : (
                                      <div className="space-y-4">
-                                         {/* Dropdown chọn Vận chuyển */}
                                          {availableTransport.length > 0 && (
                                              <div>
                                                  <label htmlFor="transportSelect" className="block text-sm font-medium mb-1 dark:text-neutral-300 flex items-center gap-2"><FaCar/> Chọn phương tiện di chuyển</label>
-                                                 <select
-                                                     id="transportSelect"
-                                                     value={selectedTransport} 
-                                                     onChange={(e) => setSelectedTransport(e.target.value)}
-                                                     className="w-full p-2 border rounded-md dark:bg-neutral-700 dark:border-neutral-600 focus:ring-sky-500 focus:border-sky-500 dark:text-white"
-                                                 >
+                                                 <select id="transportSelect" value={selectedTransport} onChange={(e) => setSelectedTransport(e.target.value)} className="w-full p-2 border rounded-md dark:bg-neutral-700 dark:border-neutral-600 focus:ring-sky-500 focus:border-sky-500 dark:text-white" >
                                                      <option value="">-- Không sử dụng dịch vụ vận chuyển --</option>
-                                                     {availableTransport.map(t => (
-                                                         <option key={t.id} value={t.id}>
-                                                             {t.name} ({t.details?.vehicle_type}, {t.details?.seats} chỗ) - {formatCurrency(t.price)}
-                                                         </option>
-                                                     ))}
+                                                     {availableTransport.map(t => ( <option key={t.id} value={t.id}> {t.name} ({t.details?.vehicle_type}, {t.details?.seats} chỗ) - {formatCurrency(t.price)} </option> ))}
                                                  </select>
                                              </div>
                                          )}
-                                         {/* Dropdown chọn Chuyến bay */}
                                          {availableFlights.length > 0 && (
                                              <div>
                                                  <label htmlFor="flightSelect" className="block text-sm font-medium mb-1 dark:text-neutral-300 flex items-center gap-2"><FaPlane/> Chọn chuyến bay</label>
-                                                 <select
-                                                     id="flightSelect"
-                                                     value={selectedFlight} 
-                                                     onChange={(e) => setSelectedFlight(e.target.value)}
-                                                     className="w-full p-2 border rounded-md dark:bg-neutral-700 dark:border-neutral-600 focus:ring-sky-500 focus:border-sky-500 dark:text-white"
-                                                 >
+                                                 <select id="flightSelect" value={selectedFlight} onChange={(e) => setSelectedFlight(e.target.value)} className="w-full p-2 border rounded-md dark:bg-neutral-700 dark:border-neutral-600 focus:ring-sky-500 focus:border-sky-500 dark:text-white" >
                                                      <option value="">-- Tự túc vé máy bay --</option>
-                                                     {availableFlights.map(f => (
-                                                         <option key={f.id} value={f.id}>
-                                                              {f.name} ({f.details?.airline} {f.details?.code}) - {f.details?.route} - {formatCurrency(f.price)}
-                                                         </option>
-                                                     ))}
+                                                     {availableFlights.map(f => ( <option key={f.id} value={f.id}> {f.name} ({f.details?.airline} {f.details?.code}) - {f.details?.route} - {formatCurrency(f.price)} </option> ))}
                                                  </select>
                                              </div>
                                          )}
@@ -330,13 +374,11 @@ export default function Payment() {
                          <div className="bg-white dark:bg-neutral-800 p-6 rounded-lg shadow-md">
                               <h2 className="text-xl font-bold mb-4 dark:text-white">PHƯƠNG THỨC THANH TOÁN</h2>
                               <div className="space-y-4">
-                                  {/* Thanh toán trực tiếp */}
                                   <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${paymentMethod === "direct" ? "border-blue-500 ring-2 ring-blue-500" : "dark:border-neutral-600"}`} >
                                       <input type="radio" name="paymentMethod" value="direct" checked={paymentMethod === "direct"} onChange={(e)=> setPaymentMethod(e.target.value)} className="w-5 h-5 text-sky-600 focus:ring-sky-500"/>
                                       <div className="ml-4"> <p className="font-semibold dark:text-white">Thanh toán trực tiếp</p> <p className="text-sm text-gray-600 dark:text-gray-400">Thanh toán tại văn phòng TourZen.</p> </div>
                                   </label>
                                   <AnimatePresence> {paymentMethod === "direct" && ( <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="pl-8 space-y-2 dark:text-gray-300"> <p className="text-sm font-semibold"> Vui lòng thanh toán trước ngày: <span className="text-red-600 font-bold">{formattedDeadline}</span> </p> <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-neutral-700 dark:border-neutral-600 dark:text-white"> <option>VP Hà Nội: Số 123, Đường ABC, Quận Hoàn Kiếm</option> <option>VP TP.HCM: Số 456, Đường XYZ, Quận 1</option> <option>VP Đà Nẵng: Số 789, Đường UVW, Quận Hải Châu</option> </select> </motion.div> )} </AnimatePresence>
-                                  {/* Thanh toán VNPay */}
                                   <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${paymentMethod === "vnpay" ? "border-blue-500 ring-2 ring-blue-500" : "dark:border-neutral-600"}`} >
                                       <input type="radio" name="paymentMethod" value="vnpay" checked={paymentMethod === "vnpay"} onChange={(e)=> setPaymentMethod(e.target.value)} className="w-5 h-5 text-sky-600 focus:ring-sky-500"/>
                                       <div className="ml-4 flex items-center"> <p className="font-semibold mr-2 dark:text-white">Thanh toán qua VNPay</p> <img src="/vnpay_logo.png" alt="VNPay" className="h-8" /> </div>
@@ -350,7 +392,28 @@ export default function Payment() {
                          <div className="bg-white dark:bg-neutral-800 p-6 rounded-lg shadow-md sticky top-24 self-start">
                              <h2 className="text-xl font-bold mb-4 border-b pb-2 dark:border-neutral-700 dark:text-white">TÓM TẮT ĐƠN HÀNG</h2>
                              <div className="space-y-4 max-h-60 overflow-y-auto pr-2 mb-4">
-                                 {cartItems.map((item) => { const adultPrice = item.priceAdult ?? item.price ?? 0; const childPrice = item.priceChild ?? 0; const itemDisplayTotal = (item.adults * adultPrice) + ((item.children || 0) * childPrice) + (item.singleSupplement || 0); return ( <div key={item.key || item.id} className="flex gap-4 border-b pb-2 last:border-0 dark:border-neutral-700"> <img src={item.image || "/images/default.jpg"} alt={item.title} className="w-16 h-16 object-cover rounded-lg flex-shrink-0"/> <div className="flex-grow min-w-0"> <p className="font-bold text-sm text-blue-800 dark:text-sky-400 truncate">{item.title}</p> <p className="text-xs text-gray-500 dark:text-gray-400">{`${item.adults || 0} NL, ${ item.children || 0 } TE, ${item.infants || 0} EB`}</p> <p className="text-sm font-semibold dark:text-white"> {formatCurrency(itemDisplayTotal)} </p> </div> </div> ); })}
+                                 {/* --- SỬA Ở ĐÂY: Thêm logic fallback ảnh --- */}
+                                 {cartItems.map((item) => { 
+                                     const adultPrice = item.priceAdult ?? item.price ?? 0; 
+                                     const childPrice = item.priceChild ?? 0; 
+                                     const itemDisplayTotal = (item.adults * adultPrice) + ((item.children || 0) * childPrice) + (item.singleSupplement || 0); 
+                                     
+                                     // Logic fallback ảnh (cho giỏ hàng cũ trong localStorage)
+                                     const itemTitle = item.title || item.name || '';
+                                     const itemImage = item.image || (itemTitle ? `/images/tour-${slugify(itemTitle)}.jpg` : "/images/default.jpg");
+
+                                     return ( 
+                                     <div key={item.key || item.id} className="flex gap-4 border-b pb-2 last:border-0 dark:border-neutral-700"> 
+                                         <img src={itemImage} alt={item.title} className="w-16 h-16 object-cover rounded-lg flex-shrink-0"/> 
+                                         <div className="flex-grow min-w-0"> 
+                                            <p className="font-bold text-sm text-blue-800 dark:text-sky-400 truncate">{item.title}</p> 
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">{`${item.adults || 0} NL, ${ item.children || 0 } TE, ${item.infants || 0} EB`}</p> 
+                                            <p className="text-sm font-semibold dark:text-white"> {formatCurrency(itemDisplayTotal)} </p> 
+                                         </div> 
+                                     </div> 
+                                     ); 
+                                 })}
+                                 {/* --- KẾT THÚC SỬA --- */}
                              </div>
 
                              <div className="space-y-2 text-sm border-t pt-4 dark:border-neutral-700 dark:text-gray-300">
