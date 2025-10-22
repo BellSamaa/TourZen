@@ -20,24 +20,33 @@ export default function ManageSuppliers() {
   const [formData, setFormData] = useState(initialFormData);
   const [editingId, setEditingId] = useState(null); 
 
-  // Hàm tải danh sách Users (Đã sửa lỗi 400 - Bỏ .order())
+  // --- BẮT ĐẦU SỬA ---
+  // Hàm tải danh sách Users (Đã thêm DEBUG LOG)
   const fetchUsers = async () => {
+    console.log("DEBUG: Bắt đầu gọi fetchUsers..."); // Log 1
+
+    // ĐẢM BẢO TÊN BẢNG 'Users' LÀ CHÍNH XÁC
     const { data, error } = await supabase
-        .from('Users')
+        .from('Users') // <-- KIỂM TRA LẠI TÊN BẢNG NÀY (có phải là 'profiles'?)
         .select('user_id, full_name, email, role');
     
     if (error) {
-        toast.error('Lỗi tải danh sách người dùng!');
-        console.error("Fetch Users Error:", error);
+        toast.error('Lỗi tải danh sách người dùng! (Xem console F12)');
+        
+        // Đây là phần quan trọng nhất:
+        console.error("DEBUG: LỖI THẬT SỰ TỪ SUPABASE (fetchUsers):", error); 
+    
     } else {
+        // Log này sẽ cho biết data có về hay không
+        console.log("DEBUG: Fetch users thành công, data trả về:", data); // Log 2
         setUsers(data || []);
     }
   };
+  // --- KẾT THÚC SỬA ---
 
   // Hàm tải danh sách NCC
   const fetchSuppliers = useCallback(async () => {
     setLoading(true);
-    // Bỏ `approval_status` khỏi select nếu muốn, nhưng `*` vẫn lấy
     const { data, error } = await supabase
       .from('Suppliers')
       .select('*, Users(full_name, email)') 
@@ -98,7 +107,6 @@ export default function ManageSuppliers() {
     setIsSubmitting(true);
     let error;
 
-    // Chuẩn bị dữ liệu (ĐÃ BỎ `approval_status`)
     const dataToSubmit = {
         name: formData.name,
         user_id: formData.user_id === '' ? null : formData.user_id, 
@@ -121,7 +129,6 @@ export default function ManageSuppliers() {
       toast.error("Có lỗi xảy ra: " + error.message);
       console.error("Lỗi Submit:", error);
     } else {
-      // Cập nhật thông báo
       toast.success(editingId ? 'Cập nhật thành công!' : 'Thêm mới thành công!');
       handleCloseModal(); 
       await fetchSuppliers(); 
@@ -146,8 +153,6 @@ export default function ManageSuppliers() {
     }
   };
 
-  // --- ĐÃ XÓA HÀM getStatusBadge ---
-
   return (
     <div className="container mx-auto px-6 py-12 bg-neutral-50 dark:bg-neutral-950 min-h-screen text-neutral-800 dark:text-neutral-200">
       <div className="flex justify-between items-center mb-8">
@@ -163,7 +168,6 @@ export default function ManageSuppliers() {
         </button>
       </div>
 
-      {/* Bảng dữ liệu - ĐÃ BỎ CỘT TRẠNG THÁI */}
       {loading ? (
         <div className="flex justify-center py-10">
           <CircleNotch size={32} className="animate-spin text-sky-500" />
@@ -175,14 +179,13 @@ export default function ManageSuppliers() {
               <tr>
                 <th scope="col" className="px-6 py-3">Tên</th>
                 <th scope="col" className="px-6 py-3">Tài khoản liên kết</th>
-                {/* <th scope="col" className="px-6 py-3">Trạng thái</th> <-- ĐÃ XÓA */}
                 <th scope="col" className="px-6 py-3 text-right">Hành động</th>
               </tr>
             </thead>
             <tbody className="divide-y dark:divide-neutral-700">
               {suppliers.map((supplier) => (
                 <tr key={supplier.id} className="hover:bg-neutral-50 dark:hover:bg-neutral-700/50">
-                  <td className="px-6 py-4 font-medium whitespace-nowrap">{supplier.name}</td>
+                  <td className="px-6 py-4 font-medium whitespace-nowDrap">{supplier.name}</td>
                   <td className="px-6 py-4">
                       {supplier.Users ? (
                           <div className='flex items-center gap-1.5' title={supplier.Users.email}>
@@ -193,7 +196,6 @@ export default function ManageSuppliers() {
                           <span className="text-xs italic text-neutral-500">Chưa liên kết</span>
                           )}
                   </td>
-                  {/* <td className="px-6 py-4">{getStatusBadge(supplier.approval_status)}</td> <-- ĐÃ XÓA */}
                   <td className="px-6 py-4 text-right flex gap-2 justify-end">
                     <button onClick={() => handleOpenModal(supplier)} className="p-2 text-blue-500 hover:text-blue-700 dark:hover:text-blue-400" title="Sửa">
                       <Pencil size={18} />
@@ -206,7 +208,6 @@ export default function ManageSuppliers() {
               ))}
               {suppliers.length === 0 && (
                 <tr>
-                    {/* Cập nhật colSpan từ 4 -> 3 */}
                     <td colSpan="3" className="text-center py-10 text-neutral-500 italic">Chưa có nhà cung cấp nào.</td>
                 </tr>
               )}
@@ -263,7 +264,6 @@ export default function ManageSuppliers() {
                   className="px-4 py-2 bg-sky-600 text-white rounded-md font-semibold hover:bg-sky-700 disabled:opacity-50 flex items-center gap-2"
                 >
                   {isSubmitting && <CircleNotch size={20} className="animate-spin" />}
-                  {/* Cập nhật text nút */}
                   {editingId ? 'Lưu thay đổi' : 'Thêm mới'}
                 </button>
               </div>
