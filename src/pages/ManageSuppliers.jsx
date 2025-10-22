@@ -9,23 +9,13 @@ import { Loader2, Plus, Building } from "lucide-react"; // Giữ lại icon libr
 const supabaseUrl = "https://zdvwpjgpysxxqpvhovct.supabase.co";
 const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkdndwamdweXN4eHFwdmhvdmN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2NjQzODUsImV4cCI6MjA3NjI0MDM4NX0.tmFvQDXSUdJlJKBuYoqvuJArZ5apYpb-eNQ90uYBJf0";
 
-let supabase;
-try {
-  // Giả định 'window.supabase' được cung cấp bởi môi trường
-  if (window.supabase) {
-    supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
-  } else {
-    console.error("Supabase client not found on window object.");
-  }
-} catch (e) {
-  console.error("Lỗi khởi tạo Supabase client:", e);
-}
+// SỬA: Xóa khởi tạo 'let supabase' ở đây.
 // ---------------------------------
 
 
 // --- Component Modal để Thêm Mới ---
-// SỬA: Xóa props db, appId. Component này sẽ dùng biến 'supabase' toàn cục
-const AddSupplierModal = ({ show, onClose, onSuccess }) => {
+// SỬA: Thêm prop 'supabase' để nhận client đã khởi tạo
+const AddSupplierModal = ({ show, onClose, onSuccess, supabase }) => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -39,7 +29,7 @@ const AddSupplierModal = ({ show, onClose, onSuccess }) => {
   // --- SỬA: Fetch user từ Supabase ---
   useEffect(() => {
     async function fetchSupplierUsers() {
-      // Chỉ fetch khi modal mở và supabase đã sẵn sàng
+      // SỬA: Kiểm tra prop 'supabase'
       if (show && supabase) {
         setLoadingUsers(true);
         try {
@@ -63,12 +53,13 @@ const AddSupplierModal = ({ show, onClose, onSuccess }) => {
       }
     }
     fetchSupplierUsers();
-  }, [show]); // Chạy lại mỗi khi modal được mở
+  }, [show, supabase]); // SỬA: Thêm 'supabase' vào dependency
 
   // --- SỬA: Submit dữ liệu lên Supabase ---
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // SỬA: Kiểm tra prop 'supabase'
     if (!supabase) {
       alert("Lỗi: Kết nối cơ sở dữ liệu chưa sẵn sàng.");
       return;
@@ -195,19 +186,33 @@ export default function ManageSuppliers() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
-
-  // --- SỬA: Xóa state của Firebase ---
+  
+  // SỬA: Thêm state để lưu trữ Supabase client
+  const [supabase, setSupabase] = useState(null);
 
   // --- SỬA: Kiểm tra Supabase khi component mount ---
   useEffect(() => {
-    if (!supabase) {
-      setError("Lỗi: Không thể khởi tạo Supabase client. 'window.supabase' không tồn tại.");
+    // SỬA: Di chuyển logic khởi tạo vào trong useEffect
+    try {
+      // Giả định 'window.supabase' được cung cấp bởi môi trường
+      if (window.supabase) {
+        const client = window.supabase.createClient(supabaseUrl, supabaseKey);
+        setSupabase(client); // <-- Lưu client vào state
+      } else {
+        console.error("Supabase client not found on window object.");
+        setError("Lỗi: Không thể khởi tạo Supabase client. 'window.supabase' không tồn tại.");
+        setLoading(false);
+      }
+    } catch (e) {
+      console.error("Lỗi khởi tạo Supabase client:", e);
+      setError("Lỗi: " + e.message);
       setLoading(false);
     }
-  }, []);
+  }, []); // <-- Chạy 1 lần duy nhất khi component mount
 
   // --- SỬA: Hàm fetch dữ liệu từ Supabase ---
   const fetchData = useCallback(async () => {
+    // SỬA: Kiểm tra state 'supabase'
     if (!supabase) {
       // Đợi Supabase sẵn sàng
       return;
@@ -232,14 +237,14 @@ export default function ManageSuppliers() {
       setError(err.message);
     }
     setLoading(false);
-  }, []); // Không còn phụ thuộc db, appId, userId
+  }, [supabase]); // SỬA: Thêm 'supabase' vào dependency
 
   // --- SỬA: Chạy hàm fetch khi Supabase sẵn sàng ---
   useEffect(() => {
     if (supabase) {
       fetchData();
     }
-  }, [fetchData]); // Chạy lại khi hàm fetchData thay đổi
+  }, [supabase, fetchData]); // SỬA: Thêm 'supabase' vào dependency
 
 
   if (loading) {
@@ -331,7 +336,8 @@ export default function ManageSuppliers() {
           // Khi thêm thành công, fetch lại danh sách
           fetchData(); 
         }}
-        // --- SỬA: Không cần truyền props db, appId ---
+        // --- SỬA: Truyền state 'supabase' vào modal ---
+        supabase={supabase}
       />
     </div>
   );
