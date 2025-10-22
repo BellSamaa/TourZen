@@ -8,6 +8,7 @@ import {
   User,
   LogOut,
   LayoutDashboard,
+  Truck,
   Menu,
   X,
   Sun,
@@ -17,6 +18,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
 // import { useCart } from "../context/CartContext"; 
 
+// 🌙 Theme Toggle
 const ThemeToggle = () => {
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
 
@@ -30,13 +32,9 @@ const ThemeToggle = () => {
     }
   }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme(theme === "light" ? "dark" : "light");
-  };
-
   return (
     <button
-      onClick={toggleTheme}
+      onClick={() => setTheme(theme === "light" ? "dark" : "light")}
       className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700"
     >
       {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
@@ -44,14 +42,20 @@ const ThemeToggle = () => {
   );
 };
 
-const ProfileMenu = ({ user, isAdmin }) => {
+// 👤 Profile Dropdown Menu
+const ProfileMenu = ({ user }) => {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLogout = async () => {
     await logout();
-    navigate("/"); 
+    navigate("/");
+  };
+
+  const goToDashboard = () => {
+    if (user.role === "admin") navigate("/admin");
+    else if (user.role === "supplier") navigate("/supplier");
   };
 
   return (
@@ -77,16 +81,32 @@ const ProfileMenu = ({ user, isAdmin }) => {
               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
             </div>
             <nav className="p-2">
-              {isAdmin && (
-                <Link
-                  to="/admin"
-                  onClick={() => setIsOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-gray-700 dark:text-gray-200 hover:bg-sky-500 hover:text-white"
+              {user.role === "admin" && (
+                <button
+                  onClick={() => {
+                    goToDashboard();
+                    setIsOpen(false);
+                  }}
+                  className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-md text-sm text-gray-700 dark:text-gray-200 hover:bg-sky-500 hover:text-white"
                 >
                   <LayoutDashboard size={16} />
                   Trang Quản trị
-                </Link>
+                </button>
               )}
+
+              {user.role === "supplier" && (
+                <button
+                  onClick={() => {
+                    goToDashboard();
+                    setIsOpen(false);
+                  }}
+                  className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-md text-sm text-gray-700 dark:text-gray-200 hover:bg-sky-500 hover:text-white"
+                >
+                  <Truck size={16} />
+                  Bảng điều khiển Nhà cung cấp
+                </button>
+              )}
+
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-md text-sm text-red-600 dark:text-red-400 hover:bg-red-500 hover:text-white"
@@ -102,12 +122,12 @@ const ProfileMenu = ({ user, isAdmin }) => {
   );
 };
 
+// 🌍 Navbar Chính
 export default function Navbar() {
-  const { session, user, isAdmin, loading } = useAuth();
+  const { session, user, loading } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  // const { cart } = useCart(); 
-  
-  const cartItemCount = 0; 
+  // const { cart } = useCart();
+  const cartItemCount = 0;
 
   const navLinks = [
     { name: "Du lịch", path: "/tours", icon: <Plane size={18} /> },
@@ -115,17 +135,10 @@ export default function Navbar() {
     { name: "Khuyến mãi", path: "/promotions", icon: <Percent size={18} /> },
   ];
 
-  // 4. Hàm render phần Đăng nhập/Profile (ĐÃ SỬA LỖI)
   const renderAuthSection = () => {
-    if (loading) {
-      return (
-        <div className="w-24 h-8 bg-gray-200 dark:bg-neutral-700 rounded-full animate-pulse"></div>
-      );
-    }
-
-    if (session && user) {
-      return <ProfileMenu user={user} isAdmin={isAdmin} />;
-    }
+    if (loading)
+      return <div className="w-24 h-8 bg-gray-200 dark:bg-neutral-700 rounded-full animate-pulse"></div>;
+    if (session && user) return <ProfileMenu user={user} />;
 
     return (
       <Link
@@ -141,7 +154,7 @@ export default function Navbar() {
   return (
     <header className="fixed top-0 left-0 w-full z-50 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-md shadow-sm border-b border-gray-200 dark:border-neutral-800">
       <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-3">
-        {/* ===== Logo Section ===== */}
+        {/* Logo */}
         <Link to="/" className="flex flex-col items-start leading-none group">
           <div className="flex items-center gap-2">
             <span className="text-3xl font-extrabold bg-gradient-to-r from-sky-500 to-blue-700 bg-clip-text text-transparent tracking-tight group-hover:scale-105 transition-transform duration-300">
@@ -159,7 +172,7 @@ export default function Navbar() {
           </span>
         </Link>
 
-        {/* ===== Navigation Links ===== */}
+        {/* Nav Links */}
         <nav className="hidden md:flex items-center gap-6">
           {navLinks.map((link) => (
             <NavLink
@@ -179,10 +192,9 @@ export default function Navbar() {
           ))}
         </nav>
 
-        {/* ===== Right Section: Icons & Auth ===== */}
+        {/* Right Section */}
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          
           <Link
             to="/cart"
             className="relative p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700"
@@ -195,10 +207,8 @@ export default function Navbar() {
             )}
           </Link>
 
-          <div className="hidden md:block">
-            {renderAuthSection()}
-          </div>
-          
+          <div className="hidden md:block">{renderAuthSection()}</div>
+
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className="md:hidden p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700"
@@ -207,8 +217,8 @@ export default function Navbar() {
           </button>
         </div>
       </div>
-      
-      {/* ===== Mobile Menu Dropdown ===== */}
+
+      {/* Mobile Menu */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div
@@ -223,8 +233,7 @@ export default function Navbar() {
                   key={link.name}
                   to={link.path}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  // Sửa lỗi cú pháp 'isActive'R'
-                  className={({ isActive }) => 
+                  className={({ isActive }) =>
                     `flex items-center gap-3 text-base font-medium ${
                       isActive ? "text-sky-600" : "text-gray-700 dark:text-gray-200"
                     }`
@@ -234,17 +243,16 @@ export default function Navbar() {
                   {link.name}
                 </NavLink>
               ))}
-              
+
               <hr className="dark:border-neutral-700" />
-              
-              {/* Auth cho Mobile */}
+
               {loading ? (
                 <div className="w-full h-10 bg-gray-200 dark:bg-neutral-700 rounded-lg animate-pulse"></div>
               ) : session && user ? (
                 <>
                   <p className="font-semibold dark:text-white px-1">Chào, {user.full_name}!</p>
-                  {isAdmin && (
-                     <Link
+                  {user.role === "admin" && (
+                    <Link
                       to="/admin"
                       onClick={() => setIsMobileMenuOpen(false)}
                       className="flex items-center gap-3 font-medium text-sky-600 dark:text-sky-400 px-1"
@@ -252,10 +260,18 @@ export default function Navbar() {
                       <LayoutDashboard size={18} /> Trang Quản trị
                     </Link>
                   )}
+                  {user.role === "supplier" && (
+                    <Link
+                      to="/supplier"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex items-center gap-3 font-medium text-sky-600 dark:text-sky-400 px-1"
+                    >
+                      <Truck size={18} /> Bảng điều khiển Nhà cung cấp
+                    </Link>
+                  )}
                   <button
                     onClick={() => {
-                      // Gọi hàm logout từ context
-                      const { logout } = useAuth(); 
+                      const { logout } = useAuth();
                       logout();
                       setIsMobileMenuOpen(false);
                     }}
