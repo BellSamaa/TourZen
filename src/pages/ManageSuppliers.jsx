@@ -20,33 +20,28 @@ export default function ManageSuppliers() {
   const [formData, setFormData] = useState(initialFormData);
   const [editingId, setEditingId] = useState(null); 
 
-  // --- BẮT ĐẦU SỬA ---
-  // Hàm tải danh sách Users (Đã thêm DEBUG LOG)
+  // --- SỬA LỖI Ở ĐÂY (1/2) ---
+  // Hàm tải danh sách Users
   const fetchUsers = async () => {
-    console.log("DEBUG: Bắt đầu gọi fetchUsers..."); // Log 1
-
-    // ĐẢM BẢO TÊN BẢNG 'Users' LÀ CHÍNH XÁC
+    // Đổi 'user_id' thành 'id' (vì đây là PK của bảng Users)
     const { data, error } = await supabase
-        .from('Users') // <-- KIỂM TRA LẠI TÊN BẢNG NÀY (có phải là 'profiles'?)
-        .select('user_id, full_name, email, role');
+        .from('Users') // <-- Vẫn đảm bảo tên bảng 'Users' là đúng
+        .select('id, full_name, email, role'); // <-- SỬA TẠI ĐÂY
     
     if (error) {
-        toast.error('Lỗi tải danh sách người dùng! (Xem console F12)');
-        
-        // Đây là phần quan trọng nhất:
-        console.error("DEBUG: LỖI THẬT SỰ TỪ SUPABASE (fetchUsers):", error); 
-    
+        toast.error('Lỗi tải danh sách người dùng!');
+        console.error("Fetch Users Error:", error);
     } else {
-        // Log này sẽ cho biết data có về hay không
-        console.log("DEBUG: Fetch users thành công, data trả về:", data); // Log 2
         setUsers(data || []);
     }
   };
-  // --- KẾT THÚC SỬA ---
 
   // Hàm tải danh sách NCC
   const fetchSuppliers = useCallback(async () => {
     setLoading(true);
+    
+    // Query này join bảng Users dựa trên foreign key `user_id` của bảng Suppliers
+    // và lấy PK của bảng Users (nên giữ nguyên)
     const { data, error } = await supabase
       .from('Suppliers')
       .select('*, Users(full_name, email)') 
@@ -67,6 +62,7 @@ export default function ManageSuppliers() {
   }, [fetchSuppliers]);
 
   // Mở modal (Giữ nguyên)
+  // supplier.user_id là FK từ bảng Suppliers -> ĐÚNG
   const handleOpenModal = (supplier = null) => {
     if (supplier) { // Chế độ sửa
       setFormData({
@@ -97,7 +93,8 @@ export default function ManageSuppliers() {
     }));
   };
 
-  // Xử lý submit (ĐÃ BỎ `approval_status`)
+  // Xử lý submit (Giữ nguyên)
+  // formData.user_id là PK của User (giờ là 'id') -> ĐÚNG
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name) {
@@ -112,13 +109,13 @@ export default function ManageSuppliers() {
         user_id: formData.user_id === '' ? null : formData.user_id, 
     };
 
-    if (editingId) { // Cập nhật NCC (Cần RLS Policy 'UPDATE')
+    if (editingId) { 
       const { error: updateError } = await supabase
         .from('Suppliers')
         .update(dataToSubmit)
         .eq('id', editingId);
       error = updateError;
-    } else { // Thêm NCC mới (Cần RLS Policy 'INSERT')
+    } else { 
       const { error: insertError } = await supabase
         .from('Suppliers')
         .insert(dataToSubmit);
@@ -185,8 +182,9 @@ export default function ManageSuppliers() {
             <tbody className="divide-y dark:divide-neutral-700">
               {suppliers.map((supplier) => (
                 <tr key={supplier.id} className="hover:bg-neutral-50 dark:hover:bg-neutral-700/50">
-                  <td className="px-6 py-4 font-medium whitespace-nowDrap">{supplier.name}</td>
+                  <td className="px-6 py-4 font-medium whitespace-nowrap">{supplier.name}</td>
                   <td className="px-6 py-4">
+                      {/* Tên 'Users' này là từ query .select('*, Users(...)') */}
                       {supplier.Users ? (
                           <div className='flex items-center gap-1.5' title={supplier.Users.email}>
                               <UserCircle size={16} className="text-neutral-500" />
@@ -216,7 +214,7 @@ export default function ManageSuppliers() {
         </div>
       )}
 
-      {/* Modal Form (Giữ nguyên) */}
+      {/* Modal Form */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-40 flex justify-center items-center p-4 transition-opacity duration-300">
           <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto transform transition-transform duration-300 scale-100">
@@ -245,8 +243,11 @@ export default function ManageSuppliers() {
                         className="w-full p-2 border rounded-md dark:bg-neutral-700 dark:border-neutral-600 focus:ring-sky-500 focus:border-sky-500 dark:text-white"
                     >
                         <option value="">[Không liên kết]</option>
+                        
+                        {/* --- SỬA LỖI Ở ĐÂY (2/2) --- */}
+                        {/* Đổi 'user.user_id' thành 'user.id' */}
                         {users.map(user => (
-                        <option key={user.user_id} value={user.user_id}>
+                        <option key={user.id} value={user.id}>
                             {user.full_name || user.email} ({user.role || 'user'})
                         </option>
                         ))}
