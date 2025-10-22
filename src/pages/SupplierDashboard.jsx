@@ -1,12 +1,18 @@
 import React from 'react';
 import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
 import {
-  Bed, CarSimple, AirplaneTilt, CurrencyDollar, SignOut, House
+  Bed,
+  CarSimple,
+  AirplaneTilt,
+  CurrencyDollar,
+  SignOut,
+  House,
+  MapTrifold, // icon cho Tour
 } from '@phosphor-icons/react';
 import { useAuth } from '../context/AuthContext';
 
 // --- Import các trang riêng cho Supplier ---
-import ManageProducts from './ManageProducts';
+import SupplierManageProducts from './SupplierManageProducts';
 import ManageTransport from './ManageTransport';
 import ManageFlights from './ManageFlights';
 import Payment from './Payment';
@@ -19,6 +25,7 @@ const SupplierSidebar = () => {
   const navItems = [
     { path: '/supplier', label: 'Tổng quan', icon: House },
     { type: 'divider', label: 'Dịch vụ cung cấp' },
+    { path: '/supplier/tours', label: 'Quản lý Tour Du lịch', icon: MapTrifold },
     { path: '/supplier/hotels', label: 'Quản lý Khách sạn', icon: Bed },
     { path: '/supplier/transport', label: 'TourZenExpress (Xe)', icon: CarSimple },
     { path: '/supplier/flights', label: 'Quản lý Chuyến bay', icon: AirplaneTilt },
@@ -100,14 +107,16 @@ export default function SupplierDashboard() {
       <SupplierSidebar />
       <main className="flex-1 p-8 bg-slate-100 dark:bg-slate-950 overflow-y-auto">
         <Routes>
+          {/* Tổng quan */}
           <Route path="/" element={<DashboardHome />} />
 
           {/* Quản lý dịch vụ */}
-          <Route path="hotels" element={<ManageProducts productType="hotel" />} />
+          <Route path="tours" element={<SupplierManageProducts />} />
+          <Route path="hotels" element={<SupplierManageProducts productType="hotel" />} />
           <Route path="transport" element={<ManageTransport />} />
           <Route path="flights" element={<ManageFlights />} />
 
-          {/* Thanh toán & Giá */}
+          {/* Thanh toán */}
           <Route path="payment" element={<Payment />} />
         </Routes>
       </main>
