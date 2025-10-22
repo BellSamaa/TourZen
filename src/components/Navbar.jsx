@@ -103,7 +103,7 @@ const ProfileMenu = ({ user }) => {
                   className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-md text-sm text-gray-700 dark:text-gray-200 hover:bg-sky-500 hover:text-white"
                 >
                   <Truck size={16} />
-                  Bảng điều khiển Nhà cung cấp
+                  Suppliers Dashboard
                 </button>
               )}
 
