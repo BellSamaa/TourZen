@@ -1,4 +1,3 @@
-// src/pages/TourDetail.jsx
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getSupabase } from "../lib/supabaseClient";
@@ -63,7 +62,6 @@ const TourDetail = () => {
     const [tour, setTour] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    {/* *** THÊM STATE CHO TAB LỊCH TRÌNH *** */}
     const [activeScheduleTab, setActiveScheduleTab] = useState(0);
 
     const { ref: bannerRef, scrollYProgress } = useScroll();
@@ -76,7 +74,6 @@ const TourDetail = () => {
             try { 
                 const { data, error: fetchError } = await supabase
                     .from("Products")
-                      // Select * sẽ tự động lấy cột "departure_months" mới
                     .select("*, supplier_name:Suppliers(name)")
                     .eq("id", id)
                     .single();
@@ -128,7 +125,6 @@ const TourDetail = () => {
         fade: true, pauseOnHover: true,
      };
 
-    {/* *** SỬA LỖI NÚT ĐẶT TOUR (Tái áp dụng) *** */}
     const handleBookNow = () => {
         if (!tour) return;
         navigate('/payment', {
@@ -188,7 +184,6 @@ const TourDetail = () => {
                          <div className="flex items-start gap-4"> <FaClock className="text-sky-500 mt-1 flex-shrink-0" size={20} /> <div> <strong className="font-semibold block text-slate-800 dark:text-slate-100">Thời gian:</strong> <span>{tour.duration || 'N/A'}</span> </div> </div>
                          <div className="flex items-start gap-4"> <FaMapMarkerAlt className="text-sky-500 mt-1 flex-shrink-0" size={20} /> <div> <strong className="font-semibold block text-slate-800 dark:text-slate-100">Điểm đến:</strong> <span>{tour.location || 'N/A'}</span> </div> </div>
                          {tour.supplier_name && ( <div className="flex items-start gap-4"> <FaInfoCircle className="text-sky-500 mt-1 flex-shrink-0" size={20} /> <div> <strong className="font-semibold block text-slate-800 dark:text-slate-100">Nhà cung cấp:</strong> 
-                                {/* *** SỬA LỖI #31 (Tái áp dụng) *** */}
                                 <span>{tour.supplier_name?.name}</span> 
                             </div> </div> )}
                          <div className="pt-5 mt-5 border-t dark:border-slate-600">
@@ -204,16 +199,15 @@ const TourDetail = () => {
                 <motion.div className="lg:col-span-1 bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border dark:border-slate-700 lg:sticky lg:top-24 self-start" variants={itemVariants}>
                     <p className="text-slate-500 dark:text-slate-400 text-sm mb-1 font-medium">Giá chỉ từ</p>
                     <p className="text-4xl md:text-5xl font-bold text-red-600 mb-6 pb-6 border-b dark:border-slate-600"> {formatCurrency(tour.price)} </p>
-Â                 <p className="text-sm text-slate-600 dark:text-slate-400 mb-6"> Nhấn nút bên dưới để tiến hành đặt tour. </p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-6"> Nhấn nút bên dưới để tiến hành đặt tour. </p>
                     <motion.button onClick={handleBookNow} className="w-full px-6 py-4 bg-gradient-to-r from-orange-500 to-red-600 text-white text-lg font-bold rounded-xl shadow-lg hover:shadow-xl hover:from-orange-600 focus:outline-none focus:ring-4 focus:ring-orange-300 dark:focus:ring-orange-800 transition-all duration-300 flex items-center justify-center gap-3 transform active:scale-95" whileHover={{ scale: 1.03, y: -3, boxShadow: "0 10px 20px rgba(0,0,0,0.2)" }}>
                         <FaCreditCard /> Đặt Tour Ngay
                     </motion.button>
                      <p className="text-xs text-slate-500 mt-4 text-center"> Nhân viên sẽ liên hệ xác nhận sau khi bạn đặt. </p>
-A               </motion.div>
+                </motion.div>
             </motion.section>
 
-            {/* *** *** *** *** *** *** *** *** *** *** *** BẮT ĐẦU KHU VỰC MỚI   *** *** LỊCH KHỞI HÀNH & BẢNG GIÁ ***
-            *** *** *** *** *** *** *** *** *** *** */}
+            {/* --- LỊCH KHỞI HÀNH & BẢNG GIÁ --- */}
             {tour.departure_months && tour.departure_months.length > 0 && (
                 <motion.section 
                     className="max-w-6xl mx-auto p-6 md:p-10 mt-8 mb-16 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border dark:border-slate-700" 
@@ -282,18 +276,16 @@ A               </motion.div>
 
                                 {/* Thông tin thêm */}
                                 <div className="space-y-3 text-sm text-slate-700 dark:text-slate-300">
-                                    <p className="flex items-start gap-2.5"><span className="mt-0.5">{item.promotions || '🎁 Đang cập nhật ưu đãi...'}</span></p>
-                                    <p className="flex items-start gap-2.5"><span className="mt-0.5">{item.familySuitability || '👨‍👩‍👧‍👦 Phù hợp với mọi gia đình.'}</span></p>
-                                    <p className="flex items-start gap-2.5"><span className="mt-0.5">{item.flightDeals || '✈️ Giá tour chưa bao gồm vé máy bay.'}</span></p>
-                                    <p className="flex items-start gap-2.5"><span className="mt-0.5 opacity-80">{item.notes || '* Giá có thể thay đổi nhẹ tùy thời điểm.'}</span></p>
+                                    <p className="flex items-start gap-2.5"><FaGift className="text-red-500 flex-shrink-0 mt-0.5" /> <span>{item.promotions || 'Đang cập nhật ưu đãi...'}</span></p>
+                                    <p className="flex items-start gap-2.5"><FaUser className="text-blue-500 flex-shrink-0 mt-0.5" /> <span>{item.familySuitability || 'Phù hợp với mọi gia đình.'}</span></p>
+                                    <p className="flex items-start gap-2.5"><FaPlane className="text-indigo-500 flex-shrink-0 mt-0.5" /> <span>{item.flightDeals || 'Giá tour chưa bao gồm vé máy bay.'}</span></p>
+                                    <p className="flex items-start gap-2.5"><FaStickyNote className="text-yellow-500 flex-shrink-0 mt-0.5" /> <span className="opacity-80">{item.notes || '* Giá có thể thay đổi nhẹ tùy thời điểm.'}</span></p>
                                 </div>
                             </motion.div>
                         </div>
                     ))}
                 </motion.section>
             )}
-            {/* *** *** *** *** *** *** *** *** *** *** *** KẾT THÚC KHU VỰC MỚI     ***
-            *** *** *** *** *** *** *** *** *** *** */}
 
 
             {/* === Lịch trình === */}
@@ -310,24 +302,23 @@ A               </motion.div>
                      ))}
                    </div>
                 </motion.section>
-G         )}
+            )}
 
             {/* === Bản đồ === */}
             <motion.section className="max-w-5xl mx-auto my-16 px-4" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
               <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center dark:text-white">Vị trí trên Bản đồ</h2>
               <div className="rounded-2xl overflow-hidden shadow-xl border dark:border-slate-700 aspect-video md:aspect-[16/6]">
-                {/* *** SỬA LỖI LINK MAP (Tái áp dụng) *** */}
                 <iframe 
-              D         title="map" 
-                        src={`https://maps.google.com/maps?q=${encodeURIComponent(tour.name + ", " + (tour.location || ''))}&output=embed`} 
+                        title="map" 
+Z                       src={`https://maps.google.com/maps?q=${encodeURIComponent(tour.name + ", " + (tour.location || ''))}&output=embed`} 
                         width="100%" 
                         height="100%" 
-S                       loading="lazy" 
+                        loading="lazy" 
                         className="border-0">
                     </iframe>
               </div>
             </motion.section>
-s       </motion.div>
+        </motion.div>
     );
 };
 
