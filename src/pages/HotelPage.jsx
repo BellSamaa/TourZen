@@ -4,9 +4,10 @@ import { getSupabase } from "../lib/supabaseClient";
 import HotelCard from "../components/HotelCard";
 import { FaSpinner, FaPlus } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
-import ProductModal from "./ProductModal"; // Đổi tên thành ProductModal nếu bạn đã tạo
-// --- THÊM: Import component hiển thị trạng thái ---
-import { ApprovalBadge } from './AdminProductApproval'; // Giả sử ApprovalBadge ở file đó
+import ProductModal from "./ProductModal";
+// --- SỬA LỖI ĐƯỜNG DẪN IMPORT ---
+import { ApprovalBadge } from './AdminProductApproval'; // Bỏ dấu './' nếu chúng cùng cấp
+// --- KẾT THÚC SỬA ---
 
 const supabase = getSupabase();
 
@@ -20,7 +21,7 @@ export default function HotelPage() {
   const [productToEdit, setProductToEdit] = useState(null);
   const [suppliers, setSuppliers] = useState([]);
 
-  // === SỬA HÀM fetchHotels ===
+  // Fetch hotels (Đã sửa để lọc theo status)
   async function fetchHotels() {
     setLoading(true);
     setError(null);
@@ -28,13 +29,12 @@ export default function HotelPage() {
       let query = supabase
         .from("Products")
         .select("*")
-        .eq("product_type", "hotel"); // Luôn lọc khách sạn
+        .eq("product_type", "hotel");
 
       // Nếu KHÔNG phải Admin, chỉ lấy 'approved'
       if (!isAdmin) {
         query = query.eq("approval_status", "approved");
       }
-      // Nếu là Admin, lấy TẤT CẢ trạng thái (để hiển thị badge)
       
       const { data, error: fetchError } = await query.order('created_at', { ascending: false });
 
@@ -48,7 +48,6 @@ export default function HotelPage() {
         setLoading(false);
     }
   }
-  // === KẾT THÚC SỬA ===
 
   // Fetch suppliers (chỉ khi là admin)
   async function fetchSuppliersForModal() {
@@ -67,7 +66,7 @@ export default function HotelPage() {
   }, [isAdmin]);
 
 
-  // --- Các hàm xử lý Modal (Giữ nguyên) ---
+  // --- Các hàm xử lý Modal ---
   const handleAddNew = () => {
     setProductToEdit(null);
     setShowModal(true);
@@ -102,27 +101,23 @@ export default function HotelPage() {
 
       <h1 className="text-3xl font-bold mb-8 text-center dark:text-white">Danh sách Khách sạn</h1>
 
-      {/* === SỬA GRID & HOTEL CARD === */}
       {hotels.length === 0 ? (
           <p className="text-center text-gray-500 italic mt-10">Không tìm thấy khách sạn nào.</p>
       ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {hotels.map((hotel) => (
-              <div key={hotel.id} className="relative group"> {/* Bọc Card bằng div */}
+              <div key={hotel.id} className="relative group">
                 {/* Hiển thị Badge trạng thái cho Admin */}
                 {isAdmin && (
                   <div className="absolute top-3 left-3 z-10">
                     <ApprovalBadge status={hotel.approval_status} />
                   </div>
                 )}
-                {/* Truyền hàm handleEdit vào HotelCard */}
                 <HotelCard hotel={hotel} onEdit={handleEdit} />
               </div>
             ))}
           </div>
       )}
-      {/* === KẾT THÚC SỬA === */}
-
 
       {/* Modal Thêm/Sửa */}
       {showModal && (
