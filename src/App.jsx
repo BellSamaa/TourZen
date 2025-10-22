@@ -18,13 +18,14 @@ import Payment from "./pages/Payment.jsx";
 import PaymentSuccess from "./pages/PaymentSuccess.jsx";
 import CartPage from "./pages/Cart.jsx";
 import Login from "./pages/Login.jsx";
-import AdminDashboard from "./pages/AdminDashboard.jsx";
-import SupplierDashboard from "./pages/SupplierDashboard.jsx"; // ✅ Thêm dòng này
+// Register.jsx không cần nữa vì Login đã bao gồm
+// import Register from "./pages/Register.jsx"; 
+import AdminDashboard from "./pages/AdminDashboard.jsx"; // Trang Admin
+import SupplierDashboard from "./pages/SupplierDashboard.jsx"; // 👈 THÊM TRANG SUPPLIER
 import HotelPage from "./pages/HotelPage.jsx";
 import PromotionPage from "./pages/PromotionPage.jsx";
 import Checkout from "./pages/Checkout.jsx";
 import About from "./pages/About.jsx";
-import AdminHotels from "./pages/AdminHotels.jsx"; 
 
 // Context Providers
 import { CartProvider } from "./context/CartContext.jsx";
@@ -42,9 +43,7 @@ function NotFound() {
     <div className="flex items-center justify-center h-screen text-center">
       <div>
         <h2 className="text-4xl font-bold">404</h2>
-        <p className="text-neutral-500 mt-2">
-          Không tìm thấy trang bạn yêu cầu.
-        </p>
+        <p className="text-neutral-500 mt-2">Không tìm thấy trang bạn yêu cầu.</p>
       </div>
     </div>
   );
@@ -52,16 +51,22 @@ function NotFound() {
 
 export default function App() {
   const location = useLocation();
+  // Giả sử Navbar/Footer có logic ẩn/hiện dựa trên location
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const isSupplierRoute = location.pathname.startsWith('/supplier');
+  const isAuthRoute = location.pathname === '/login';
 
   return (
     <AuthProvider>
       <CartProvider>
         <ScrollToTop />
-        <Navbar />
+        {/* Ẩn Navbar/Footer trên các trang Dashboard và trang Login */}
+        {!isAdminRoute && !isSupplierRoute && !isAuthRoute && <Navbar />}
 
-        <main className="pt-[76px] bg-white dark:bg-neutral-900 min-h-screen">
+        <main className={!isAdminRoute && !isSupplierRoute && !isAuthRoute ? "pt-[76px] bg-white dark:bg-neutral-900 min-h-screen" : "bg-white dark:bg-neutral-900 min-h-screen"}>
           <AnimatePresence mode="wait">
             <Routes location={location} key={location.pathname}>
+              {/* === Public Routes === */}
               <Route path="/" element={<Home />} />
               <Route path="/about-tourzen" element={<About />} />
               <Route path="/tours" element={<TourList />} />
@@ -73,23 +78,25 @@ export default function App() {
               <Route path="/promotions" element={<PromotionPage />} />
               <Route path="/payment/*" element={<Payment />} />
               <Route path="/payment-success" element={<PaymentSuccess />} />
+              <Route path="/vnpay" element={<VNPAYPage />} />
+
+              {/* === Auth Routes === */}
               <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Login />} />
+              {/* Trang Register dùng chung component Login */}
+              <Route path="/register" element={<Login />} /> 
 
-              {/* --- VÙNG ADMIN --- */}
-              <Route path="/admin/hotels" element={<AdminHotels />} />
+              {/* === Private Dashboards === */}
+              {/* 👈 SỬA ADMIN ROUTE */}
               <Route path="/admin/*" element={<AdminDashboard />} />
-
-              {/* --- ✅ VÙNG SUPPLIER --- */}
+              {/* 👈 THÊM SUPPLIER ROUTE MỚI */}
               <Route path="/supplier/*" element={<SupplierDashboard />} />
 
-              <Route path="/vnpay" element={<VNPAYPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AnimatePresence>
         </main>
 
-        <Footer />
+        {!isAdminRoute && !isSupplierRoute && !isAuthRoute && <Footer />}
       </CartProvider>
     </AuthProvider>
   );
