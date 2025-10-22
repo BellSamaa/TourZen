@@ -176,7 +176,8 @@ export default function ManageSuppliers() {
     const { data, error } = await supabase
       .from("Suppliers")
       // Lấy tất cả cột từ Suppliers, và 2 cột từ bảng Users
-      .select("*, Users(full_name, email)"); 
+      // SỬA LỖI: Chỉ định rõ join bằng cột 'user_id' và đặt tên là 'Users'
+      .select("*, Users:user_id(full_name, email)"); 
 
     if (error) {
       console.error("Lỗi fetch nhà cung cấp:", error);
@@ -288,4 +289,5 @@ export default function ManageSuppliers() {
     </div>
   );
 }
+
 
