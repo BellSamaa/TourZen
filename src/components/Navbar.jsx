@@ -13,6 +13,7 @@ import {
   X,
   Sun,
   Moon,
+  ShoppingBag, // Thêm icon cho đơn hàng
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
@@ -104,6 +105,19 @@ const ProfileMenu = ({ user }) => {
                 >
                   <Truck size={16} />
                   Suppliers Dashboard
+                </button>
+              )}
+
+              {user.role !== "admin" && user.role !== "supplier" && (
+                <button
+                  onClick={() => {
+                    navigate("/my-bookings");
+                    setIsOpen(false);
+                  }}
+                  className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-md text-sm text-gray-700 dark:text-gray-200 hover:bg-sky-500 hover:text-white"
+                >
+                  <ShoppingBag size={16} />
+                  Đơn hàng của tôi
                 </button>
               )}
 
@@ -267,6 +281,15 @@ export default function Navbar() {
                       className="flex items-center gap-3 font-medium text-sky-600 dark:text-sky-400 px-1"
                     >
                       <Truck size={18} /> Bảng điều khiển Nhà cung cấp
+                    </Link>
+                  )}
+                  {user.role !== "admin" && user.role !== "supplier" && (
+                    <Link
+                      to="/my-bookings"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex items-center gap-3 font-medium text-sky-600 dark:text-sky-400 px-1"
+                    >
+                      <ShoppingBag size={18} /> Đơn hàng của tôi
                     </Link>
                   )}
                   <button
