@@ -1,5 +1,6 @@
 // src/pages/ManageBookings.jsx
 // (Nội dung được nâng cấp thành "Quản lý Khách hàng" & Admin)
+// Phiên bản đã sửa lỗi: Xử lý cập nhật stock đầy đủ cho create/edit/delete/status change, hỗ trợ transport/flight trong modal, kiểm tra stock trước khi trừ
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { getSupabase } from "../lib/supabaseClient";
@@ -27,6 +28,89 @@ const formatDate = (dateString) => {
 };
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+
+// --- Chuỗi select cho booking (MỚI) ---
+const bookingSelect = `
+    id, created_at, quantity, total_price, status, user_id,
+    main_tour:Products!product_id (id, name, product_type, supplier_id, stock),
+    transport_service:Products!transport_product_id (id, name, product_type, supplier_id, stock),
+    flight_service:Products!flight_product_id (id, name, product_type, supplier_id, stock)
+`;
+
+// --- Hàm lấy products từ booking (MỚI) ---
+const getProductsFromBooking = (booking) => {
+    const prods = [];
+    if (booking?.main_tour) prods.push(booking.main_tour);
+    if (booking?.transport_service) prods.push(booking.transport_service);
+    if (booking?.flight_service) prods.push(booking.flight_service);
+    return prods;
+};
+
+// --- Hàm apply stock changes (MỚI) ---
+const applyStockChanges = async (oldBooking, newBooking) => {
+    const changes = [];
+
+    // Reverse old if confirmed
+    if (oldBooking && oldBooking.status === 'confirmed') {
+        const oldProducts = getProductsFromBooking(oldBooking);
+        for (const prod of oldProducts) {
+            changes.push({ product: prod, delta: oldBooking.quantity, reason: `Hoàn lại cho Booking #${oldBooking.id}` });
+        }
+    }
+
+    // Apply new if confirmed
+    if (newBooking && newBooking.status === 'confirmed') {
+        const newProducts = getProductsFromBooking(newBooking);
+        for (const prod of newProducts) {
+            changes.push({ product: prod, delta: -newBooking.quantity, reason: `Xác nhận Booking #${newBooking.id}` });
+        }
+    }
+
+    if (changes.length === 0) return;
+
+    // Tính net delta và kiểm tra stock cho các trừ (delta < 0)
+    const netDeltas = new Map();
+    const productNames = new Map();
+    changes.forEach(ch => {
+        const pid = ch.product.id;
+        const currentDelta = netDeltas.get(pid) || 0;
+        netDeltas.set(pid, currentDelta + ch.delta);
+        if (!productNames.has(pid)) {
+            productNames.set(pid, ch.product.name);
+        }
+    });
+
+    const checkPids = [];
+    netDeltas.forEach((delta, pid) => {
+        if (delta < 0) {
+            checkPids.push({ pid, required: -delta, name: productNames.get(pid) });
+        }
+    });
+
+    if (checkPids.length > 0) {
+        const pids = checkPids.map(c => c.pid);
+        const { data: stocks, error: fetchError } = await supabase
+            .from('Products')
+            .select('id, stock')
+            .in('id', pids);
+
+        if (fetchError) {
+            throw new Error('Lỗi kiểm tra stock: ' + fetchError.message);
+        }
+
+        for (const st of stocks) {
+            const ch = checkPids.find(c => c.pid === st.id);
+            if (st.stock < ch.required) {
+                throw new Error(`Không đủ chỗ cho sản phẩm "${ch.name}". Còn lại: ${st.stock}, cần: ${ch.required}`);
+            }
+        }
+    }
+
+    // Áp dụng changes
+    for (const ch of changes) {
+        await updateStockAndNotify(ch.product, ch.delta, ch.reason);
+    }
+};
 
 // --- Component con: Hàng chờ Phê duyệt Sản phẩm (Giữ nguyên) ---
 const ProductApprovalQueue = () => {
@@ -127,50 +211,59 @@ const ProductApprovalQueue = () => {
     );
 };
 
-
-// --- (MỚI) Component Modal Thêm/Sửa Booking ---
+// (CẬP NHẬT) Component Modal Thêm/Sửa Booking (Thêm transport & flight)
 const EditBookingModal = ({ booking, onClose, onSave, allProducts, allUsers }) => {
     const [formData, setFormData] = useState({
         user_id: '',
         product_id: '',
+        transport_id: '',
+        flight_id: '',
         quantity: 1,
         status: 'pending',
     });
     const [totalPrice, setTotalPrice] = useState(0);
     const [error, setError] = useState('');
 
-    // Load data khi edit
+    // Group products by type
+    const tours = useMemo(() => allProducts.filter(p => p.product_type === 'tour'), [allProducts]);
+    const transports = useMemo(() => allProducts.filter(p => p.product_type === 'transport'), [allProducts]);
+    const flights = useMemo(() => allProducts.filter(p => p.product_type === 'flight'), [allProducts]);
+
     useEffect(() => {
         if (booking) {
             setFormData({
                 user_id: booking.user_id || '',
                 product_id: booking.main_tour?.id || '',
-                // Bỏ qua transport và flight vì modal này chỉ hỗ trợ 1 tour chính
+                transport_id: booking.transport_service?.id || '',
+                flight_id: booking.flight_service?.id || '',
                 quantity: booking.quantity || 1,
                 status: booking.status || 'pending',
                 id: booking.id
             });
         } else {
-            // Reset form khi tạo mới
             setFormData({
                 user_id: '',
                 product_id: '',
+                transport_id: '',
+                flight_id: '',
                 quantity: 1,
                 status: 'pending',
             });
         }
     }, [booking]);
 
-    // Tính toán tổng giá khi sản phẩm hoặc số lượng thay đổi
+    // Tính tổng giá
     useEffect(() => {
-        const product = allProducts.find(p => p.id === formData.product_id);
         const quantity = parseInt(formData.quantity, 10) || 0;
-        if (product && quantity > 0) {
-            setTotalPrice(product.price * quantity);
-        } else {
-            setTotalPrice(0);
-        }
-    }, [formData.product_id, formData.quantity, allProducts]);
+        let total = 0;
+        const main = allProducts.find(p => p.id === formData.product_id);
+        if (main) total += main.price * quantity;
+        const trans = allProducts.find(p => p.id === formData.transport_id);
+        if (trans) total += trans.price * quantity;
+        const fl = allProducts.find(p => p.id === formData.flight_id);
+        if (fl) total += fl.price * quantity;
+        setTotalPrice(total);
+    }, [formData.product_id, formData.transport_id, formData.flight_id, formData.quantity, allProducts]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -181,25 +274,41 @@ const EditBookingModal = ({ booking, onClose, onSave, allProducts, allUsers }) =
         e.preventDefault();
         setError('');
         if (!formData.user_id || !formData.product_id || formData.quantity <= 0) {
-            setError('Vui lòng điền đầy đủ thông tin (Khách hàng, Tour, Số lượng > 0).');
+            setError('Vui lòng điền đầy đủ thông tin (Khách hàng, Tour chính, Số lượng > 0).');
             return;
         }
-
-        const product = allProducts.find(p => p.id === formData.product_id);
-        if (!product) {
-             setError('Sản phẩm không hợp lệ.');
-             return;
+        const main = allProducts.find(p => p.id === formData.product_id);
+        if (!main) {
+            setError('Tour chính không hợp lệ.');
+            return;
+        }
+        // Kiểm tra transport & flight nếu có
+        if (formData.transport_id) {
+            const trans = allProducts.find(p => p.id === formData.transport_id);
+            if (!trans || trans.product_type !== 'transport') {
+                setError('Dịch vụ xe không hợp lệ.');
+                return;
+            }
+        }
+        if (formData.flight_id) {
+            const fl = allProducts.find(p => p.id === formData.flight_id);
+            if (!fl || fl.product_type !== 'flight') {
+                setError('Dịch vụ bay không hợp lệ.');
+                return;
+            }
         }
 
         const dataToSave = {
-            ...formData,
+            user_id: formData.user_id,
+            product_id: formData.product_id,
+            transport_product_id: formData.transport_id || null,
+            flight_product_id: formData.flight_id || null,
+            quantity: parseInt(formData.quantity, 10),
             total_price: totalPrice,
-            // Đơn giản hóa: chỉ lưu tour chính
-            transport_product_id: null,
-            flight_product_id: null,
+            status: formData.status,
         };
 
-        onSave(dataToSave);
+        onSave(dataToSave, formData.id ? booking : null);
     };
 
     return (
@@ -232,7 +341,7 @@ const EditBookingModal = ({ booking, onClose, onSave, allProducts, allUsers }) =
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tour/Dịch vụ chính</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tour chính</label>
                         <select
                             name="product_id"
                             value={formData.product_id}
@@ -240,8 +349,38 @@ const EditBookingModal = ({ booking, onClose, onSave, allProducts, allUsers }) =
                             required
                             className="w-full px-3 py-2 border rounded-lg dark:bg-neutral-700 dark:border-neutral-600 focus:ring-sky-500 focus:border-sky-500"
                         >
-                            <option value="">-- Chọn dịch vụ --</option>
-                            {allProducts.map(product => (
+                            <option value="">-- Chọn tour --</option>
+                            {tours.map(product => (
+                                <option key={product.id} value={product.id}>{product.name} ({formatCurrency(product.price)}) - Còn lại: {product.stock}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Dịch vụ xe (tùy chọn)</label>
+                        <select
+                            name="transport_id"
+                            value={formData.transport_id}
+                            onChange={handleChange}
+                            className="w-full px-3 py-2 border rounded-lg dark:bg-neutral-700 dark:border-neutral-600 focus:ring-sky-500 focus:border-sky-500"
+                        >
+                            <option value="">-- Không chọn --</option>
+                            {transports.map(product => (
+                                <option key={product.id} value={product.id}>{product.name} ({formatCurrency(product.price)}) - Còn lại: {product.stock}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Dịch vụ bay (tùy chọn)</label>
+                        <select
+                            name="flight_id"
+                            value={formData.flight_id}
+                            onChange={handleChange}
+                            className="w-full px-3 py-2 border rounded-lg dark:bg-neutral-700 dark:border-neutral-600 focus:ring-sky-500 focus:border-sky-500"
+                        >
+                            <option value="">-- Không chọn --</option>
+                            {flights.map(product => (
                                 <option key={product.id} value={product.id}>{product.name} ({formatCurrency(product.price)}) - Còn lại: {product.stock}</option>
                             ))}
                         </select>
@@ -260,7 +399,7 @@ const EditBookingModal = ({ booking, onClose, onSave, allProducts, allUsers }) =
                                 className="w-full px-3 py-2 border rounded-lg dark:bg-neutral-700 dark:border-neutral-600 focus:ring-sky-500 focus:border-sky-500"
                             />
                         </div>
-                         <div>
+                        <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Trạng thái</label>
                             <select
                                 name="status"
@@ -325,6 +464,46 @@ const DeleteConfirmationModal = ({ booking, onClose, onConfirm }) => {
     );
 };
 
+// --- (CẬP NHẬT) updateStockAndNotify (Giữ nguyên, nhưng có thể cải thiện sau bằng RPC)
+const updateStockAndNotify = async (product, quantityChange, reason) => {
+    if (!product || !product.id || !product.supplier_id) return;
+
+    const { data: currentProduct, error: fetchError } = await supabase
+        .from('Products')
+        .select('stock, name')
+        .eq('id', product.id)
+        .single();
+
+    if (fetchError || !currentProduct) {
+        throw new Error("Lỗi fetch sản phẩm để cập nhật stock.");
+    }
+
+    const newStock = currentProduct.stock + quantityChange;
+
+    const { error: stockError } = await supabase
+        .from('Products')
+        .update({ stock: newStock })
+        .eq('id', product.id);
+
+    if (stockError) {
+        throw new Error("Lỗi cập nhật số lượng ảo.");
+    }
+
+    const message = `Cập nhật SL: ${reason}. Tour "${product.name}". Thay đổi: ${quantityChange}. SL ảo còn lại: ${newStock}.`;
+
+    const { error: notifyError } = await supabase
+        .from('Notifications')
+        .insert({
+            supplier_id: product.supplier_id,
+            message: message,
+            related_product_id: product.id,
+            is_read: false
+        });
+
+    if (notifyError) {
+        console.error("Lỗi tạo thông báo cho NCC:", notifyError);
+    }
+};
 
 // --- Component chính: Quản lý Khách hàng ---
 export default function ManageBookings() {
@@ -333,34 +512,23 @@ export default function ManageBookings() {
     const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
 
-    // (MỚI) State cho Modals
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [currentBooking, setCurrentBooking] = useState(null); // null = tạo mới
+    const [currentBooking, setCurrentBooking] = useState(null);
     const [bookingToDelete, setBookingToDelete] = useState(null);
     
-    // (MỚI) State cho dữ liệu form
     const [allProducts, setAllProducts] = useState([]);
     const [allUsers, setAllUsers] = useState([]);
 
-
-    // (CẬP NHẬT) Sửa câu select để lấy `supplier_id` và `stock` cho logic số lượng ảo
     const fetchData = useCallback(async () => {
         setLoading(true);
         setError(null);
 
         const { data, error } = await supabase
             .from("Bookings")
-            .select(`
-                id, created_at, quantity, total_price, status, user_id,
-                user:Users ( id, full_name, email ), 
-                main_tour:Products!product_id ( id, name, product_type, supplier_id, stock ),
-                transport_service:Products!transport_product_id ( id, name, product_type, supplier_id, stock ),
-                flight_service:Products!flight_product_id ( id, name, product_type, supplier_id, stock )
-            `)
-            .order('created_at', { ascending: false }); 
+            .select(`${bookingSelect}, user:Users (id, full_name, email)`)
+            .order('created_at', { ascending: false });
 
         if (error) {
-            console.error("Lỗi fetch bookings:", error);
             setError(error.message);
         } else {
             setBookings(data || []);
@@ -372,103 +540,34 @@ export default function ManageBookings() {
         fetchData();
     }, [fetchData]);
 
-    // (MỚI) Fetch dữ liệu cho Modals (Products và Users)
     useEffect(() => {
         const fetchModalData = async () => {
-            // Lấy products (có supplier_id và stock)
             const { data: products } = await supabase
                 .from('Products')
-                .select('id, name, price, stock, supplier_id')
+                .select('id, name, price, stock, supplier_id, product_type')
                 .eq('approval_status', 'approved');
             setAllProducts(products || []);
 
-            // Lấy users
             const { data: users } = await supabase.from('Users').select('id, full_name, email');
             setAllUsers(users || []);
         };
         fetchModalData();
     }, []);
 
-
-    // --- (MỚI) Logic Cốt lõi: Cập nhật số lượng ảo & Thông báo NCC ---
-    const updateStockAndNotify = async (product, quantityChange, reason) => {
-        // quantityChange: số âm (trừ kho), số dương (cộng kho)
-        
-        if (!product || !product.id || !product.supplier_id) {
-            console.error("Thiếu thông tin Product hoặc Supplier để cập nhật stock.", product);
-            return;
-        }
-
-        // 1. Lấy stock hiện tại (để tránh race condition, nên dùng RPC, nhưng tạm thời dùng select + update)
-        const { data: currentProduct, error: fetchError } = await supabase
-            .from('Products')
-            .select('stock, name')
-            .eq('id', product.id)
-            .single();
-
-        if (fetchError || !currentProduct) {
-            console.error("Lỗi fetch sản phẩm để cập nhật stock:", fetchError);
-            alert("Lỗi: Không thể lấy stock sản phẩm.");
-            return;
-        }
-
-        const newStock = (currentProduct.stock || 0) + quantityChange;
-
-        // 2. Cập nhật "số lượng ảo" (stock)
-        const { error: stockError } = await supabase
-            .from('Products')
-            .update({ stock: newStock })
-            .eq('id', product.id);
-        
-        if (stockError) {
-            console.error("Lỗi cập nhật số lượng ảo:", stockError);
-            alert("Lỗi: Cập nhật stock thất bại.");
-            // Không dừng lại, vẫn cố thông báo
-        }
-
-        // 3. Gửi thông báo cho Supplier (Tạo 1 record trong bảng Notifications)
-        // (Giả sử bạn có bảng `Notifications` với các cột: `supplier_id`, `message`, `related_product_id`)
-        const message = `Cập nhật SL: ${reason}. 
-                       Tour "${product.name}". 
-                       Thay đổi: ${quantityChange}. 
-                       SL ảo còn lại: ${newStock}.`;
-        
-        const { error: notifyError } = await supabase
-            .from('Notifications') // Bảng này phải tồn tại trong DB của bạn
-            .insert({
-                supplier_id: product.supplier_id,
-                message: message,
-                related_product_id: product.id,
-                is_read: false
-            });
-
-        if (notifyError) {
-            console.error("Lỗi tạo thông báo cho NCC:", notifyError);
-            // Đây là lỗi không nghiêm trọng, không cần báo user
-        }
-
-        console.log(`Đã cập nhật stock và thông báo cho NCC: ${message}`);
-    };
-
-
-    // (CẬP NHẬT) Sửa hàm handleStatusChange để xử lý logic stock
-    // Giờ đây hàm nhận cả object `booking` thay vì chỉ `bookingId`
+    // (CẬP NHẬT) handleStatusChange
     const handleStatusChange = async (booking, newStatus) => {
-        const oldStatus = booking.status;
-        const product = booking.main_tour; // Tạm thời chỉ xử lý main_tour
-        const quantity = booking.quantity;
+        if (booking.status === newStatus) return;
 
-        // Không làm gì nếu trạng thái không đổi
-        if (oldStatus === newStatus) return;
+        const oldBooking = { ...booking };
+        const newBooking = { ...booking, status: newStatus };
 
-        // Cập nhật UI trước
-        setBookings((prevBookings) =>
-            prevBookings.map((b) =>
-                b.id === booking.id ? { ...b, status: newStatus } : b
-            )
-        );
+        try {
+            await applyStockChanges(oldBooking, newBooking);
+        } catch (e) {
+            alert(e.message);
+            return;
+        }
 
-        // Cập nhật DB
         const { error } = await supabase
             .from("Bookings")
             .update({ status: newStatus })
@@ -476,107 +575,98 @@ export default function ManageBookings() {
 
         if (error) {
             alert("Lỗi cập nhật trạng thái: " + error.message);
-            fetchData(); // Tải lại nếu lỗi
+            fetchData();
             return;
         }
 
-        // --- Logic Số lượng ảo & Thông báo ---
-        try {
-             // Case 1: Xác nhận đơn (Trừ kho)
-            if (newStatus === 'confirmed' && oldStatus !== 'confirmed') {
-                await updateStockAndNotify(product, -quantity, `Booking #${booking.id} Xác nhận`);
-            } 
-            // Case 2: Hủy đơn đã xác nhận (Hoàn kho)
-            else if (newStatus !== 'confirmed' && oldStatus === 'confirmed') {
-                await updateStockAndNotify(product, quantity, `Booking #${booking.id} Hủy/Hoàn`);
-            }
-            // Các trường hợp khác (pending -> cancelled) không ảnh hưởng kho
-        } catch (e) {
-            console.error("Lỗi nghiêm trọng khi xử lý stock/notify:", e);
-            alert("Đã cập nhật trạng thái, nhưng lỗi xử lý số lượng: " + e.message);
-        }
-        // Tải lại danh sách sản phẩm để cập nhật số lượng (stock) trong modal
-        const { data: products } = await supabase.from('Products').select('id, name, price, stock, supplier_id').eq('approval_status', 'approved');
+        setBookings(prev => prev.map(b => b.id === booking.id ? newBooking : b));
+
+        // Refetch allProducts
+        const { data: products } = await supabase
+            .from('Products')
+            .select('id, name, price, stock, supplier_id, product_type')
+            .eq('approval_status', 'approved');
         setAllProducts(products || []);
     };
 
-    // (MỚI) Hàm lưu (Thêm/Sửa) Booking
-    const handleSaveBooking = async (formData) => {
-        // Lưu ý: Logic stock được xử lý riêng qua handleStatusChange (dropdown)
-        // Hàm này chỉ tập trung vào việc tạo/cập nhật booking
-        
-        const dataToSave = {
-            user_id: formData.user_id,
-            product_id: formData.product_id, // Gán vào main_tour
-            quantity: parseInt(formData.quantity, 10),
-            total_price: formData.total_price,
-            status: formData.status,
-            // Đơn giản hóa: null các dịch vụ khác
-            transport_product_id: null,
-            flight_product_id: null,
-        };
-        
-        let error;
-
-        if (formData.id) {
-            // Cập nhật
-            const { error: updateError } = await supabase
+    // (CẬP NHẬT) handleSaveBooking (Thêm oldBooking param)
+    const handleSaveBooking = async (dataToSave, oldBooking) => {
+        let result, dbError;
+        if (dataToSave.id) {
+            result = await supabase
                 .from('Bookings')
                 .update(dataToSave)
-                .eq('id', formData.id);
-            error = updateError;
+                .eq('id', dataToSave.id)
+                .select(bookingSelect);
+            dbError = result.error;
         } else {
-            // Thêm mới
-            const { error: insertError } = await supabase
+            delete dataToSave.id; // Không cần id cho insert
+            result = await supabase
                 .from('Bookings')
-                .insert(dataToSave);
-            error = insertError;
+                .insert(dataToSave)
+                .select(bookingSelect);
+            dbError = result.error;
         }
 
-        if (error) {
-            console.error("Lỗi lưu booking:", error);
-            alert("Lỗi: " + error.message);
-        } else {
-            setIsModalOpen(false); // Đóng modal
-            fetchData(); // Tải lại danh sách
+        if (dbError) {
+            alert("Lỗi lưu booking: " + dbError.message);
+            return;
         }
+
+        const newBookingData = result.data[0];
+
+        try {
+            await applyStockChanges(oldBooking, newBookingData);
+        } catch (e) {
+            alert(e.message);
+            // Có thể revert DB, nhưng tạm thời tải lại
+            fetchData();
+            return;
+        }
+
+        setIsModalOpen(false);
+        fetchData();
+
+        // Refetch allProducts
+        const { data: products } = await supabase
+            .from('Products')
+            .select('id, name, price, stock, supplier_id, product_type')
+            .eq('approval_status', 'approved');
+        setAllProducts(products || []);
     };
 
-    // (MỚI) Hàm Xóa Booking
+    // (CẬP NHẬT) handleDeleteBooking
     const handleDeleteBooking = async (booking) => {
         if (!booking) return;
 
-        // --- Logic Số lượng ảo: Hoàn kho nếu đơn đã 'confirmed' ---
-         try {
-            if (booking.status === 'confirmed' && booking.main_tour) {
-                await updateStockAndNotify(booking.main_tour, booking.quantity, `Booking #${booking.id} Bị Xóa`);
-            }
+        try {
+            await applyStockChanges(booking, null);
         } catch (e) {
-             console.error("Lỗi hoàn stock khi xóa:", e);
-             alert("Lỗi khi hoàn stock: " + e.message + ". Vui lòng kiểm tra thủ công.");
+            alert(e.message);
+            return;
         }
 
-        // Tiến hành xóa booking
         const { error } = await supabase
             .from('Bookings')
             .delete()
             .eq('id', booking.id);
-        
+
         if (error) {
-            console.error("Lỗi xóa booking:", error);
-            alert("Lỗi: " + error.message);
+            alert("Lỗi xóa booking: " + error.message);
         } else {
-            setBookingToDelete(null); // Đóng modal xác nhận
-            fetchData(); // Tải lại danh sách
-            // Tải lại danh sách sản phẩm để cập nhật số lượng (stock) trong modal
-            const { data: products } = await supabase.from('Products').select('id, name, price, stock, supplier_id').eq('approval_status', 'approved');
+            setBookingToDelete(null);
+            fetchData();
+
+            const { data: products } = await supabase
+                .from('Products')
+                .select('id, name, price, stock, supplier_id, product_type')
+                .eq('approval_status', 'approved');
             setAllProducts(products || []);
         }
     };
 
     // --- (Giữ nguyên) Phân tích dữ liệu & Lọc tìm kiếm ---
     const { topCustomers, popularProducts, serviceTypeUsage } = useMemo(() => {
-        // ... (Giữ nguyên logic tính toán)
         const customerStats = {};
         const productStats = {};
         const typeStats = { tour: 0, transport: 0, flight: 0 };
