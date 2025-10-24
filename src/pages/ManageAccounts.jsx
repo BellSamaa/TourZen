@@ -1,12 +1,10 @@
 // src/pages/ManageAccounts.jsx
-// (Đã thêm Pagination và Debounced Search - Sửa lỗi khai báo kép)
+// (Pagination + Debounced Search - Rà soát lại)
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { getSupabase } from "../lib/supabaseClient";
 import toast from 'react-hot-toast';
-import {
-  FaSpinner, FaUsers, FaUserCog, FaBuilding, FaTrash, FaSearch, FaFilter,
-} from "react-icons/fa";
-import { UserList, CaretLeft, CaretRight, CircleNotch, X } from "@phosphor-icons/react"; // <<< Sửa import icon
+import { FaSpinner, FaUsers, FaUserCog, FaBuilding, FaTrash, FaSearch, FaFilter } from "react-icons/fa";
+import { UserList, CaretLeft, CaretRight, CircleNotch, X } from "@phosphor-icons/react";
 
 const supabase = getSupabase();
 
@@ -33,7 +31,7 @@ const getPaginationWindow = (currentPage, totalPages, width = 2) => {
   return finalPages;
 };
 
-// --- Badge + Icon theo vai trò (GIỮ LẠI ĐỊNH NGHĨA Ở ĐÂY) ---
+// --- Badge + Icon theo vai trò ---
 const getRoleStyle = (role) => {
   switch (role) {
     case "admin": return { label: "Admin", icon: <FaUserCog className="text-red-500" />, badge: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300", };
@@ -65,36 +63,49 @@ export default function ManageAccounts() {
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
       let query = supabase.from("Users").select("*", { count: 'exact' });
+
+      // Apply Filters
       if (filterRole !== "all") { query = query.eq('role', filterRole); }
       if (filterActive !== "all") {
           if (filterActive === 'active') { query = query.or('is_active.is.true,is_active.is.null'); }
           else { query = query.eq('is_active', false); }
       }
+      // Apply Search
       if (debouncedSearch.trim() !== "") {
         const searchTerm = `%${debouncedSearch.trim()}%`;
         query = query.or(`full_name.ilike.${searchTerm},email.ilike.${searchTerm},address.ilike.${searchTerm},phone_number.ilike.${searchTerm}`);
       }
+      // Apply Order & Pagination
       query = query.order("created_at", { ascending: false }).range(from, to);
+
       const { data, error: fetchError, count } = await query;
       if (fetchError) throw fetchError;
+
       setCustomers(data || []);
       setTotalItems(count || 0);
-      if (!isInitialLoad && data.length === 0 && count > 0 && currentPage > 1) { setCurrentPage(1); }
+
+      // Go back to page 1 if current page becomes empty (and not initial load)
+      if (!isInitialLoad && data.length === 0 && count > 0 && currentPage > 1) {
+          setCurrentPage(1);
+      }
     } catch (err) {
       console.error("Lỗi fetch tài khoản:", err);
       setError("Không thể tải danh sách tài khoản.");
       toast.error("Lỗi tải danh sách tài khoản.");
+      // Reset state on error
+      setCustomers([]);
+      setTotalItems(0);
     } finally {
       if (isInitialLoad) setLoading(false);
       setIsFetchingPage(false);
     }
-  }, [currentPage, debouncedSearch, filterRole, filterActive]);
+  }, [currentPage, debouncedSearch, filterRole, filterActive]); // Ensure ITEMS_PER_PAGE is constant or included if dynamic
 
   // --- Trigger fetch ---
   useEffect(() => {
       const isInitial = customers.length === 0 && loading;
       fetchCustomers(isInitial);
-  }, [fetchCustomers, customers.length, loading]);
+  }, [fetchCustomers, customers.length, loading]); // Added missing dependencies
 
   // --- Reset page on search/filter ---
   useEffect(() => {
@@ -117,12 +128,20 @@ export default function ManageAccounts() {
       if (error) { toast.error("Lỗi xóa hồ sơ."); }
       else { toast.success(`Đã xóa hồ sơ "${userName}"!`); fetchCustomers(false); }
   };
-  const handleEditUser = async (user) => {
+   const handleEditUser = async (user) => {
       const newName = prompt("Tên mới:", user.full_name || "");
       const newAddress = prompt("Địa chỉ mới:", user.address || "");
       const newPhone = prompt("SĐT mới:", user.phone_number || "");
       if (newName === null && newAddress === null && newPhone === null) return;
-      const updates = { full_name: newName ?? user.full_name, address: newAddress ?? user.address, phone_number: newPhone ?? user.phone_number }; // Use ?? for null check
+      // Use ?? to keep existing value if prompt returns null or empty string
+      const updates = {
+          full_name: newName !== null ? (newName.trim() || user.full_name) : user.full_name,
+          address: newAddress !== null ? (newAddress.trim() || user.address) : user.address,
+          phone_number: newPhone !== null ? (newPhone.trim() || user.phone_number) : user.phone_number
+      };
+      // Only update if there are actual changes
+      if (updates.full_name === user.full_name && updates.address === user.address && updates.phone_number === user.phone_number) return;
+
       setIsFetchingPage(true);
       const { error } = await supabase.from("Users").update(updates).eq("id", user.id);
       setIsFetchingPage(false);
@@ -130,10 +149,12 @@ export default function ManageAccounts() {
       else { toast.success("Cập nhật hồ sơ thành công!"); fetchCustomers(false); }
   };
   const handleToggleActive = async (user) => {
-      const next = user.is_active === false;
+      const next = user.is_active === false; // Handles null/true as active
       const action = next ? "MỞ KHÓA" : "KHÓA";
       if (!window.confirm(`${action} tài khoản "${user.full_name || user.email}"?`)) return;
+      setIsFetchingPage(true); // Show loading
       const { error } = await supabase.from("Users").update({ is_active: next }).eq("id", user.id);
+      setIsFetchingPage(false); // Hide loading
       if (error) { toast.error("Lỗi cập nhật trạng thái."); }
       else { toast.success(`${action} tài khoản thành công!`); fetchCustomers(false); }
   };
@@ -142,10 +163,14 @@ export default function ManageAccounts() {
   const paginationWindow = useMemo(() => getPaginationWindow(currentPage, totalPages, 2), [currentPage, totalPages]);
 
   // --- Loading ban đầu ---
-  if (loading) { /* ... JSX loading ... */ }
-
-  // --- Lỗi ban đầu ---
-  if (error && customers.length === 0) { /* ... JSX lỗi ... */ }
+  if (loading) {
+    return (
+      <div className="flex flex-col justify-center items-center p-24 text-center">
+        <FaSpinner className="animate-spin text-sky-500" size={40} />
+        <p className="text-slate-500 mt-3 font-medium"> Đang tải danh sách tài khoản... </p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 space-y-6 min-h-screen dark:bg-slate-900 dark:text-white">
@@ -214,9 +239,9 @@ export default function ManageAccounts() {
                                     {isLocked && ( <div className="text-xs text-amber-600 dark:text-amber-500 mt-1 font-semibold">Đã khóa</div> )}
                                 </td>
                                 <td className="px-6 py-4 text-center whitespace-nowrap space-x-1">
-                                    <button onClick={() => handleEditUser(c)} className="action-button text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa">✏️</button>
-                                    <button onClick={() => handleToggleActive(c)} className={`action-button ${isLocked ? "text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/30" : "text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700/40"}`} title={isLocked ? "Mở khóa" : "Khóa"}>{isLocked ? "🔓" : "🔒"}</button>
-                                    <button onClick={() => handleDeleteUser(c.id, c.full_name || c.email)} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa"><FaTrash size={14} /></button>
+                                    <button onClick={() => handleEditUser(c)} disabled={isFetchingPage} className="action-button text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa">✏️</button>
+                                    <button onClick={() => handleToggleActive(c)} disabled={isFetchingPage} className={`action-button ${isLocked ? "text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/30" : "text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700/40"}`} title={isLocked ? "Mở khóa" : "Khóa"}>{isLocked ? "🔓" : "🔒"}</button>
+                                    <button onClick={() => handleDeleteUser(c.id, c.full_name || c.email)} disabled={isFetchingPage} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa"><FaTrash size={14} /></button>
                                 </td>
                             </tr>
                         );
@@ -244,7 +269,7 @@ export default function ManageAccounts() {
       <style jsx>{`
         .filter-select { @apply px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-sky-400 outline-none transition appearance-none; }
         .role-select { @apply rounded-lg px-2 py-1 text-sm border-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-1 dark:focus:ring-offset-slate-800 transition appearance-none cursor-pointer disabled:cursor-not-allowed; }
-        .action-button { @apply p-1.5 rounded-lg transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-offset-1 dark:focus:ring-offset-slate-800; }
+        .action-button { @apply p-1.5 rounded-lg transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-offset-1 dark:focus:ring-offset-slate-800 disabled:opacity-50 disabled:cursor-not-allowed; } /* Added disabled styles */
         .pagination-arrow { @apply p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors; }
         .pagination-number { @apply w-8 h-8 rounded-md font-semibold transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed; }
         .pagination-active { @apply bg-sky-600 text-white hover:bg-sky-600 dark:hover:bg-sky-600; }
@@ -254,8 +279,3 @@ export default function ManageAccounts() {
     </div>
   );
 }
-
-// --- XÓA ĐỊNH NGHĨA THỪA Ở ĐÂY ---
-// const useDebounce = (value, delay) => { ... };
-// const getPaginationWindow = (currentPage, totalPages, width = 2) => { ... };
-// const getRoleStyle = (role) => { ... };
