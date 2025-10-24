@@ -1,7 +1,7 @@
 // src/pages/AdminDashboard.jsx
 // (Đã sửa lỗi isActive + Giữ nguyên Lazy Loading & Hiệu ứng)
 
-import React, { Suspense } from 'react'; // <<< Thêm Suspense
+import React, { Suspense } from 'react';
 import { Routes, Route, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -21,7 +21,7 @@ const Reports = React.lazy(() => import('./Reports'));
 
 // --- Component Sidebar (Đã sửa lỗi isActive) ---
 const AdminSidebar = () => {
-    const location = useLocation(); // <<< useLocation để check active path
+    const location = useLocation();
     const navigate = useNavigate();
     const { user, logout } = useAuth();
 
