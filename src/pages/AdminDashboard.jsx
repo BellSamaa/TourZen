@@ -53,8 +53,9 @@ const AdminSidebar = () => {
                         key={item.path}
                         to={item.path}
                         end={item.path === '/admin'}
-                        // <<< SỬA Ở ĐÂY: Dùng function as children >>>
+                        // <<< BỎ prop className ở đây >>>
                     >
+                        {/* <<< Dùng function as children pattern >>> */}
                         {({ isActive }) => ( // <<< Hàm nhận isActive
                             <div // <<< Bọc nội dung trong div để áp style
                                  className={`flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-colors duration-200 group ${
