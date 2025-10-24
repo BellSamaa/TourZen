@@ -38,28 +38,6 @@ import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 import "./index.css";
-
-// Component NotFound
-
-function NotFound() {
-
-  return (
-
-    <div className="flex items-center justify-center min-h-screen text-center">
-
-      <div>
-
-        <h2 className="text-4xl font-bold dark:text-white">404</h2>
-
-        <p className="text-neutral-500 dark:text-neutral-400 mt-2">Không tìm thấy trang bạn yêu cầu.</p>
-
-      </div>
-
-    </div>
-
-  );
-
-}
 // --- (MỚI) Component Layout ---
 // Component này sẽ chứa Navbar, Footer và render các trang con
 const SiteLayout = () => {
