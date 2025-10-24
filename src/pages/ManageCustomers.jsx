@@ -1,7 +1,10 @@
 // ManageCustomersSupabase.jsx
+// (FIXED: Sửa tên bảng thành "Users" và cập nhật tên cột cho khớp CSDL)
+
 import React, { useState, useEffect } from "react";
-import { FaSearch, FaPlus } from "react-icons/fa";
+import { FaSearch, FaPlus, FaEdit, FaTrash } from "react-icons/fa"; // Thêm FaEdit, FaTrash
 import { getSupabase } from "../lib/supabaseClient";
+import toast from 'react-hot-toast'; // <<< Thêm toast
 
 const supabase = getSupabase();
 
@@ -12,13 +15,14 @@ export default function ManageCustomersSupabase() {
 
   // Pagination
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(5);
+  const [pageSize] = useState(5); // Giữ nguyên pageSize nếu muốn
   const [totalPages, setTotalPages] = useState(1);
 
   const [showForm, setShowForm] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [selectedCustomer, setSelectedCustomer] = useState(null); // Lưu trữ user đang sửa/xóa
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [form, setForm] = useState({ TenKH: "", DiaChi: "", Email: "", SDT: "" });
+  // <<< SỬA: State form dùng tên cột mới >>>
+  const [form, setForm] = useState({ full_name: "", address: "", email: "", phone_number: "" });
   const [formError, setFormError] = useState("");
 
   // Fetch customers with pagination
@@ -28,18 +32,22 @@ export default function ManageCustomersSupabase() {
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
 
+      // <<< SỬA: Đổi tên bảng thành "Users" >>>
       let query = supabase
-        .from("KhachHang")
+        .from("Users")
         .select("*", { count: "exact" })
-        .order("MaKH", { ascending: true })
+        // <<< SỬA: Sắp xếp theo cột tồn tại, ví dụ full_name >>>
+        .order("full_name", { ascending: true })
         .range(from, to);
 
       if (search.trim() !== "") {
+        // <<< SỬA: Đổi tên bảng và cột tìm kiếm >>>
         query = supabase
-          .from("KhachHang")
+          .from("Users")
           .select("*", { count: "exact" })
-          .ilike("TenKH", `%${search.trim()}%`)
-          .order("MaKH", { ascending: true })
+          // Tìm kiếm trên nhiều cột hơn
+          .or(`full_name.ilike.%${search.trim()}%,email.ilike.%${search.trim()}%,phone_number.ilike.%${search.trim()}%`)
+          .order("full_name", { ascending: true })
           .range(from, to);
       }
 
@@ -49,7 +57,8 @@ export default function ManageCustomersSupabase() {
       setTotalPages(Math.ceil(count / pageSize) || 1);
     } catch (err) {
       console.error("Lỗi tải danh sách khách hàng:", err);
-      alert("Không thể tải dữ liệu khách hàng.");
+      // <<< SỬA: Dùng toast thay alert >>>
+      toast.error(`Không thể tải dữ liệu khách hàng: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -57,57 +66,87 @@ export default function ManageCustomersSupabase() {
 
   useEffect(() => {
     fetchCustomers();
-  }, [page]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]); // Chỉ fetch lại khi đổi trang
 
   // --- Form ---
   const openForm = (customer = null) => {
     setFormError("");
     if (customer) {
       setSelectedCustomer(customer);
+      // <<< SỬA: Dùng tên cột mới >>>
       setForm({
-        TenKH: customer.TenKH,
-        DiaChi: customer.DiaChi,
-        Email: customer.Email,
-        SDT: customer.SDT,
+        full_name: customer.full_name || '',
+        address: customer.address || '',
+        email: customer.email || '', // Email thường không nên cho sửa ở đây
+        phone_number: customer.phone_number || '',
       });
     } else {
       setSelectedCustomer(null);
-      setForm({ TenKH: "", DiaChi: "", Email: "", SDT: "" });
+      // <<< SỬA: Dùng tên cột mới >>>
+      setForm({ full_name: "", address: "", email: "", phone_number: "" });
     }
     setShowForm(true);
   };
 
   const closeForm = () => {
     setShowForm(false);
-    setSelectedCustomer(null);
+    setSelectedCustomer(null); // Reset selected customer khi đóng form
+    setForm({ full_name: "", address: "", email: "", phone_number: "" }); // Reset form về rỗng
+    setFormError(""); // Xóa lỗi form
   };
 
   const validateForm = () => {
-    if (!form.TenKH.trim()) return "Tên không được trống.";
-    if (!form.DiaChi.trim()) return "Địa chỉ không được trống.";
-    if (!form.Email.trim()) return "Email không được trống.";
-    if (!form.SDT.trim()) return "Số điện thoại không được trống.";
+    // <<< SỬA: Dùng tên cột mới >>>
+    if (!form.full_name?.trim()) return "Tên không được trống.";
+    // Bỏ validate bắt buộc cho các trường khác nếu cần
+    // if (!form.address?.trim()) return "Địa chỉ không được trống.";
+    // if (!form.email?.trim()) return "Email không được trống.";
+    // if (!form.phone_number?.trim()) return "Số điện thoại không được trống.";
     return "";
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
     const err = validateForm();
-    if (err) return setFormError(err);
+    if (err) {
+        setFormError(err);
+        return;
+    }
+    setFormError(""); // Xóa lỗi nếu validate thành công
     try {
+      // <<< SỬA: Tạo object update với tên cột đúng >>>
+      const updateData = {
+          full_name: form.full_name,
+          address: form.address,
+          // Email thường không nên cập nhật trực tiếp ở đây, nó liên quan đến Auth
+          phone_number: form.phone_number,
+      };
+
       if (selectedCustomer) {
-        await supabase
-          .from("KhachHang")
-          .update(form)
-          .eq("MaKH", selectedCustomer.MaKH);
+        // <<< SỬA: Update bảng "Users" theo "id" >>>
+        const { error } = await supabase
+          .from("Users")
+          .update(updateData)
+          .eq("id", selectedCustomer.id); // Dùng cột 'id'
+         if (error) throw error;
+         toast.success("Cập nhật khách hàng thành công!");
       } else {
-        await supabase.from("KhachHang").insert(form);
+        // <<< LƯU Ý: Thêm mới user nên thực hiện qua Supabase Auth (Signup) >>>
+        // Đoạn code insert này sẽ tạo record trong 'Users' nhưng không tạo tài khoản Auth
+        // Nếu bạn muốn tạo user mới hoàn chỉnh, cần gọi hàm signup của Supabase Auth trước
+        toast.warn("Chức năng thêm mới nên được thực hiện qua Đăng ký tài khoản.");
+        // const { error } = await supabase.from("Users").insert(updateData); // Tạm ẩn
+        // if (error) throw error;
+        // toast.success("Thêm khách hàng thành công! (Chưa có tài khoản đăng nhập)");
       }
-      fetchCustomers();
-      closeForm();
+      fetchCustomers(); // Tải lại danh sách
+      closeForm();    // Đóng form
     } catch (err) {
       console.error("Lỗi lưu:", err);
-      setFormError("Không thể lưu dữ liệu.");
+      // <<< SỬA: Hiển thị lỗi cụ thể hơn >>>
+      setFormError(`Không thể lưu dữ liệu: ${err.message}`);
+      toast.error(`Lỗi lưu: ${err.message}`);
     }
   };
 
@@ -116,103 +155,124 @@ export default function ManageCustomersSupabase() {
     setSelectedCustomer(c);
     setShowDeleteConfirm(true);
   };
-  const closeDeleteConfirm = () => setShowDeleteConfirm(false);
+  const closeDeleteConfirm = () => {
+      setSelectedCustomer(null); // Reset selected customer khi đóng confirm
+      setShowDeleteConfirm(false);
+  }
 
   const handleDelete = async () => {
+    if (!selectedCustomer) return;
     try {
-      await supabase.from("KhachHang").delete().eq("MaKH", selectedCustomer.MaKH);
-      fetchCustomers();
-      closeDeleteConfirm();
+      // <<< SỬA: Xóa từ bảng "Users" theo "id" >>>
+      // Lưu ý: Thao tác này chỉ xóa profile trong bảng Users, không xóa tài khoản trong Auth.
+      // Để xóa hoàn toàn user, cần gọi hàm xóa user của Supabase Auth Admin API (cần quyền admin)
+      const { error } = await supabase.from("Users").delete().eq("id", selectedCustomer.id);
+      if (error) throw error;
+      toast.success(`Đã xóa hồ sơ "${selectedCustomer.full_name}"!`);
+      fetchCustomers(); // Tải lại danh sách
+      closeDeleteConfirm(); // Đóng confirm
     } catch (err) {
-      alert("Xóa thất bại: " + err.message);
+      console.error("Lỗi xóa:", err);
+      toast.error(`Xóa thất bại: ${err.message}`);
     }
   };
 
-  // --- Pagination controls ---
+  // --- Pagination controls (Giữ nguyên) ---
   const handlePrev = () => setPage((p) => Math.max(p - 1, 1));
   const handleNext = () => setPage((p) => Math.min(p + 1, totalPages));
 
-  const handleSearch = (e) => {
+  // Kích hoạt tìm kiếm khi nhấn Enter hoặc nút Search
+  const handleSearchSubmit = (e) => {
     e.preventDefault();
-    setPage(1);
+    setPage(1); // Reset về trang 1 khi tìm kiếm
     fetchCustomers();
   };
+  // Tự động tìm kiếm khi người dùng ngừng gõ (debounce)
+   useEffect(() => {
+     const handler = setTimeout(() => {
+       setPage(1); // Reset về trang 1
+       fetchCustomers();
+     }, 500); // Đợi 500ms sau khi ngừng gõ
+     return () => clearTimeout(handler); // Hủy timeout nếu gõ tiếp
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [search]); // Chỉ chạy khi search thay đổi
 
   return (
-    <div className="p-6">
-      <h2 className="text-2xl font-semibold mb-4">Khách hàng</h2>
+    <div className="p-4 sm:p-6 dark:bg-slate-900 dark:text-white min-h-screen">
+      <h2 className="text-2xl font-semibold mb-4">Quản lý Khách hàng (Users)</h2>
 
       {/* --- Thanh tìm kiếm + thêm --- */}
-      <div className="flex items-center mb-4">
-        <form onSubmit={handleSearch} className="flex items-stretch">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Nhập tên khách hàng..."
-            className="border rounded-l-md p-2 w-64"
-          />
-          <button
-            type="submit"
-            className="bg-sky-600 text-white px-3 py-2 rounded-r-md"
-          >
-            <FaSearch />
-          </button>
-        </form>
+      <div className="flex flex-col sm:flex-row items-center justify-between mb-4 gap-3">
+        {/* <<< SỬA: Form tìm kiếm với debounce, không cần nút submit >>> */}
+        <div className="relative w-full sm:w-auto flex-grow sm:flex-grow-0">
+           <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+           <input
+             type="text"
+             value={search}
+             onChange={(e) => setSearch(e.target.value)}
+             placeholder="Tìm tên, email, SĐT..."
+             className="border rounded-md p-2 pl-10 w-full sm:w-72 dark:bg-slate-700 dark:border-slate-600"
+           />
+        </div>
+        {/* <<< Tạm ẩn nút Thêm vì logic thêm user phức tạp hơn >>>
         <button
           onClick={() => openForm()}
-          className="ml-4 bg-green-600 text-white px-3 py-2 rounded flex items-center gap-1"
+          className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded flex items-center gap-1 w-full sm:w-auto justify-center"
         >
-          <FaPlus /> Thêm khách hàng
-        </button>
+          <FaPlus /> Thêm khách hàng (Tạm ẩn)
+        </button> */}
       </div>
 
       {/* --- Bảng dữ liệu --- */}
-      <div className="overflow-x-auto bg-white shadow-md rounded">
-        <table className="w-full border-collapse">
-          <thead className="bg-gray-100">
+      <div className="overflow-x-auto bg-white dark:bg-slate-800 shadow-md rounded-lg border dark:border-slate-700">
+        <table className="w-full border-collapse min-w-[600px]">
+          <thead className="bg-gray-100 dark:bg-slate-700">
             <tr>
-              <th className="p-3 border text-left">#</th>
-              <th className="p-3 border text-left">Tên người đặt</th>
-              <th className="p-3 border text-left">Địa chỉ</th>
-              <th className="p-3 border text-left">Email</th>
-              <th className="p-3 border text-left">SĐT</th>
-              <th className="p-3 border text-center">Hành động</th>
+              <th className="p-3 border dark:border-slate-600 text-left text-xs uppercase font-semibold">#</th>
+              {/* <<< SỬA: Tên cột >>> */}
+              <th className="p-3 border dark:border-slate-600 text-left text-xs uppercase font-semibold">Tên</th>
+              <th className="p-3 border dark:border-slate-600 text-left text-xs uppercase font-semibold">Email</th>
+              <th className="p-3 border dark:border-slate-600 text-left text-xs uppercase font-semibold">Địa chỉ</th>
+              <th className="p-3 border dark:border-slate-600 text-left text-xs uppercase font-semibold">SĐT</th>
+              <th className="p-3 border dark:border-slate-600 text-center text-xs uppercase font-semibold">Hành động</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y dark:divide-slate-700">
             {loading ? (
               <tr>
-                <td colSpan="6" className="text-center py-6 text-gray-500">
+                <td colSpan="6" className="text-center py-6 text-gray-500 dark:text-gray-400">
                   Đang tải...
                 </td>
               </tr>
             ) : customers.length === 0 ? (
               <tr>
-                <td colSpan="6" className="text-center py-6 text-gray-500 italic">
-                  Không có dữ liệu
+                <td colSpan="6" className="text-center py-6 text-gray-500 dark:text-gray-400 italic">
+                  {search ? "Không tìm thấy khách hàng." : "Chưa có dữ liệu."}
                 </td>
               </tr>
             ) : (
               customers.map((c, i) => (
-                <tr key={c.MaKH} className="hover:bg-gray-50">
-                  <td className="p-2 border text-center">{(page - 1) * pageSize + i + 1}</td>
-                  <td className="p-2 border">{c.TenKH}</td>
-                  <td className="p-2 border">{c.DiaChi}</td>
-                  <td className="p-2 border">{c.Email}</td>
-                  <td className="p-2 border">{c.SDT}</td>
-                  <td className="p-2 border text-center">
+                <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 text-sm">
+                  {/* <<< SỬA: Tên cột >>> */}
+                  <td className="p-2 border dark:border-slate-600 text-center text-gray-500">{(page - 1) * pageSize + i + 1}</td>
+                  <td className="p-2 border dark:border-slate-600 font-medium">{c.full_name || <i className="text-gray-400">Chưa có</i>}</td>
+                  <td className="p-2 border dark:border-slate-600">{c.email}</td>
+                  <td className="p-2 border dark:border-slate-600">{c.address || <i className="text-gray-400">Chưa có</i>}</td>
+                  <td className="p-2 border dark:border-slate-600">{c.phone_number || <i className="text-gray-400">Chưa có</i>}</td>
+                  <td className="p-2 border dark:border-slate-600 text-center whitespace-nowrap">
                     <button
                       onClick={() => openForm(c)}
-                      className="bg-blue-500 text-white px-3 py-1 rounded mr-2"
+                      className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-1.5 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 mr-1"
+                      title="Sửa"
                     >
-                      Sửa
+                      <FaEdit />
                     </button>
                     <button
                       onClick={() => openDeleteConfirm(c)}
-                      className="bg-red-500 text-white px-3 py-1 rounded"
+                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30"
+                      title="Xóa hồ sơ"
                     >
-                      Xóa
+                      <FaTrash />
                     </button>
                   </td>
                 </tr>
@@ -223,86 +283,91 @@ export default function ManageCustomersSupabase() {
       </div>
 
       {/* --- Phân trang --- */}
-      <div className="flex justify-center items-center mt-4 gap-2">
-        <button
-          onClick={handlePrev}
-          disabled={page === 1}
-          className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-        >
-          Trang trước
-        </button>
-        {Array.from({ length: totalPages }, (_, i) => (
-          <button
-            key={i + 1}
-            onClick={() => setPage(i + 1)}
-            className={`px-3 py-1 rounded ${
-              page === i + 1
-                ? "bg-sky-600 text-white"
-                : "bg-gray-100 hover:bg-gray-200"
-            }`}
-          >
-            {i + 1}
-          </button>
-        ))}
-        <button
-          onClick={handleNext}
-          disabled={page === totalPages}
-          className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-        >
-          Trang tiếp
-        </button>
-      </div>
+       {!loading && totalItems > pageSize && (
+         <div className="flex justify-center items-center mt-4 gap-2 text-sm">
+             <button
+                 onClick={handlePrev}
+                 disabled={page === 1 || loading}
+                 className="px-3 py-1 bg-gray-200 dark:bg-slate-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+             >
+                 Trang trước
+             </button>
+             {/* Hiển thị số trang linh hoạt hơn nếu cần */}
+             <span className="font-semibold">{page} / {totalPages}</span>
+             <button
+                 onClick={handleNext}
+                 disabled={page === totalPages || loading}
+                 className="px-3 py-1 bg-gray-200 dark:bg-slate-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+             >
+                 Trang tiếp
+             </button>
+         </div>
+       )}
+
 
       {/* --- Modal form --- */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50">
-          <div className="bg-white p-6 rounded shadow w-[400px]">
+        <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-xl w-full max-w-md">
             <h3 className="text-lg font-semibold text-center mb-4">
-              {selectedCustomer ? "Sửa khách hàng" : "Thêm khách hàng"}
+              {selectedCustomer ? "Sửa thông tin khách hàng" : "Thêm khách hàng (Chỉ hồ sơ)"}
             </h3>
             {formError && (
-              <p className="text-sm text-red-600 mb-3">{formError}</p>
+              <p className="text-sm text-red-600 dark:text-red-400 mb-3 bg-red-50 dark:bg-red-900/30 p-2 rounded text-center">{formError}</p>
             )}
-            <form onSubmit={handleSave}>
-              <label className="block text-sm mb-1">Tên khách hàng</label>
-              <input
-                value={form.TenKH}
-                onChange={(e) => setForm({ ...form, TenKH: e.target.value })}
-                className="border p-2 rounded w-full mb-3"
-              />
+            <form onSubmit={handleSave} className="space-y-3">
+              <div>
+                <label className="block text-sm mb-1 font-medium">Tên khách hàng *</label>
+                {/* <<< SỬA: Dùng tên cột mới >>> */}
+                <input
+                  value={form.full_name}
+                  onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                  className="border dark:border-slate-600 p-2 rounded w-full dark:bg-slate-700"
+                  required
+                />
+              </div>
 
-              <label className="block text-sm mb-1">Địa chỉ</label>
-              <input
-                value={form.DiaChi}
-                onChange={(e) => setForm({ ...form, DiaChi: e.target.value })}
-                className="border p-2 rounded w-full mb-3"
-              />
+              <div>
+                <label className="block text-sm mb-1 font-medium">Địa chỉ</label>
+                {/* <<< SỬA: Dùng tên cột mới >>> */}
+                <input
+                  value={form.address}
+                  onChange={(e) => setForm({ ...form, address: e.target.value })}
+                  className="border dark:border-slate-600 p-2 rounded w-full dark:bg-slate-700"
+                />
+              </div>
 
-              <label className="block text-sm mb-1">Email</label>
-              <input
-                value={form.Email}
-                onChange={(e) => setForm({ ...form, Email: e.target.value })}
-                className="border p-2 rounded w-full mb-3"
-              />
+               {/* Email nên được quản lý qua Auth, chỉ hiển thị */}
+               <div>
+                  <label className="block text-sm mb-1 font-medium">Email (Không thể sửa)</label>
+                  <input
+                      value={form.email}
+                      className="border dark:border-slate-600 p-2 rounded w-full dark:bg-slate-700 bg-gray-100 dark:bg-slate-600 cursor-not-allowed"
+                      disabled
+                  />
+              </div>
 
-              <label className="block text-sm mb-1">SĐT</label>
-              <input
-                value={form.SDT}
-                onChange={(e) => setForm({ ...form, SDT: e.target.value })}
-                className="border p-2 rounded w-full mb-4"
-              />
+              <div>
+                <label className="block text-sm mb-1 font-medium">SĐT</label>
+                {/* <<< SỬA: Dùng tên cột mới >>> */}
+                <input
+                  value={form.phone_number}
+                  onChange={(e) => setForm({ ...form, phone_number: e.target.value })}
+                  className="border dark:border-slate-600 p-2 rounded w-full dark:bg-slate-700"
+                />
+              </div>
 
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end gap-2 pt-3">
                 <button
                   type="button"
-                  className="bg-gray-300 px-3 py-1 rounded"
+                  className="bg-gray-300 dark:bg-slate-600 px-4 py-2 rounded font-semibold hover:bg-gray-400 dark:hover:bg-slate-500"
                   onClick={closeForm}
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  className="bg-green-600 text-white px-3 py-1 rounded"
+                  className="bg-green-600 text-white px-4 py-2 rounded font-semibold hover:bg-green-700"
                 >
                   Lưu
                 </button>
@@ -314,27 +379,30 @@ export default function ManageCustomersSupabase() {
 
       {/* --- Modal xác nhận xóa --- */}
       {showDeleteConfirm && selectedCustomer && (
-        <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50">
-          <div className="bg-white p-6 rounded shadow w-[360px] text-center">
+        <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-xl w-full max-w-sm text-center">
             <h4 className="text-lg font-semibold text-red-600 mb-3">
-              Xác nhận xóa
+              Xác nhận xóa hồ sơ
             </h4>
             <p className="mb-4">
-              Bạn có chắc muốn xóa khách hàng{" "}
-              <b>{selectedCustomer.TenKH}</b> không?
+              Bạn có chắc muốn xóa hồ sơ của khách hàng{" "}
+              {/* <<< SỬA: Dùng tên cột mới >>> */}
+              <b>{selectedCustomer.full_name || selectedCustomer.email}</b>?
+              <br/>
+              <span className="text-sm text-orange-600 dark:text-orange-400">(Hành động này không xóa tài khoản đăng nhập.)</span>
             </p>
-            <div className="flex justify-center gap-2">
+            <div className="flex justify-center gap-3">
               <button
-                className="bg-gray-300 px-3 py-1 rounded"
+                className="bg-gray-300 dark:bg-slate-600 px-4 py-2 rounded font-semibold hover:bg-gray-400 dark:hover:bg-slate-500"
                 onClick={closeDeleteConfirm}
               >
                 Hủy
               </button>
               <button
-                className="bg-red-600 text-white px-3 py-1 rounded"
+                className="bg-red-600 text-white px-4 py-2 rounded font-semibold hover:bg-red-700"
                 onClick={handleDelete}
               >
-                Xóa
+                Xóa hồ sơ
               </button>
             </div>
           </div>

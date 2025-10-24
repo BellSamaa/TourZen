@@ -1,6 +1,5 @@
 // src/pages/ManageAccounts.jsx
-// (Pagination + Debounced Search - Rà soát lại)
-// ĐÃ SỬA: Đổi 'full_name' thành 'ten' để khớp với CSDL
+// (FIXED: Sửa lỗi sort 'created_at' và đổi 'ten' thành 'full_name')
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { getSupabase } from "../lib/supabaseClient";
 import toast from 'react-hot-toast';
@@ -9,7 +8,7 @@ import { UserList, CaretLeft, CaretRight, CircleNotch, X } from "@phosphor-icons
 
 const supabase = getSupabase();
 
-// --- Hook Debounce ---
+// --- Hook Debounce (Giữ nguyên) ---
 const useDebounce = (value, delay) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
   useEffect(() => {
@@ -19,7 +18,7 @@ const useDebounce = (value, delay) => {
   return debouncedValue;
 };
 
-// --- Helper Pagination Window ---
+// --- Helper Pagination Window (Giữ nguyên) ---
 const getPaginationWindow = (currentPage, totalPages, width = 2) => {
   if (totalPages <= 1) return [];
   if (totalPages <= 5 + width * 2) { return Array.from({ length: totalPages }, (_, i) => i + 1); }
@@ -32,7 +31,7 @@ const getPaginationWindow = (currentPage, totalPages, width = 2) => {
   return finalPages;
 };
 
-// --- Badge + Icon theo vai trò ---
+// --- Badge + Icon theo vai trò (Giữ nguyên) ---
 const getRoleStyle = (role) => {
   switch (role) {
     case "admin": return { label: "Admin", icon: <FaUserCog className="text-red-500" />, badge: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300", };
@@ -74,11 +73,12 @@ export default function ManageAccounts() {
       // Apply Search
       if (debouncedSearch.trim() !== "") {
         const searchTerm = `%${debouncedSearch.trim()}%`;
-        // SỬA 1: Đổi 'full_name' thành 'ten'
-        query = query.or(`ten.ilike.${searchTerm},email.ilike.${searchTerm},address.ilike.${searchTerm},phone_number.ilike.${searchTerm}`);
+        // <<< SỬA 1: Đổi 'ten' thành 'full_name' >>>
+        query = query.or(`full_name.ilike.${searchTerm},email.ilike.${searchTerm},address.ilike.${searchTerm},phone_number.ilike.${searchTerm}`);
       }
       // Apply Order & Pagination
-      query = query.order("created_at", { ascending: false }).range(from, to);
+      // <<< SỬA 2: Đổi 'created_at' thành 'full_name' >>>
+      query = query.order("full_name", { ascending: true }).range(from, to); // Sắp xếp theo tên
 
       const { data, error: fetchError, count } = await query;
       if (fetchError) throw fetchError;
@@ -92,8 +92,10 @@ export default function ManageAccounts() {
       }
     } catch (err) {
       console.error("Lỗi fetch tài khoản:", err);
-      setError("Không thể tải danh sách tài khoản.");
-      toast.error("Lỗi tải danh sách tài khoản.");
+      // <<< SỬA: Hiển thị lỗi cụ thể hơn nếu có thể >>>
+      const errorMsg = err.message || "Không thể tải danh sách tài khoản.";
+      setError(errorMsg);
+      toast.error(`Lỗi tải danh sách: ${errorMsg}`);
       // Reset state on error
       setCustomers([]);
       setTotalItems(0);
@@ -101,15 +103,15 @@ export default function ManageAccounts() {
       if (isInitialLoad) setLoading(false);
       setIsFetchingPage(false);
     }
-  }, [currentPage, debouncedSearch, filterRole, filterActive]); // Ensure ITEMS_PER_PAGE is constant or included if dynamic
+  }, [currentPage, debouncedSearch, filterRole, filterActive]);
 
-  // --- Trigger fetch ---
+  // --- Trigger fetch (Giữ nguyên) ---
   useEffect(() => {
       const isInitial = customers.length === 0 && loading;
       fetchCustomers(isInitial);
-  }, [fetchCustomers, customers.length, loading]); // Added missing dependencies
+  }, [fetchCustomers, customers.length, loading]);
 
-  // --- Reset page on search/filter ---
+  // --- Reset page on search/filter (Giữ nguyên) ---
   useEffect(() => {
       if (currentPage !== 1) { setCurrentPage(1); }
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -123,7 +125,7 @@ export default function ManageAccounts() {
       else { toast.success("Cập nhật vai trò thành công!"); fetchCustomers(false); }
   };
   const handleDeleteUser = async (userId, userName) => {
-      // SỬA 2: Lấy 'userName' từ c.ten
+      // <<< SỬA 3: Lấy 'userName' từ tham số (đã truyền full_name) >>>
       if (!window.confirm(`XÓA HỒ SƠ "${userName}"?\n(Chỉ xóa hồ sơ.)`)) return;
       setIsFetchingPage(true);
       const { error } = await supabase.from("Users").delete().eq("id", userId);
@@ -132,21 +134,20 @@ export default function ManageAccounts() {
       else { toast.success(`Đã xóa hồ sơ "${userName}"!`); fetchCustomers(false); }
   };
    const handleEditUser = async (user) => {
-      // SỬA 3: Lấy tên từ 'user.ten'
-      const newName = prompt("Tên mới:", user.ten || "");
+      // <<< SỬA 4: Lấy tên từ 'user.full_name' >>>
+      const newName = prompt("Tên mới:", user.full_name || "");
       const newAddress = prompt("Địa chỉ mới:", user.address || "");
       const newPhone = prompt("SĐT mới:", user.phone_number || "");
       if (newName === null && newAddress === null && newPhone === null) return;
-      // Use ?? to keep existing value if prompt returns null or empty string
+
       const updates = {
-          // SỬA 4: Cập nhật cột 'ten'
-          ten: newName !== null ? (newName.trim() || user.ten) : user.ten,
+          // <<< SỬA 5: Cập nhật cột 'full_name' >>>
+          full_name: newName !== null ? (newName.trim() || user.full_name) : user.full_name,
           address: newAddress !== null ? (newAddress.trim() || user.address) : user.address,
           phone_number: newPhone !== null ? (newPhone.trim() || user.phone_number) : user.phone_number
       };
-      // Only update if there are actual changes
-      // SỬA 5: Kiểm tra 'updates.ten'
-      if (updates.ten === user.ten && updates.address === user.address && updates.phone_number === user.phone_number) return;
+      // <<< SỬA 6: Kiểm tra 'updates.full_name' >>>
+      if (updates.full_name === user.full_name && updates.address === user.address && updates.phone_number === user.phone_number) return;
 
       setIsFetchingPage(true);
       const { error } = await supabase.from("Users").update(updates).eq("id", user.id);
@@ -157,8 +158,8 @@ export default function ManageAccounts() {
   const handleToggleActive = async (user) => {
       const next = user.is_active === false; // Handles null/true as active
       const action = next ? "MỞ KHÓA" : "KHÓA";
-      // SỬA 6: Lấy tên từ 'user.ten'
-      if (!window.confirm(`${action} tài khoản "${user.ten || user.email}"?`)) return;
+      // <<< SỬA 7: Lấy tên từ 'user.full_name' >>>
+      if (!window.confirm(`${action} tài khoản "${user.full_name || user.email}"?`)) return;
       setIsFetchingPage(true); // Show loading
       const { error } = await supabase.from("Users").update({ is_active: next }).eq("id", user.id);
       setIsFetchingPage(false); // Hide loading
@@ -166,10 +167,10 @@ export default function ManageAccounts() {
       else { toast.success(`${action} tài khoản thành công!`); fetchCustomers(false); }
   };
 
-  // --- Pagination Window ---
+  // --- Pagination Window (Giữ nguyên) ---
   const paginationWindow = useMemo(() => getPaginationWindow(currentPage, totalPages, 2), [currentPage, totalPages]);
 
-  // --- Loading ban đầu ---
+  // --- Loading ban đầu (Giữ nguyên) ---
   if (loading) {
     return (
       <div className="flex flex-col justify-center items-center p-24 text-center">
@@ -179,6 +180,7 @@ export default function ManageAccounts() {
     );
   }
 
+  // --- JSX (Sửa lỗi hiển thị tên) ---
   return (
     <div className="p-4 sm:p-6 space-y-6 min-h-screen dark:bg-slate-900 dark:text-white">
       {/* Tiêu đề */}
@@ -223,7 +225,8 @@ export default function ManageAccounts() {
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
-                    {error && !isFetchingPage && ( <tr><td colSpan="7" className="p-8 text-center text-red-500">{error}</td></tr> )}
+                    {/* <<< SỬA: Hiển thị lỗi cụ thể hơn >>> */}
+                    {error && !isFetchingPage && ( <tr><td colSpan="7" className="p-8 text-center text-red-500">{typeof error === 'string' ? error : error.message}</td></tr> )}
                     {!error && loading && customers.length === 0 && ( <tr><td colSpan="7" className="p-8 text-center"><FaSpinner className="animate-spin text-2xl mx-auto text-sky-500" /></td></tr> )}
                     {!error && !loading && !isFetchingPage && customers.length === 0 && ( <tr><td colSpan="7" className="p-8 text-center text-gray-500 italic">{debouncedSearch || filterRole !== 'all' || filterActive !== 'all' ? "Không tìm thấy tài khoản." : "Chưa có dữ liệu."}</td></tr> )}
                     {!error && customers.map((c, index) => {
@@ -232,8 +235,8 @@ export default function ManageAccounts() {
                         return (
                             <tr key={c.id} className={`hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors ${isLocked ? "opacity-60 bg-red-50 dark:bg-red-900/10" : ""}`} >
                                 <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</td>
-                                {/* SỬA 7: Hiển thị 'c.ten' */}
-                                <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">{c.ten || <span className="italic text-gray-400">Chưa cập nhật</span>}</td>
+                                {/* <<< SỬA 8: Hiển thị 'c.full_name' >>> */}
+                                <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">{c.full_name || <span className="italic text-gray-400">Chưa cập nhật</span>}</td>
                                 <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.email}</td>
                                 <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.address || <span className="italic text-gray-400">Chưa có</span>}</td>
                                 <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.phone_number || <span className="italic text-gray-400">Chưa có</span>}</td>
@@ -249,8 +252,8 @@ export default function ManageAccounts() {
                                 <td className="px-6 py-4 text-center whitespace-nowrap space-x-1">
                                     <button onClick={() => handleEditUser(c)} disabled={isFetchingPage} className="action-button text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa">✏️</button>
                                     <button onClick={() => handleToggleActive(c)} disabled={isFetchingPage} className={`action-button ${isLocked ? "text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/30" : "text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700/40"}`} title={isLocked ? "Mở khóa" : "Khóa"}>{isLocked ? "🔓" : "🔒"}</button>
-                                    {/* SỬA 8: Truyền 'c.ten' vào hàm delete */}
-                                    <button onClick={() => handleDeleteUser(c.id, c.ten || c.email)} disabled={isFetchingPage} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa"><FaTrash size={14} /></button>
+                                    {/* <<< SỬA 9: Truyền 'c.full_name' vào hàm delete >>> */}
+                                    <button onClick={() => handleDeleteUser(c.id, c.full_name || c.email)} disabled={isFetchingPage} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa"><FaTrash size={14} /></button>
                                 </td>
                             </tr>
                         );
@@ -260,7 +263,7 @@ export default function ManageAccounts() {
          </div>
       </div>
 
-       {/* Pagination UI */}
+       {/* Pagination UI (Giữ nguyên) */}
       {!loading && totalItems > ITEMS_PER_PAGE && (
           <div className="flex flex-col sm:flex-row justify-between items-center mt-6 text-sm text-gray-600 dark:text-gray-400">
               <div> Hiển thị <span className="font-semibold dark:text-white">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> - <span className="font-semibold dark:text-white">{Math.min(currentPage * ITEMS_PER_PAGE, totalItems)}</span> / <span className="font-semibold dark:text-white">{totalItems}</span> tài khoản </div>
@@ -274,11 +277,11 @@ export default function ManageAccounts() {
           </div>
       )}
 
-      {/* CSS */}
+      {/* CSS (Giữ nguyên) */}
       <style jsx>{`
         .filter-select { @apply px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-sky-400 outline-none transition appearance-none; }
         .role-select { @apply rounded-lg px-2 py-1 text-sm border-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-1 dark:focus:ring-offset-slate-800 transition appearance-none cursor-pointer disabled:cursor-not-allowed; }
-        .action-button { @apply p-1.5 rounded-lg transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-offset-1 dark:focus:ring-offset-slate-800 disabled:opacity-50 disabled:cursor-not-allowed; } /* Added disabled styles */
+        .action-button { @apply p-1.5 rounded-lg transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-offset-1 dark:focus:ring-offset-slate-800 disabled:opacity-50 disabled:cursor-not-allowed; }
         .pagination-arrow { @apply p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors; }
         .pagination-number { @apply w-8 h-8 rounded-md font-semibold transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed; }
         .pagination-active { @apply bg-sky-600 text-white hover:bg-sky-600 dark:hover:bg-sky-600; }
