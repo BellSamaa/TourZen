@@ -1,225 +1,195 @@
 // src/pages/ManageAccounts.jsx
-// (Nội dung file ManageCustomers.jsx mới của bạn)
-import React, { useState, useEffect, useMemo } from "react";
+// (Đã thêm Pagination và Debounced Search)
+import React, { useState, useEffect, useMemo, useCallback } from "react"; // <<< Thêm useCallback
 import { getSupabase } from "../lib/supabaseClient";
+import toast from 'react-hot-toast'; // <<< Thêm toast
 import {
-  FaSpinner,
-  FaUsers,
-  FaUserCog,
-  FaBuilding,
-  FaTrash,
-  FaSearch,
-  FaFilter,
+  FaSpinner, FaUsers, FaUserCog, FaBuilding, FaTrash, FaSearch, FaFilter,
 } from "react-icons/fa";
-import { UserList } from "@phosphor-icons/react";
+import { UserList, CaretLeft, CaretRight } from "@phosphor-icons/react"; // <<< Thêm CaretLeft, CaretRight
 
 const supabase = getSupabase();
 
-// --- Badge + Icon theo vai trò ---
-const getRoleStyle = (role) => {
-  switch (role) {
-    case "admin":
-      return {
-        label: "Admin",
-        icon: <FaUserCog className="text-red-500" />,
-        badge: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
-      };
-    case "supplier":
-      return {
-        label: "Supplier",
-        icon: <FaBuilding className="text-blue-500" />,
-        badge:
-          "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
-      };
-    case "user":
-    default:
-      return {
-        label: "User",
-        icon: <FaUsers className="text-green-500" />,
-        badge:
-          "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
-      };
-  }
+// --- (MỚI) Hook Debounce ---
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => { setDebouncedValue(value); }, delay);
+    return () => { clearTimeout(handler); };
+  }, [value, delay]);
+  return debouncedValue;
 };
 
-export default function ManageAccounts() { // <<< Đổi tên component
+// --- (MỚI) Helper Pagination Window ---
+const getPaginationWindow = (currentPage, totalPages, width = 2) => {
+  if (totalPages <= 1) return [];
+  if (totalPages <= 5 + width * 2) { return Array.from({ length: totalPages }, (_, i) => i + 1); }
+  const pages = new Set([1]);
+  for (let i = Math.max(2, currentPage - width); i <= Math.min(totalPages - 1, currentPage + width); i++) { pages.add(i); }
+  pages.add(totalPages);
+  const sortedPages = [...pages].sort((a, b) => a - b);
+  const finalPages = []; let lastPage = 0;
+  for (const page of sortedPages) { if (lastPage !== 0 && page - lastPage > 1) { finalPages.push("..."); } finalPages.push(page); lastPage = page; }
+  return finalPages;
+};
+
+
+// --- Badge + Icon theo vai trò (Giữ nguyên) ---
+const getRoleStyle = (role) => { /* ... code ... */ };
+
+
+export default function ManageAccounts() {
   const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Loading cho lần tải đầu
+  const [isFetchingPage, setIsFetchingPage] = useState(false); // Loading khi chuyển trang/search/filter
   const [error, setError] = useState(null);
+
+  // --- Search & Filter ---
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 400); // <<< Dùng debounce
   const [filterRole, setFilterRole] = useState("all");
-  const [filterActive, setFilterActive] = useState("all"); // all | active | inactive
+  const [filterActive, setFilterActive] = useState("all");
 
-  async function fetchCustomers() {
-    setLoading(true);
+  // --- (MỚI) Pagination State ---
+  const ITEMS_PER_PAGE = 15; // <<< Số lượng tài khoản mỗi trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
+
+  // --- (CẬP NHẬT) Fetch data với Pagination & Search/Filter ---
+  const fetchCustomers = useCallback(async (isInitialLoad = false) => {
+    if (!isInitialLoad) setIsFetchingPage(true); // Bật loading chuyển trang
     setError(null);
-    const { data, error: fetchError } = await supabase
-      .from("Users")
-      .select("*")
-      .order("full_name", { ascending: true });
+    try {
+      const from = (currentPage - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
 
-    if (fetchError) {
-      console.error("Lỗi fetch khách hàng:", fetchError);
-      setError("Không thể tải danh sách khách hàng: " + fetchError.message);
-    } else {
+      let query = supabase
+        .from("Users")
+        .select("*", { count: 'exact' }); // <<< Lấy count
+
+      // --- Áp dụng Filter ---
+      if (filterRole !== "all") {
+          query = query.eq('role', filterRole);
+      }
+      if (filterActive !== "all") {
+          // Xử lý giá trị null/undefined cho is_active (coi như là active)
+          if (filterActive === 'active') {
+              query = query.or('is_active.is.true,is_active.is.null');
+          } else { // inactive
+              query = query.eq('is_active', false);
+          }
+      }
+
+      // --- Áp dụng Search (sau filter) ---
+      if (debouncedSearch.trim() !== "") {
+        const searchTerm = `%${debouncedSearch.trim()}%`;
+        // Tìm kiếm trên nhiều cột
+        query = query.or(`full_name.ilike.${searchTerm},email.ilike.${searchTerm},address.ilike.${searchTerm},phone_number.ilike.${searchTerm}`);
+      }
+
+      // --- Sắp xếp & Phân trang ---
+      query = query
+        .order("created_at", { ascending: false }) // <<< Sắp xếp theo ngày tạo mới nhất
+        .range(from, to); // <<< Phân trang
+
+      const { data, error: fetchError, count } = await query;
+
+      if (fetchError) throw fetchError;
+
       setCustomers(data || []);
-    }
-    setLoading(false);
-  }
+      setTotalItems(count || 0);
 
+      // Tự động về trang 1 nếu trang hiện tại không còn dữ liệu
+      // Chỉ thực hiện nếu không phải lần tải đầu tiên để tránh vòng lặp vô hạn
+      if (!isInitialLoad && data.length === 0 && count > 0 && currentPage > 1) {
+          setCurrentPage(1); // Sẽ trigger fetch lại ở useEffect dưới
+      }
+
+    } catch (err) {
+      console.error("Lỗi fetch tài khoản:", err);
+      setError("Không thể tải danh sách tài khoản.");
+      toast.error("Lỗi tải danh sách tài khoản.");
+    } finally {
+      if (isInitialLoad) setLoading(false); // Tắt loading ban đầu
+      setIsFetchingPage(false); // Tắt loading chuyển trang
+    }
+  // <<< Dependencies: các state ảnh hưởng đến query >>>
+  }, [currentPage, debouncedSearch, filterRole, filterActive]);
+
+  // --- Trigger fetch khi dependencies thay đổi ---
   useEffect(() => {
-    fetchCustomers();
-  }, []);
+      // Xác định xem đây có phải là lần tải đầu tiên không
+      const isInitial = customers.length === 0 && loading;
+      fetchCustomers(isInitial);
+  }, [fetchCustomers, customers.length, loading]); // Thêm dependencies mới
 
+  // --- (MỚI) Reset về trang 1 khi search/filter thay đổi ---
+  useEffect(() => {
+      if (currentPage !== 1) {
+          setCurrentPage(1);
+      }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, filterRole, filterActive]); // Chỉ reset khi search/filter thay đổi
+
+
+  // --- Các hàm xử lý khác (Cập nhật để gọi fetchCustomers) ---
   const handleRoleChange = async (customerId, currentRole, newRole) => {
-    if (
-      !window.confirm(
-        `Bạn có chắc muốn đổi vai trò từ '${currentRole}' thành '${newRole}'?`
-      )
-    ) {
-      setCustomers(
-        customers.map((c) =>
-          c.id === customerId ? { ...c, role: currentRole } : c
-        )
-      );
-      return;
-    }
-
-    setCustomers(
-      customers.map((c) => (c.id === customerId ? { ...c, role: newRole } : c))
-    );
-
-    const { error } = await supabase
-      .from("Users")
-      .update({ role: newRole })
-      .eq("id", customerId);
-
-    if (error) {
-      alert("Lỗi cập nhật vai trò: " + error.message);
-      fetchCustomers();
-    } else {
-      alert("Cập nhật vai trò thành công!");
-    }
+      if (!window.confirm(`Đổi vai trò từ '${currentRole}' thành '${newRole}'?`)) return;
+      // Optimistic UI (tùy chọn)
+      const { error } = await supabase.from("Users").update({ role: newRole }).eq("id", customerId);
+      if (error) { toast.error("Lỗi cập nhật vai trò."); /* Realtime sẽ xử lý rollback */ }
+      else { toast.success("Cập nhật vai trò thành công!"); fetchCustomers(false); /* Fetch lại trang hiện tại */ }
   };
-
   const handleDeleteUser = async (userId, userName) => {
-    if (
-      !window.confirm(
-        `XÓA HỒ SƠ NGƯỜI DÙNG?\nBạn có chắc muốn xóa "${userName}"?\n(Hành động này chỉ xóa hồ sơ, không xóa tài khoản đăng nhập.)`
-      )
-    )
-      return;
-
-    setLoading(true);
-    const { error: deleteProfileError } = await supabase
-      .from("Users")
-      .delete()
-      .eq("id", userId);
-
-    if (deleteProfileError) {
-      alert("Lỗi khi xóa hồ sơ: " + deleteProfileError.message);
-    } else {
-      alert(`Đã xóa hồ sơ người dùng "${userName}"!`);
-      fetchCustomers();
-    }
-    setLoading(false);
+      if (!window.confirm(`XÓA HỒ SƠ "${userName}"?\n(Chỉ xóa hồ sơ, không xóa tài khoản đăng nhập.)`)) return;
+      setIsFetchingPage(true); // Hiện loading
+      const { error } = await supabase.from("Users").delete().eq("id", userId);
+      setIsFetchingPage(false); // Tắt loading
+      if (error) { toast.error("Lỗi xóa hồ sơ."); }
+      else { toast.success(`Đã xóa hồ sơ "${userName}"!`); fetchCustomers(false); /* Fetch lại trang hiện tại */}
   };
-
-  // --- Chỉnh sửa hồ sơ (nhanh bằng prompt) ---
   const handleEditUser = async (user) => {
-    const newName = prompt("Nhập tên mới:", user.full_name || "");
-    const newAddress = prompt("Nhập địa chỉ mới:", user.address || "");
-    const newPhone = prompt("Nhập số điện thoại mới:", user.phone_number || "");
-
-    if (newName === null && newAddress === null && newPhone === null) return;
-
-    const updates = {
-      full_name: newName || user.full_name,
-      address: newAddress || user.address,
-      phone_number: newPhone || user.phone_number,
-    };
-
-    const { error } = await supabase
-      .from("Users")
-      .update(updates)
-      .eq("id", user.id);
-
-    if (error) {
-      alert("Lỗi khi cập nhật hồ sơ: " + error.message);
-    } else {
-      alert("Cập nhật hồ sơ thành công!");
-      fetchCustomers();
-    }
+      const newName = prompt("Tên mới:", user.full_name || "");
+      const newAddress = prompt("Địa chỉ mới:", user.address || "");
+      const newPhone = prompt("SĐT mới:", user.phone_number || "");
+      if (newName === null && newAddress === null && newPhone === null) return;
+      const updates = { full_name: newName || user.full_name, address: newAddress || user.address, phone_number: newPhone || user.phone_number };
+      setIsFetchingPage(true); // Hiện loading
+      const { error } = await supabase.from("Users").update(updates).eq("id", user.id);
+      setIsFetchingPage(false); // Tắt loading
+      if (error) { toast.error("Lỗi cập nhật hồ sơ."); }
+      else { toast.success("Cập nhật hồ sơ thành công!"); fetchCustomers(false); /* Fetch lại trang hiện tại */}
   };
-
-  // --- Khóa / Mở khóa tài khoản ---
   const handleToggleActive = async (user) => {
-    // Mặc định is_active là null hoặc true, nên !user.is_active sẽ thành false
-    // Nếu user.is_active là false, !user.is_active sẽ thành true
-    const next = user.is_active === false ? true : false; 
-    const action = next ? "MỞ KHÓA" : "KHÓA";
-    if (
-      !window.confirm(`${action} tài khoản "${user.full_name || user.email}"?`)
-    )
-      return;
-
-    // Optimistic UI
-    setCustomers((prev) =>
-      prev.map((c) => (c.id === user.id ? { ...c, is_active: next } : c))
-    );
-
-    const { error } = await supabase
-      .from("Users")
-      .update({ is_active: next })
-      .eq("id", user.id);
-
-    if (error) {
-      alert("Lỗi cập nhật trạng thái: " + error.message);
-      fetchCustomers(); // rollback
-    } else {
-      alert(`${action} tài khoản thành công!`);
-    }
+      const next = user.is_active === false;
+      const action = next ? "MỞ KHÓA" : "KHÓA";
+      if (!window.confirm(`${action} tài khoản "${user.full_name || user.email}"?`)) return;
+      // Optimistic UI (tùy chọn)
+      const { error } = await supabase.from("Users").update({ is_active: next }).eq("id", user.id);
+      if (error) { toast.error("Lỗi cập nhật trạng thái."); /* Realtime sẽ xử lý rollback */ }
+      else { toast.success(`${action} tài khoản thành công!`); fetchCustomers(false); /* Fetch lại trang hiện tại */}
   };
 
-  // --- Bộ lọc & tìm kiếm (mở rộng: address, phone_number, is_active) ---
-  const filteredCustomers = useMemo(() => {
-    const q = search.toLowerCase();
-    return customers.filter((c) => {
-      const matchSearch =
-        c.full_name?.toLowerCase().includes(q) ||
-        c.email?.toLowerCase().includes(q) ||
-        c.address?.toLowerCase().includes(q) ||
-        c.phone_number?.toLowerCase?.().includes(q) || 
-        (typeof c.phone_number === "number" &&
-          String(c.phone_number).includes(search));
 
-      const matchRole = filterRole === "all" ? true : c.role === filterRole;
+  // --- Pagination Window ---
+  const paginationWindow = useMemo(
+      () => getPaginationWindow(currentPage, totalPages, 2),
+      [currentPage, totalPages]
+  );
 
-      const matchActive =
-        filterActive === "all"
-          ? true
-          : filterActive === "active"
-          ? c.is_active !== false // true hoặc undefined (dữ liệu cũ)
-          : c.is_active === false; // inactive
-
-      return matchSearch && matchRole && matchActive;
-    });
-  }, [customers, search, filterRole, filterActive]);
-
-  // --- Loading ---
-  if (loading && customers.length === 0) {
+  // --- Loading ban đầu ---
+  if (loading) { // Chỉ hiện loading toàn trang khi tải lần đầu
     return (
       <div className="flex flex-col justify-center items-center p-24 text-center">
         <FaSpinner className="animate-spin text-sky-500" size={40} />
-        <p className="text-slate-500 mt-3 font-medium">
-          Đang tải danh sách tài khoản...
-        </p>
+        <p className="text-slate-500 mt-3 font-medium"> Đang tải danh sách tài khoản... </p>
       </div>
     );
   }
 
-  // --- Error ---
-  if (error) {
+  // --- Lỗi ---
+  if (error && customers.length === 0) { // Chỉ hiện lỗi toàn trang nếu không có data nào
     return (
       <div className="max-w-2xl mx-auto mt-10 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 p-6 rounded-xl text-center shadow-md">
         {error}
@@ -228,166 +198,153 @@ export default function ManageAccounts() { // <<< Đổi tên component
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6 min-h-screen dark:bg-slate-900 dark:text-white">
       {/* --- Tiêu đề --- */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
           <UserList size={30} weight="duotone" className="text-sky-600" />
           Quản lý Tài khoản
         </h1>
       </div>
 
       {/* --- Thanh tìm kiếm và lọc --- */}
-      <div className="flex flex-wrap items-center gap-3 bg-white dark:bg-slate-800 p-4 rounded-xl shadow border border-gray-200 dark:border-slate-700">
-        <div className="relative flex-1 min-w-[250px]">
-          <FaSearch className="absolute left-3 top-3 text-gray-400" />
+      <div className="flex flex-col md:flex-row items-center gap-3 bg-white dark:bg-slate-800 p-4 rounded-xl shadow border border-gray-200 dark:border-slate-700">
+        {/* Input Search */}
+        <div className="relative flex-grow w-full md:w-auto"> {/* <<< Thêm flex-grow */}
+          <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" /> {/* <<< Sửa top-3 thành top-1/2 -translate-y-1/2 */}
           <input
             type="text"
-            placeholder="Tìm theo tên, email, địa chỉ hoặc SĐT..."
+            placeholder="Tìm theo tên, email, địa chỉ, SĐT..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-sky-400 outline-none transition"
           />
         </div>
-
-        <div className="flex items-center gap-2">
-          <FaFilter className="text-gray-400" />
-          <select
-            value={filterRole}
-            onChange={(e) => setFilterRole(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-sky-400 outline-none transition"
-          >
-            <option value="all">Tất cả vai trò</option>
-            <option value="user">User</option>
-            <option value="supplier">Supplier</option>
-            <option value="admin">Admin</option>
+        {/* Filters */}
+        <div className="flex items-center gap-2 w-full md:w-auto flex-shrink-0"> {/* <<< Thêm flex-shrink-0 */}
+          <FaFilter className="text-gray-400 hidden sm:block" /> {/* <<< Ẩn icon trên mobile */}
+          <select value={filterRole} onChange={(e) => setFilterRole(e.target.value)} className="filter-select">
+            <option value="all">Tất cả vai trò</option> <option value="user">User</option> <option value="supplier">Supplier</option> <option value="admin">Admin</option>
           </select>
-
-          {/* Lọc theo trạng thái */}
-          <select
-            value={filterActive}
-            onChange={(e) => setFilterActive(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-sky-400 outline-none transition"
-          >
-            <option value="all">Tất cả trạng thái</option>
-            <option value="active">Đang hoạt động</option>
-            <option value="inactive">Đã khóa</option>
+          <select value={filterActive} onChange={(e) => setFilterActive(e.target.value)} className="filter-select">
+            <option value="all">Tất cả trạng thái</option> <option value="active">Hoạt động</option> <option value="inactive">Đã khóa</option>
           </select>
         </div>
       </div>
 
       {/* --- Bảng khách hàng --- */}
       <div className="bg-white dark:bg-slate-800 shadow-lg rounded-xl overflow-hidden border border-gray-200 dark:border-slate-700">
-         <div className="overflow-x-auto">
+         <div className="overflow-x-auto relative">
+             {/* <<< Loading overlay >>> */}
+            {isFetchingPage && (
+                <div className="absolute inset-0 bg-white/70 dark:bg-slate-800/70 flex items-center justify-center z-10">
+                    <FaSpinner className="animate-spin text-sky-500 text-3xl" />
+                </div>
+            )}
             <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
-            <thead className="bg-gray-50 dark:bg-slate-700/40">
-                <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">
-                    Tên đầy đủ
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">
-                    Email
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">
-                    Địa chỉ
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">
-                    Số điện thoại
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">
-                    Vai trò
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">
-                    Hành động
-                </th>
-                </tr>
-            </thead>
-
-            <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
-                {filteredCustomers.map((c) => {
-                const role = getRoleStyle(c.role);
-                const isLocked = c.is_active === false;
-                return (
-                    <tr
-                    key={c.id}
-                    className={`hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors ${isLocked ? "opacity-60 bg-red-50 dark:bg-red-900/10" : ""}`}
-                    >
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                        {c.full_name || <span className="italic text-gray-400">Chưa cập nhật</span>}
-                    </td>
-
-                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
-                        {c.email}
-                    </td>
-
-                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
-                        {c.address && c.address.trim() !== "" ? c.address : <span className="italic text-gray-400">Chưa có</span>}
-                    </td>
-
-                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
-                        {c.phone_number && String(c.phone_number).trim() !== "" ? String(c.phone_number) : <span className="italic text-gray-400">Chưa có</span>}
-                    </td>
-
-                    <td className="px-6 py-4 text-sm whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                        {role.icon}
-                        <select
-                            value={c.role}
-                            onChange={(e) => handleRoleChange(c.id, c.role, e.target.value)}
-                            disabled={isLocked}
-                            className={`rounded-lg px-2 py-1 text-sm border-none focus:ring-2 focus:ring-sky-400 transition ${role.badge} ${isLocked ? "cursor-not-allowed" : ""}`}
-                        >
-                            <option value="user">User</option>
-                            <option value="supplier">Supplier</option>
-                            <option value="admin">Admin</option>
-                        </select>
-                        </div>
-                        {isLocked && (
-                        <div className="text-xs text-amber-600 dark:text-amber-500 mt-1 font-semibold">Tài khoản đã bị khóa</div>
-                        )}
-                    </td>
-
-                    <td className="px-6 py-4 text-right flex justify-end gap-2 whitespace-nowrap">
-                        <button
-                        onClick={() => handleEditUser(c)}
-                        className="p-2 text-blue-500 hover:text-blue-700 dark:hover:text-blue-300 transition-all rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30"
-                        title="Chỉnh sửa thông tin người dùng"
-                        type="button"
-                        >
-                        ✏️
-                        </button>
-
-                        <button
-                        onClick={() => handleToggleActive(c)}
-                        className={`p-2 rounded-lg transition-all hover:bg-slate-50 dark:hover:bg-slate-700/40 ${isLocked ? "text-amber-600 hover:text-amber-700" : "text-slate-600 hover:text-slate-800"}`}
-                        title={isLocked ? "Mở khóa tài khoản" : "Khóa tài khoản"}
-                        type="button"
-                        >
-                        {isLocked ? "🔓" : "🔒"}
-                        </button>
-
-                        <button
-                        onClick={() => handleDeleteUser(c.id, c.full_name || c.email)}
-                        className="p-2 text-red-500 hover:text-red-700 dark:hover:text-red-300 transition-all rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30"
-                        title="Xóa người dùng"
-                        type="button"
-                        >
-                        <FaTrash size={16} />
-                        </button>
-                    </td>
+                <thead className="bg-gray-50 dark:bg-slate-700/40">
+                    <tr>
+                        {/* <<< Thêm cột STT >>> */}
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">STT</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Tên</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Email</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Địa chỉ</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">SĐT</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Vai trò</th>
+                        <th className="px-6 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Hành động</th>
                     </tr>
-                );
-                })}
-            </tbody>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                    {/* <<< Hiển thị lỗi ngay trong bảng nếu có lỗi fetch >>> */}
+                    {error && !isFetchingPage && (
+                         <tr><td colSpan="7" className="p-8 text-center text-red-500">{error}</td></tr>
+                    )}
+                    {/* <<< Chỉ hiện loading xoay tròn khi chưa có data và không có lỗi >>> */}
+                    {!error && loading && customers.length === 0 && (
+                         <tr><td colSpan="7" className="p-8 text-center"><FaSpinner className="animate-spin text-2xl mx-auto text-sky-500" /></td></tr>
+                    )}
+                     {/* <<< Hiển thị "Không tìm thấy" >>> */}
+                    {!error && !loading && customers.length === 0 && (
+                         <tr><td colSpan="7" className="p-8 text-center text-gray-500 italic">
+                             {debouncedSearch || filterRole !== 'all' || filterActive !== 'all' ? "Không tìm thấy tài khoản phù hợp." : "Chưa có dữ liệu tài khoản."}
+                         </td></tr>
+                    )}
+                    {/* <<< Render danh sách >>> */}
+                    {!error && customers.map((c, index) => { // <<< Thêm index
+                        const role = getRoleStyle(c.role);
+                        const isLocked = c.is_active === false;
+                        return (
+                            <tr key={c.id} className={`hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors ${isLocked ? "opacity-60 bg-red-50 dark:bg-red-900/10" : ""}`} >
+                                {/* <<< Thêm STT >>> */}
+                                <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</td>
+                                <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">{c.full_name || <span className="italic text-gray-400">Chưa cập nhật</span>}</td>
+                                <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.email}</td>
+                                <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.address || <span className="italic text-gray-400">Chưa có</span>}</td>
+                                <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.phone_number || <span className="italic text-gray-400">Chưa có</span>}</td>
+                                <td className="px-6 py-4 text-sm whitespace-nowrap">
+                                    <div className="flex items-center gap-2">
+                                        {role.icon}
+                                        <select value={c.role || 'user'} onChange={(e) => handleRoleChange(c.id, c.role, e.target.value)} disabled={isLocked} className={`role-select ${role.badge} ${isLocked ? "cursor-not-allowed" : ""}`} >
+                                            <option value="user">User</option> <option value="supplier">Supplier</option> <option value="admin">Admin</option>
+                                        </select>
+                                    </div>
+                                    {isLocked && ( <div className="text-xs text-amber-600 dark:text-amber-500 mt-1 font-semibold">Đã khóa</div> )}
+                                </td>
+                                <td className="px-6 py-4 text-center whitespace-nowrap space-x-1"> {/* <<< Giảm space */}
+                                    {/* <<< Sửa style nút bấm >>> */}
+                                    <button onClick={() => handleEditUser(c)} className="action-button text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa">✏️</button>
+                                    <button onClick={() => handleToggleActive(c)} className={`action-button ${isLocked ? "text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/30" : "text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700/40"}`} title={isLocked ? "Mở khóa" : "Khóa"}>{isLocked ? "🔓" : "🔒"}</button>
+                                    <button onClick={() => handleDeleteUser(c.id, c.full_name || c.email)} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa"><FaTrash size={14} /></button> {/* <<< Giảm size icon */}
+                                </td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
             </table>
          </div>
-
-        {filteredCustomers.length === 0 && (
-          <div className="text-center py-10 text-gray-500 dark:text-gray-400 text-sm">
-            Không có tài khoản nào phù hợp với bộ lọc.
-          </div>
-        )}
       </div>
+
+       {/* --- (MỚI) Pagination UI --- */}
+      {!loading && totalItems > ITEMS_PER_PAGE && ( // Chỉ hiện nếu có nhiều hơn 1 trang
+          <div className="flex flex-col sm:flex-row justify-between items-center mt-6 text-sm text-gray-600 dark:text-gray-400">
+              <div> Hiển thị <span className="font-semibold dark:text-white">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> - <span className="font-semibold dark:text-white">{Math.min(currentPage * ITEMS_PER_PAGE, totalItems)}</span> / <span className="font-semibold dark:text-white">{totalItems}</span> tài khoản </div>
+              <div className="flex items-center gap-1 mt-3 sm:mt-0">
+                  <button onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1 || isFetchingPage} className="pagination-arrow" aria-label="Trang trước"><CaretLeft weight="bold" /></button>
+                  {paginationWindow.map((pageNumber, idx) => pageNumber === "..." ? ( <span key={`dots-${idx}`} className="pagination-dots">...</span> ) : (
+                      <button key={pageNumber} onClick={() => setCurrentPage(pageNumber)} disabled={isFetchingPage} className={`pagination-number ${ currentPage === pageNumber ? "pagination-active" : "" }`}>{pageNumber}</button>
+                  ))}
+                  <button onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages || isFetchingPage} className="pagination-arrow" aria-label="Trang sau"><CaretRight weight="bold" /></button>
+              </div>
+          </div>
+      )}
+
+      {/* CSS (Thêm style cho filter, role select, action button, pagination) */}
+      <style jsx>{`
+        .filter-select { @apply px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-sky-400 outline-none transition appearance-none; } /* Thêm appearance-none */
+        .role-select { @apply rounded-lg px-2 py-1 text-sm border-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-1 dark:focus:ring-offset-slate-800 transition appearance-none cursor-pointer disabled:cursor-not-allowed; } /* Thêm appearance-none, cursor */
+        .action-button { @apply p-1.5 rounded-lg transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-offset-1 dark:focus:ring-offset-slate-800; } /* Sửa style nút hành động */
+
+        .pagination-arrow { @apply p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors; }
+        .pagination-number { @apply w-8 h-8 rounded-md font-semibold transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed; }
+        .pagination-active { @apply bg-sky-600 text-white hover:bg-sky-600 dark:hover:bg-sky-600; }
+        .pagination-dots { @apply px-2 py-1 text-gray-500 dark:text-gray-400; }
+      `}</style>
+
     </div>
   );
 }
+
+// --- Hook Debounce (Dán code vào đây) ---
+// const useDebounce = (value, delay) => { ... }; // Đã có ở trên
+
+// --- Helper Pagination Window (Dán code vào đây) ---
+// const getPaginationWindow = (currentPage, totalPages, width = 2) => { ... }; // Đã có ở trên
+
+// --- Badge + Icon theo vai trò (Dán code vào đây) ---
+const getRoleStyle = (role) => {
+  switch (role) {
+    case "admin": return { label: "Admin", icon: <FaUserCog className="text-red-500" />, badge: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300", };
+    case "supplier": return { label: "Supplier", icon: <FaBuilding className="text-blue-500" />, badge: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300", };
+    default: return { label: "User", icon: <FaUsers className="text-green-500" />, badge: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300", };
+  }
+};
