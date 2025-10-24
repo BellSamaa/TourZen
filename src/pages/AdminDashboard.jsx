@@ -1,28 +1,27 @@
 // src/pages/AdminDashboard.jsx
-// (Hoàn chỉnh + Hiệu ứng chuyển trang)
+// (Đã sửa lỗi isActive + Giữ nguyên Lazy Loading & Hiệu ứng)
 
-import React from 'react';
+import React, { Suspense } from 'react'; // <<< Thêm Suspense
 import { Routes, Route, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion'; // <<< Thêm import
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     House, UserList, UsersThree, Buildings, Package,
-    CheckSquare, ChartBar, SignOut
+    CheckSquare, ChartBar, SignOut, CircleNotch
 } from '@phosphor-icons/react';
 import { useAuth } from '../context/AuthContext';
 
-// --- Import các trang ---
-import DashboardHome from './DashboardHome';
-import ManageAccounts from './ManageAccounts';
-import ManageCustomers from './ManageCustomers';
-import ManageTour from './ManageTour';
-import AdminManageProducts from './AdminManageProducts';
-import ManageSuppliers from './ManageSuppliers';
-import Reports from './Reports';
+// --- (LAZY LOAD) Import các trang ---
+const DashboardHome = React.lazy(() => import('./DashboardHome'));
+const ManageAccounts = React.lazy(() => import('./ManageAccounts'));
+const ManageCustomers = React.lazy(() => import('./ManageCustomers'));
+const ManageTour = React.lazy(() => import('./ManageTour'));
+const AdminManageProducts = React.lazy(() => import('./AdminManageProducts'));
+const ManageSuppliers = React.lazy(() => import('./ManageSuppliers'));
+const Reports = React.lazy(() => import('./Reports'));
 
-// --- Component Sidebar ---
 // --- Component Sidebar (Đã sửa lỗi isActive) ---
 const AdminSidebar = () => {
-    const location = useLocation();
+    const location = useLocation(); // <<< useLocation để check active path
     const navigate = useNavigate();
     const { user, logout } = useAuth();
 
@@ -91,57 +90,56 @@ const AdminSidebar = () => {
     );
 };
 
-// --- Các phần còn lại của AdminDashboard.jsx giữ nguyên ---
-// const LoadingFallback = () => { ... };
-// const pageVariants = { ... };
-// const pageTransition = { ... };
-// export default function AdminDashboard() { ... };
+// --- Component Fallback Loading ---
+const LoadingFallback = () => (
+    <div className="flex justify-center items-center h-[calc(100vh-100px)]">
+        <CircleNotch size={48} className="animate-spin text-sky-500" />
+    </div>
+);
+
+// --- Hiệu ứng chuyển trang ---
+const pageVariants = {
+    initial: { opacity: 0, x: -20 },
+    in: { opacity: 1, x: 0 },
+    out: { opacity: 0, x: 20 }
+};
+const pageTransition = { type: "tween", ease: "anticipate", duration: 0.4 };
+
 
 // --- Component Chính AdminDashboard ---
 export default function AdminDashboard() {
-    const location = useLocation(); // <<< Thêm useLocation ở đây
-
-    // <<< Định nghĩa hiệu ứng chuyển trang >>>
-    const pageVariants = {
-        initial: { opacity: 0, x: -20 },
-        in: { opacity: 1, x: 0 },
-        out: { opacity: 0, x: 20 }
-    };
-
-    const pageTransition = {
-        type: "tween", // Hoặc "spring"
-        ease: "anticipate", // Hiệu ứng ease-in-out mượt mà
-        duration: 0.4 // Thời gian chuyển
-    };
+    const location = useLocation();
 
     return (
         <div className="flex min-h-screen bg-slate-100 dark:bg-slate-950">
             <AdminSidebar />
-            <main className="flex-1 overflow-x-hidden relative"> {/* <<< Thêm relative và overflow-x-hidden */}
-                 {/* <<< Bọc Routes bằng AnimatePresence để có hiệu ứng exit >>> */}
-                <AnimatePresence mode="wait"> {/* mode="wait" đảm bảo trang cũ exit xong mới đến trang mới */}
-                    <motion.div
-                        key={location.pathname} // <<< Key thay đổi theo path để trigger animation
-                        initial="initial"
-                        animate="in"
-                        exit="out"
-                        variants={pageVariants}
-                        transition={pageTransition}
-                        className="p-6 md:p-8 lg:p-10" // <<< Di chuyển padding vào đây
-                    >
-                        <Routes location={location}> {/* <<< Cung cấp location cho Routes */}
-                            <Route path="/" element={<DashboardHome />} />
-                            <Route path="accounts" element={<ManageAccounts />} />
-                            <Route path="customers" element={<ManageCustomers />} />
-                            <Route path="tours" element={<ManageTour />} />
-                            <Route path="products" element={<AdminManageProducts />} />
-                            <Route path="suppliers" element={<ManageSuppliers />} />
-                            <Route path="reports" element={<Reports />} />
-                        </Routes>
-                    </motion.div>
-                </AnimatePresence>
+            <main className="flex-1 overflow-x-hidden relative">
+                <Suspense fallback={<LoadingFallback />}>
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={location.pathname}
+                            initial="initial"
+                            animate="in"
+                            exit="out"
+                            variants={pageVariants}
+                            transition={pageTransition}
+                            className="p-6 md:p-8 lg:p-10" // Padding ở đây
+                        >
+                            <Routes location={location}>
+                                <Route path="/" element={<DashboardHome />} />
+                                <Route path="accounts" element={<ManageAccounts />} />
+                                <Route path="customers" element={<ManageCustomers />} />
+                                <Route path="suppliers" element={<ManageSuppliers />} />
+                                <Route path="tours" element={<ManageTour />} />
+                                <Route path="products" element={<AdminManageProducts />} />
+                                <Route path="reports" element={<Reports />} />
+                                {/* Route fallback "*" nếu cần */}
+                                {/* <Route path="*" element={<NotFoundAdmin />} /> */}
+                            </Routes>
+                        </motion.div>
+                    </AnimatePresence>
+                </Suspense>
             </main>
-            {/* Xóa các dòng render Modal lỗi ở đây */}
         </div>
     );
 }
