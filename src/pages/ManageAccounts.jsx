@@ -1,5 +1,6 @@
 // src/pages/ManageAccounts.jsx
 // (Pagination + Debounced Search - Rà soát lại)
+// ĐÃ SỬA: Đổi 'full_name' thành 'ten' để khớp với CSDL
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { getSupabase } from "../lib/supabaseClient";
 import toast from 'react-hot-toast';
@@ -73,7 +74,8 @@ export default function ManageAccounts() {
       // Apply Search
       if (debouncedSearch.trim() !== "") {
         const searchTerm = `%${debouncedSearch.trim()}%`;
-        query = query.or(`full_name.ilike.${searchTerm},email.ilike.${searchTerm},address.ilike.${searchTerm},phone_number.ilike.${searchTerm}`);
+        // SỬA 1: Đổi 'full_name' thành 'ten'
+        query = query.or(`ten.ilike.${searchTerm},email.ilike.${searchTerm},address.ilike.${searchTerm},phone_number.ilike.${searchTerm}`);
       }
       // Apply Order & Pagination
       query = query.order("created_at", { ascending: false }).range(from, to);
@@ -121,6 +123,7 @@ export default function ManageAccounts() {
       else { toast.success("Cập nhật vai trò thành công!"); fetchCustomers(false); }
   };
   const handleDeleteUser = async (userId, userName) => {
+      // SỬA 2: Lấy 'userName' từ c.ten
       if (!window.confirm(`XÓA HỒ SƠ "${userName}"?\n(Chỉ xóa hồ sơ.)`)) return;
       setIsFetchingPage(true);
       const { error } = await supabase.from("Users").delete().eq("id", userId);
@@ -129,18 +132,21 @@ export default function ManageAccounts() {
       else { toast.success(`Đã xóa hồ sơ "${userName}"!`); fetchCustomers(false); }
   };
    const handleEditUser = async (user) => {
-      const newName = prompt("Tên mới:", user.full_name || "");
+      // SỬA 3: Lấy tên từ 'user.ten'
+      const newName = prompt("Tên mới:", user.ten || "");
       const newAddress = prompt("Địa chỉ mới:", user.address || "");
       const newPhone = prompt("SĐT mới:", user.phone_number || "");
       if (newName === null && newAddress === null && newPhone === null) return;
       // Use ?? to keep existing value if prompt returns null or empty string
       const updates = {
-          full_name: newName !== null ? (newName.trim() || user.full_name) : user.full_name,
+          // SỬA 4: Cập nhật cột 'ten'
+          ten: newName !== null ? (newName.trim() || user.ten) : user.ten,
           address: newAddress !== null ? (newAddress.trim() || user.address) : user.address,
           phone_number: newPhone !== null ? (newPhone.trim() || user.phone_number) : user.phone_number
       };
       // Only update if there are actual changes
-      if (updates.full_name === user.full_name && updates.address === user.address && updates.phone_number === user.phone_number) return;
+      // SỬA 5: Kiểm tra 'updates.ten'
+      if (updates.ten === user.ten && updates.address === user.address && updates.phone_number === user.phone_number) return;
 
       setIsFetchingPage(true);
       const { error } = await supabase.from("Users").update(updates).eq("id", user.id);
@@ -151,7 +157,8 @@ export default function ManageAccounts() {
   const handleToggleActive = async (user) => {
       const next = user.is_active === false; // Handles null/true as active
       const action = next ? "MỞ KHÓA" : "KHÓA";
-      if (!window.confirm(`${action} tài khoản "${user.full_name || user.email}"?`)) return;
+      // SỬA 6: Lấy tên từ 'user.ten'
+      if (!window.confirm(`${action} tài khoản "${user.ten || user.email}"?`)) return;
       setIsFetchingPage(true); // Show loading
       const { error } = await supabase.from("Users").update({ is_active: next }).eq("id", user.id);
       setIsFetchingPage(false); // Hide loading
@@ -225,7 +232,8 @@ export default function ManageAccounts() {
                         return (
                             <tr key={c.id} className={`hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors ${isLocked ? "opacity-60 bg-red-50 dark:bg-red-900/10" : ""}`} >
                                 <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</td>
-                                <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">{c.full_name || <span className="italic text-gray-400">Chưa cập nhật</span>}</td>
+                                {/* SỬA 7: Hiển thị 'c.ten' */}
+                                <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">{c.ten || <span className="italic text-gray-400">Chưa cập nhật</span>}</td>
                                 <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.email}</td>
                                 <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.address || <span className="italic text-gray-400">Chưa có</span>}</td>
                                 <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.phone_number || <span className="italic text-gray-400">Chưa có</span>}</td>
@@ -241,7 +249,8 @@ export default function ManageAccounts() {
                                 <td className="px-6 py-4 text-center whitespace-nowrap space-x-1">
                                     <button onClick={() => handleEditUser(c)} disabled={isFetchingPage} className="action-button text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa">✏️</button>
                                     <button onClick={() => handleToggleActive(c)} disabled={isFetchingPage} className={`action-button ${isLocked ? "text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/30" : "text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700/40"}`} title={isLocked ? "Mở khóa" : "Khóa"}>{isLocked ? "🔓" : "🔒"}</button>
-                                    <button onClick={() => handleDeleteUser(c.id, c.full_name || c.email)} disabled={isFetchingPage} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa"><FaTrash size={14} /></button>
+                                    {/* SỬA 8: Truyền 'c.ten' vào hàm delete */}
+                                    <button onClick={() => handleDeleteUser(c.id, c.ten || c.email)} disabled={isFetchingPage} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa"><FaTrash size={14} /></button>
                                 </td>
                             </tr>
                         );
