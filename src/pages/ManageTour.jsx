@@ -67,16 +67,6 @@ const getStatusColor = (status) => {
     }
 };
 
-// --- Chuỗi select ---
-const bookingSelect = `
-    id, created_at, quantity, total_price, status, user_id,
-    main_tour:Products!product_id (
-        id, name, product_type, supplier_id, stock, price, {/* <<< Thêm price cho modal >>> */}
-        supplier:Suppliers ( name )
-    ),
-    user:Users (id, full_name, email)
-`;
-
 // --- Hàm lấy products từ booking (Chỉ tour) ---
 const getProductsFromBooking = (booking) => {
     const prods = [];

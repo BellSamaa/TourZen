@@ -29,7 +29,7 @@ export default function ManageCustomersSupabase() {
       const to = from + pageSize - 1;
 
       let query = supabase
-        .from("KhachHang")
+        .from("khach_hang")
         .select("*", { count: "exact" })
         .order("MaKH", { ascending: true })
         .range(from, to);
@@ -97,11 +97,11 @@ export default function ManageCustomersSupabase() {
     try {
       if (selectedCustomer) {
         await supabase
-          .from("KhachHang")
+          .from("khach_hang")
           .update(form)
           .eq("MaKH", selectedCustomer.MaKH);
       } else {
-        await supabase.from("KhachHang").insert(form);
+        await supabase.from("khach_hang").insert(form);
       }
       fetchCustomers();
       closeForm();
@@ -120,7 +120,7 @@ export default function ManageCustomersSupabase() {
 
   const handleDelete = async () => {
     try {
-      await supabase.from("KhachHang").delete().eq("MaKH", selectedCustomer.MaKH);
+      await supabase.from("khach_hang").delete().eq("MaKH", selectedCustomer.MaKH);
       fetchCustomers();
       closeDeleteConfirm();
     } catch (err) {
