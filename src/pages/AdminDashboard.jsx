@@ -20,8 +20,9 @@ import ManageSuppliers from './ManageSuppliers';
 import Reports from './Reports';
 
 // --- Component Sidebar ---
+// --- Component Sidebar (Đã sửa lỗi isActive) ---
 const AdminSidebar = () => {
-    const location = useLocation(); // <<< Thêm useLocation ở đây
+    const location = useLocation();
     const navigate = useNavigate();
     const { user, logout } = useAuth();
 
@@ -29,9 +30,9 @@ const AdminSidebar = () => {
         { path: '/admin', label: 'Tổng quan', icon: House },
         { path: '/admin/accounts', label: 'Quản lý Tài khoản', icon: UserList },
         { path: '/admin/customers', label: 'Quản lý Khách hàng', icon: UsersThree },
+        { path: '/admin/suppliers', label: 'Quản lý Nhà cung cấp', icon: Buildings },
         { path: '/admin/tours', label: 'Quản lý Đặt Tour', icon: Package },
         { path: '/admin/products', label: 'Quản lý Sản phẩm Tour', icon: CheckSquare },
-        { path: '/admin/suppliers', label: 'Quản lý Nhà cung cấp', icon: Buildings },
         { path: '/admin/reports', label: 'Báo cáo & Thống kê', icon: ChartBar },
     ];
 
@@ -41,7 +42,7 @@ const AdminSidebar = () => {
     };
 
     return (
-        <div className="flex flex-col w-64 min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 text-slate-300 shadow-lg">
+        <div className="flex flex-col w-64 min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 text-slate-300 shadow-lg flex-shrink-0">
             {/* Header */}
             <div className="px-5 py-6 flex items-center gap-3 border-b border-slate-700">
                 <h2 className="text-xl font-bold text-sky-400">TourZen Admin</h2>
@@ -53,16 +54,21 @@ const AdminSidebar = () => {
                         key={item.path}
                         to={item.path}
                         end={item.path === '/admin'}
-                        className={({ isActive }) =>
-                            `flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-colors duration-200 group ${ // <<< Sửa lại transition
-                            isActive
-                                ? 'bg-sky-700 text-white font-semibold shadow-inner'
-                                : 'hover:bg-slate-700 hover:text-white'
-                            }`
-                        }
+                        // <<< SỬA Ở ĐÂY: Dùng function as children >>>
                     >
-                        {item.icon && <item.icon size={22} weight={location.pathname === item.path || (item.path !== '/admin' && location.pathname.startsWith(item.path)) ? "duotone" : "light"} />} {/* <<< Cập nhật weight icon */}
-                        <span className="text-sm">{item.label}</span>
+                        {({ isActive }) => ( // <<< Hàm nhận isActive
+                            <div // <<< Bọc nội dung trong div để áp style
+                                 className={`flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-colors duration-200 group ${
+                                     isActive
+                                         ? 'bg-sky-700 text-white font-semibold shadow-inner' // Style khi active
+                                         : 'text-slate-300 hover:bg-slate-700 hover:text-white' // Style khi inactive + hover
+                                 }`}
+                             >
+                                 {/* <<< isActive giờ đã hợp lệ ở đây >>> */}
+                                 {item.icon && <item.icon size={22} weight={isActive ? "fill" : "light"} />}
+                                 <span className="text-sm">{item.label}</span>
+                            </div>
+                        )}
                     </NavLink>
                 ))}
             </nav>
@@ -84,6 +90,12 @@ const AdminSidebar = () => {
         </div>
     );
 };
+
+// --- Các phần còn lại của AdminDashboard.jsx giữ nguyên ---
+// const LoadingFallback = () => { ... };
+// const pageVariants = { ... };
+// const pageTransition = { ... };
+// export default function AdminDashboard() { ... };
 
 // --- Component Chính AdminDashboard ---
 export default function AdminDashboard() {
