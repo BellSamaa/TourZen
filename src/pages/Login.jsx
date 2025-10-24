@@ -1,12 +1,15 @@
+// src/pages/Login.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaLock, FaEye, FaEyeSlash, FaUser, FaEnvelope, FaSignInAlt } from "react-icons/fa";
+import { 
+    FaLock, FaEye, FaEyeSlash, FaUser, FaEnvelope, FaSignInAlt,
+    FaMapMarkerAlt, FaPhone // <<< Thêm icon mới
+} from "react-icons/fa";
 import { getSupabase } from "../lib/supabaseClient";
 
-// Lấy client Supabase một lần duy nhất
 const supabase = getSupabase();
 
-// --- Component con để hiển thị độ mạnh mật khẩu ---
+// --- Component con để hiển thị độ mạnh mật khẩu (Giữ nguyên) ---
 const PasswordStrengthMeter = ({ password }) => {
   const [strength, setStrength] = useState({ score: 0, label: '', color: '' });
 
@@ -40,7 +43,6 @@ const PasswordStrengthMeter = ({ password }) => {
         break;
     }
     
-    // Chỉ hiển thị khi người dùng bắt đầu nhập
     if(password.length > 0) {
         setStrength({ score, label, color });
     } else {
@@ -68,9 +70,19 @@ const PasswordStrengthMeter = ({ password }) => {
 // --- Component chính ---
 export default function Login() {
   const navigate = useNavigate();
-  // Sử dụng 'login' hoặc 'register' để quản lý tab
   const [mode, setMode] = useState('login'); 
-  const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" });
+  
+  // <<< SỬA ĐỔI (1/4): Thêm address và phone_number vào state ---
+  const initialFormState = { 
+    name: "", 
+    email: "", 
+    password: "", 
+    confirm: "", 
+    address: "", 
+    phone_number: "" 
+  };
+  const [form, setForm] = useState(initialFormState);
+  
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
@@ -83,7 +95,6 @@ export default function Login() {
     setSuccess("");
     setLoading(true);
 
-    // --- LOGIC ĐĂNG KÝ TÀI KHOẢN MỚI ---
     if (mode === 'register') {
       if (form.password !== form.confirm) {
         setError("Mật khẩu không khớp.");
@@ -99,25 +110,28 @@ export default function Login() {
       if (signUpError) {
         setError(signUpError.message);
       } else if (user) {
-        // Sau khi tạo user, lưu thông tin công khai vào bảng 'Users'
-        // Cột 'role' sẽ tự động nhận giá trị mặc định là 'user' mà ta đã cài đặt ở Bước 1
+        
+        // <<< SỬA ĐỔI (2/4): Thêm address và phone_number vào CSDL ---
         const { error: insertError } = await supabase
           .from('Users')
           .insert({
             id: user.id,
             full_name: form.name,
             email: form.email,
+            address: form.address, // <-- Thêm địa chỉ
+            phone_number: form.phone_number, // <-- Thêm SĐT
+            // 'role' sẽ tự động nhận giá trị default 'user'
+            // 'is_active' sẽ tự động nhận giá trị default 'true'
           });
         
         if (insertError) {
           setError(`Tài khoản đã được tạo nhưng không thể lưu thông tin: ${insertError.message}`);
         } else {
           setSuccess("Đăng ký thành công! Vui lòng kiểm tra email để xác nhận.");
-          setForm({ name: "", email: "", password: "", confirm: "" });
+          setForm(initialFormState); // <-- Reset form
         }
       }
     
-    // --- LOGIC ĐĂNG NHẬP ---
     } else {
       const { data: { user }, error: signInError } = await supabase.auth.signInWithPassword({
         email: form.email,
@@ -127,19 +141,27 @@ export default function Login() {
       if (signInError) {
         setError("Email hoặc mật khẩu không đúng.");
       } else if (user) {
-        // Đăng nhập thành công, KIỂM TRA VAI TRÒ (ROLE)
         const { data: userData, error: userError } = await supabase
           .from('Users')
-          .select('role')
+          .select('role, is_active') // <<< Lấy thêm trạng thái active
           .eq('id', user.id)
-          .single(); // Lấy một dòng duy nhất
+          .single();
 
         if (userError) {
           setError("Không thể lấy thông tin vai trò người dùng.");
         } else if (userData) {
-          // Chuyển hướng dựa trên vai trò
+          
+          // <<< SỬA ĐỔI: Kiểm tra tài khoản có bị khóa không
+          if (userData.is_active === false) {
+             setError("Tài khoản của bạn đã bị khóa. Vui lòng liên hệ Admin.");
+             setLoading(false);
+             // Tự động logout nếu lỡ đăng nhập
+             await supabase.auth.signOut(); 
+             return;
+          }
+
           if (userData.role === 'admin') {
-            navigate("/admin/dashboard");
+            navigate("/admin/dashboard"); // Sửa thành /admin/dashboard cho rõ
           } else {
             navigate("/");
           }
@@ -154,10 +176,10 @@ export default function Login() {
     setMode(newMode);
     setError('');
     setSuccess('');
-    setForm({ name: "", email: "", password: "", confirm: "" });
+    // <<< SỬA ĐỔI (3/4): Reset form đầy đủ ---
+    setForm(initialFormState); 
   }
 
-  // --- Giao diện (JSX) ---
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-gray-900 text-white p-4">
        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-black animate-gradient-xy"></div>
@@ -188,6 +210,20 @@ export default function Login() {
                 <FaEnvelope className="absolute top-3.5 left-4 text-gray-400" />
                 <input type="email" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input-field" required />
             </div>
+
+             {/* <<< SỬA ĐỔI (4/4): Thêm 2 trường mới cho Đăng ký --- */}
+            {mode === 'register' && (
+              <>
+                <div className="relative">
+                    <FaMapMarkerAlt className="absolute top-3.5 left-4 text-gray-400" />
+                    <input type="text" placeholder="Địa chỉ (Tỉnh/Thành phố)" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="input-field" />
+                </div>
+                <div className="relative">
+                    <FaPhone className="absolute top-3.5 left-4 text-gray-400" />
+                    <input type="tel" placeholder="Số điện thoại" value={form.phone_number} onChange={(e) => setForm({ ...form, phone_number: e.target.value })} className="input-field" />
+                </div>
+              </>
+            )}
             
             <div className="relative">
                 <FaLock className="absolute top-3.5 left-4 text-gray-400" />
@@ -196,7 +232,6 @@ export default function Login() {
                     {showPassword ? <FaEyeSlash /> : <FaEye />}
                 </span>
             </div>
-             {/* Thước đo mật khẩu chỉ hiện khi đăng ký */}
              {mode === 'register' && <PasswordStrengthMeter password={form.password} />}
 
             {mode === 'register' && (
@@ -209,7 +244,6 @@ export default function Login() {
                 </div>
             )}
             
-            {/* --- Nút Submit --- */}
             <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 rounded-lg font-semibold shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2">
                 {loading ? (
                     <>
@@ -229,6 +263,7 @@ export default function Login() {
         </form>
       </div>
 
+      {/* --- CSS (Giữ nguyên) --- */}
       <style>{`
         .input-field {
           width: 100%;

@@ -1,69 +1,69 @@
 // src/pages/TourList.jsx
+// (Chỉ cập nhật hàm fetchData)
+
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
-
-// --- Tích hợp Supabase & Auth ---
 import { getSupabase } from "../lib/supabaseClient";
 import { useAuth } from "../context/AuthContext";
-
-// --- Import Components ---
 import TourCard from "../components/TourCard.jsx";
-import ProductModal from "./ProductModal"; // Modal để Sửa/Thêm
+import ProductModal from "./ProductModal"; 
 import { FaPlus, FaSpinner } from "react-icons/fa";
 
 const supabase = getSupabase();
 
 export default function TourList() {
-  const { isAdmin } = useAuth(); // Lấy trạng thái Admin
-
-  // --- State quản lý dữ liệu ---
+  const { isAdmin } = useAuth(); 
   const [tours, setTours] = useState([]);
-  const [suppliers, setSuppliers] = useState([]); // Cần cho Modal
+  const [suppliers, setSuppliers] = useState([]); 
   const [loading, setLoading] = useState(true);
-  
-  // --- State cho bộ lọc ---
   const [q, setQ] = useState("");
   const [sort, setSort] = useState("popular");
-
-  // --- State cho Modal ---
   const [showModal, setShowModal] = useState(false);
   const [productToEdit, setProductToEdit] = useState(null);
 
-  // Hàm fetch dữ liệu từ Supabase
+  // <<< SỬA ĐỔI TẠI ĐÂY ---
   const fetchData = useCallback(async () => {
     setLoading(true);
     
     // Lấy danh sách tour
-    const { data: tourData, error: tourError } = await supabase
+    let query = supabase
       .from("Products")
       .select("*")
       .eq("product_type", "tour")
-      .eq("approval_status", "approved"); // <--- THAY ĐỔI CHÍNH: Chỉ lấy tour đã duyệt
+      .eq("approval_status", "approved"); // Phải được duyệt
+
+    // --- THAY ĐỔI CHÍNH ---
+    // Nếu không phải Admin, chỉ lấy tour đã ĐĂNG (is_published)
+    if (!isAdmin) {
+        query = query.eq("is_published", true);
+    }
+    // (Admin sẽ thấy cả tour 'approved' nhưng 'chưa đăng' để tiện review)
+
+    const { data: tourData, error: tourError } = await query;
 
     if (tourError) {
       console.error("Lỗi fetch tour:", tourError);
     } else {
       setTours(tourData || []);
     }
+    // --- KẾT THÚC SỬA ĐỔI ---
 
-    // Nếu là admin, tải luôn danh sách nhà cung cấp để dùng cho Modal
     if (isAdmin) {
       const { data: supplierData } = await supabase.from("Suppliers").select("id, name");
       if (supplierData) setSuppliers(supplierData);
     }
 
     setLoading(false);
-  }, [isAdmin]); // Chạy lại hàm này nếu trạng thái admin thay đổi
+  }, [isAdmin]); 
+// ... (Phần còn lại của file giữ nguyên) ...
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Lọc và sắp xếp dữ liệu
   const filteredTours = useMemo(() => {
+    // ...
     let arr = [...tours];
-
-    // Lọc theo từ khóa (tìm kiếm cả Tên và Mã tour)
     if (q) {
       arr = arr.filter(
         (t) =>
@@ -71,24 +71,18 @@ export default function TourList() {
           (t.tour_code && t.tour_code.toLowerCase().includes(q.toLowerCase()))
       );
     }
-    
-    // Sắp xếp
     if (sort === "price-asc") arr.sort((a, b) => a.price - b.price);
     if (sort === "price-desc") arr.sort((a, b) => b.price - a.price);
-    // Lưu ý: Cần thêm cột `sold` vào bảng Products nếu muốn dùng sort 'popular'
-    // if (sort === "popular") arr.sort((a, b) => (b.sold || 0) - (a.sold || 0));
-
     return arr;
   }, [q, sort, tours]);
 
-  // --- Các hàm xử lý Modal ---
   const handleAddNew = () => {
-    setProductToEdit(null); // Chế độ Thêm mới
+    setProductToEdit(null); 
     setShowModal(true);
   };
 
   const handleEdit = (tour) => {
-    setProductToEdit(tour); // Chế độ Sửa
+    setProductToEdit(tour); 
     setShowModal(true);
   };
 
@@ -109,24 +103,13 @@ export default function TourList() {
           </h1>
         </div>
         
-        {/* THANH CÔNG CỤ ADMIN */}
         {isAdmin && (
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-sky-100 dark:bg-sky-900/50 border-l-4 border-sky-500 text-sky-800 dark:text-sky-200 p-4 mb-8 rounded-lg flex justify-between items-center shadow-md"
           >
-            <div>
-              <p className="font-bold">Chế độ Quản trị viên</p>
-              <p className="text-sm">Bạn có thể thêm hoặc chỉnh sửa tour tại đây.</p>
-            </div>
-            <button
-              onClick={handleAddNew}
-              className="flex items-center space-x-2 bg-sky-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-sky-700 transition-colors"
-            >
-              <FaPlus />
-              <span>Thêm Tour Mới</span>
-            </button>
+            {/* ... */}
           </motion.div>
         )}
 
@@ -156,11 +139,10 @@ export default function TourList() {
               <motion.div
                 key={tour.id}
                 initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05, duration: 0.5 }}
+V              whileInView={{ opacity: 1, y: 0 }}
+        _B     transition={{ delay: i * 0.05, duration: 0.5 }}
                 viewport={{ once: true }}
               >
-                {/* Truyền hàm handleEdit vào TourCard */}
                 <TourCard tour={tour} onEdit={handleEdit} />
               </motion.div>
             ))}
@@ -174,12 +156,11 @@ export default function TourList() {
         )}
       </div>
 
-      {/* MODAL THÊM/SỬA (chỉ render khi cần) */}
       {showModal && (
         <ProductModal
           show={showModal}
           onClose={() => setShowModal(false)}
-          onSuccess={fetchData} // Tải lại danh sách sau khi lưu
+          onSuccess={fetchData} 
           productToEdit={productToEdit}
           productType="tour"
           suppliers={suppliers}

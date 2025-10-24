@@ -1,204 +1,129 @@
-// src/pages/DashboardHome.jsx
-import React, { useState, useEffect } from 'react';
-import { getSupabase } from "../lib/supabaseClient";
-import { Link } from 'react-router-dom';
-import { FaSpinner, FaChartLine, FaBoxOpen, FaUserPlus, FaShoppingCart, FaFileInvoiceDollar } from "react-icons/fa";
+// src/pages/AdminDashboard.jsx
+// (Làm lại hoàn toàn để làm layout và router)
 
-const supabase = getSupabase();
+import React from 'react';
+import { Routes, Route, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { 
+    House,         // Tổng quan
+    UserList,      // Quản lý Tài khoản
+    UsersThree,    // Quản lý Khách hàng
+    Buildings,     // Quản lý Nhà cung cấp
+    Package,       // Quản lý Đặt Tour
+    CheckSquare,   // Quản lý Sản phẩm Tour
+    ChartBar,      // Báo cáo
+    SignOut 
+} from '@phosphor-icons/react';
+import { useAuth } from '../context/AuthContext';
 
-// --- Helper Functions ---
-const formatCurrency = (number) => {
-    if (typeof number !== 'number' || isNaN(number)) return "0 ₫";
-    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(number);
-};
-const formatDate = (dateString) => {
-    const options = { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" };
-    return new Date(dateString).toLocaleString("vi-VN", options);
-};
+// --- Import 7 component con ---
+import DashboardHome from './DashboardHome';
+import ManageAccounts from './ManageAccounts';         // 1. Quản lý Tài khoản
+import ManageCustomers from './ManageCustomers';       // 2. Quản lý Khách hàng (CRM)
+import ManageTour from './ManageTour';               // 3. Quản lý Đặt Tour
+import AdminManageProducts from './AdminManageProducts'; // 4. Quản lý Sản phẩm Tour
+import ManageSuppliers from './ManageSuppliers';       // 5. Quản lý Nhà cung cấp
+import Reports from './Reports'; // (File báo cáo)
 
-// --- Component Card Thống kê ---
-const StatCard = ({ title, value, icon, colorClass, loading }) => (
-    <div className={`p-6 rounded-2xl shadow-lg border ${colorClass} bg-white dark:bg-neutral-800`}>
-        <div className="flex justify-between items-start">
-            <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase">{title}</p>
-                {loading ? (
-                    <FaSpinner className="animate-spin text-2xl mt-2 text-gray-400" />
-                ) : (
-                    <p className="text-3xl font-bold text-gray-800 dark:text-white mt-1">{value}</p>
-                )}
-            </div>
-            <div className={`p-3 rounded-full ${colorClass} bg-opacity-10`}>
-                {icon}
-            </div>
-        </div>
-    </div>
-);
+// --- Component Sidebar (Đã cập nhật) ---
+const AdminSidebar = () => {
+    const navigate = useNavigate();
+    const { user, logout } = useAuth(); // Giả định bạn có useAuth
 
-// --- Component Chính ---
-export default function DashboardHome() {
-    const [loading, setLoading] = useState(true);
-    const [stats, setStats] = useState({
-        monthlyRevenue: 0,
-        monthlyBookings: 0,
-        pendingProducts: 0,
-        newUsers: 0
-    });
-    const [recentBookings, setRecentBookings] = useState([]);
+    // <<< DANH SÁCH 5 CHỨC NĂNG CHÍNH + 2
+    const navItems = [
+        { path: '/admin', label: 'Tổng quan', icon: House },
+        { path: '/admin/accounts', label: 'Quản lý Tài khoản', icon: UserList }, 
+        { path: '/admin/customers', label: 'Quản lý Khách hàng', icon: UsersThree }, 
+        { path: '/admin/suppliers', label: 'Quản lý Nhà cung cấp', icon: Buildings },
+        { path: '/admin/tours', label: 'Quản lý Đặt Tour', icon: Package },
+        { path: '/admin/products', label: 'Quản lý Sản phẩm Tour', icon: CheckSquare }, 
+        { path: '/admin/reports', label: 'Báo cáo & Thống kê', icon: ChartBar },
+    ];
 
-    useEffect(() => {
-        async function fetchKpis() {
-            setLoading(true);
-            
-            // Lấy ngày đầu tiên của tháng hiện tại (Tháng 10)
-            const now = new Date(); // Giả sử là 23/10/2025
-            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-
-            try {
-                // 1. Lấy Doanh thu & Đơn hàng tháng này (chỉ đơn 'confirmed')
-                const { data: bookingData, error: bookingError } = await supabase
-                    .from('Bookings')
-                    .select('total_price')
-                    .eq('status', 'confirmed')
-                    .gte('created_at', startOfMonth);
-                if (bookingError) throw bookingError;
-                
-                const monthlyRevenue = bookingData.reduce((sum, b) => sum + b.total_price, 0);
-                const monthlyBookings = bookingData.length;
-
-                // 2. Lấy số sản phẩm chờ duyệt
-                const { count: pendingCount, error: pendingError } = await supabase
-                    .from('Products')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('approval_status', 'pending');
-                if (pendingError) throw pendingError;
-
-                // 3. Lấy số người dùng mới tháng này
-                const { count: userCount, error: userError } = await supabase
-                    .from('Users')
-                    .select('id', { count: 'exact', head: true })
-                    .gte('created_at', startOfMonth);
-                if (userError) throw userError;
-
-                // 4. Lấy 5 đơn hàng mới nhất
-                const { data: recentData, error: recentError } = await supabase
-                    .from("Bookings")
-                    .select(`
-                        id, created_at, total_price, status,
-                        user:Users ( full_name ), 
-                        main_tour:Products!product_id ( name )
-                    `)
-                    .order('created_at', { ascending: false })
-                    .limit(5);
-                if (recentError) throw recentError;
-
-                setStats({
-                    monthlyRevenue: monthlyRevenue,
-                    monthlyBookings: monthlyBookings,
-                    pendingProducts: pendingCount || 0,
-                    newUsers: userCount || 0
-                });
-                setRecentBookings(recentData || []);
-
-            } catch (error) {
-                console.error("Lỗi tải dữ liệu Dashboard:", error);
-            } finally {
-                setLoading(false);
-            }
+    const handleLogout = async () => { 
+        // Giả sử hàm logout của bạn xử lý việc signout khỏi supabase
+        // await supabase.auth.signOut(); 
+        if(logout) {
+            await logout();
         }
-
-        fetchKpis();
-    }, []);
-
+        navigate("/");
+   };
 
     return (
-        <div className="space-y-8">
-            <h1 className="text-3xl font-bold text-slate-800 dark:text-white">
-                Tổng quan
-            </h1>
-
-            {/* === 1. Các thẻ KPIs (Thống kê nhanh) === */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard
-                    title={`Doanh thu (T${new Date().getMonth() + 1})`}
-                    value={formatCurrency(stats.monthlyRevenue)}
-                    icon={<FaFileInvoiceDollar size={22} className="text-green-600" />}
-                    colorClass="border-green-200 dark:border-green-700"
-                    loading={loading}
-                />
-                <StatCard
-                    title={`Đơn hàng (T${new Date().getMonth() + 1})`}
-                    value={stats.monthlyBookings}
-                    icon={<FaShoppingCart size={22} className="text-sky-600" />}
-                    colorClass="border-sky-200 dark:border-sky-700"
-                    loading={loading}
-                />
-                <StatCard
-                    title="Sản phẩm chờ duyệt"
-                    value={stats.pendingProducts}
-                    icon={<FaBoxOpen size={22} className="text-yellow-600" />}
-                    colorClass="border-yellow-200 dark:border-yellow-700"
-                    loading={loading}
-                />
-                <StatCard
-                    title="Người dùng mới (Tháng)"
-                    value={stats.newUsers}
-                    icon={<FaUserPlus size={22} className="text-indigo-600" />}
-                    colorClass="border-indigo-200 dark:border-indigo-700"
-                    loading={loading}
-                />
+        <div className="flex flex-col w-64 min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 text-slate-300 shadow-lg">
+            {/* Header Sidebar */}
+            <div className="px-5 py-6 flex items-center gap-3 border-b border-slate-700">
+                 {/* <img src="/logo-icon.png" alt="Logo" className="w-8 h-8" /> */}
+                 <h2 className="text-xl font-bold text-sky-400">TourZen Admin</h2>
             </div>
 
-            {/* === 2. Cập nhật mới (Đơn hàng gần đây) === */}
-            <div className="bg-white dark:bg-neutral-800 shadow-xl rounded-lg border dark:border-neutral-700">
-                <div className="p-5 border-b border-gray-200 dark:border-neutral-700">
-                    <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
-                        Cập nhật mới
-                    </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Các đơn hàng vừa được tạo gần đây.</p>
-                </div>
-                
-                {loading && recentBookings.length === 0 ? (
-                    <div className="p-10 text-center"><FaSpinner className="animate-spin text-2xl mx-auto text-gray-400" /></div>
-                ) : (
-                    <div className="flow-root">
-                        <ul role="list" className="divide-y divide-gray-200 dark:divide-neutral-700">
-                            {recentBookings.map(booking => (
-                                <li key={booking.id} className="p-5 hover:bg-gray-50 dark:hover:bg-neutral-700/50 transition-colors">
-                                    <div className="flex items-center space-x-4">
-                                        <div className="flex-shrink-0">
-                                            <div className="h-10 w-10 rounded-full bg-sky-100 dark:bg-sky-900 flex items-center justify-center">
-                                                <FaShoppingCart className="h-5 w-5 text-sky-600 dark:text-sky-400" />
-                                            </div>
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                                                {booking.user?.full_name || 'Khách vãng lai'}
-                                            </p>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                                                Đã đặt tour: {booking.main_tour?.name || 'N/A'}
-                                            </p>
-                                        </div>
-                                        <div className="text-right flex-shrink-0">
-                                            <p className="text-sm font-semibold text-green-600">
-                                                {formatCurrency(booking.total_price)}
-                                            </p>
-                                             <p className="text-xs text-gray-400">
-                                                {formatDate(booking.created_at)}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
-                 <div className="p-4 text-center bg-gray-50 dark:bg-neutral-800 border-t border-gray-200 dark:border-neutral-700">
-                    <Link to="/admin/bookings" className="text-sm font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300">
-                        Xem tất cả đơn hàng &rarr;
-                    </Link>
-                </div>
-            </div>
+            {/* Navigation */}
+            <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto">
+                {navItems.map((item) => (
+                    <NavLink
+                        key={item.path}
+                        to={item.path}
+                        // 'end' chỉ áp dụng cho trang Tổng quan
+                        end={item.path === '/admin'} 
+                        className={({ isActive }) =>
+                            `flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
+                            isActive
+                                ? 'bg-sky-700 text-white font-semibold shadow-inner'
+                                : 'hover:bg-slate-700 hover:text-white'
+                            }`
+                        }
+                    >
+                          {item.icon && <item.icon size={22} weight="duotone" />}
+                          <span className="text-sm">{item.label}</span>
+                    </NavLink>
+                ))}
+            </nav>
+
+            {/* User Info & Logout */}
+            {user && (
+                  <div className="px-3 py-4 border-t border-slate-700 mt-auto">
+                        <p className="text-sm font-medium text-white truncate mb-2 px-2" title={user.email}>
+                            {/* Giả sử user object có full_name, nếu không, dùng email */}
+                            Xin chào, {user.full_name || user.email}!
+                       </p>
+                      <button
+                          onClick={handleLogout}
+                          className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-red-400 hover:bg-red-900/50 hover:text-red-300 transition-colors"
+                      >
+                          <SignOut size={20} weight="duotone" />
+                          <span>Đăng xuất</span>
+                      </button>
+                  </div>
+            )}
+        </div>
+    );
+};
+
+
+// --- Component Chính AdminDashboard ---
+export default function AdminDashboard() {
+    return (
+        <div className="flex min-h-screen bg-slate-100 dark:bg-slate-950">
+            <AdminSidebar />
+            
+            {/* Vùng nội dung chính */}
+            <main className="flex-1 p-6 md:p-8 lg:p-10 overflow-y-auto">
+                {/* Thiết lập các Routes */}
+                <Routes>
+                    {/* Trang chủ Admin */}
+                    <Route path="/" element={<DashboardHome />} /> 
+                    
+                    {/* 5 Chức năng chính */}
+                    <Route path="accounts" element={<ManageAccounts />} /> 
+                    <Route path="customers" element={<ManageCustomers />} /> 
+                    <Route path="suppliers" element={<ManageSuppliers />} />
+                    <Route path="tours" element={<ManageTour />} /> 
+                    <Route path="products" element={<AdminManageProducts />} />
+                    
+                    {/* Trang báo cáo */}
+                    <Route path="reports" element={<Reports />} />
+                </Routes>
+            </main>
         </div>
     );
 }
