@@ -1,306 +1,452 @@
 // src/pages/ManageCustomers.jsx
-// (Làm lại hoàn toàn thành trang CRM)
+// (Nâng cấp UI, Sửa lỗi Pagination, Thêm Debounced Search từ file ManageCustomers EDIT)
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { FaSearch, FaPlus, FaSpinner } from "react-icons/fa";
+import { UsersThree, Pencil, Trash } from "@phosphor-icons/react";
 import { getSupabase } from "../lib/supabaseClient";
 import toast from "react-hot-toast";
-import { 
-    FaSpinner, FaSearch, FaUserEdit, FaHistory, FaRegCommentDots, FaTrash,
-    FaRegStar, FaStar 
-} from "react-icons/fa";
-import { UsersThree } from "@phosphor-icons/react";
 
 const supabase = getSupabase();
 
-// --- Helper Functions ---
-const formatCurrency = (number) => {
-    if (typeof number !== 'number' || isNaN(number)) return "0 ₫";
-    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(number);
-};
-const formatDate = (dateString) => {
-    const options = { year: "numeric", month: "2-digit", day: "2-digit" };
-    return new Date(dateString).toLocaleString("vi-VN", options);
-};
-
-// --- Component con (MỚI): Lịch sử Đặt hàng ---
-const CustomerHistoryModal = ({ user, onClose }) => {
-    const [bookings, setBookings] = useState([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const fetchHistory = async () => {
-            setLoading(true);
-            const { data, error } = await supabase
-                .from("Bookings")
-                .select("id, created_at, total_price, status, main_tour:Products!product_id(name)")
-                .eq("user_id", user.id)
-                .order("created_at", { ascending: false });
-            
-            if (data) setBookings(data);
-            setLoading(false);
-        };
-        fetchHistory();
-    }, [user.id]);
-
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'confirmed': return 'bg-green-100 text-green-800';
-            case 'cancelled': return 'bg-red-100 text-red-800';
-            default: return 'bg-yellow-100 text-yellow-800';
-        }
+// --- Hook (MỚI): Debounce (Trì hoãn) ---
+// Hook này giúp trì hoãn việc tìm kiếm cho đến khi người dùng ngừng gõ
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    return () => {
+      clearTimeout(handler);
     };
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex justify-center items-center p-4">
-            <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-2xl p-6 w-full max-w-2xl relative max-h-[80vh] flex flex-col">
-                <button onClick={onClose} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
-                    &times;
-                </button>
-                <h3 className="text-xl font-bold mb-4 text-gray-800 dark:text-white">
-                    Lịch sử đặt tour của: {user.full_name}
-                </h3>
-                <div className="overflow-y-auto">
-                    {loading ? (
-                        <div className="flex justify-center p-8"><FaSpinner className="animate-spin text-2xl" /></div>
-                    ) : bookings.length === 0 ? (
-                        <p className="text-center text-gray-500 py-8 italic">Khách hàng này chưa đặt tour nào.</p>
-                    ) : (
-                        <ul className="divide-y dark:divide-neutral-700">
-                            {bookings.map(b => (
-                                <li key={b.id} className="py-3 flex justify-between items-center">
-                                    <div>
-                                        <p className="font-semibold dark:text-white">{b.main_tour?.name || "Tour đã bị xóa"}</p>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Ngày đặt: {formatDate(b.created_at)}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="font-semibold text-sky-600 dark:text-sky-400">{formatCurrency(b.total_price)}</p>
-                                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${getStatusColor(b.status)}`}>
-                                            {b.status}
-                                        </span>
-                                    </div>
-                                LI>
-                            ))}
-                        </ul>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
+  }, [value, delay]);
+  return debouncedValue;
 };
 
-// --- Component con (MỚI): Quản lý Đánh giá ---
-const ManageReviews = () => {
-    const [reviews, setReviews] = useState([]);
-    const [loading, setLoading] = useState(true);
+// --- Helper (MỚI): Tạo cửa sổ phân trang ---
+// Sửa lỗi hiển thị quá nhiều trang
+const getPaginationWindow = (currentPage, totalPages, width = 2) => {
+  if (totalPages <= 1) return [];
+  // Nếu tổng số trang ít, hiển thị tất cả
+  if (totalPages <= 5 + width * 2) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
 
-    const fetchReviews = useCallback(async () => {
-        setLoading(true);
-        const { data, error } = await supabase
-            .from("Reviews") // <<< Giả định bạn có bảng 'Reviews'
-            .select("*, user:Users(full_name, email), product:Products(name)")
-            .order("created_at", { ascending: false });
-        if (data) setReviews(data);
-        setLoading(false);
-    }, []);
+  const pages = new Set();
+  pages.add(1); // Luôn thêm trang 1
 
-    useEffect(() => { fetchReviews(); }, [fetchReviews]);
+  // Thêm các trang xung quanh trang hiện tại
+  for (let i = 0; i <= width; i++) {
+    if (currentPage - i > 1) pages.add(currentPage - i);
+    if (currentPage + i < totalPages) pages.add(currentPage + i);
+  }
 
-    const handleDelete = async (reviewId) => {
-        if (!window.confirm("Bạn có chắc muốn xóa đánh giá này?")) return;
+  pages.add(totalPages); // Luôn thêm trang cuối
 
-        const { error } = await supabase.from("Reviews").delete().eq("id", reviewId);
-        if (error) {
-            toast.error("Lỗi khi xóa: "Try again.");
-        } else {
-            toast.success("Đã xóa đánh giá.");
-            fetchReviews();
-        }
-    };
+  const sortedPages = [...pages].sort((a, b) => a - b);
+  const finalPages = [];
 
-    const renderStars = (rating) => {
-        return Array(5).fill(0).map((_, i) => (
-            i < rating 
-            ? <FaStar key={i} className="text-yellow-400" /> 
-            : <FaRegStar key={i} className="text-gray-300" />
-        ));
-    };
-
-    return (
-        <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-xl overflow-hidden border border-gray-200 dark:border-neutral-700 mt-8">
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-white p-5 border-b dark:border-neutral-700 flex items-center gap-3">
-                 <FaRegCommentDots className="text-sky-600" /> Quản lý Đánh giá
-            </h2>
-            {loading ? (
-                <div className="p-8 text-center"><FaSpinner className="animate-spin text-2xl" /></div>
-            ) : reviews.length === 0 ? (
-                <p className="p-8 text-center text-gray-500 italic">Chưa có đánh giá nào.</p>
-            ) : (
-                <div className="divide-y dark:divide-neutral-700 max-h-[600px] overflow-y-auto">
-                    {reviews.map(r => (
-                        <div key={r.id} className="p-5 flex gap-4">
-                            <div className="flex-1">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <p className="font-semibold dark:text-white">{r.user?.full_name || 'Khách'}</p>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Tour: {r.product?.name || 'N/A'}</p>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        {renderStars(r.rating)}
-                                    </div>
-                                </div>
-                                <p className="text-gray-700 dark:text-gray-300 mt-2">{r.comment}</p>
-                            </div>
-                            <button 
-                                onClick={() => handleDelete(r.id)}
-                                className="p-2 text-red-500 hover:text-red-700 dark:hover:text-red-300 transition-all rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30"
-                                title="Xóa đánh giá"
-                            >
-                                <FaTrash />
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            )}
-        </div>
-    );
+  // Thêm "..." vào các khoảng trống
+  let lastPage = 0;
+  for (const page of sortedPages) {
+    if (lastPage !== 0 && page - lastPage > 1) {
+      finalPages.push("...");
+    }
+    finalPages.push(page);
+    lastPage = page;
+  }
+  return finalPages;
 };
 
-
-// --- Component chính: Quản lý Khách hàng (CRM) ---
 export default function ManageCustomers() {
-    const [customers, setCustomers] = useState([]); // Lấy từ bảng Users
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [search, setSearch] = useState("");
-    const [selectedUser, setSelectedUser] = useState(null); // Cho modal lịch sử
+  const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-    const fetchCustomers = useCallback(async () => {
-        setLoading(true);
-        setError(null);
-        // Lấy user, nhưng chỉ role 'user'
-        const { data, error: fetchError } = await supabase
-            .from("Users")
-            .select("*")
-            .eq('role', 'user') // <<< Chỉ lấy khách hàng
-            .order("full_name", { ascending: true });
+  // --- Search (ĐÃ CẬP NHẬT) ---
+  const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearch = useDebounce(searchTerm, 400); // Trì hoãn 400ms
 
-        if (fetchError) {
-            setError("Không thể tải danh sách khách hàng: " + fetchError.message);
-        } else {
-            setCustomers(data || []);
-        }
-        setLoading(false);
-    }, []);
+  // --- Pagination (ĐÃ CẬP NHẬT) ---
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(5); // Giữ nguyên 5
+  const [totalCount, setTotalCount] = useState(0);
+  const totalPages = Math.ceil(totalCount / pageSize) || 1;
 
-    useEffect(() => {
-        fetchCustomers();
-    }, [fetchCustomers]);
+  // --- Modals ---
+  const [showForm, setShowForm] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [form, setForm] = useState({ TenKH: "", DiaChi: "", Email: "", SDT: "" });
+  const [formError, setFormError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false); // Thêm state loading cho form
 
-    // --- Cập nhật thông tin cá nhân (lấy từ ManageAccounts) ---
-    const handleEditUser = async (user) => {
-        const newName = prompt("Nhập tên mới:", user.full_name || "");
-        const newAddress = prompt("Nhập địa chỉ mới:", user.address || "");
-        const newPhone = prompt("Nhập số điện thoại mới:", user.phone_number || "");
+  // --- Fetch data (ĐÃ CẬP NHẬT) ---
+  const fetchCustomers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
 
-        if (newName === null && newAddress === null && newPhone === null) return;
+      let query = supabase
+        .from("KhachHang")
+        .select("*", { count: "exact" });
 
-        const updates = {
-            full_name: newName || user.full_name,
-            address: newAddress || user.address,
-            phone_number: newPhone || user.phone_number,
-        };
+      // Áp dụng tìm kiếm nếu có
+      if (debouncedSearch.trim() !== "") {
+        query = query.ilike("TenKH", `%${debouncedSearch.trim()}%`);
+      }
 
-        const { error } = await supabase.from("Users").update(updates).eq("id", user.id);
-        if (error) {
-            toast.error("Lỗi khi cập nhật: " + error.message);
-        } else {
-            toast.success("Cập nhật hồ sơ thành công!");
-            fetchCustomers();
-        }
-    };
+      // Sắp xếp và phân trang
+      query = query
+        .order("MaKH", { ascending: true })
+        .range(from, to);
+
+      const { data, count, error } = await query;
+      
+      if (error) throw error;
+      
+      setCustomers(data || []);
+      setTotalCount(count || 0);
+
+      // Nếu trang hiện tại không còn dữ liệu (do xóa/tìm kiếm), quay về trang 1
+      if (data.length === 0 && count > 0 && page > 1) {
+        setPage(1);
+      }
+
+    } catch (err) {
+      console.error("Lỗi tải danh sách khách hàng:", err);
+      toast.error("Không thể tải dữ liệu khách hàng.");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, pageSize, debouncedSearch]); // <= Phụ thuộc vào trang, cỡ trang, và TÌM KIẾM
+
+  // Trigger fetch khi các dependencies thay đổi
+  useEffect(() => {
+    fetchCustomers();
+  }, [fetchCustomers]);
+
+  // Reset về trang 1 khi tìm kiếm
+  useEffect(() => {
+    if (page !== 1) setPage(1);
+  }, [debouncedSearch]);
+
+
+  // --- Form ---
+  const openForm = (customer = null) => {
+    setFormError("");
+    setIsSubmitting(false);
+    if (customer) {
+      setSelectedCustomer(customer);
+      setForm({
+        TenKH: customer.TenKH,
+        DiaChi: customer.DiaChi,
+        Email: customer.Email,
+        SDT: customer.SDT,
+      });
+    } else {
+      setSelectedCustomer(null);
+      setForm({ TenKH: "", DiaChi: "", Email: "", SDT: "" });
+    }
+    setShowForm(true);
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setSelectedCustomer(null);
+  };
+
+  const validateForm = () => {
+    if (!form.TenKH.trim()) return "Tên không được trống.";
+    if (!form.DiaChi.trim()) return "Địa chỉ không được trống.";
+    if (!form.Email.trim()) return "Email không được trống.";
+    if (!form.SDT.trim()) return "Số điện thoại không được trống.";
+    return "";
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    const err = validateForm();
+    if (err) return setFormError(err);
     
-    // --- Lọc tìm kiếm ---
-    const filteredCustomers = useMemo(() => {
-        const q = search.toLowerCase();
-        return customers.filter((c) => 
-            c.full_name?.toLowerCase().includes(q) ||
-            c.email?.toLowerCase().includes(q) ||
-            c.address?.toLowerCase().includes(q) ||
-            c.phone_number?.toLowerCase?.().includes(q)
-        );
-    }, [customers, search]);
+    setIsSubmitting(true);
+    setFormError("");
+    
+    try {
+      if (selectedCustomer) {
+        // --- Sửa ---
+        const { error } = await supabase
+          .from("KhachHang")
+          .update(form)
+          .eq("MaKH", selectedCustomer.MaKH);
+        if (error) throw error;
+        toast.success("Cập nhật khách hàng thành công!");
+      } else {
+        // --- Thêm ---
+        const { error } = await supabase.from("KhachHang").insert(form);
+        if (error) throw error;
+        toast.success("Thêm khách hàng thành công!");
+      }
+      fetchCustomers();
+      closeForm();
+    } catch (err) {
+      console.error("Lỗi lưu:", err);
+      setFormError("Không thể lưu dữ liệu: " + err.message);
+      toast.error("Lỗi: " + err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-    return (
-        <div className="p-6 space-y-6">
-            <h1 className="text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
-                <UsersThree size={30} weight="duotone" className="text-sky-600" />
-                Quản lý Khách hàng
-            </h1>
+  // --- Delete (ĐÃ CẬP NHẬT) ---
+  const openDeleteConfirm = (c) => {
+    setSelectedCustomer(c);
+    setShowDeleteConfirm(true);
+  };
+  const closeDeleteConfirm = () => setShowDeleteConfirm(false);
 
-            {/* --- Thanh tìm kiếm --- */}
-            <div className="relative">
-                <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                    type="text"
-                    placeholder="Tìm theo tên, email, địa chỉ, SĐT..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 rounded-lg border border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-sky-400 outline-none transition"
-                />
-            </div>
+  const handleDelete = async () => {
+    if (!selectedCustomer) return;
+    try {
+      const { error } = await supabase.from("KhachHang").delete().eq("MaKH", selectedCustomer.MaKH);
+      if (error) throw error;
+      toast.success(`Đã xóa khách hàng ${selectedCustomer.TenKH}.`);
+      fetchCustomers();
+      closeDeleteConfirm();
+    } catch (err) {
+      toast.error("Xóa thất bại: " + err.message);
+    }
+  };
 
-            {/* --- Bảng khách hàng --- */}
-            <div className="bg-white dark:bg-slate-800 shadow-lg rounded-xl overflow-hidden border border-gray-200 dark:border-slate-700">
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
-                        <thead className="bg-gray-50 dark:bg-slate-700/40">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Tên Khách hàng</th>
-                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Email</th>
-                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Số điện thoại</th>
-                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Địa chỉ</th>
-                                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Hành động</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
-                            {loading ? (
-                                <tr><td colSpan="5" className="p-8 text-center"><FaSpinner className="animate-spin text-2xl mx-auto" /></td></tr>
-                            ) : filteredCustomers.length === 0 ? (
-                                <tr><td colSpan="5" className="p-8 text-center text-gray-500 italic">Không tìm thấy khách hàng.</td></tr>
-                            ) : (
-                                filteredCustomers.map(c => (
-                                    <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
-                                        <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">{c.full_name}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.email}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.phone_number || 'N/A'}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.address || 'N/A'}</td>
-                                        <td className="px-6 py-4 text-center whitespace-nowrap space-x-2">
-                                            <button 
-                                                onClick={() => handleEditUser(c)}
-                                                className="p-2 text-blue-500 hover:text-blue-700" title="Cập nhật thông tin">
-                                                <FaUserEdit size={16} />
-                                            </button>
-                                            <button 
-                                                onClick={() => setSelectedUser(c)}
-                                                className="p-2 text-green-500 hover:text-green-700" title="Xem lịch sử đặt tour">
-                                                <FaHistory size={16} />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            
-            {/* --- Component Quản lý Đánh giá --- */}
-            <ManageReviews />
+  // --- Pagination controls (ĐÃ CẬP NHẬT) ---
+  const handlePageChange = (newPage) => {
+    if (typeof newPage === 'number') {
+      setPage(newPage);
+    }
+  };
+  
+  // Tạo cửa sổ phân trang
+  const paginationWindow = useMemo(
+    () => getPaginationWindow(page, totalPages, 2),
+    [page, totalPages]
+  );
 
-            {/* --- Modal Lịch sử --- */}
-            {selectedUser && (
-                <CustomerHistoryModal user={selectedUser} onClose={() => setSelectedUser(null)} />
-            )}
+  return (
+    <div className="p-6 space-y-6 min-h-screen dark:bg-slate-900 dark:text-white">
+      <h1 className="text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+        <UsersThree size={30} weight="duotone" className="text-sky-600" />
+        Quản lý Khách hàng (CRUD)
+      </h1>
+
+      {/* --- Thanh tìm kiếm + thêm (ĐÃ CẬP NHẬT) --- */}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="relative w-full md:w-auto">
+          <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Tìm theo tên khách hàng..."
+            className="w-full md:w-80 pl-12 pr-4 py-3 rounded-lg border border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-sky-400 outline-none transition"
+          />
         </div>
-    );
+        <button
+          onClick={() => openForm()}
+          className="w-full md:w-auto bg-sky-600 hover:bg-sky-700 text-white px-5 py-3 rounded-lg flex items-center justify-center gap-2 font-semibold transition-all"
+        >
+          <FaPlus /> Thêm khách hàng
+        </button>
+      </div>
+
+      {/* --- Bảng dữ liệu (ĐÃ CẬP NHẬT) --- */}
+      <div className="bg-white dark:bg-slate-800 shadow-lg rounded-xl overflow-hidden border border-gray-200 dark:border-slate-700">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+            <thead className="bg-gray-50 dark:bg-slate-700/40">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">#</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Tên khách hàng</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Địa chỉ</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">SĐT</th>
+                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Hành động</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+              {loading ? (
+                <tr><td colSpan="6" className="p-8 text-center"><FaSpinner className="animate-spin text-2xl mx-auto text-sky-500" /></td></tr>
+              ) : customers.length === 0 ? (
+                <tr><td colSpan="6" className="p-8 text-center text-gray-500 italic">
+                  {searchTerm ? "Không tìm thấy khách hàng." : "Chưa có dữ liệu khách hàng."}
+                </td></tr>
+              ) : (
+                customers.map((c, i) => (
+                  <tr key={c.MaKH} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{(page - 1) * pageSize + i + 1}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">{c.TenKH}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.DiaChi}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.Email}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.SDT}</td>
+                    <td className="px-6 py-4 text-center whitespace-nowrap space-x-2">
+                      <button 
+                          onClick={() => openForm(c)}
+                          className="p-2 text-blue-500 hover:text-blue-700 dark:hover:text-blue-400 transition-all rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30" 
+                          title="Sửa">
+                          <Pencil size={18} weight="bold" />
+                      </button>
+                      <button 
+                          onClick={() => openDeleteConfirm(c)}
+                          className="p-2 text-red-500 hover:text-red-700 dark:hover:text-red-400 transition-all rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30" 
+                          title="Xóa">
+                          <Trash size={18} weight="bold" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* --- Phân trang (ĐÃ CẬP NHẬT) --- */}
+      {customers.length > 0 && (
+        <div className="flex justify-center items-center mt-6 gap-2">
+          <button
+            onClick={() => handlePageChange(page - 1)}
+            disabled={page === 1}
+            className="px-3 py-2 bg-gray-100 text-gray-700 rounded-md disabled:opacity-50 dark:bg-slate-700 dark:text-gray-300 dark:disabled:opacity-40 hover:bg-gray-200 dark:hover:bg-slate-600"
+          >
+            Trang trước
+          </button>
+          
+          {paginationWindow.map((p, idx) => 
+            p === "..." ? (
+              <span key={`dots-${idx}`} className="px-4 py-2 text-gray-500 dark:text-gray-400">...</span>
+            ) : (
+              <button
+                key={p}
+                onClick={() => handlePageChange(p)}
+                className={`w-10 h-10 rounded-md font-semibold ${
+                  page === p
+                    ? "bg-sky-600 text-white"
+                    : "bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600"
+                }`}
+              >
+                {p}
+              </button>
+            )
+          )}
+          
+          <button
+            onClick={() => handlePageChange(page + 1)}
+            disabled={page === totalPages}
+            className="px-3 py-2 bg-gray-100 text-gray-700 rounded-md disabled:opacity-50 dark:bg-slate-700 dark:text-gray-300 dark:disabled:opacity-40 hover:bg-gray-200 dark:hover:bg-slate-600"
+          >
+            Trang tiếp
+          </button>
+        </div>
+      )}
+
+      {/* --- Modal form (ĐÃ CẬP NHẬT) --- */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-xl w-full max-w-lg">
+            <h3 className="text-xl font-bold text-slate-800 dark:text-white text-center mb-4">
+              {selectedCustomer ? "Sửa thông tin Khách hàng" : "Thêm Khách hàng mới"}
+            </h3>
+            {formError && (
+              <p className="text-sm text-red-500 dark:text-red-400 mb-3 bg-red-50 dark:bg-red-900/30 p-2 rounded-md text-center">{formError}</p>
+            )}
+            <form onSubmit={handleSave} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tên khách hàng</label>
+                <input
+                  value={form.TenKH}
+                  onChange={(e) => setForm({ ...form, TenKH: e.target.value })}
+                  className="border border-gray-300 p-2 rounded-md w-full dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:ring-sky-500 focus:border-sky-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Địa chỉ</label>
+                <input
+                  value={form.DiaChi}
+                  onChange={(e) => setForm({ ...form, DiaChi: e.target.value })}
+                  className="border border-gray-300 p-2 rounded-md w-full dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:ring-sky-500 focus:border-sky-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={form.Email}
+                  onChange={(e) => setForm({ ...form, Email: e.target.value })}
+                  className="border border-gray-300 p-2 rounded-md w-full dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:ring-sky-500 focus:border-sky-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">SĐT</label>
+                <input
+                  value={form.SDT}
+                  onChange={(e) => setForm({ ...form, SDT: e.target.value })}
+                  className="border border-gray-300 p-2 rounded-md w-full dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:ring-sky-500 focus:border-sky-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md font-semibold hover:bg-gray-300 dark:bg-slate-600 dark:text-gray-200 dark:hover:bg-slate-500"
+                  onClick={closeForm}
+                  disabled={isSubmitting}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="bg-green-600 text-white px-4 py-2 rounded-md font-semibold hover:bg-green-700 flex items-center gap-2 disabled:opacity-50"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? <FaSpinner className="animate-spin" /> : null}
+                  {isSubmitting ? "Đang lưu..." : "Lưu"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- Modal xác nhận xóa (ĐÃ CẬP NHẬT) --- */}
+      {showDeleteConfirm && selectedCustomer && (
+        <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-xl w-full max-w-md text-center">
+            <h4 className="text-xl font-bold text-red-600 dark:text-red-400 mb-3">
+              Xác nhận xóa
+            </h4>
+            <p className="mb-6 text-gray-700 dark:text-gray-300">
+              Bạn có chắc muốn xóa khách hàng{" "}
+              <b className="dark:text-white">{selectedCustomer.TenKH}</b> không?
+              <br/>
+              Hành động này không thể hoàn tác.
+            </p>
+            <div className="flex justify-center gap-4">
+              <button
+                className="bg-gray-200 text-gray-800 px-5 py-2 rounded-md font-semibold hover:bg-gray-300 dark:bg-slate-600 dark:text-gray-200 dark:hover:bg-slate-500"
+                onClick={closeDeleteConfirm}
+              >
+                Hủy
+              </button>
+              <button
+                className="bg-red-600 text-white px-5 py-2 rounded-md font-semibold hover:bg-red-700"
+                onClick={handleDelete}
+              >
+                Xác nhận Xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
