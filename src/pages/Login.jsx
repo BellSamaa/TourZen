@@ -1,69 +1,23 @@
 // src/pages/Login.jsx
-// (Nâng cấp giao diện "Hoa lá cành" + Hiệu ứng)
+// (Nâng cấp giao diện "Hoa lá cành" + Hiệu ứng - Đã sửa lỗi khai báo kép)
 import React, { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom"; // <<< Thêm useLocation
+import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     FaLock, FaEye, FaEyeSlash, FaUser, FaEnvelope, FaSignInAlt,
-    FaMapMarkerAlt, FaPhone, FaInfoCircle, FaCheckCircle // <<< Thêm CheckCircle
+    FaMapMarkerAlt, FaPhone, FaInfoCircle, FaCheckCircle
 } from "react-icons/fa";
 import { getSupabase } from "../lib/supabaseClient";
 
 const supabase = getSupabase();
 
-// --- Component PasswordStrengthMeter (Đã sửa màu chữ) ---
-const PasswordStrengthMeter = ({ password }) => {
-    const [strength, setStrength] = useState({ score: 0, label: '', color: '', textColor: 'text-gray-400' }); // <<< Mặc định màu text xám nhạt
-
-    useEffect(() => {
-        let score = 0; let label = 'Yếu 😕'; let color = 'bg-red-500'; let textColor = 'text-red-300'; // <<< Màu chữ sáng hơn
-        if (!password) { setStrength({ score: 0, label: '', color: '', textColor: 'text-gray-400' }); return; }
-        // ... (logic tính score giữ nguyên) ...
-        if (password.length >= 8) score++; if (/[A-Z]/.test(password)) score++; if (/[a-z]/.test(password)) score++; if (/[0-9]/.test(password)) score++; if (/[^A-Za-z0-9]/.test(password)) score++;
-        switch (score) {
-            case 5: label = 'Rất mạnh 💪'; color = 'bg-emerald-500'; textColor = 'text-emerald-300'; break;
-            case 4: label = 'Mạnh 👍'; color = 'bg-green-500'; textColor = 'text-green-300'; break;
-            case 3: label = 'Trung bình 🙂'; color = 'bg-yellow-500'; textColor = 'text-yellow-300'; break;
-            default: label = 'Yếu 😕'; color = 'bg-red-500'; textColor = 'text-red-300'; break;
-        }
-        setStrength({ score, label, color, textColor });
-    }, [password]);
-
-    if (!password) return null;
-
-    return (
-        <div className="w-full mt-1">
-            <div className="relative w-full h-1.5 bg-white/20 rounded-full overflow-hidden"> {/* <<< Nền thanh trắng mờ */}
-                <motion.div
-                    className={`absolute top-0 left-0 h-full rounded-full ${strength.color}`}
-                    initial={{ width: '0%' }}
-                    animate={{ width: `${(strength.score / 5) * 100}%` }}
-                    transition={{ duration: 0.5, ease: "easeOut" }}
-                />
-            </div>
-            <AnimatePresence>
-                {strength.label && (
-                    <motion.p
-                        key={strength.label}
-                        className={`text-xs text-right mt-1 font-medium ${strength.textColor}`} // <<< Dùng textColor đã sửa
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                    >
-                        {strength.label}
-                    </motion.p>
-                )}
-            </AnimatePresence>
-        </div>
-    );
-};
-
+// --- Component PasswordStrengthMeter (Định nghĩa đầy đủ ở dưới) ---
+// <<< ĐÃ XÓA ĐỊNH NGHĨA Ở ĐÂY >>>
 
 // --- Component chính ---
 export default function Login() {
     const navigate = useNavigate();
-    const location = useLocation(); // <<< Lấy location
+    const location = useLocation();
     const [mode, setMode] = useState('login');
     const initialFormState = { name: "", email: "", password: "", confirm: "", address: "", phone_number: "" };
     const [form, setForm] = useState(initialFormState);
@@ -87,16 +41,9 @@ export default function Login() {
                 if (signUpError) throw signUpError;
                 if (user) {
                     const { error: insertError } = await supabase.from('Users').insert({ id: user.id, full_name: form.name, email: form.email, address: form.address, phone_number: form.phone_number });
-                    // Lưu ý quan trọng về RLS: Đảm bảo policy cho phép user mới insert vào bảng Users
-                    if (insertError) {
-                        console.error("Insert profile error:", insertError);
-                        // Cân nhắc xóa user trong auth nếu insert lỗi nghiêm trọng
-                        throw new Error(`Lỗi lưu hồ sơ: ${insertError.message}. Vui lòng thử lại.`);
-                    }
+                    if (insertError) { console.error("Insert profile error:", insertError); throw new Error(`Lỗi lưu hồ sơ: ${insertError.message}. Vui lòng thử lại.`); }
                     setSuccess("Đăng ký thành công! 🎉 Vui lòng kiểm tra email để xác nhận.");
                     setForm(initialFormState);
-                    // Có thể tự động chuyển sang login sau khi đăng ký thành công
-                    // setTimeout(() => setMode('login'), 2000);
                 } else throw new Error("Không thể tạo người dùng.");
             } else { // Login
                 const { data: { user }, error: signInError } = await supabase.auth.signInWithPassword({ email: form.email, password: form.password });
@@ -104,24 +51,20 @@ export default function Login() {
                 if (user) {
                     const { data: userData, error: userError } = await supabase.from('Users').select('role, is_active').eq('id', user.id).single();
                     if (userError) {
-                         // Nếu lỗi ở đây có thể do chưa có profile -> tạo profile mặc định
-                         if (userError.code === 'PGRST116') { // code cho "relation 'Users' does not contain row"
+                         if (userError.code === 'PGRST116') {
                              const { error: insertError } = await supabase.from('Users').insert({ id: user.id, email: user.email });
                              if (insertError) throw new Error("Lỗi tạo hồ sơ người dùng.");
-                             // Tạo xong thì điều hướng về trang chủ
                              navigate(location.state?.from?.pathname || "/", { replace: true });
-                             return; // Kết thúc sớm
+                             return;
                          } else {
                              throw new Error("Lỗi lấy thông tin người dùng.");
                          }
                     }
                     if (userData) {
                         if (userData.is_active === false) { await supabase.auth.signOut(); throw new Error("Tài khoản của bạn đã bị khóa. 🔒"); }
-                        // <<< Điều hướng thông minh hơn: về trang trước đó nếu có >>>
                         const from = location.state?.from?.pathname || (userData.role === 'admin' ? "/admin" : "/");
                         navigate(from, { replace: true });
                     } else {
-                        // Trường hợp không có userData nhưng không phải lỗi PGRST116 (hiếm gặp)
                         throw new Error("Không tìm thấy hồ sơ người dùng.");
                     }
                 }
@@ -157,7 +100,7 @@ export default function Login() {
     return (
         <div
             className="min-h-screen w-full flex items-center justify-center p-4 overflow-hidden bg-cover bg-center bg-no-repeat"
-            style={{ backgroundImage: "url('/images/login-background.jpg')" }} // <<< Đảm bảo ảnh tồn tại
+            style={{ backgroundImage: "url('/images/login-background.jpg')" }}
         >
             {/* Lớp phủ Gradient */}
             <motion.div
@@ -190,10 +133,10 @@ export default function Login() {
                 </motion.div>
 
                 {/* Error/Success Messages */}
-                <AnimatePresence mode="wait"> {/* <<< Thêm mode="wait" */}
+                <AnimatePresence mode="wait">
                     {error && (
                         <motion.div
-                            key="error-message" // <<< Thêm key
+                            key="error-message"
                             className="bg-red-500/80 border border-red-400 text-white p-3 mb-4 rounded-xl text-sm font-semibold text-center flex items-center justify-center gap-2 shadow-lg"
                             variants={messageVariants} initial="hidden" animate="visible" exit="exit"
                         >
@@ -202,7 +145,7 @@ export default function Login() {
                     )}
                     {success && (
                         <motion.div
-                            key="success-message" // <<< Thêm key
+                            key="success-message"
                             className="bg-green-500/80 border border-green-400 text-white p-3 mb-4 rounded-xl text-sm font-semibold text-center flex items-center justify-center gap-2 shadow-lg"
                             variants={messageVariants} initial="hidden" animate="visible" exit="exit"
                         >
@@ -215,7 +158,7 @@ export default function Login() {
                 <motion.form onSubmit={handleSubmit} className="space-y-5" variants={inputGroupVariants}>
                      <AnimatePresence mode="popLayout">
                         {mode === 'register' && (
-                            <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout> {/* <<< Thêm layout */}
+                            <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
                                 <FaUser className="input-icon" />
                                 <input type="text" placeholder="Họ và tên" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field" required />
                             </motion.div>
@@ -228,11 +171,11 @@ export default function Login() {
 
                         {mode === 'register' && (
                             <>
-                                <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout> {/* <<< Thêm layout */}
+                                <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
                                     <FaMapMarkerAlt className="input-icon" />
                                     <input type="text" placeholder="Địa chỉ (Tỉnh/Thành phố)" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="input-field" />
                                 </motion.div>
-                                <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout> {/* <<< Thêm layout */}
+                                <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
                                     <FaPhone className="input-icon" />
                                     <input type="tel" placeholder="Số điện thoại" value={form.phone_number} onChange={(e) => setForm({ ...form, phone_number: e.target.value })} className="input-field" />
                                 </motion.div>
@@ -248,13 +191,13 @@ export default function Login() {
                         </motion.div>
 
                         {mode === 'register' && (
-                            <motion.div variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout> {/* <<< Thêm layout */}
+                            <motion.div variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
                                 <PasswordStrengthMeter password={form.password} />
                             </motion.div>
                         )}
 
                         {mode === 'register' && (
-                            <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout> {/* <<< Thêm layout */}
+                            <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
                                 <FaLock className="input-icon" />
                                 <input type={showConfirm ? "text" : "password"} placeholder="Nhập lại mật khẩu" value={form.confirm} onChange={(e) => setForm({ ...form, confirm: e.target.value })} className="input-field pr-10" required />
                                 <span className="absolute top-1/2 transform -translate-y-1/2 right-3 cursor-pointer text-gray-400 hover:text-white transition-colors" onClick={() => setShowConfirm(!showConfirm)}>
@@ -274,8 +217,8 @@ export default function Login() {
                     >
                         {loading ? (
                              <>
-                                <svg className="animate-spin h-5 w-5 text-white" /* ... svg code ... */>
-                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
                                 <span>Đang xử lý...</span>
                             </>
@@ -327,12 +270,12 @@ export default function Login() {
     );
 }
 
-// --- Component PasswordStrengthMeter (Đã sửa màu chữ) ---
+// --- Component PasswordStrengthMeter (Định nghĩa đầy đủ ở đây) ---
 const PasswordStrengthMeter = ({ password }) => {
-    // ... (code component này giữ nguyên từ phiên bản trước) ...
-     const [strength, setStrength] = useState({ score: 0, label: '', color: '', textColor: 'text-gray-400' });
+    const [strength, setStrength] = useState({ score: 0, label: '', color: '', textColor: 'text-gray-400' }); // <<< Mặc định màu text xám nhạt
+
     useEffect(() => {
-        let score = 0; let label = 'Yếu 😕'; let color = 'bg-red-500'; let textColor = 'text-red-300';
+        let score = 0; let label = 'Yếu 😕'; let color = 'bg-red-500'; let textColor = 'text-red-300'; // <<< Màu chữ sáng hơn
         if (!password) { setStrength({ score: 0, label: '', color: '', textColor: 'text-gray-400' }); return; }
         if (password.length >= 8) score++; if (/[A-Z]/.test(password)) score++; if (/[a-z]/.test(password)) score++; if (/[0-9]/.test(password)) score++; if (/[^A-Za-z0-9]/.test(password)) score++;
         switch (score) {
@@ -343,14 +286,32 @@ const PasswordStrengthMeter = ({ password }) => {
         }
         setStrength({ score, label, color, textColor });
     }, [password]);
+
     if (!password) return null;
+
     return (
         <div className="w-full mt-1">
-            <div className="relative w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
-                <motion.div className={`absolute top-0 left-0 h-full rounded-full ${strength.color}`} initial={{ width: '0%' }} animate={{ width: `${(strength.score / 5) * 100}%` }} transition={{ duration: 0.5, ease: "easeOut" }} />
+            <div className="relative w-full h-1.5 bg-white/20 rounded-full overflow-hidden"> {/* <<< Nền thanh trắng mờ */}
+                <motion.div
+                    className={`absolute top-0 left-0 h-full rounded-full ${strength.color}`}
+                    initial={{ width: '0%' }}
+                    animate={{ width: `${(strength.score / 5) * 100}%` }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                />
             </div>
             <AnimatePresence>
-                {strength.label && (<motion.p key={strength.label} className={`text-xs text-right mt-1 font-medium ${strength.textColor}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>{strength.label}</motion.p>)}
+                {strength.label && (
+                    <motion.p
+                        key={strength.label}
+                        className={`text-xs text-right mt-1 font-medium ${strength.textColor}`} // <<< Dùng textColor đã sửa
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                    >
+                        {strength.label}
+                    </motion.p>
+                )}
             </AnimatePresence>
         </div>
     );
