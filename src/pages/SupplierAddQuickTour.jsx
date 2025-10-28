@@ -1,17 +1,19 @@
 // src/pages/SupplierAddQuickTour.jsx
+// (NÂNG CẤP: Xóa bỏ logic 'inventory' cũ)
+
 import React, { useState, useEffect, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom"; // Import Link
+import { Link, useNavigate } from "react-router-dom";
 import { getSupabase } from "../lib/supabaseClient";
 import { useAuth } from "../context/AuthContext";
-// 👇 1. Import dữ liệu tour mẫu (Đảm bảo đường dẫn và tên biến đúng) 👇
-import { TOURS } from "../data/tours"; // Sửa lại tên file nếu cần
+import { TOURS } from "../data/tours";
 import { FaPlus, FaCheckCircle, FaSpinner, FaExclamationCircle } from "react-icons/fa";
+import toast from "react-hot-toast"; // (MỚI) Dùng toast thay vì alert
 
 const supabase = getSupabase();
 
 // --- Hàm format tiền tệ ---
 const formatCurrency = (number) => {
-    if (typeof number !== "number" || isNaN(number)) return "Liên hệ"; // Hoặc "0 ₫"
+    if (typeof number !== "number" || isNaN(number)) return "Liên hệ";
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(number);
 };
 
@@ -25,49 +27,46 @@ const LoadingComponent = () => (
 
 export default function SupplierAddQuickTour() {
     const navigate = useNavigate();
-    const { user } = useAuth(); // Lấy user đang đăng nhập
-    const [localTours, setLocalTours] = useState(TOURS); // Dùng TOURS từ file data
-    const [addingStatus, setAddingStatus] = useState({}); // Trạng thái thêm từng tour
-    const [loadingData, setLoadingData] = useState(true); // Trạng thái load ban đầu
-    const [dbTourCodes, setDbTourCodes] = useState(new Set()); // Mã tour đã có trong DB
-    const [loggedInSupplierId, setLoggedInSupplierId] = useState(null); // ID của Supplier này
+    const { user } = useAuth();
+    const [localTours, setLocalTours] = useState(TOURS); 
+    const [addingStatus, setAddingStatus] = useState({}); 
+    const [loadingData, setLoadingData] = useState(true); 
+    const [dbTourCodes, setDbTourCodes] = useState(new Set());
+    const [loggedInSupplierId, setLoggedInSupplierId] = useState(null); 
 
-    // Fetch dữ liệu cần thiết: mã tour đã có VÀ supplier_id của user đang đăng nhập
     const fetchData = useCallback(async () => {
         if (!user) {
             setLoadingData(false);
             return;
         }
         setLoadingData(true);
-        setLoggedInSupplierId(null); // Reset supplier ID trước khi fetch
+        setLoggedInSupplierId(null); 
 
-        try { // Thêm try...catch để bắt lỗi
+        try { 
             const [productRes, supplierRes] = await Promise.all([
                 supabase.from('Products').select('tour_code').eq('product_type', 'tour'),
                 supabase.from('Suppliers').select('id').eq('user_id', user.id).maybeSingle()
             ]);
 
-            // Xử lý product codes
             if (productRes.error) {
                 console.error('Lỗi fetch existing tour codes:', productRes.error);
             } else if (productRes.data) {
                 setDbTourCodes(new Set(productRes.data.map(p => p.tour_code)));
             }
 
-            // Xử lý supplier ID
             if (supplierRes.error) {
                 console.error('Lỗi fetch supplier ID for user:', supplierRes.error);
-                alert("Lỗi: Không tìm thấy thông tin Nhà cung cấp liên kết với tài khoản của bạn. Vui lòng liên hệ Admin.");
+                toast.error("Lỗi: Không tìm thấy thông tin Nhà cung cấp của bạn.");
                 setLoggedInSupplierId(null);
             } else if (supplierRes.data) {
                 setLoggedInSupplierId(supplierRes.data.id);
             } else {
-                 alert("Lỗi: Tài khoản của bạn chưa được liên kết với Nhà cung cấp nào. Vui lòng liên hệ Admin.");
+                 toast.error("Lỗi: Tài khoản của bạn chưa được liên kết với Nhà cung cấp.");
                  setLoggedInSupplierId(null);
             }
         } catch (err) {
             console.error("Lỗi fetch data:", err);
-            alert("Đã xảy ra lỗi khi tải dữ liệu cần thiết.");
+            toast.error("Đã xảy ra lỗi khi tải dữ liệu.");
         } finally {
             setLoadingData(false);
         }
@@ -82,7 +81,7 @@ export default function SupplierAddQuickTour() {
         const tourCode = String(tourToAdd.id);
 
         if (!user || !loggedInSupplierId) {
-            alert("Lỗi: Không thể xác định Nhà cung cấp. Vui lòng đăng nhập lại hoặc liên hệ Admin.");
+            toast.error("Lỗi: Không thể xác định Nhà cung cấp. Vui lòng đăng nhập lại.");
             return;
         }
 
@@ -93,14 +92,16 @@ export default function SupplierAddQuickTour() {
 
         setAddingStatus((prev) => ({ ...prev, [tourCode]: 'adding' }));
 
+        // (SỬA) Xóa bỏ 'inventory' vì đã lỗi thời
+        // Slots bây giờ được quản lý bằng bảng 'Departures'
         const productData = {
             name: tourToAdd.title,
             tour_code: tourCode,
             price: tourToAdd.price || 0,
-            inventory: tourToAdd.inventory || 10,
+            // inventory: tourToAdd.inventory || 10, // <-- (ĐÃ XÓA)
             product_type: 'tour',
             supplier_id: loggedInSupplierId,
-            approval_status: 'pending',
+            approval_status: 'pending', // Chờ Admin duyệt
             image_url: tourToAdd.image,
             description: tourToAdd.description,
             duration: tourToAdd.duration,
@@ -118,16 +119,16 @@ export default function SupplierAddQuickTour() {
             console.error('Lỗi insert tour:', insertError);
             setAddingStatus((prev) => ({ ...prev, [tourCode]: 'error' }));
              if (insertError.code === '23505') {
-                 alert(`Lỗi khi thêm tour "${tourToAdd.title}": Mã Tour "${tourCode}" đã tồn tại.`);
+                 toast.error(`Lỗi: Mã Tour "${tourCode}" đã tồn tại.`);
                  setAddingStatus((prev) => ({ ...prev, [tourCode]: 'exists' }));
                  setDbTourCodes(prev => new Set(prev).add(tourCode));
              } else {
-                 alert(`Lỗi khi thêm tour "${tourToAdd.title}": ${insertError.message}`);
+                 toast.error(`Lỗi khi thêm tour: ${insertError.message}`);
              }
         } else {
             setAddingStatus((prev) => ({ ...prev, [tourCode]: 'added' }));
             setDbTourCodes(prev => new Set(prev).add(tourCode));
-            alert(`Đã thêm tour "${tourToAdd.title}" thành công.\nTour đang chờ Admin phê duyệt.`);
+            toast.success(`Đã thêm tour "${tourToAdd.title}"!\nTour đang chờ Admin phê duyệt.`);
         }
     };
 
@@ -158,7 +159,9 @@ export default function SupplierAddQuickTour() {
                 Thêm Nhanh Tour Mẫu
             </h1>
             <p className="text-md text-gray-600 dark:text-gray-400 mb-8">
-                Chọn các tour mẫu có sẵn dưới đây để thêm vào danh mục sản phẩm của bạn. Các tour mới sẽ cần được Admin phê duyệt trước khi hiển thị công khai.
+                Chọn các tour mẫu có sẵn dưới đây để thêm vào danh mục sản phẩm của bạn. Các tour mới sẽ cần được Admin phê duyệt.
+                <br/>
+                <span className="font-semibold text-sky-600 dark:text-sky-400">Lưu ý:</span> Sau khi thêm, bạn cần vào "Quản lý Tour" để thêm Lịch khởi hành và Slots cho tour.
             </p>
 
             <div className="bg-white dark:bg-neutral-800 shadow-xl rounded-lg overflow-hidden border dark:border-slate-700">
@@ -181,11 +184,9 @@ export default function SupplierAddQuickTour() {
                                     <div className="min-w-0">
                                         <p className="text-base font-semibold text-gray-900 dark:text-white truncate">{tour.title}</p>
                                         <p className="text-sm text-gray-500 dark:text-gray-400">Mã: {tour.id}</p>
-                                        {/* Sử dụng formatCurrency */}
                                         <p className="text-sm text-red-600 font-medium">{formatCurrency(tour.price)}</p>
                                     </div>
                                 </div>
-                                {/* Nút Thêm và Trạng thái */}
                                 <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
                                     {status === 'idle' && (
                                         <button
