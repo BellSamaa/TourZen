@@ -25,7 +25,7 @@ import {
   Sparkle,
   Wallet,
 } from "@phosphor-icons/react"; // <<< THÊM Icons mới
-import { getSupabase } from "../lib/supabaseClient";
+import { getSupabase } from "./lib/supabaseClient";
 import toast from "react-hot-toast";
 
 const supabase = getSupabase();
@@ -497,10 +497,13 @@ export default function ManageCustomersSupabase() {
       // Lưu ý: Thao tác này chỉ xóa hồ sơ trong bảng 'Users'
       // Nó KHÔNG xóa tài khoản trong 'auth.users'
       // (Để xóa auth user, cần gọi hàm RLS từ Edge Function)
-      const { error }_ = await supabase
+      
+      // SỬA LỖI Ở ĐÂY: Đã xóa dấu "_" thừa
+      const { error } = await supabase
         .from("Users")
         .delete()
         .eq("id", selectedCustomer.id);
+
       if (error) throw error;
       toast.success(
         `Đã xóa hồ sơ "${selectedCustomer.full_name || selectedCustomer.email}"!`
@@ -518,7 +521,6 @@ export default function ManageCustomersSupabase() {
       );
     }
   };
-
   // --- Pagination Window ---
   const paginationWindow = useMemo(
     () => getPaginationWindow(currentPage, totalPages, 2),
