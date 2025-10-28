@@ -92,26 +92,70 @@ const StatCard = ({ title, value, icon, loading }) => (
   </motion.div>
 );
 
-// --- Component Lấy Dữ Liệu Thống Kê (Tối ưu Stagger) ---
+// --- Component Lấy Dữ Liệu Thống Kê (ĐÃ SỬA LỖI ĐẾM VIP) ---
 const CustomerStats = () => {
   const [stats, setStats] = useState({ total: 0, vip: 0, new: 0, spend: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Logic fetch (giữ nguyên)
     const fetchStats = async () => {
+      setLoading(true);
       try {
-        const { count: totalCount } = await supabase.from("Users").select("id", { count: "exact", head: true }).eq("role", "user");
-        const { data: spendData } = await supabase.from("Bookings").select("total_price").eq("status", "confirmed");
-        const totalSpend = spendData.reduce((sum, row) => sum + (row.total_price || 0), 0);
-        const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const { count: newCount } = await supabase.from("Users").select("id", { count: "exact", head: true }).eq("role", "user").gte("created_at", thirtyDaysAgo.toISOString());
-        const { data: allBookings } = await supabase.from("Bookings").select("user_id, total_price").eq("status", "confirmed");
-        const spendByUser = allBookings.reduce((acc, b) => { acc[b.user_id] = (acc[b.user_id] || 0) + (b.total_price || 0); return acc; }, {});
-        const vipCount = Object.values(spendByUser).filter((spend) => spend >= VIP_THRESHOLD).length;
-        setStats({ total: totalCount || 0, vip: vipCount, new: newCount || 0, spend: totalSpend });
-      } catch (error) { console.error("Lỗi fetch stats:", error); } 
-      finally { setLoading(false); }
+        // 1. Tổng khách hàng (role 'user')
+        const { count: totalCount, error: totalErr } = await supabase
+          .from("Users")
+          .select("id", { count: "exact", head: true })
+          .eq("role", "user");
+        if (totalErr) throw totalErr;
+
+        // 2. Tổng chi tiêu (từ Bookings)
+        const { data: spendData, error: spendErr } = await supabase
+          .from("Bookings")
+          .select("total_price")
+          .eq("status", "confirmed");
+        if (spendErr) throw spendErr;
+        const totalSpend = spendData.reduce(
+          (sum, row) => sum + (row.total_price || 0),
+          0
+        );
+
+        // 3. Khách hàng mới (30 ngày qua)
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const { count: newCount, error: newErr } = await supabase
+          .from("Users")
+          .select("id", { count: "exact", head: true })
+          .eq("role", "user")
+          .gte("created_at", thirtyDaysAgo.toISOString());
+        if (newErr) console.warn("Lỗi fetch new users:", newErr.message);
+
+        // 4. (SỬA LỖI) Đếm khách hàng VIP từ cột "customer_tier"
+        const { count: vipCount, error: vipErr } = await supabase
+          .from("Users")
+          .select("id", { count: "exact", head: true })
+          .eq("role", "user")
+          .eq("customer_tier", "VIP"); // <<< ĐÂY LÀ THAY ĐỔI QUAN TRỌNG
+          
+        if (vipErr) {
+            console.error("Lỗi đếm VIP:", vipErr);
+            throw vipErr;
+        }
+        
+        // 5. Cập nhật State
+        setStats({
+          total: totalCount || 0,
+          vip: vipCount || 0, // <<< Sử dụng số đếm mới
+          new: newCount || 0,
+          spend: totalSpend,
+        });
+
+      } catch (error) { 
+        console.error("Lỗi fetch stats:", error);
+        toast.error("Không thể tải dữ liệu thống kê.");
+      } 
+      finally { 
+        setLoading(false); 
+      }
     };
     fetchStats();
   }, []);
