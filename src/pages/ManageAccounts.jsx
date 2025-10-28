@@ -5,7 +5,7 @@ import {
     UsersThree, CaretLeft, CaretRight, CircleNotch, X, MagnifyingGlass,
     PencilLine, ArrowsClockwise, WarningCircle, UserPlus, UserCircleMinus, UserCircleCheck,
     Eye, EyeSlash, CheckCircle, XCircle, User, At, ShieldCheck, CalendarBlank, Hourglass,
-    ArchiveBox // <<< FIX: Sửa từ Inbox thành ArchiveBox
+    Archive // <<< FIX LẦN 3: Sửa từ ArchiveBox thành Archive
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -527,8 +527,8 @@ export default function AdminManageAccounts() {
                                     {!error && !loading && !isFetchingPage && accounts.length === 0 && ( 
                                         <tr><td colSpan="6" className="td-center py-20 text-slate-500">
                                             <div className="flex flex-col items-center">
-                                                {/* <<< FIX: Sửa từ Inbox thành ArchiveBox */}
-                                                <ArchiveBox size={48} className="text-slate-400 mb-4" weight="light" />
+                                                {/* <<< FIX: Sửa từ ArchiveBox thành Archive */}
+                                                <Archive size={48} className="text-slate-400 mb-4" weight="light" />
                                                 <span className="font-sora font-semibold text-lg text-slate-600 dark:text-slate-300">Không tìm thấy tài khoản</span>
                                                 <span className="text-sm mt-1">{debouncedSearch ? `Không có kết quả cho "${debouncedSearch}"` : "Chưa có dữ liệu."}</span>
                                             </div>
