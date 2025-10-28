@@ -90,10 +90,10 @@ function Sidebar() {
                     Tổng Quan
                 </SidebarLink>
                 <SidebarLink to="/admin/tours" icon={<AirplaneTilt size={20} />}>
-                    Quản lý Tour
+                    Quản lý Sản phẩm Tour
                 </SidebarLink>
                 <SidebarLink to="/admin/bookings" icon={<Package size={20} />}>
-                    Quản lý Đơn Đặt
+                    Quản lý Đặt Tour
                 </SidebarLink>
                 <SidebarLink to="/admin/customers" icon={<Users size={20} />}>
                     Quản lý Khách Hàng
