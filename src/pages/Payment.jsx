@@ -97,7 +97,7 @@ export default function Payment() {
         // Nếu là Buy Now VÀ đã chọn lịch
         if (isBuyNow && buyNowItem && selectedDeparture) {
             const slug = buyNowItem.name ? slugify(buyNowItem.name) : '';
-            const image = buyNowItem.image_url || /* ... fallback ảnh ... */;
+const image = buyNowItem.image_url || (buyNowItem.galleryImages && buyNowItem.galleryImages[0]) || (slug ? `/images/tour-${slug}.jpg` : "/images/default.jpg");
             return [{
                 key: selectedDeparture.id, title: buyNowItem.name, image: image,
                 priceAdult: selectedDeparture.adult_price, priceChild: selectedDeparture.child_price,
