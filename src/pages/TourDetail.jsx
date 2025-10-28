@@ -1,16 +1,16 @@
 // src/pages/TourDetail.jsx
-// (NÂNG CẤP: Đã tích hợp bảng "Departures" mới)
+// (NÂNG CẤP: Giữ nguyên giao diện, chỉ xóa phần chọn Slot & Lịch khởi hành)
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getSupabase } from "../lib/supabaseClient";
-import toast, { Toaster } from "react-hot-toast"; // <-- THÊM Toaster
+import toast, { Toaster } from "react-hot-toast";
 import { ParallaxBanner, useParallax } from "react-scroll-parallax";
 import Slider from "react-slick";
 import { 
     FaCreditCard, FaSpinner, FaMapMarkerAlt, FaClock, FaInfoCircle,
     FaCalendarAlt, FaMoneyBillWave, FaChild, FaUser, FaPlus, FaGift, FaPlane, FaStickyNote,
-    FaUsers // <-- THÊM icon
+    FaUsers
 } from "react-icons/fa";
 import { motion, useScroll, useTransform } from "framer-motion";
 import "slick-carousel/slick/slick.css";
@@ -65,121 +65,63 @@ const TourDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const [tour, setTour] = useState(null);
-    const [departures, setDepartures] = useState([]); // <-- MỚI: Lưu lịch khởi hành
+    // (ĐÃ XÓA state: departures, departuresLoading, selectedDepartureId)
     const [loading, setLoading] = useState(true);
-    const [departuresLoading, setDeparturesLoading] = useState(true); // <-- MỚI: Loading cho lịch
     const [error, setError] = useState(null);
-    const [selectedDepartureId, setSelectedDepartureId] = useState(null); // <-- MỚI: ID của lịch đã chọn
 
     const { ref: bannerRef, scrollYProgress } = useScroll();
     const bannerTextY = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
 
-    // --- (SỬA) useEffect fetch data ---
+    // --- (SỬA) useEffect fetch data (chỉ fetch tour) ---
     useEffect(() => {
-        async function fetchTourAndDepartures() {
-            // Kiểm tra ID hợp lệ
+        async function fetchTour() {
             if (!id || !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id)) {
                  setError("ID tour không hợp lệ.");
                  setLoading(false);
-                 setDeparturesLoading(false);
                  return;
             }
-
             setLoading(true);
-            setDeparturesLoading(true);
             setError(null);
             setTour(null);
-            setDepartures([]);
-            setSelectedDepartureId(null);
             window.scrollTo(0, 0);
 
             try {
                 // Fetch 1: Lấy thông tin Tour
-                // (Chỉ lấy tour đã được Duyệt và Đăng)
                 const { data: tourData, error: tourError } = await supabase
                     .from("Products")
                     .select("*, supplier_name:Suppliers(name)")
                     .eq("id", id)
-                    .eq("is_published", true) // <-- QUAN TRỌNG
-                    .eq("approval_status", "approved") // <-- QUAN TRỌNG
+                    .eq("is_published", true)
+                    .eq("approval_status", "approved")
                     .single();
 
                 if (tourError || !tourData) {
                     throw new Error("Tour không tồn tại hoặc đã bị ẩn.");
                 }
-                
                 setTour(tourData);
-                setLoading(false); // <-- Thông tin chính đã tải xong
-
-                // Fetch 2: Lấy Lịch khởi hành
-                const today = new Date().toISOString().split('T')[0];
-                const { data: departuresData, error: departuresError } = await supabase
-                    .from("Departures")
-                    .select("*")
-                    .eq("product_id", id)
-                    .gte("departure_date", today) // Chỉ lấy các ngày trong tương lai
-                    .order("departure_date", { ascending: true });
-                
-                if (departuresError) throw departuresError;
-
-                setDepartures(departuresData || []);
 
             } catch (err) {
                  console.error("Lỗi fetch chi tiết tour:", err);
                  setError(err.message || "Không thể tải thông tin tour. Vui lòng thử lại.");
                  setTour(null);
             } finally {
-                 setLoading(false); // Đảm bảo loading chính tắt
-                 setDeparturesLoading(false); // Tắt loading của lịch
+                 setLoading(false);
             }
         }
         
-        fetchTourAndDepartures();
+        fetchTour();
     }, [id]);
 
-    // --- (MỚI) Tính giá "Từ" thấp nhất ---
-    const displayPrice = useMemo(() => {
-        if (departuresLoading) return tour?.price || 0; // Hiển thị giá gốc trong khi chờ
-        
-        // Lọc các lịch còn chỗ
-        const available = departures.filter(d => d.max_slots > d.booked_slots);
-        
-        if (available.length > 0) {
-            // Tìm giá người lớn nhỏ nhất
-            return Math.min(...available.map(d => d.adult_price));
-        }
-        
-        return tour?.price || 0; // Fallback về giá gốc nếu không có lịch
-    }, [departures, departuresLoading, tour]);
+    // --- (SỬA) Giá "Từ" (Giữ nguyên, dùng giá gốc của tour) ---
+    const displayPrice = tour?.price || 0;
 
-
-    // --- (SỬA) Logic "Đặt Ngay" ---
+    // --- (SỬA) Logic "Đặt Ngay" (Không cần chọn slot nữa) ---
     const handleBookNow = () => {
-        if (!selectedDepartureId) {
-            toast.error("Vui lòng chọn một ngày khởi hành bên dưới.");
-            // Cuộn tới khu vực chọn lịch
-            document.getElementById('departures-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            return;
-        }
-
-        const selectedDeparture = departures.find(d => d.id === selectedDepartureId);
-        if (!selectedDeparture) {
-            toast.error("Lỗi: Ngày khởi hành đã chọn không hợp lệ.");
-            return;
-        }
-        
-        // Kiểm tra lại lần nữa phòng trường hợp data cũ
-        if (selectedDeparture.max_slots <= selectedDeparture.booked_slots) {
-            toast.error("Ngày khởi hành này đã hết chỗ. Vui lòng chọn ngày khác.");
-            setSelectedDepartureId(null); // Reset lựa chọn
-            return;
-        }
-
         // Gửi data qua trang Payment
         navigate('/payment', {
             state: {
                 item: tour, // Gửi toàn bộ thông tin tour
-                selectedDeparture: selectedDeparture // Gửi data LỊCH KHỞI HÀNH đã chọn
+                // (KHÔNG gửi selectedDeparture nữa)
             }
         });
     };
@@ -214,7 +156,7 @@ const TourDetail = () => {
             initial="hidden" animate="visible" exit={{ opacity: 0 }}
             variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { duration: 0.4 } } }} 
         >
-            <Toaster position="top-center" reverseOrder={false} /> {/* <-- THÊM Toaster */}
+            <Toaster position="top-center" reverseOrder={false} />
             
             {/* === Banner (Giữ nguyên) === */}
             <div ref={bannerRef} className="relative overflow-hidden">
@@ -266,14 +208,16 @@ const TourDetail = () => {
                     </div>
                 </motion.div>
 
-                {/* --- Cột Đặt vé (ĐÃ SỬA GIÁ) --- */}
+                {/* --- Cột Đặt vé (ĐÃ SỬA) --- */}
                 <motion.div className="lg:col-span-1 bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border dark:border-slate-700 lg:sticky lg:top-24 self-start" variants={itemVariants}>
                     <p className="text-slate-500 dark:text-slate-400 text-sm mb-1 font-medium">Giá chỉ từ</p>
                     <p className="text-4xl md:text-5xl font-bold text-red-600 mb-6 pb-6 border-b dark:border-slate-600">
-                        {/* SỬA: Dùng giá thấp nhất đã tính toán */}
+                        {/* (SỬA) Dùng giá gốc */}
                         {displayPrice > 0 ? formatCurrency(displayPrice) : "Liên hệ"}
                     </p>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-6"> Chọn lịch khởi hành và giá ở bên dưới, sau đó nhấn "Đặt Tour Ngay". </p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
+                        Bạn sẽ chọn ngày khởi hành và số lượng khách ở bước tiếp theo.
+                    </p>
                     <motion.button onClick={handleBookNow} className="w-full px-6 py-4 bg-gradient-to-r from-orange-500 to-red-600 text-white text-lg font-bold rounded-xl shadow-lg hover:shadow-xl hover:from-orange-600 focus:outline-none focus:ring-4 focus:ring-orange-300 dark:focus:ring-orange-800 transition-all duration-300 flex items-center justify-center gap-3 transform active:scale-95" whileHover={{ scale: 1.03, y: -3, boxShadow: "0 10px 20px rgba(0,0,0,0.2)" }}>
                         <FaCreditCard /> Đặt Tour Ngay
                     </motion.button>
@@ -281,94 +225,7 @@ const TourDetail = () => {
                 </motion.div>
             </motion.section>
 
-            {/* --- (MỚI) LỊCH KHỞI HÀNH & BẢNG GIÁ --- */}
-            {/* (Đã xây dựng lại hoàn toàn) */}
-            <motion.section 
-                id="departures-section" // <-- ID để cuộn tới
-                className="max-w-6xl mx-auto p-6 md:p-10 mt-8 mb-16 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border dark:border-slate-700" 
-                initial={{ opacity: 0, y: 50 }} 
-                whileInView={{ opacity: 1, y: 0 }} 
-                viewport={{ once: true }} 
-                transition={{ duration: 0.6 }}
-            >
-                <h2 className="text-2xl md:text-3xl font-bold mb-8 text-center text-sky-700 dark:text-sky-400"> Chọn Lịch khởi hành </h2>
-                
-                {/* Trạng thái Loading */}
-                {departuresLoading && (
-                    <div className="flex justify-center items-center p-10">
-                        <FaSpinner className="animate-spin text-3xl text-sky-500" />
-                        <p className="ml-3 text-lg text-slate-600 dark:text-slate-400">Đang tải lịch khởi hành...</p>
-                    </div>
-                )}
-
-                {/* Không có lịch */}
-                {!departuresLoading && departures.length === 0 && (
-                     <div className="text-center p-10 text-lg text-slate-500 dark:text-slate-400 italic">
-                        <FaCalendarAlt className="mx-auto text-4xl mb-4 opacity-50" />
-                        Hiện chưa có lịch khởi hành nào cho tour này.
-                        <br/>Vui lòng quay lại sau!
-                    </div>
-                )}
-
-                {/* Danh sách lịch */}
-                {!departuresLoading && departures.length > 0 && (
-                    <div className="space-y-4">
-                        {departures.map(dep => {
-                            const remaining = dep.max_slots - dep.booked_slots;
-                            const isFull = remaining <= 0;
-                            const isSelected = dep.id === selectedDepartureId;
-
-                            return (
-                                <motion.div
-                                    key={dep.id}
-                                    onClick={() => !isFull && setSelectedDepartureId(dep.id)}
-                                    className={`
-                                        p-5 border-2 rounded-lg transition-all duration-300
-                                        ${isFull ? 'bg-slate-100 dark:bg-slate-800 opacity-60 cursor-not-allowed' : 'bg-white dark:bg-slate-700 cursor-pointer hover:shadow-md hover:border-sky-400 dark:hover:bg-slate-600'}
-                                        ${isSelected ? 'border-sky-500 shadow-lg bg-sky-50 dark:bg-sky-900/30' : 'border-gray-200 dark:border-slate-600'}
-                                    `}
-                                    layout
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.3 }}
-                                >
-                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                        {/* Ngày & Slots */}
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-3">
-                                                {/* Nút radio (giả) */}
-                                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-sky-500 bg-sky-500' : 'border-gray-400 bg-white dark:bg-slate-600'}`}>
-                                                    {isSelected && <div className="w-2 h-2 bg-white rounded-full"></div>}
-                                                </div>
-                                                <span className="text-lg font-bold text-slate-800 dark:text-slate-100">
-                                                    {new Date(dep.departure_date + 'T00:00:00').toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
-                                                </span>
-                                            </div>
-                                            <div className="ml-8 mt-1.5 flex items-center gap-2 text-sm font-medium">
-                                                <FaUsers className={isFull ? 'text-red-500' : 'text-green-600'} />
-                                                <span className={isFull ? 'text-red-500' : 'text-green-600'}>
-                                                    {isFull ? 'Đã hết chỗ' : `Chỉ còn ${remaining} chỗ`}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {/* Giá */}
-                                        <div className="md:text-right ml-8 md:ml-0">
-                                            <div className="flex items-center md:justify-end gap-2 text-sm text-slate-600 dark:text-slate-300"><FaUser /> Người lớn</div>
-                                            <div className="text-xl font-bold text-red-600 mt-1">{formatCurrency(dep.adult_price)}</div>
-                                        </div>
-                                        <div className="md:text-right ml-8 md:ml-0">
-                                            <div className="flex items-center md:justify-end gap-2 text-sm text-slate-600 dark:text-slate-300"><FaChild /> Trẻ em</div>
-                                            <div className="text-lg font-bold text-red-600 mt-1">{formatCurrency(dep.child_price)}</div>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            )
-                        })}
-                    </div>
-                )}
-            </motion.section>
-
+            {/* --- (XÓA) Đã xóa phần Lịch khởi hành --- */}
 
             {/* === Lịch trình (Giữ nguyên) === */}
             {tour.itinerary && tour.itinerary.length > 0 && (
