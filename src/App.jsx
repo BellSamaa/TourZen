@@ -17,7 +17,7 @@ import TourList from "./pages/TourList.jsx";
 import TourDetail from "./pages/TourDetail.jsx";
 import Payment from "./pages/Payment.jsx";
 import PaymentSuccess from "./pages/PaymentSuccess.jsx";
-import CartPage from "./pages/Cart.jsx";
+import Cart from "./pages/Cart.jsx";
 import Login from "./pages/Login.jsx";
 import About from "./pages/About.jsx";
 import Services from "./pages/Services.jsx";
@@ -93,7 +93,7 @@ export default function App() {
                         <Route path="about-tourzen" element={<About />} />
                         <Route path="tours" element={<TourList />} />
                         <Route path="tour/:id" element={<TourDetail />} />
-                        <Route path="cart" element={<CartPage />} />
+                        <Route path="cart" element={<Cart />} /> {/* Đổi từ <CartPage /> sang <Cart /> */}
                         <Route path="payment" element={<Payment />} />
                         <Route path="payment-success" element={<PaymentSuccess />} />
                         <Route path="services" element={<Services />} />
