@@ -25,7 +25,7 @@ import {
   Sparkle,
   Wallet,
 } from "@phosphor-icons/react"; // <<< THÊM Icons mới
-import { getSupabase } from "./lib/supabaseClient";
+import { getSupabase } from "../lib/supabaseClient";
 import toast from "react-hot-toast";
 
 const supabase = getSupabase();
