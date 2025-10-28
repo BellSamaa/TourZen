@@ -1,5 +1,5 @@
 // src/pages/Cart.jsx
-// (Sửa nút Thanh toán dùng useNavigate)
+// (Sửa lỗi cú pháp + Nút Thanh toán dùng useNavigate)
 import React, { useState } from "react";
 // SỬA: Thêm useNavigate
 import { Link, useNavigate } from "react-router-dom";
@@ -9,29 +9,49 @@ import { motion, AnimatePresence } from "framer-motion";
 import { FaUser, FaChild, FaBaby } from "react-icons/fa";
 import toast from 'react-hot-toast';
 
-const formatCurrency = (number) => /* ... */;
-const CartQuantityInput = ({ /* ... */ }) => ( /* ... */ );
+// --- SỬA Ở ĐÂY: Khôi phục hàm formatCurrency ---
+const formatCurrency = (number) =>
+  typeof number === "number"
+    ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(number)
+    : "N/A";
+// --- KẾT THÚC SỬA ---
+
+// --- SỬA Ở ĐÂY: Khôi phục CartQuantityInput ---
+const CartQuantityInput = ({ label, icon: Icon, value, onDecrease, onIncrease, min = 0 }) => (
+    <div className="flex items-center justify-between py-1">
+        <label className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+            <Icon size={12} className="text-gray-500" />
+            {label}
+        </label>
+        <div className="flex items-center gap-1.5">
+            <button type="button" onClick={onDecrease} disabled={value <= min} className="p-1 rounded-full bg-gray-200 dark:bg-neutral-600 hover:bg-gray-300 disabled:opacity-50">
+                <Minus size={10} />
+            </button>
+            <span className="w-6 text-center text-sm font-medium dark:text-white">{value}</span>
+            <button type="button" onClick={onIncrease} className="p-1 rounded-full bg-gray-200 dark:bg-neutral-600 hover:bg-gray-300">
+                <Plus size={10} />
+            </button>
+        </div>
+    </div>
+);
+// --- KẾT THÚC SỬA ---
+
 
 export default function CartPage() { // Hoặc Cart
-  const navigate = useNavigate(); // <-- THÊM hook
+  const navigate = useNavigate(); // <-- Hook useNavigate
   const { items, removeFromCart, clearCart, total, updateQty } = useCart();
   const [notification, setNotification] = useState("");
 
+  // Phần Giỏ hàng trống (Giữ nguyên)
   if (!items || items.length === 0) return ( /* ... JSX Giỏ hàng trống ... */ );
 
-  const calculateItemTotal = (item) => /* ... */;
-  const handleQtyChange = (key, type, delta) => { /* ... */ };
-
-  // <-- THÊM hàm xử lý cho nút -->
-  const handleCheckout = () => {
-    // Có thể thêm kiểm tra items.length > 0 nếu cần
-    navigate('/payment'); // Dùng navigate để chuyển trang
-  };
+  const calculateItemTotal = (item) => /* ... Giữ nguyên ... */;
+  const handleQtyChange = (key, type, delta) => { /* ... Giữ nguyên ... */ };
+  const handleCheckout = () => { navigate('/payment'); }; // <-- Hàm cho nút
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-16">
-      <h2 className="text-3xl font-bold mb-10 text-center dark:text-white">🧳 Giỏ hàng của bạn</h2>
-
+      {/* ... Tiêu đề ... */}
       <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-2xl overflow-hidden">
         <AnimatePresence>
             {items.map((item) => (
@@ -52,14 +72,14 @@ export default function CartPage() { // Hoặc Cart
           <div className="text-right">
               <p className="text-lg font-medium text-gray-600 dark:text-gray-300">Tổng cộng:</p>
               <p className="text-3xl font-bold text-sky-600">{formatCurrency(total)}</p>
-              {/* --- SỬA Ở ĐÂY: Dùng button thay vì Link --- */}
+              {/* --- Dùng button thay vì Link --- */}
               <button
                 onClick={handleCheckout} // Gọi hàm xử lý
                 className="mt-4 inline-block bg-sky-500 hover:bg-sky-600 text-white px-6 py-3 rounded-full font-semibold transition-all"
               >
                 Thanh toán
               </button>
-              {/* --- KẾT THÚC SỬA --- */}
+              {/* --- Kết thúc sửa --- */}
           </div>
       </div>
 
