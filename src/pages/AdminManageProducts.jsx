@@ -44,7 +44,7 @@ const DeparturesManager = ({ tourId }) => {
     // Tải danh sách lịch khởi hành của tour này
     const fetchDepartures = useCallback(async () => {
         setLoading(true); setError(null);
-        const { data, error }_ = await supabase
+        const { data, error } = await supabase
             .from("Departures")
             .select("*")
             .eq("product_id", tourId)
@@ -91,7 +91,7 @@ const DeparturesManager = ({ tourId }) => {
     const handleDelete = async (id) => {
         if (!window.confirm("Bạn chắc muốn XÓA lịch khởi hành này? Chỗ đã đặt (nếu có) cũng sẽ mất thông tin.")) return;
         
-        const { error }_ = await supabase.from("Departures").delete().eq("id", id);
+        const { error } = await supabase.from("Departures").delete().eq("id", id);
         if (error) {
             toast.error("Lỗi xóa: " + error.message);
         } else {
@@ -323,7 +323,7 @@ const EditTourModal = ({ tour, onClose, onSuccess, suppliers }) => {
         }
 
         // 3. Update bảng Products
-        const { error }_ = await supabase.from("Products").update(dataToUpdate).eq("id", tour.id);
+        const { error } = await supabase.from("Products").update(dataToUpdate).eq("id", tour.id);
         
         if (error) { toast.error("Lỗi cập nhật tour: " + error.message); }
         else {
@@ -500,7 +500,7 @@ export default function AdminManageProducts() {
             approval_status: newStatus,
             is_published: false // Luôn set là false khi thay đổi status này
         };
-        const { error }_ = await supabase.from("Products").update(updateData).eq("id", id);
+        const { error } = await supabase.from("Products").update(updateData).eq("id", id);
         setIsFetchingPage(false);
         if (error) { toast.error("Lỗi: " + error.message); }
         else { toast.success(`Đã ${actionText} tour!`); fetchProducts(false); }
@@ -509,7 +509,7 @@ export default function AdminManageProducts() {
          // (LƯU Ý: Do có ON DELETE CASCADE, xóa tour sẽ tự động xóa các Departures liên quan)
          if (!window.confirm(`XÓA VĨNH VIỄN tour "${tour.name}"?\nTất cả lịch khởi hành và slots của tour này cũng sẽ bị xóa!\nThao tác này không thể hoàn tác!`)) return;
          setIsFetchingPage(true);
-         const { error }_ = await supabase.from("Products").delete().eq("id", tour.id);
+         const { error } = await supabase.from("Products").delete().eq("id", tour.id);
          setIsFetchingPage(false);
          if (error) { toast.error("Lỗi xóa: " + error.message); }
          else { toast.success("Đã xóa tour."); fetchProducts(false); }
