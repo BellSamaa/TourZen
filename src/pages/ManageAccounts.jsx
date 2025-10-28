@@ -5,7 +5,7 @@ import {
     UsersThree, CaretLeft, CaretRight, CircleNotch, X, MagnifyingGlass,
     PencilLine, ArrowsClockwise, WarningCircle, UserPlus, UserCircleMinus, UserCircleCheck,
     Eye, EyeSlash, CheckCircle, XCircle, User, At, ShieldCheck, CalendarBlank, Hourglass,
-    Inbox 
+    ArchiveBox // <<< FIX: Sửa từ Inbox thành ArchiveBox
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -143,18 +143,17 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
 
     return (
         <motion.div
-            className="fixed inset-0 bg-black/70 z-40 flex justify-center items-center p-4" // <<< UPGRADE: Tăng độ mờ backdrop
+            className="fixed inset-0 bg-black/70 z-40 flex justify-center items-center p-4"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
         >
             <motion.div
-                className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col font-inter" // <<< UPGRADE: Nền modal dark
+                className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col font-inter"
                 initial={{ scale: 0.9, opacity: 0 }} 
                 animate={{ scale: 1, opacity: 1 }} 
                 exit={{ scale: 0.9, opacity: 0 }}
                 transition={{ duration: 0.2, type: "spring", stiffness: 200, damping: 25 }}
             >
-                {/* <<< UPGRADE: Header Modal với Gradient */}
                 <div className="flex justify-between items-center p-5 border-b border-slate-200/80 dark:border-slate-700/50 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800/50 rounded-t-lg">
                     <h3 className="text-lg font-sora font-semibold text-slate-800 dark:text-white">
                         {isEdit ? 'Chỉnh sửa Tài khoản' : 'Thêm Tài khoản mới'}
@@ -170,7 +169,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
 
                 <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
                     <motion.div 
-                        className="overflow-y-auto p-6 space-y-5" // <<< UPGRADE: Tăng space-y-5
+                        className="overflow-y-auto p-6 space-y-5"
                         variants={modalFormVariants}
                         initial="hidden"
                         animate="visible"
@@ -213,7 +212,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                         )}
                         
                         {/* Username & Full Name */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5"> {/* <<< UPGRADE: Tăng gap-5 */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <motion.div variants={fieldVariant}>
                                 <label className="label-style" htmlFor="username">Tên đăng nhập *</label>
                                 <input 
@@ -236,7 +235,6 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                         {/* Role */}
                         <motion.div variants={fieldVariant}>
                             <label className="label-style" htmlFor="role">Vai trò *</label>
-                            {/* <<< UPGRADE: Custom Select với icon chấm màu */}
                             <div className="relative">
                                 <select 
                                     id="role"
@@ -259,7 +257,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                         {isEdit && (
                             <motion.div variants={fieldVariant}>
                                 <label className="label-style">Trạng thái</label>
-                                <div className="flex items-center gap-3 p-3.5 bg-slate-100 dark:bg-slate-800 rounded-md"> {/* <<< UPGRADE: Tăng p-3.5, gap-3 */}
+                                <div className="flex items-center gap-3 p-3.5 bg-slate-100 dark:bg-slate-800 rounded-md">
                                     <input 
                                         type="checkbox" name="is_active" id="is_active_toggle"
                                         checked={formData.is_active} onChange={handleChange}
@@ -278,15 +276,15 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                     <div className="p-5 border-t border-slate-200/80 dark:border-slate-700/50 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-b-lg">
                         <motion.button 
                             type="button" onClick={onClose} disabled={loading} 
-                            className="modal-button-secondary-pro" // <<< UPGRADE: Class mới
+                            className="modal-button-secondary-pro"
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                         >Hủy</motion.button>
                         
                         <motion.button 
                             type="submit" disabled={loading} 
-                            className="modal-button-primary-pro flex items-center justify-center gap-2 min-w-[120px]" // <<< UPGRADE: Class mới
-                            whileHover={{ scale: 1.05, y: -2 }} // <<< UPGRADE: Thêm hiệu ứng y
+                            className="modal-button-primary-pro flex items-center justify-center gap-2 min-w-[120px]"
+                            whileHover={{ scale: 1.05, y: -2 }}
                             whileTap={{ scale: 0.95 }}
                         >
                             {loading ? <CircleNotch size={18} className="animate-spin" /> : (isEdit ? <PencilLine size={18} /> : <UserPlus size={18} />) }
@@ -374,7 +372,7 @@ export default function AdminManageAccounts() {
         }
     }, [debouncedSearch]);
     
-    // --- Event Handlers (Gi..."(Giữ nguyên)
+    // --- Event Handlers (Giữ nguyên)
     const handleSuspend = (account) => {
         toast((t) => (
             <div className="flex flex-col items-center p-1">
@@ -385,7 +383,7 @@ export default function AdminManageAccounts() {
                 <div className="mt-3 flex gap-2">
                  <motion.button
                     whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                    className="modal-button-danger-pro text-sm" // <<< UPGRADE: Class mới
+                    className="modal-button-danger-pro text-sm"
                     onClick={async () => {
                         toast.dismiss(t.id);
                         setIsFetchingPage(true);
@@ -401,7 +399,7 @@ export default function AdminManageAccounts() {
                   > Xác nhận Ngừng </motion.button>
                   <motion.button
                     whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                    className="modal-button-secondary-pro text-sm" // <<< UPGRADE: Class mới
+                    className="modal-button-secondary-pro text-sm"
                     onClick={() => toast.dismiss(t.id)}
                   > Hủy </motion.button>
                 </div>
@@ -422,7 +420,6 @@ export default function AdminManageAccounts() {
         }
     };
     
-    // <<< UPGRADE: Thêm màu vào map
     const getRoleInfo = (roleId) => {
         const rolesMap = { 
             admin: { name: 'Admin', color: 'bg-purple-500' }, 
@@ -447,7 +444,7 @@ export default function AdminManageAccounts() {
     // --- JSX ---
     return (
         <motion.div
-            className="p-4 md:p-8 min-h-screen bg-slate-50 dark:bg-slate-900 font-inter" // <<< UPGRADE: p-8, bg-slate-50, font-inter
+            className="p-4 md:p-8 min-h-screen bg-slate-50 dark:bg-slate-900 font-inter"
             initial="hidden"
             animate="visible"
         >
@@ -458,19 +455,19 @@ export default function AdminManageAccounts() {
                 {/* Header */}
                 <motion.div variants={itemVariant} className="flex flex-wrap items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-3xl font-sora font-bold text-slate-900 dark:text-white flex items-center gap-3"> {/* <<< UPGRADE: text-3xl, font-sora, font-bold */}
-                            <UsersThree weight="duotone" className="text-indigo-600" size={36} /> {/* <<< UPGRADE: text-indigo, size-36 */}
+                        <h1 className="text-3xl font-sora font-bold text-slate-900 dark:text-white flex items-center gap-3">
+                            <UsersThree weight="duotone" className="text-indigo-600" size={36} />
                             Quản lý Tài khoản
                         </h1>
-                        <p className="mt-2 text-base text-slate-600 dark:text-slate-400"> {/* <<< UPGRADE: mt-2, text-base */}
+                        <p className="mt-2 text-base text-slate-600 dark:text-slate-400">
                             Quản lý tài khoản người dùng hệ thống
                         </p>
                     </div>
                     <motion.button 
-                        whileHover={{ scale: 1.05, y: -2, boxShadow: '0 10px 20px -10px rgb(99 102 241 / 50%)' }} // <<< UPGRADE: Thêm shadow
+                        whileHover={{ scale: 1.05, y: -2, boxShadow: '0 10px 20px -10px rgb(99 102 241 / 50%)' }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => setModalAccount('new')}
-                        className="button-primary-pro flex items-center gap-2" // <<< UPGRADE: Class mới
+                        className="button-primary-pro flex items-center gap-2"
                     >
                         <UserPlus size={18} weight="bold" />
                         Thêm Tài Khoản
@@ -480,27 +477,27 @@ export default function AdminManageAccounts() {
                 {/* Bảng */}
                 <motion.div
                     variants={itemVariant}
-                    className="bg-white dark:bg-slate-800 shadow-xl rounded-lg overflow-hidden border border-slate-200/80 dark:border-slate-700/50" // <<< UPGRADE: shadow-xl
+                    className="bg-white dark:bg-slate-800 shadow-xl rounded-lg overflow-hidden border border-slate-200/80 dark:border-slate-700/50"
                 >
-                    <div className="p-6 flex flex-wrap justify-between items-center gap-4 border-b border-slate-200 dark:border-slate-700"> {/* <<< UPGRADE: p-6 */}
-                        <h2 className="text-xl font-sora font-semibold text-slate-800 dark:text-slate-100"> {/* <<< UPGRADE: text-xl, font-sora */}
+                    <div className="p-6 flex flex-wrap justify-between items-center gap-4 border-b border-slate-200 dark:border-slate-700">
+                        <h2 className="text-xl font-sora font-semibold text-slate-800 dark:text-slate-100">
                             Danh Sách Tài Khoản
                         </h2>
                         <div className="flex items-center gap-3 w-full sm:w-auto">
-                            <div className="relative w-full sm:w-72"> {/* <<< UPGRADE: w-72 */}
+                            <div className="relative w-full sm:w-72">
                                 <MagnifyingGlass size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                                 <input 
                                     type="text" 
                                     value={searchTerm} 
                                     onChange={(e) => setSearchTerm(e.target.value)} 
                                     placeholder="Tìm Tên, Email, Username..." 
-                                    className="search-input-pro" // <<< UPGRADE: Class mới
+                                    className="search-input-pro"
                                 />
                             </div>
                             <motion.button
                                 whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
                                 onClick={() => fetchAccounts(false)} disabled={isFetchingPage} 
-                                className="button-secondary-pro" // <<< UPGRADE: Class mới
+                                className="button-secondary-pro"
                                 title="Làm mới"
                             >
                                 <ArrowsClockwise size={18} className={isFetchingPage ? "animate-spin" : ""} />
@@ -511,7 +508,6 @@ export default function AdminManageAccounts() {
                     <div className="overflow-x-auto relative">
                         {isFetchingPage && !loading && ( <div className="loading-overlay"> <CircleNotch size={32} className="animate-spin text-indigo-500" /> </div> )}
                         <table className="min-w-full">
-                            {/* <<< UPGRADE: Thead mới */}
                             <thead className="border-b-2 border-slate-100 dark:border-slate-700">
                                 <tr>
                                     <th className="th-style-pro w-[20%]"><div className="flex items-center gap-1.5"><User size={14}/>Tên đăng nhập</div></th>
@@ -531,7 +527,8 @@ export default function AdminManageAccounts() {
                                     {!error && !loading && !isFetchingPage && accounts.length === 0 && ( 
                                         <tr><td colSpan="6" className="td-center py-20 text-slate-500">
                                             <div className="flex flex-col items-center">
-                                                <Inbox size={48} className="text-slate-400 mb-4" weight="light" />
+                                                {/* <<< FIX: Sửa từ Inbox thành ArchiveBox */}
+                                                <ArchiveBox size={48} className="text-slate-400 mb-4" weight="light" />
                                                 <span className="font-sora font-semibold text-lg text-slate-600 dark:text-slate-300">Không tìm thấy tài khoản</span>
                                                 <span className="text-sm mt-1">{debouncedSearch ? `Không có kết quả cho "${debouncedSearch}"` : "Chưa có dữ liệu."}</span>
                                             </div>
@@ -549,14 +546,12 @@ export default function AdminManageAccounts() {
                                             exit={{ opacity: 0, x: -50, transition: { duration: 0.2 } }}
                                             className="hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
                                         >
-                                            {/* <<< UPGRADE: Phân cấp font */}
                                             <td className="td-style-pro">
                                                 <div className="font-sora font-semibold text-slate-800 dark:text-slate-100">{account.username}</div>
                                                 <div className="font-inter text-sm text-slate-500 dark:text-slate-400">{account.full_name}</div>
                                             </td>
                                             <td className="td-style-pro font-inter text-slate-600 dark:text-slate-400">{account.email}</td>
                                             <td className="td-style-pro">
-                                                {/* <<< UPGRADE: Badge chấm màu mới */}
                                                 <span className="badge-pro">
                                                     <span className={`w-2.5 h-2.5 rounded-full ${roleInfo.color}`}></span>
                                                     <span className="font-medium">{roleInfo.name}</span>
@@ -780,4 +775,3 @@ export default function AdminManageAccounts() {
         </motion.div>
     );
 }
-
