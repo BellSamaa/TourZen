@@ -1,684 +1,698 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+// ManageCustomersSupabase.jsx
+/* NÂNG CẤP LỚN v3:
+  1. (UI) Tinh chỉnh toàn bộ giao diện: tăng padding, font chữ, độ "thoáng".
+  2. (UI) Thêm hiệu ứng hover tinh tế cho hàng (translate-y) và nút (scale).
+  3. (UI) Thiết kế lại ô input-inline cho đẹp mắt hơn.
+  4. (UI) Đánh bóng Modal (padding, typography, hover).
+*/
+
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { FaSpinner, FaSearch, FaTrash } from "react-icons/fa";
+import {
+  UserList, CaretLeft, CaretRight, CircleNotch, X, Plus, UsersThree, Crown, Sparkle, Wallet,
+  PencilSimple, Check, XCircle, List, Package, Bed, Airplane, Receipt, Cake, Info,
+} from "@phosphor-icons/react";
 import { getSupabase } from "../lib/supabaseClient";
 import toast from "react-hot-toast";
-import {
-    UsersThree, CaretLeft, CaretRight, CircleNotch, X, MagnifyingGlass,
-    PencilLine, ArrowsClockwise, WarningCircle, UserPlus, UserCircleMinus, UserCircleCheck,
-    Eye, EyeSlash, CheckCircle, XCircle, User, At, ShieldCheck, CalendarBlank, Hourglass,
-    Inbox // <<< UPGRADE: Thêm icon cho "No Data"
-} from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const supabase = getSupabase();
+const ITEMS_PER_PAGE = 10;
+const VIP_THRESHOLD = 20000000;
 
-// --- Hook Debounce (Giữ nguyên) ---
+// --- Hooks & Helpers (Giữ nguyên) ---
 const useDebounce = (value, delay) => {
-    const [debouncedValue, setDebouncedValue] = useState(value);
-    useEffect(() => {
-        const handler = setTimeout(() => {
-            setDebouncedValue(value);
-        }, delay);
-        return () => {
-            clearTimeout(handler);
-        };
-    }, [value, delay]);
-    return debouncedValue;
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => { setDebouncedValue(value); }, delay);
+    return () => { clearTimeout(handler); };
+  }, [value, delay]);
+  return debouncedValue;
 };
 
-// --- Helper Pagination Window (Giữ nguyên) ---
 const getPaginationWindow = (currentPage, totalPages, width = 2) => {
-    if (totalPages <= 1) return [];
-    if (totalPages <= 5 + width) {
-        return Array.from({ length: totalPages }, (_, i) => i + 1);
-    }
-    let pages = [1];
-    let start = Math.max(2, currentPage - width);
-    let end = Math.min(totalPages - 1, currentPage + width);
-    if (currentPage - width > 2) pages.push('...');
-    for (let i = start; i <= end; i++) pages.push(i);
-    if (currentPage + width < totalPages - 1) pages.push('...');
-    pages.push(totalPages);
-    return pages;
+  if (totalPages <= 1) return [];
+  if (totalPages <= 5 + width * 2) { return Array.from({ length: totalPages }, (_, i) => i + 1); }
+  const pages = new Set([1]);
+  for (let i = Math.max(2, currentPage - width); i <= Math.min(totalPages - 1, currentPage + width); i++) { pages.add(i); }
+  pages.add(totalPages);
+  const sortedPages = [...pages].sort((a, b) => a - b);
+  const finalPages = []; let lastPage = 0;
+  for (const page of sortedPages) { if (lastPage !== 0 && page - lastPage > 1) { finalPages.push("..."); } finalPages.push(page); lastPage = page; }
+  return finalPages;
 };
 
-// --- Variants cho Modal (Giữ nguyên) ---
-const modalFormVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        delay: 0.1,
-        staggerChildren: 0.07
-      }
-    }
-};
-const fieldVariant = {
-    hidden: { opacity: 0, y: 10 },
-    visible: { opacity: 1, y: 0 }
+const formatCurrency = (amount) => {
+  if (typeof amount !== "number") return "0 ₫";
+  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount);
 };
 
-// --- Modal Thêm/Sửa Tài Khoản (Giữ nguyên logic, tinh chỉnh style) ---
-const AccountModal = ({ account, onClose, onSuccess }) => {
-    const isEdit = !!account;
-    
-    const ROLES = [
-        { id: 'admin', name: 'Admin' },
-        { id: 'manager', name: 'Manager' },
-        { id: 'staff', name: 'Staff' },
-        { id: 'user', name: 'User' },
-        { id: 'supplier', name: 'Supplier' },
-    ];
+const formatStatsNumber = (num) => {
+  if (num >= 1_000_000_000) { return (num / 1_000_000_000).toFixed(1) + " tỷ"; }
+  if (num >= 1_000_000) { return (num / 1_000_000).toFixed(1) + " triệu"; }
+  if (num >= 1_000) { return (num / 1_000).toFixed(1) + " k"; }
+  return num;
+};
 
-    const [formData, setFormData] = useState({
-        email: isEdit ? account.email : '',
-        password: '',
-        username: isEdit ? (account.username || '') : '',
-        full_name: isEdit ? account.full_name : '',
-        role: isEdit ? account.role : 'staff',
-        is_active: isEdit ? account.is_active : true,
-    });
-    const [loading, setLoading] = useState(false);
-    const [showPassword, setShowPassword] = useState(false);
+const getCustomerTierStyle = (tier) => {
+  switch (tier) {
+    case "VIP": return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300";
+    case "Thường xuyên": return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300";
+    case "Mới": return "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300";
+    default: return "bg-gray-100 text-gray-600 dark:bg-gray-700/30 dark:text-gray-300";
+  }
+};
+const CUSTOMER_TIERS = ['Tiêu chuẩn', 'VIP', 'Thường xuyên', 'Mới'];
 
-    const handleChange = (e) => {
-        const { name, value, type, checked } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: type === 'checkbox' ? checked : value,
-        }));
+// --- (NÂNG CẤP) Hiệu ứng cho Thẻ Stats ---
+const cardVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4 } }
+};
+
+const StatCard = ({ title, value, icon, loading }) => (
+  <motion.div
+    className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-lg shadow-gray-200/40 dark:shadow-black/20 border border-gray-100 dark:border-slate-700/50 flex items-center gap-4 transition-transform duration-300 hover:scale-[1.03]"
+    variants={cardVariants}
+  >
+    <div className="p-3.5 rounded-full bg-sky-100 dark:bg-sky-900/50 text-sky-600 dark:text-sky-400">
+      {icon}
+    </div>
+    <div>
+      <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p>
+      {loading ? (
+        <div className="h-7 w-24 bg-gray-200 dark:bg-slate-700 rounded animate-pulse mt-1"></div>
+      ) : (
+        <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
+      )}
+    </div>
+  </motion.div>
+);
+
+// --- Component Lấy Dữ Liệu Thống Kê (Tối ưu Stagger) ---
+const CustomerStats = () => {
+  const [stats, setStats] = useState({ total: 0, vip: 0, new: 0, spend: 0 });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const { count: totalCount } = await supabase.from("Users").select("id", { count: "exact", head: true }).eq("role", "user");
+        const { data: spendData } = await supabase.from("Bookings").select("total_price").eq("status", "confirmed");
+        const totalSpend = spendData.reduce((sum, row) => sum + (row.total_price || 0), 0);
+        const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const { count: newCount } = await supabase.from("Users").select("id", { count: "exact", head: true }).eq("role", "user").gte("created_at", thirtyDaysAgo.toISOString());
+        const { data: allBookings } = await supabase.from("Bookings").select("user_id, total_price").eq("status", "confirmed");
+        const spendByUser = allBookings.reduce((acc, b) => { acc[b.user_id] = (acc[b.user_id] || 0) + (b.total_price || 0); return acc; }, {});
+        const vipCount = Object.values(spendByUser).filter((spend) => spend >= VIP_THRESHOLD).length;
+        setStats({ total: totalCount || 0, vip: vipCount, new: newCount || 0, spend: totalSpend });
+      } catch (error) { console.error("Lỗi fetch stats:", error); } 
+      finally { setLoading(false); }
     };
+    fetchStats();
+  }, []);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
+  return (
+    <motion.div
+      className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6"
+      initial="hidden"
+      animate="visible"
+      variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
+    >
+      <StatCard title="Tổng khách hàng" value={stats.total} loading={loading} icon={<UsersThree size={24} weight="duotone" />} />
+      <StatCard title="Khách hàng VIP" value={stats.vip} loading={loading} icon={<Crown size={24} weight="duotone" />} />
+      <StatCard title="Khách hàng mới" value={stats.new} loading={loading} icon={<Sparkle size={24} weight="duotone" />} />
+      <StatCard title="Tổng chi tiêu" value={formatStatsNumber(stats.spend)} loading={loading} icon={<Wallet size={24} weight="duotone" />} />
+    </motion.div>
+  );
+};
 
-        try {
-            if (isEdit) {
-                // ... (Logic sửa giữ nguyên) ...
-                const { error: updateError } = await supabase
-                    .from('Users')
-                    .update({
-                        username: formData.username,
-                        full_name: formData.full_name,
-                        role: formData.role,
-                        is_active: formData.is_active,
-                    })
-                    .eq('id', account.id);
-                if (updateError) throw updateError;
-                toast.success('Cập nhật tài khoản thành công!');
-            } else {
-                // ... (Logic thêm giữ nguyên) ...
-                const { data: authData, error: authError } = await supabase.auth.signUp({
-                    email: formData.email,
-                    password: formData.password,
-                });
-                if (authError) throw authError;
-                if (!authData.user) throw new Error('Không thể tạo user trong Auth.');
+// --- (NÂNG CẤP) Component Modal Xem Chi Tiết Đơn Hàng ---
+const CustomerBookingsModal = ({ customer, onClose }) => {
+  const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-                const { error: profileError } = await supabase
-                    .from('Users')
-                    .insert({
-                        id: authData.user.id,
-                        email: formData.email,
-                        username: formData.username,
-                        full_name: formData.full_name,
-                        role: formData.role,
-                        is_active: formData.is_active,
-                        created_at: new Date().toISOString(),
-                    });
-                if (profileError) throw profileError;
-                toast.success('Thêm tài khoản mới thành công!');
-            }
-            onSuccess();
-            onClose();
-        } catch (error) {
-            console.error("Lỗi Thêm/Sửa tài khoản:", error);
-            const errorMessage = error.message.includes("Password") 
-                ? "Mật khẩu quá yếu (cần ít nhất 6 ký tự)."
-                : (error.message || 'Đã xảy ra lỗi không xác định.');
-            toast.error(errorMessage);
-        } finally {
-            setLoading(false);
-        }
+  useEffect(() => {
+    if (!customer) return;
+    const fetchBookings = async () => {
+      setLoading(true); setError(null);
+      try {
+        const { data, error: rpcError } = await supabase.rpc('get_bookings_for_user', { customer_id: customer.id });
+        if (rpcError) throw rpcError;
+        setBookings(data || []); 
+      } catch (err) {
+        console.error("Lỗi fetch bookings (RPC):", err);
+        setError(err.message.includes("permission denied") ? "Bạn không có quyền xem." : err.message); 
+      } finally { setLoading(false); }
     };
+    fetchBookings();
+  }, [customer]);
 
-    return (
-        <motion.div
-            className="fixed inset-0 bg-black/60 z-40 flex justify-center items-center p-4"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-        >
-            <motion.div
-                className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col" // Giữ shadow-xl cho modal
-                initial={{ scale: 0.9, opacity: 0 }} 
-                animate={{ scale: 1, opacity: 1 }} 
-                exit={{ scale: 0.9, opacity: 0 }}
-                transition={{ duration: 0.2, type: "spring", stiffness: 200, damping: 25 }}
-            >
-                <div className="flex justify-between items-center p-5 border-b dark:border-slate-700"> {/* <<< UPGRADE: Tăng padding P-5 */}
-                    <h3 className="text-lg font-semibold text-slate-800 dark:text-white">
-                        {isEdit ? 'Chỉnh sửa Tài khoản' : 'Thêm Tài khoản mới'}
-                    </h3>
-                    <motion.button 
-                        whileHover={{ scale: 1.1, rotate: 90 }} 
-                        whileTap={{ scale: 0.9 }}
-                        onClick={onClose} 
-                        disabled={loading} 
-                        className="text-gray-400 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50"
-                    > <X size={20}/> </motion.button>
-                </div>
-
-                <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
-                    <motion.div 
-                        className="overflow-y-auto p-6 space-y-4" // <<< UPGRADE: Tăng P-6
-                        variants={modalFormVariants}
-                        initial="hidden"
-                        animate="visible"
-                    >
-                        {/* Email */}
-                        <motion.div variants={fieldVariant}>
-                            <label className="label-style" htmlFor="email">Email *</label>
-                            <input 
-                                id="email"
-                                type="email" name="email" value={formData.email} onChange={handleChange} 
-                                required disabled={isEdit} 
-                                className="input-style disabled:bg-slate-100 dark:disabled:bg-slate-700" 
-                                placeholder="example@tourmanager.com"
-                            />
-                        </motion.div>
-
-                        {/* Password */}
-                        {!isEdit && (
-                            <motion.div variants={fieldVariant}>
-                                <label className="label-style" htmlFor="password">Mật khẩu *</label>
-                                <div className="relative">
-                                    <input 
-                                        id="password"
-                                        type={showPassword ? "text" : "password"}
-                                        name="password" value={formData.password} onChange={handleChange} 
-                                        required minLength="6"
-                                        className="input-style pr-10"
-                                        placeholder="Tối thiểu 6 ký tự"
-                                    />
-                                    <button 
-                                        type="button" 
-                                        onClick={() => setShowPassword(!showPassword)}
-                                        className="password-toggle-btn"
-                                        title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-                                    >
-                                        {showPassword ? <EyeSlash size={20} /> : <Eye size={20} />}
-                                    </button>
-                                </div>
-                            </motion.div>
-                        )}
-                        
-                        {/* Username & Full Name */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <motion.div variants={fieldVariant}>
-                                <label className="label-style" htmlFor="username">Tên đăng nhập *</label>
-                                <input 
-                                    id="username"
-                                    type="text" name="username" value={formData.username} onChange={handleChange} 
-                                    required className="input-style" placeholder="admin01"
-                                />
-                            </motion.div>
-
-                            <motion.div variants={fieldVariant}>
-                                <label className="label-style" htmlFor="full_name">Họ và Tên *</label>
-                                <input 
-                                    id="full_name"
-                                    type="text" name="full_name" value={formData.full_name} onChange={handleChange} 
-                                    required className="input-style" placeholder="Nguyễn Văn An"
-                                />
-                            </motion.div>
-                        </div>
-
-                        {/* Role */}
-                        <motion.div variants={fieldVariant}>
-                            <label className="label-style" htmlFor="role">Vai trò *</label>
-                            <select 
-                                id="role"
-                                name="role" value={formData.role} onChange={handleChange} 
-                                required className="input-style"
-                            >
-                                {ROLES.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                            </select>
-                        </motion.div>
-
-                        {/* Status (Edit only) */}
-                        {isEdit && (
-                            <motion.div variants={fieldVariant}>
-                                <label className="label-style">Trạng thái</label>
-                                <div className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-md"> {/* <<< UPGRADE: Tăng P-3 */}
-                                    <input 
-                                        type="checkbox" name="is_active" id="is_active_toggle"
-                                        checked={formData.is_active} onChange={handleChange}
-                                        className="w-4 h-4 text-sky-600 rounded border-gray-300 focus:ring-sky-500"
-                                    />
-                                    <label htmlFor="is_active_toggle" className="text-sm dark:text-white cursor-pointer">
-                                        {formData.is_active ? 'Đang Hoạt động' : 'Đã Ngừng'}
-                                    </label>
-                                </div>
-                            </motion.div>
-                        )}
-                        
-                    </motion.div>
-                    
-                    {/* Modal Footer Buttons */}
-                    <div className="p-5 border-t dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800"> {/* <<< UPGRADE: Tăng P-5 */}
-                        <motion.button 
-                            type="button" onClick={onClose} disabled={loading} 
-                            className="modal-button-secondary"
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                        >Hủy</motion.button>
-                        
-                        <motion.button 
-                            type="submit" disabled={loading} 
-                            className="modal-button-primary flex items-center justify-center gap-1.5 min-w-[120px]"
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                        >
-                            {loading ? <CircleNotch size={18} className="animate-spin" /> : (isEdit ? <PencilLine size={18} /> : <UserPlus size={18} />) }
-                            {isEdit ? 'Lưu thay đổi' : 'Thêm mới'}
-                        </motion.button>
-                    </div>
-                </form>
-            </motion.div>
-        </motion.div>
-    );
-};
-
-
-// --- Variants cho Stagger (Giữ nguyên) ---
-const pageVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
+  const getProductIcon = (type) => {
+    switch (type) {
+      case 'tour': return <Package weight="duotone" className="text-blue-500" size={22} />;
+      case 'hotel': return <Bed weight="duotone" className="text-green-500" size={22} />;
+      case 'flight': return <Airplane weight="duotone" className="text-purple-500" size={22} />;
+      default: return <Info weight="duotone" className="text-gray-400" size={22} />;
     }
-};
-const itemVariant = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100 } }
-};
+  };
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'confirmed': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
+      case 'pending': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300';
+      case 'cancelled': return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300';
+      default: return 'bg-gray-100 text-gray-600 dark:bg-gray-700/30 dark:text-gray-300';
+    }
+  };
 
-
-// --- Component chính: Quản lý Tài Khoản ---
-export default function AdminManageAccounts() {
-    const [accounts, setAccounts] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [isFetchingPage, setIsFetchingPage] = useState(false);
-    const [error, setError] = useState(null);
-    const [modalAccount, setModalAccount] = useState(null);
-    const [searchTerm, setSearchTerm] = useState("");
-    const debouncedSearch = useDebounce(searchTerm, 400);
-    const ITEMS_PER_PAGE = 10;
-    const [currentPage, setCurrentPage] = useState(1);
-    const [totalItems, setTotalItems] = useState(0);
-    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
-
-    // --- Fetch data (Giữ nguyên logic) ---
-    const fetchAccounts = useCallback(async (isInitialLoad = false) => {
-        if (!isInitialLoad) setIsFetchingPage(true);
-        setError(null);
+  return (
+    <motion.div
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-center p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col"
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
+      >
+        <div className="flex justify-between items-center mb-5 pb-5 border-b dark:border-slate-700">
+          <h3 className="text-xl sm:text-2xl font-semibold flex items-center gap-3">
+            <Receipt size={28} className="text-sky-600" />
+            <span>Đơn hàng của: <span className="text-sky-600 dark:text-sky-400">{customer.full_name || customer.email}</span></span>
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+            <X size={22} weight="bold" />
+          </button>
+        </div>
         
-        try {
-            const from = (currentPage - 1) * ITEMS_PER_PAGE;
-            const to = from + ITEMS_PER_PAGE - 1;
-            
-            const selectQuery = `id, username, full_name, email, role, is_active, created_at`;
-            
-            let query = supabase.from("Users").select(selectQuery, { count: 'exact' });
+        <div className="overflow-y-auto space-y-3 pr-2 -mr-4 simple-scrollbar">
+          {loading && (
+            <div className="flex justify-center items-center p-16"> <CircleNotch size={36} className="animate-spin text-sky-500" /> </div>
+          )}
+          {error && <p className="text-center text-red-500 p-16">{error}</p>}
+          
+          {!loading && !error && bookings.length === 0 && (
+            <p className="text-center text-gray-500 p-16 italic">Khách hàng này chưa có đơn hàng nào.</p>
+          )}
 
-            if (debouncedSearch.trim() !== "") {
-                const searchStr = `%${debouncedSearch.trim()}%`;
-                query = query.or(`full_name.ilike.${searchStr},email.ilike.${searchStr},username.ilike.${searchStr}`);
-            }
-
-            query = query.order("created_at", { ascending: false }).range(from, to);
-
-            const { data, count, error: fetchError } = await query;
-            if (fetchError) throw fetchError;
-            
-            const processedData = data.map(acc => ({...acc, username: acc.username || 'N/A'}));
-            setAccounts(processedData || []);
-            setTotalItems(count || 0);
-
-            if (!isInitialLoad && data.length === 0 && count > 0 && currentPage > 1) {
-                setCurrentPage(1);
-            }
-        } catch (err) {
-            console.error("Lỗi fetch accounts:", err);
-            setError(err);
-        } finally {
-            if (isInitialLoad) setLoading(false);
-            setIsFetchingPage(false);
-        }
-    }, [currentPage, debouncedSearch]);
-
-    // --- UseEffects (Giữ nguyên) ---
-    useEffect(() => {
-        fetchAccounts(true);
-    }, [fetchAccounts]);
-
-    useEffect(() => {
-        if (currentPage !== 1) {
-            setCurrentPage(1);
-        }
-    }, [debouncedSearch]);
-
-    
-    // --- Event Handlers (Giữ nguyên) ---
-    const handleSuspend = (account) => {
-        toast((t) => (
-            <div className="flex flex-col items-center p-1">
-                 <span className="text-center">
-                    Ngừng hoạt động tài khoản <b>{account.username}</b>?<br/>
-                    <span className="text-xs text-orange-600">Tài khoản sẽ không thể đăng nhập.</span>
-                 </span>
-                <div className="mt-3 flex gap-2">
-                 <motion.button
-                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                    className="modal-button-danger text-sm"
-                    onClick={async () => {
-                        toast.dismiss(t.id);
-                        setIsFetchingPage(true);
-                        const { error: updateError } = await supabase.from("Users").update({ is_active: false }).eq("id", account.id);
-                        setIsFetchingPage(false);
-                        if (updateError) {
-                            toast.error("Lỗi: " + updateError.message);
-                        } else {
-                            toast.success("Đã ngừng tài khoản.");
-                            fetchAccounts(false);
-                        }
-                    }}
-                  > Xác nhận Ngừng </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                    className="modal-button-secondary text-sm" onClick={() => toast.dismiss(t.id)}
-                  > Hủy </motion.button>
-                </div>
-            </div>
-          ), { icon: <WarningCircle size={24} className="text-red-500"/>, duration: 8000 });
-    };
-
-    const formatDate = (dateString) => {
-        if (!dateString) return "N/A";
-        try {
-            return new Date(dateString).toLocaleDateString('vi-VN', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric'
-            });
-        } catch (error) {
-            return "Invalid Date";
-        }
-    };
-    
-    const getRoleName = (roleId) => {
-        const rolesMap = { admin: 'Admin', manager: 'Manager', staff: 'Staff', user: 'User', supplier: 'Supplier' };
-        return rolesMap[roleId] || roleId;
-    };
-
-    const paginationWindow = useMemo(() => getPaginationWindow(currentPage, totalPages, 2), [currentPage, totalPages]);
-
-     if (loading && accounts.length === 0) {
-        return (
-            <div className="p-6 flex justify-center items-center min-h-screen dark:bg-slate-900">
-                <CircleNotch size={40} className="animate-spin text-sky-600" />
-            </div>
-        );
-    }
-
-    // --- JSX ---
-    return (
-        <motion.div
-            className="p-4 md:p-6 min-h-screen dark:bg-slate-900 dark:text-white"
-            initial="hidden"
-            animate="visible"
-        >
-            <motion.div 
-                className="space-y-6"
-                variants={pageVariants}
-            >
-                {/* Header */}
-                <motion.div variants={itemVariant} className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
-                            <UsersThree weight="duotone" className="text-sky-600" size={30} />
-                            Quản lý Tài khoản
-                        </h1>
-                        <p className="mt-1.5 text-sm text-gray-500 dark:text-gray-400"> {/* <<< UPGRADE: Tăng mt-1.5 */}
-                            Quản lý tài khoản người dùng hệ thống
-                        </p>
-                    </div>
-                    <motion.button 
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setModalAccount('new')}
-                        className="button-primary flex items-center gap-1.5"
-                    >
-                        <UserPlus size={18} weight="bold" />
-                        Thêm Tài Khoản
-                    </motion.button>
-                </motion.div>
-
-                {/* Bảng */}
-                <motion.div
-                    variants={itemVariant}
-                    className="bg-white dark:bg-slate-800 shadow-lg rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700" // <<< UPGRADE: shadow-lg, thêm border
-                >
-                    <div className="p-4 flex flex-wrap justify-between items-center gap-3 border-b border-slate-200 dark:border-slate-700">
-                        <h2 className="text-lg font-semibold dark:text-white">
-                            Danh Sách Tài Khoản
-                        </h2>
-                        <div className="flex items-center gap-3 w-full sm:w-auto">
-                            <div className="relative w-full sm:w-64">
-                                <MagnifyingGlass size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" /> {/* <<< UPGRADE: left-3.5 */}
-                                <input 
-                                    type="text" 
-                                    value={searchTerm} 
-                                    onChange={(e) => setSearchTerm(e.target.value)} 
-                                    placeholder="Tìm kiếm tài khoản..." 
-                                    className="search-input"
-                                />
-                            </div>
-                            <motion.button
-                                whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-                                onClick={() => fetchAccounts(false)} disabled={isFetchingPage} 
-                                className={`p-2.5 button-secondary ${isFetchingPage ? 'opacity-50' : ''}`} title="Làm mới" // <<< UPGRADE: p-2.5
-                            >
-                                <ArrowsClockwise size={18} className={isFetchingPage ? "animate-spin" : ""} />
-                            </motion.button>
-                        </div>
-                    </div>
-
-                    <div className="overflow-x-auto relative">
-                        {isFetchingPage && !loading && ( <div className="loading-overlay"> <CircleNotch size={32} className="animate-spin text-sky-500" /> </div> )}
-                        <table className="min-w-full divide-y divide-slate-100 dark:divide-slate-700">
-                            <thead className="bg-slate-50 dark:bg-slate-700/40">
-                                <tr>
-                                    <th className="th-style w-[15%]"><div className="flex items-center gap-1.5"><User size={14}/>Tên đăng nhập</div></th>
-                                    <th className="th-style w-[20%]"><div className="flex items-center gap-1.5"><User size={14}/>Họ và Tên</div></th>
-                                    <th className="th-style w-[25%]"><div className="flex items-center gap-1.5"><At size={14}/>Email</div></th>
-                                    <th className="th-style w-[10%]"><div className="flex items-center gap-1.5"><ShieldCheck size={14}/>Vai trò</div></th>
-                                    <th className="th-style w-[10%]"><div className="flex items-center gap-1.5"><Hourglass size={14}/>Trạng thái</div></th>
-                                    <th className="th-style w-[10%]"><div className="flex items-center gap-1.5"><CalendarBlank size={14}/>Ngày tạo</div></th>
-                                    <th className="th-style text-center w-[10%]">Thao tác</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                                <AnimatePresence>
-                                    {error && !isFetchingPage && ( 
-                                        <tr><td colSpan="7" className="td-center text-red-500 py-20">{`Lỗi: ${error.message}`}</td></tr> 
-                                    )}
-                                    
-                                    {!error && !loading && !isFetchingPage && accounts.length === 0 && ( 
-                                        <tr><td colSpan="7" className="td-center text-gray-500 py-20"> {/* <<< UPGRADE: Thêm Icon và style */}
-                                            <div className="flex flex-col items-center">
-                                                <Inbox size={40} className="text-gray-400 mb-3" />
-                                                <span className="font-semibold">Không tìm thấy tài khoản</span>
-                                                <span className="text-sm">{debouncedSearch ? `Không có kết quả cho "${debouncedSearch}"` : "Chưa có dữ liệu."}</span>
-                                            </div>
-                                        </td></tr> 
-                                    )}
-                                    
-                                    {!error && accounts.map((account, index) => (
-                                        <motion.tr
-                                            key={account.id}
-                                            layout
-                                            initial={{ opacity: 0, y: -10 }} 
-                                            animate={{ opacity: 1, y: 0 }} 
-                                            exit={{ opacity: 0, x: -50, transition: { duration: 0.2 } }}
-                                            // <<< UPGRADE: Thêm Zebra Striping và hover rõ hơn
-                                            className={`transition-colors 
-                                                ${index % 2 === 0 ? 'bg-white dark:bg-slate-800' : 'bg-slate-50 dark:bg-slate-800/50'} 
-                                                hover:bg-sky-50 dark:hover:bg-slate-700
-                                            `}
-                                        >
-                                            <td className="td-style font-medium text-slate-900 dark:text-white">{account.username}</td>
-                                            <td className="td-style text-gray-700 dark:text-gray-200">{account.full_name}</td>
-                                            <td className="td-style text-gray-600 dark:text-gray-300">{account.email}</td>
-                                            <td className="td-style">
-                                                {account.role === 'admin' && <span className="badge-role-admin">{getRoleName(account.role)}</span>}
-                                                {account.role === 'manager' && <span className="badge-role-manager">{getRoleName(account.role)}</span>}
-                                                {account.role === 'staff' && <span className="badge-role-staff">{getRoleName(account.role)}</span>}
-                                                {account.role === 'user' && <span className="badge-role-user">{getRoleName(account.role)}</span>}
-                                                {account.role === 'supplier' && <span className="badge-role-supplier">{getRoleName(account.role)}</span>}
-                                            </td>
-                                            <td className="td-style">
-                                                {account.is_active ? 
-                                                    <span className="badge-green"><CheckCircle size={14} weight="bold"/>Hoạt động</span> : 
-                                                    <span className="badge-gray"><XCircle size={14} weight="bold"/>Ngừng</span>}
-                                            </td>
-                                            <td className="td-style text-gray-500 text-xs">{formatDate(account.created_at)}</td> {/* <<< UPGRADE: text-xs */}
-                                            <td className="td-style text-center space-x-2">
-                                                <motion.button 
-                                                    whileHover={{ scale: 1.15, y: -2 }} whileTap={{ scale: 0.9 }}
-                                                    onClick={() => setModalAccount(account)} 
-                                                    disabled={isFetchingPage} 
-                                                    className="action-button text-sky-600 hover:bg-sky-100 dark:hover:bg-sky-900/30" 
-                                                    title="Sửa tài khoản"
-                                                > <PencilLine size={18}/> </motion.button>
-                                                
-                                                {account.is_active ? (
-                                                    <motion.button
-                                                        whileHover={{ scale: 1.15, y: -2 }} whileTap={{ scale: 0.9 }}
-                                                        onClick={() => handleSuspend(account)} 
-                                                        disabled={isFetchingPage} 
-                                                        className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" 
-                                                        title="Ngừng tài khoản"
-                                                    > <UserCircleMinus size={18}/> </motion.button>
-                                                ) : (
-                                                    <motion.button
-                                                        whileHover={{ scale: 1.15, y: -2 }} whileTap={{ scale: 0.9 }}
-                                                        onClick={() => setModalAccount(account)}
-                                                        disabled={isFetchingPage} 
-                                                        className="action-button text-green-500 hover:bg-green-100 dark:hover:bg-green-900/30" 
-                                                        title="Kích hoạt lại (trong Sửa)"
-                                                    > <UserCircleCheck size={18}/> </motion.button>
-                                                )}
-                                            </td>
-                                        </motion.tr>
-                                    ))}
-                                </AnimatePresence>
-                            </tbody>
-                        </table>
-                    </div>
-                </motion.div>
-
-                {/* Pagination UI */}
-                {!loading && totalItems > ITEMS_PER_PAGE && (
-                    <motion.div
-                        variants={itemVariant}
-                        className="flex flex-col sm:flex-row justify-between items-center mt-5 text-sm text-gray-600 dark:text-gray-400" // <<< UPGRADE: mt-5
-                    >
+          {!loading && !error && bookings.length > 0 && (
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+              <thead className="bg-gray-50 dark:bg-slate-700/40 sticky top-0">
+                <tr>
+                  <th className="th-style">Dịch vụ</th>
+                  <th className="th-style">Ngày đặt</th>
+                  <th className="th-style text-right">Tổng tiền</th>
+                  <th className="th-style text-center">Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                {bookings.map(b => (
+                  <tr key={b.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors">
+                    <td className="td-style">
+                      <div className="flex items-center gap-3">
+                        {getProductIcon(b.Products?.product_type)}
                         <div>
-                            Hiển thị <b>{(currentPage - 1) * ITEMS_PER_PAGE + 1}</b> - <b>{Math.min(currentPage * ITEMS_PER_PAGE, totalItems)}</b> trên <b>{totalItems}</b> tài khoản
+                          <div className="font-semibold text-gray-900 dark:text-white">
+                            {b.Products?.name || <span className="italic text-gray-400">Dịch vụ đã bị xóa</span>}
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400 capitalize">
+                            {b.Products?.product_type || 'N/A'}
+                          </div>
                         </div>
-                        <nav className="flex items-center gap-1 mt-3 sm:mt-0">
-                            <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={() => setCurrentPage(1)} disabled={currentPage === 1 || isFetchingPage} className="pagination-arrow"> <CaretLeft size={16} weight="bold" /> </motion.button>
-                            {paginationWindow.map((page, index) =>
-                                typeof page === 'number' ? (
-                                    <motion.button
-                                        whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-                                        key={index}
-                                        onClick={() => setCurrentPage(page)}
-                                        disabled={currentPage === page || isFetchingPage}
-                                        className={`pagination-number ${currentPage === page ? 'pagination-active' : ''}`}
-                                    > {page} </motion.button>
-                                ) : (
-                                    <span key={index} className="pagination-dots"> ... </span>
-                                )
-                            )}
-                            <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages || isFetchingPage} className="pagination-arrow"> <CaretRight size={16} weight="bold" /> </motion.button>
-                        </nav>
-                    </motion.div>
-                )}
-            </motion.div>
+                      </div>
+                    </td>
+                    <td className="td-style text-sm">
+                      {new Date(b.created_at).toLocaleDateString('vi-VN')}
+                    </td>
+                    <td className="td-style text-right font-medium whitespace-nowrap">
+                      {formatCurrency(b.total_price)}
+                    </td>
+                    <td className="td-style text-center">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${getStatusBadge(b.status)}`}>
+                        {b.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
 
-            {/* Modal */}
-            <AnimatePresence>
-                {modalAccount && (
-                    <AccountModal
-                        key={modalAccount.id || 'new'}
-                        account={modalAccount === 'new' ? null : modalAccount}
-                        onClose={() => setModalAccount(null)}
-                        onSuccess={() => fetchAccounts(false)}
-                    />
-                )}
-            </AnimatePresence>
 
-            {/* CSS */}
-            <style jsx>{`
-                /* <<< UPGRADE: Tăng padding, focus rõ hơn */
-                .search-input { @apply w-full pl-10 pr-4 py-2.5 text-sm rounded-lg border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 outline-none transition disabled:opacity-50; }
-                
-                /* <<< UPGRADE: Tăng padding */
-                .th-style { @apply px-6 py-3.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap; }
-                .td-style { @apply px-6 py-4 text-sm; } /* Tăng py-4 */
-                
-                .td-center { @apply px-6 text-center; } /* Bỏ py-10 để dùng py-20 ở trên */
-                
-                /* <<< UPGRADE: Tăng padding */
-                .badge-base { @apply px-3 py-1 text-xs font-semibold rounded-md inline-flex items-center gap-1.5 whitespace-nowrap; }
-                .badge-green { @apply badge-base bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300; }
-                .badge-gray { @apply badge-base bg-gray-200 text-gray-700 dark:bg-slate-700 dark:text-slate-300; }
-                
-                .badge-role-admin { @apply badge-base bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300; }
-                .badge-role-manager { @apply badge-base bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300; }
-                .badge-role-staff { @apply badge-base bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300; }
-                .badge-role-user { @apply badge-base bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300; }
-                .badge-role-supplier { @apply badge-base bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300; }
+// --- Component Chính ---
+export default function ManageCustomersSupabase() {
+  const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [isFetchingPage, setIsFetchingPage] = useState(false);
+  const [error, setError] = useState(null);
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 400);
 
-                /* <<< UPGRADE: Tăng padding */
-                .button-secondary { @apply bg-slate-200 hover:bg-slate-300 dark:bg-neutral-700 dark:hover:bg-neutral-600 text-slate-800 dark:text-white font-semibold px-4 py-2.5 rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed; }
-                .button-primary { @apply bg-slate-800 hover:bg-slate-900 dark:bg-white dark:hover:bg-gray-200 text-white dark:text-slate-900 font-semibold px-4 py-2.5 rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed; }
-                
-                .pagination-arrow { @apply p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors; }
-                .pagination-number { @apply w-9 h-9 rounded-md font-semibold transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed; } /* <<< UPGRADE: w-9 h-9 */
-                .pagination-active { @apply bg-sky-600 text-white hover:bg-sky-600 dark:hover:bg-sky-600; }
-                .pagination-dots { @apply px-2 py-1 text-gray-500 dark:text-gray-400; }
-                .loading-overlay { @apply absolute inset-0 bg-white/70 dark:bg-slate-800/70 flex items-center justify-center z-10; }
-                
-                /* <<< UPGRADE: Tăng padding, focus rõ hơn */
-                .input-style { @apply border border-gray-300 dark:border-slate-600 p-2.5 rounded-md w-full dark:bg-slate-700 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 outline-none transition text-sm disabled:opacity-70; }
-                .label-style { @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5; } /* <<< UPGRADE: mb-1.5 */
-                
-                /* <<< UPGRADE: Tăng padding */
-                .modal-button-secondary { @apply px-5 py-2.5 bg-neutral-200 dark:bg-neutral-600 rounded-md font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-500 text-sm disabled:opacity-50 transition-colors; }
-                .modal-button-primary { @apply px-5 py-2.5 bg-sky-600 text-white rounded-md font-semibold hover:bg-sky-700 text-sm disabled:opacity-50 transition-colors; }
-                .modal-button-danger { @apply px-5 py-2.5 bg-red-600 text-white rounded-md font-semibold hover:bg-red-700 text-sm disabled:opacity-50 transition-colors; }
-                
-                .action-button { @apply p-1.5 rounded-lg transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-offset-1 dark:focus:ring-offset-slate-800 disabled:opacity-50 disabled:cursor-not-allowed; }
-                
-                .password-toggle-btn {
-                    @apply absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors;
-                }
-            `}</style>
-        </motion.div>
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
+
+  const [editingCustomerId, setEditingCustomerId] = useState(null);
+  const [editingData, setEditingData] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [viewingBookingsCustomer, setViewingBookingsCustomer] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+
+  // --- (NÂNG CẤP) Fetch customers (Thêm cột ngay_sinh) ---
+  const fetchCustomers = useCallback(async (isInitialLoad = false) => {
+    if (!isInitialLoad) setIsFetchingPage(true);
+    setError(null);
+    try {
+      const from = (currentPage - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+      
+      let countQuery = supabase.from("Users").select("id", { count: "exact", head: true }).eq("role", "user");
+      let dataQuery = supabase.from("Users").select("*, customer_tier, ngay_sinh").eq("role", "user");
+
+      if (debouncedSearch.trim() !== "") {
+        const searchTerm = `%${debouncedSearch.trim()}%`;
+        const searchQuery = `full_name.ilike.${searchTerm},email.ilike.${searchTerm},address.ilike.${searchTerm},phone_number.ilike.${searchTerm}`;
+        countQuery = countQuery.or(searchQuery);
+        dataQuery = dataQuery.or(searchQuery);
+      }
+
+      dataQuery = dataQuery.order("full_name", { ascending: true }).range(from, to);
+
+      const { count, error: countError } = await countQuery;
+      if (countError) throw countError;
+      const { data: usersData, error: usersError } = await dataQuery;
+      if (usersError) throw usersError;
+
+      if (!usersData || usersData.length === 0) {
+        setCustomers([]); setTotalItems(count || 0);
+        if (!isInitialLoad && count > 0 && currentPage > 1) { setCurrentPage(1); }
+        return;
+      }
+
+      const userIds = usersData.map((u) => u.id);
+      const { data: bookingsData } = await supabase.from("Bookings").select("user_id, total_price").in("user_id", userIds).eq("status", "confirmed");
+
+      const statsMap = (bookingsData || []).reduce((acc, booking) => {
+        const userId = booking.user_id;
+        if (!acc[userId]) { acc[userId] = { order_count: 0, total_spend: 0 }; }
+        acc[userId].order_count += 1;
+        acc[userId].total_spend += booking.total_price || 0;
+        return acc;
+      }, {});
+
+      const combinedData = usersData.map((user) => ({
+        ...user,
+        order_count: statsMap[user.id]?.order_count || 0,
+        total_spend: statsMap[user.id]?.total_spend || 0,
+        customer_tier: user.customer_tier || 'Tiêu chuẩn',
+        ngay_sinh: user.ngay_sinh ? user.ngay_sinh.split('T')[0] : '', 
+      }));
+
+      setCustomers(combinedData);
+      setTotalItems(count || 0);
+    } catch (err) {
+      console.error("Lỗi fetch khách hàng:", err);
+      setError(err.message || "Không thể tải danh sách khách hàng.");
+    } finally {
+      if (isInitialLoad) setLoading(false);
+      setIsFetchingPage(false);
+    }
+  }, [currentPage, debouncedSearch]);
+
+  // --- Triggers Fetch & Reset (Giữ nguyên) ---
+  useEffect(() => {
+    const isInitial = customers.length === 0 && loading;
+    fetchCustomers(isInitial);
+  }, [fetchCustomers, customers.length, loading]);
+
+  useEffect(() => {
+    if (currentPage !== 1) { setCurrentPage(1); }
+  }, [debouncedSearch]);
+
+
+  // --- (NÂNG CẤP) Handlers cho INLINE EDIT (Thêm ngay_sinh) ---
+  const handleStartEdit = (customer) => {
+    setEditingCustomerId(customer.id);
+    setEditingData({
+      full_name: customer.full_name || '',
+      address: customer.address || '',
+      phone_number: customer.phone_number || '',
+      customer_tier: customer.customer_tier || 'Tiêu chuẩn',
+      ngay_sinh: customer.ngay_sinh || '',
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCustomerId(null); setEditingData({}); setIsSaving(false);
+  };
+
+  const handleEditDataChange = (field, value) => {
+    setEditingData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingCustomerId || isSaving) return;
+    if (!editingData.full_name?.trim()) { toast.error("Tên khách hàng không được để trống."); return; }
+
+    setIsSaving(true);
+    const updateData = {
+        full_name: editingData.full_name.trim(),
+        address: editingData.address?.trim() || null,
+        phone_number: editingData.phone_number?.trim() || null,
+        customer_tier: editingData.customer_tier,
+        ngay_sinh: editingData.ngay_sinh || null,
+    };
+
+    try {
+      const { error } = await supabase.from("Users").update(updateData).eq("id", editingCustomerId);
+      if (error) throw error;
+      toast.success("Cập nhật khách hàng thành công!");
+      handleCancelEdit();
+      fetchCustomers();
+    } catch (err) {
+      console.error("Lỗi lưu:", err);
+      toast.error(`Không thể lưu dữ liệu: ${err.message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // --- Delete Handlers (Giữ nguyên) ---
+  const openDeleteConfirm = (c) => {
+    setSelectedCustomer(c); setShowDeleteConfirm(true);
+  };
+  const closeDeleteConfirm = () => {
+    setSelectedCustomer(null); setShowDeleteConfirm(false);
+  };
+  const handleDelete = async () => {
+    if (!selectedCustomer) return;
+    try {
+      const { error } = await supabase.from("Users").delete().eq("id", selectedCustomer.id);
+      if (error) throw error;
+      toast.success(`Đã xóa hồ sơ "${selectedCustomer.full_name || selectedCustomer.email}"!`);
+      if (customers.length === 1 && currentPage > 1) { setCurrentPage(currentPage - 1); } 
+      else { fetchCustomers(); }
+      closeDeleteConfirm();
+    } catch (err) {
+      console.error("Lỗi xóa:", err);
+      toast.error(`Xóa thất bại: ${err.message}.`);
+    }
+  };
+
+  const paginationWindow = useMemo(() => getPaginationWindow(currentPage, totalPages, 2), [currentPage, totalPages]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen bg-gray-50/50 dark:bg-slate-900">
+        <CircleNotch className="animate-spin text-sky-500" size={48} />
+        <p className="text-slate-500 dark:text-slate-400 mt-4 font-medium"> Đang tải dữ liệu... </p>
+      </div>
     );
+  }
+
+  return (
+    <motion.div
+      className="p-4 sm:p-6 space-y-6 min-h-screen bg-gray-50/50 dark:bg-slate-900 dark:text-white"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+    >
+      {/* Tiêu đề & Nút Thêm */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+            <UserList size={32} weight="duotone" className="text-sky-600" />
+            Quản lý Khách hàng
+          </h1>
+          <p className="text-base text-gray-500 dark:text-gray-400 mt-1.5">
+            Chỉnh sửa thông tin, phân loại và xem lịch sử đơn hàng.
+          </p>
+        </div>
+        <button
+          onClick={() => toast('Chức năng "Thêm Khách Hàng" cần quy trình mời (invite) riêng.', { icon: "ℹ️" })}
+          className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white rounded-lg shadow-md shadow-sky-600/30 hover:bg-sky-700 hover:shadow-lg hover:shadow-sky-600/40 transition-all font-semibold focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+        >
+          <Plus size={18} weight="bold" />
+          Thêm Khách Hàng
+        </button>
+      </div>
+
+      {/* Thống kê */}
+      <CustomerStats />
+
+      {/* Bảng dữ liệu */}
+      <div className="bg-white dark:bg-slate-800 shadow-2xl shadow-gray-200/50 dark:shadow-black/30 rounded-xl overflow-hidden border border-gray-200 dark:border-slate-700">
+        {/* Thanh tìm kiếm */}
+        <div className="p-4 border-b border-gray-200 dark:border-slate-700">
+          <div className="relative flex-grow w-full max-w-md">
+            <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm khách hàng (tên, email, SĐT...)"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-11 pr-4 py-2.5 rounded-lg border border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-sky-400 focus:bg-white dark:focus:bg-slate-700 outline-none transition-all"
+            />
+          </div>
+        </div>
+
+        {/* Bảng */}
+        <div className="overflow-x-auto relative">
+          {(isFetchingPage || isSaving) && (
+            <div className="absolute inset-0 bg-white/70 dark:bg-slate-800/70 flex items-center justify-center z-10">
+              <CircleNotch size={32} className="animate-spin text-sky-500" />
+            </div>
+          )}
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+            <thead className="bg-gray-50 dark:bg-slate-700/40">
+              <tr>
+                <th className="th-style">Họ và tên</th>
+                <th className="th-style">Liên hệ</th>
+                <th className="th-style">Địa chỉ</th>
+                <th className="th-style">Ngày sinh</th>
+                <th className="th-style text-center">Đơn</th>
+                <th className="th-style text-right">Tổng chi</th>
+                <th className="th-style text-center">Loại</th>
+                <th className="th-style text-center">Thao tác</th>
+              </tr>
+            </thead>
+            <motion.tbody
+              className="divide-y divide-gray-100 dark:divide-slate-700"
+              initial="hidden"
+              animate="visible"
+              variants={{ visible: { transition: { staggerChildren: 0.05 } } }}
+            >
+              {error && !isFetchingPage && ( <tr><td colSpan="8" className="p-8 text-center text-red-500">{error}</td></tr> )}
+              {!error && !loading && !isFetchingPage && customers.length === 0 && ( <tr><td colSpan="8" className="p-8 text-center text-gray-500 italic">{debouncedSearch ? "Không tìm thấy khách hàng." : "Chưa có dữ liệu."}</td></tr> )}
+              
+              {!error && customers.map((c) => {
+                const isEditing = editingCustomerId === c.id;
+                const tierStyle = getCustomerTierStyle(isEditing ? editingData.customer_tier : c.customer_tier);
+                
+                return (
+                  <motion.tr
+                    key={c.id}
+                    className={`transition-colors duration-200 ${isEditing ? 'bg-sky-50 dark:bg-sky-900/10' : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'}`}
+                    variants={cardVariants}
+                    layout
+                  >
+                    {/* Họ và tên */}
+                    <td className="td-style">
+                      {isEditing ? (
+                        <input type="text" value={editingData.full_name} onChange={(e) => handleEditDataChange('full_name', e.target.value)} className="inline-input-style" />
+                      ) : (
+                        <span className="font-semibold text-base text-gray-900 dark:text-white">{c.full_name || <span className="italic text-gray-400">...</span>}</span>
+                      )}
+                    </td>
+                    
+                    {/* Liên hệ */}
+                    <td className="td-style whitespace-nowrap">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{c.email}</span>
+                        {isEditing ? (
+                          <input type="text" placeholder="Số điện thoại" value={editingData.phone_number} onChange={(e) => handleEditDataChange('phone_number', e.target.value)} className="inline-input-style text-sm mt-1" />
+                        ) : (
+                          <span className="text-sm text-gray-500 dark:text-gray-400">{c.phone_number || "..."}</span>
+                        )}
+                      </div>
+                    </td>
+                    
+                    {/* Địa chỉ */}
+                    <td className="td-style max-w-xs">
+                      {isEditing ? (
+                         <input type="text" placeholder="Địa chỉ" value={editingData.address} onChange={(e) => handleEditDataChange('address', e.target.value)} className="inline-input-style" />
+                      ) : (
+                        <span className="truncate block text-sm">{c.address || <span className="italic text-gray-400">...</span>}</span>
+                      )}
+                    </td>
+
+                    {/* Ngày Sinh */}
+                    <td className="td-style">
+                      {isEditing ? (
+                         <input type="date" value={editingData.ngay_sinh} onChange={(e) => handleEditDataChange('ngay_sinh', e.target.value)} className="inline-input-style text-sm" />
+                      ) : (
+                        <span className="text-sm whitespace-nowrap">
+                          {c.ngay_sinh ? new Date(c.ngay_sinh).toLocaleDateString('vi-VN') : <span className="italic text-gray-400">...</span>}
+                        </span>
+                      )}
+                    </td>
+                    
+                    {/* Số đơn */}
+                    <td className="td-style text-center font-medium text-base">{c.order_count}</td>
+                    
+                    {/* Tổng chi tiêu */}
+                    <td className="td-style text-right font-semibold text-gray-800 dark:text-gray-200 whitespace-nowrap">
+                      {formatCurrency(c.total_spend)}
+                    </td>
+                    
+                    {/* Loại (Customer Tier) */}
+                    <td className="td-style text-center">
+                      {isEditing ? (
+                        <select value={editingData.customer_tier} onChange={(e) => handleEditDataChange('customer_tier', e.target.value)} className="inline-select-style">
+                          {CUSTOMER_TIERS.map(tier => (<option key={tier} value={tier}>{tier}</option>))}
+                        </select>
+                      ) : (
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${tierStyle}`}>
+                          {c.customer_tier || 'Tiêu chuẩn'}
+                        </span>
+                      )}
+                    </td>
+                    
+                    {/* Thao tác (Actions) */}
+                    <td className="td-style text-center whitespace-nowrap space-x-1">
+                      {isEditing ? (
+                        <>
+                          <button onClick={handleSaveEdit} disabled={isSaving} className="action-button text-green-500 hover:bg-green-100 dark:hover:bg-green-900/30" title="Lưu"><Check size={18} weight="bold" /></button>
+                          <button onClick={handleCancelEdit} disabled={isSaving} className="action-button text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700/30" title="Hủy"><XCircle size={18} weight="bold" /></button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => setViewingBookingsCustomer(c)} disabled={isFetchingPage || editingCustomerId} className="action-button text-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/30" title="Xem các đơn hàng"><List size={18} weight="bold" /></button>
+                          <button onClick={() => handleStartEdit(c)} disabled={isFetchingPage || editingCustomerId} className="action-button text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa thông tin"><PencilSimple size={18} weight="bold" /></button>
+                          <button onClick={() => openDeleteConfirm(c)} disabled={isFetchingPage || editingCustomerId} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa hồ sơ"><FaTrash size={16} /></button>
+                        </>
+                      )}
+                    </td>
+                  </motion.tr>
+                );
+              })}
+            </motion.tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* --- Pagination UI --- */}
+      {!loading && totalItems > ITEMS_PER_PAGE && (
+        <div className="flex flex-col sm:flex-row justify-between items-center mt-6 text-sm text-gray-600 dark:text-gray-400">
+          <div> Hiển thị <span className="font-semibold dark:text-white">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> - <span className="font-semibold dark:text-white">{Math.min(currentPage * ITEMS_PER_PAGE, totalItems)}</span> / <span className="font-semibold dark:text-white">{totalItems}</span> khách hàng </div>
+          <div className="flex items-center gap-1 mt-3 sm:mt-0">
+            <button onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1 || isFetchingPage} className="pagination-arrow" aria-label="Trang trước"><CaretLeft weight="bold" /></button>
+            {paginationWindow.map((pageNumber, idx) => pageNumber === "..." ? ( <span key={`dots-${idx}`} className="pagination-dots">...</span> ) : (
+              <button key={pageNumber} onClick={() => setCurrentPage(pageNumber)} disabled={isFetchingPage} className={`pagination-number ${ currentPage === pageNumber ? "pagination-active" : "" }`}>{pageNumber}</button>
+            ))}
+            <button onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages || isFetchingPage} className="pagination-arrow" aria-label="Trang sau"><CaretRight weight="bold" /></button>
+          </div>
+        </div>
+      )}
+
+      {/* --- Modals --- */}
+      <AnimatePresence>
+        {viewingBookingsCustomer && (
+          <CustomerBookingsModal
+            customer={viewingBookingsCustomer}
+            onClose={() => setViewingBookingsCustomer(null)}
+          />
+        )}
+      </AnimatePresence>
+      
+      <AnimatePresence>
+        {showDeleteConfirm && selectedCustomer && (
+          <motion.div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div 
+              className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-2xl w-full max-w-sm text-center"
+              initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+            >
+              <h4 className="text-xl font-semibold text-red-600 dark:text-red-500 mb-3"> Xác nhận xóa hồ sơ </h4>
+              <p className="mb-6 text-gray-700 dark:text-gray-300">
+                Bạn có chắc muốn xóa hồ sơ của{" "} <b>{selectedCustomer.full_name || selectedCustomer.email}</b>?
+                <br/>
+                <span className="text-sm text-orange-600 dark:text-orange-400">(Hành động này không xóa tài khoản đăng nhập.)</span>
+              </p>
+              <div className="flex justify-center gap-4">
+                <button className="modal-button-secondary" onClick={closeDeleteConfirm}> Hủy </button>
+                <button className="modal-button-danger" onClick={handleDelete}> Xóa hồ sơ </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* --- CSS (NÂNG CẤP TOÀN DIỆN) --- */}
+      <style jsx>{`
+        .th-style { 
+          @apply px-5 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider; 
+        }
+        .td-style { 
+          @apply px-5 py-5 text-sm text-gray-600 dark:text-gray-300 align-top; /* Tăng padding */
+        }
+        .action-button { 
+          @apply p-2 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-2 dark:focus:ring-offset-slate-800 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-110 active:scale-95; 
+        }
+        .pagination-arrow { 
+          @apply p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors; 
+        }
+        .pagination-number { 
+          @apply w-9 h-9 rounded-md font-semibold transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed; 
+        }
+        .pagination-active { 
+          @apply bg-sky-600 text-white hover:bg-sky-600 dark:hover:bg-sky-600; 
+        }
+        .pagination-dots { 
+          @apply px-2 py-1 text-gray-500 dark:text-gray-400; 
+        }
+        
+        /* (NÂNG CẤP) CSS cho Inline Editing */
+        .inline-input-style {
+          @apply p-2 border-0 border-b-2 border-sky-300 dark:border-sky-700 rounded-none w-full bg-transparent dark:bg-transparent focus:ring-0 focus:border-sky-500 outline-none transition text-sm;
+        }
+        .inline-select-style {
+          @apply p-2 border-0 border-b-2 border-sky-300 dark:border-sky-700 rounded-none w-full bg-transparent dark:bg-transparent focus:ring-0 focus:border-sky-500 outline-none transition text-xs;
+        }
+
+        /* (NÂNG CẤP) Modal buttons */
+        .modal-button-secondary { 
+          @apply px-5 py-2.5 bg-neutral-200 dark:bg-neutral-700 rounded-lg font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-600 text-sm transition-all; 
+        }
+        .modal-button-danger { 
+          @apply px-5 py-2.5 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 text-sm transition-all shadow-md shadow-red-500/30; 
+        }
+
+        /* (NÂNG CẤP) Scrollbar cho Modal */
+        .simple-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .simple-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .simple-scrollbar::-webkit-scrollbar-thumb {
+          background: #ccc;
+          border-radius: 10px;
+        }
+        .dark .simple-scrollbar::-webkit-scrollbar-thumb {
+          background: #4b5563; /* dark:gray-600 */
+        }
+      `}</style>
+    </motion.div>
+  );
 }
