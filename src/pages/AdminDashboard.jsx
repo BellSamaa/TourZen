@@ -1,146 +1,148 @@
 // src/pages/AdminDashboard.jsx
-// (Đã sửa lỗi isActive + Giữ nguyên Lazy Loading & Hiệu ứng)
+// (NÂNG CẤP HIỆU ỨNG: Thêm Framer Motion vào Sidebar)
 
-import React, { Suspense } from 'react';
-import { Routes, Route, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import React from 'react';
+import { Outlet, NavLink } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import { motion } from 'framer-motion'; // <-- IMPORT MOTION
 import {
-    House, UserList, UsersThree, Buildings, Package,
-    CheckSquare, ChartBar, SignOut, CircleNotch
+    Layout,
+    AirplaneTilt,
+    Package,
+    Users,
+    Buildings,
+    UserCircleGear,
+    List,
+    UserCircle
 } from '@phosphor-icons/react';
-import { useAuth } from '../context/AuthContext';
 
-// --- (LAZY LOAD) Import các trang ---
-const DashboardHome = React.lazy(() => import('./DashboardHome'));
-const ManageAccounts = React.lazy(() => import('./ManageAccounts'));
-const ManageCustomers = React.lazy(() => import('./ManageCustomers'));
-const ManageTour = React.lazy(() => import('./ManageTour'));
-const AdminManageProducts = React.lazy(() => import('./AdminManageProducts'));
-const ManageSuppliers = React.lazy(() => import('./ManageSuppliers'));
-const Reports = React.lazy(() => import('./Reports'));
+// --- (NÂNG CẤP) Component Link của Sidebar ---
+function SidebarLink({ to, icon, children }) {
+    const baseClass = "flex items-center gap-3 py-3 px-6 rounded-lg transition-colors duration-200";
+    const textClass = "text-sm font-medium";
 
-// --- Component Sidebar (Đã sửa lỗi isActive) ---
-const AdminSidebar = () => {
-    const location = useLocation();
-    const navigate = useNavigate();
-    const { user, logout } = useAuth();
-
-    const navItems = [
-        { path: '/admin', label: 'Tổng quan', icon: House },
-        { path: '/admin/accounts', label: 'Quản lý Tài khoản', icon: UserList },
-        { path: '/admin/customers', label: 'Quản lý Khách hàng', icon: UsersThree },
-        { path: '/admin/suppliers', label: 'Quản lý Nhà cung cấp', icon: Buildings },
-        { path: '/admin/tours', label: 'Quản lý Đặt Tour', icon: Package },
-        { path: '/admin/products', label: 'Quản lý Sản phẩm Tour', icon: CheckSquare },
-        { path: '/admin/reports', label: 'Báo cáo & Thống kê', icon: ChartBar },
-    ];
-
-    const handleLogout = async () => {
-        if (logout) { await logout(); }
-        navigate("/");
+    // (MỚI) Định nghĩa animation cho từng link
+    const linkVariants = {
+        hidden: { opacity: 0, x: -20 },
+        visible: { opacity: 1, x: 0 },
     };
 
     return (
-        <div className="flex flex-col w-64 min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 text-slate-300 shadow-lg flex-shrink-0">
-            {/* Header */}
-            <div className="px-5 py-6 flex items-center gap-3 border-b border-slate-700">
-                <h2 className="text-xl font-bold text-sky-400">TourZen Admin</h2>
-            </div>
-            {/* Navigation */}
-            <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto">
-                {navItems.map((item) => (
-                    <NavLink
-                        key={item.path}
-                        to={item.path}
-                        end={item.path === '/admin'}
-                        // <<< BỎ prop className ở đây >>>
-                    >
-                        {/* <<< Dùng function as children pattern >>> */}
-                        {({ isActive }) => ( // <<< Hàm nhận isActive
-                            <div // <<< Bọc nội dung trong div để áp style
-                                 className={`flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-colors duration-200 group ${
-                                     isActive
-                                         ? 'bg-sky-700 text-white font-semibold shadow-inner' // Style khi active
-                                         : 'text-slate-300 hover:bg-slate-700 hover:text-white' // Style khi inactive + hover
-                                 }`}
-                             >
-                                 {/* <<< isActive giờ đã hợp lệ ở đây >>> */}
-                                 {item.icon && <item.icon size={22} weight={isActive ? "fill" : "light"} />}
-                                 <span className="text-sm">{item.label}</span>
-                            </div>
-                        )}
-                    </NavLink>
-                ))}
-            </nav>
-            {/* User Info & Logout */}
-            {user && (
-                <div className="px-3 py-4 border-t border-slate-700 mt-auto">
-                    <p className="text-sm font-medium text-white truncate mb-2 px-2" title={user.email}>
-                        Xin chào, {user.user_metadata?.full_name || user.email}!
-                    </p>
-                    <button
-                        onClick={handleLogout}
-                        className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-red-400 hover:bg-red-900/50 hover:text-red-300 transition-colors"
-                    >
-                        <SignOut size={20} weight="duotone" />
-                        <span>Đăng xuất</span>
-                    </button>
-                </div>
-            )}
-        </div>
+        <motion.div variants={linkVariants} whileHover={{ x: 3 }}>
+            <NavLink
+                to={to}
+                end
+                className={({ isActive }) =>
+                    `${baseClass} w-full ` + // Thêm w-full
+                    (isActive
+                        ? 'bg-white/10 text-white'
+                        : 'text-blue-100 hover:bg-white/5')
+                }
+            >
+                <div className="flex-shrink-0">{icon}</div>
+                <span className={textClass}>
+                    {children}
+                </span>
+            </NavLink>
+        </motion.div>
     );
-};
+}
 
-// --- Component Fallback Loading ---
-const LoadingFallback = () => (
-    <div className="flex justify-center items-center h-[calc(100vh-100px)]">
-        <CircleNotch size={48} className="animate-spin text-sky-500" />
-    </div>
-);
-
-// --- Hiệu ứng chuyển trang ---
-const pageVariants = {
-    initial: { opacity: 0, x: -20 },
-    in: { opacity: 1, x: 0 },
-    out: { opacity: 0, x: 20 }
-};
-const pageTransition = { type: "tween", ease: "anticipate", duration: 0.4 };
-
-
-// --- Component Chính AdminDashboard ---
-export default function AdminDashboard() {
-    const location = useLocation();
+// --- (NÂNG CẤP) Component Sidebar ---
+function Sidebar() {
+    // (MỚI) Định nghĩa animation cho container chứa các link
+    const navContainerVariants = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: {
+                staggerChildren: 0.08, // Mỗi link cách nhau 0.08s
+            },
+        },
+    };
 
     return (
-        <div className="flex min-h-screen bg-slate-100 dark:bg-slate-950">
-            <AdminSidebar />
-            <main className="flex-1 overflow-x-hidden relative">
-                <Suspense fallback={<LoadingFallback />}>
-                    <AnimatePresence mode="wait">
-                        <motion.div
-                            key={location.pathname}
-                            initial="initial"
-                            animate="in"
-                            exit="out"
-                            variants={pageVariants}
-                            transition={pageTransition}
-                            className="p-6 md:p-8 lg:p-10" // Padding ở đây
-                        >
-                            <Routes location={location}>
-                                <Route path="/" element={<DashboardHome />} />
-                                <Route path="accounts" element={<ManageAccounts />} />
-                                <Route path="customers" element={<ManageCustomers />} />
-                                <Route path="suppliers" element={<ManageSuppliers />} />
-                                <Route path="tours" element={<ManageTour />} />
-                                <Route path="products" element={<AdminManageProducts />} />
-                                <Route path="reports" element={<Reports />} />
-                                {/* Route fallback "*" nếu cần */}
-                                {/* <Route path="*" element={<NotFoundAdmin />} /> */}
-                            </Routes>
-                        </motion.div>
-                    </AnimatePresence>
-                </Suspense>
-            </main>
+        <div className="flex flex-col w-64 h-screen bg-blue-600 text-white">
+            
+            {/* Logo Area */}
+            <motion.div 
+                className="flex items-center justify-between h-16 px-6 border-b border-blue-500/50"
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+            >
+                <span className="font-bold text-2xl text-white">
+                    TourZen
+                </span>
+                <button className="text-blue-200 hover:text-white">
+                    <List size={24} />
+                </button>
+            </motion.div>
+
+            {/* (NÂNG CẤP) Navigation */}
+            <motion.nav 
+                className="flex-1 p-4 space-y-1 overflow-y-auto"
+                variants={navContainerVariants}
+                initial="hidden"
+                animate="visible"
+            >
+                <SidebarLink to="/admin/dashboard" icon={<Layout size={20} />}>
+                    Tổng Quan
+                </SidebarLink>
+                <SidebarLink to="/admin/tours" icon={<AirplaneTilt size={20} />}>
+                    Quản lý Tour
+                </SidebarLink>
+                <SidebarLink to="/admin/bookings" icon={<Package size={20} />}>
+                    Quản lý Đơn Đặt
+                </SidebarLink>
+                <SidebarLink to="/admin/customers" icon={<Users size={20} />}>
+                    Quản lý Khách Hàng
+                </SidebarLink>
+                <SidebarLink to="/admin/suppliers" icon={<Buildings size={20} />}>
+                    Quản lý Nhà Cung Cấp
+                </SidebarLink>
+                <SidebarLink to="/admin/accounts" icon={<UserCircleGear size={20} />}>
+                    Quản lý Tài Khoản
+                </SidebarLink>
+            </motion.nav>
+
+            {/* (NÂNG CẤP) User Profile */}
+            <motion.div 
+                className="p-4 border-t border-blue-500/50"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.5 }} // Delay để chờ link load xong
+            >
+                <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer">
+                    <UserCircle size={36} weight="light" className="flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate">Nguyễn Văn An</p>
+                        <p className="text-xs text-blue-200 truncate">Admin</p>
+                    </div>
+                </div>
+            </motion.div>
+        </div>
+    );
+}
+
+
+// --- Component Layout chính (Giữ nguyên) ---
+export default function AdminDashboard() {
+    return (
+        <div className="flex h-screen bg-gray-50 dark:bg-slate-900">
+            <Sidebar />
+            <div className="flex-1 flex flex-col overflow-hidden">
+                <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 dark:bg-slate-900 p-6">
+                    <Outlet />
+                </main>
+            </div>
+            <Toaster
+                position="top-right"
+                reverseOrder={false}
+                toastOptions={{
+                    className: 'dark:bg-slate-700 dark:text-white',
+                }}
+            />
         </div>
     );
 }

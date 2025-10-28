@@ -1,8 +1,14 @@
 // src/pages/DashboardHome.jsx
-import React, { useState, useEffect } from 'react';
+// (Đây là trang "Tổng quan" - SẼ NẰM BÊN TRONG AdminDashboard.jsx)
+// (PHIÊN BẢN NÂNG CẤP: Hợp nhất UI từ Figma + Sửa lỗi Fetch + Tối ưu Loading)
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { getSupabase } from "../lib/supabaseClient";
 import { Link } from 'react-router-dom';
-import { FaSpinner, FaChartLine, FaBoxOpen, FaUserPlus, FaShoppingCart, FaFileInvoiceDollar } from "react-icons/fa";
+import { motion } from 'framer-motion';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Package, Users, Bank, AirplaneTilt, ArrowUp, ArrowDown, User, CircleNotch } from '@phosphor-icons/react';
+import toast from 'react-hot-toast';
 
 const supabase = getSupabase();
 
@@ -11,232 +17,329 @@ const formatCurrency = (number) => {
     if (typeof number !== 'number' || isNaN(number)) return "0 ₫";
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(number);
 };
-const formatDate = (dateString) => {
-    if (!dateString) return 'N/A'; // Handle null/undefined dates
-    const options = { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" };
+const formatDateShort = (dateString) => { // Dạng "dd/MM/yyyy"
+    if (!dateString) return 'N/A';
     try {
-        return new Date(dateString).toLocaleString("vi-VN", options);
-    } catch (e) {
-        console.error("Invalid date string for formatting:", dateString, e);
-        return 'Invalid Date';
+        return new Date(dateString).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+    } catch (e) { return 'Invalid Date'; }
+};
+const getPaymentStatus = (status) => {
+    switch (status) {
+        case 'confirmed': return { text: 'Đã thanh toán', color: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' };
+        case 'cancelled': return { text: 'Đã hủy', color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' };
+        case 'pending':
+        default: return { text: 'Chờ xử lý', color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300' };
     }
 };
 
-// --- Component Card Thống kê ---
-const StatCard = ({ title, value, icon, colorClass, loading }) => (
-    <div className={`p-6 rounded-2xl shadow-lg border ${colorClass} bg-white dark:bg-neutral-800`}>
-        <div className="flex justify-between items-start">
+
+// --- (FIXED) Thẻ Thống Kê (Sửa lỗi Tailwind JIT) ---
+// Truyền thẳng class thay vì dùng 'color="green"'
+const StatCard = ({ title, value, change, icon, iconBgColor, iconTextColor, loading }) => {
+    const isPositive = change && change.startsWith('+');
+    const changeColor = isPositive ? 'text-green-500' : 'text-red-500';
+    const IconCmp = icon;
+
+    return (
+        <motion.div
+            className="bg-white dark:bg-slate-800 p-5 rounded-lg shadow-md border dark:border-slate-700 flex items-start justify-between"
+            whileHover={{ y: -5 }}
+            transition={{ type: 'spring', stiffness: 300 }}
+        >
             <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{title}</p> {/* <<< Thêm tracking-wider */}
-                {loading ? (
-                    <FaSpinner className="animate-spin text-2xl mt-2 text-gray-400" />
-                ) : (
-                    <p className="text-3xl font-bold text-gray-800 dark:text-white mt-1">{value}</p>
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{title}</p>
+                <div className="text-3xl font-bold text-slate-800 dark:text-white mt-2">
+                    {loading ? <CircleNotch size={28} className="animate-spin text-sky-500" /> : value}
+                </div>
+                {change && (
+                    <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                        <span className={changeColor}>{isPositive ? <ArrowUp size={12} weight="bold"/> : <ArrowDown size={12} weight="bold"/>} {change}</span>
+                        <span>so với tháng trước</span>
+                    </div>
                 )}
             </div>
-            <div className={`p-3 rounded-full ${colorClass.replace('border-', 'bg-').replace('dark:border-', 'dark:bg-')} bg-opacity-10 dark:bg-opacity-20`}> {/* <<< Tự động lấy màu nền nhạt */}
-                {React.cloneElement(icon, { size: 22 })} {/* <<< Đảm bảo size icon nhất quán */}
+            <div className={`p-3 rounded-full ${iconBgColor}`}>
+                <IconCmp size={24} className={`${iconTextColor}`} />
             </div>
-        </div>
+        </motion.div>
+    );
+};
+
+// --- Biểu đồ Doanh thu (Giả lập) ---
+const simpleChartData = [
+  { name: 'T1', DoanhThu: 32000000 }, { name: 'T2', DoanhThu: 41000000 }, { name: 'T3', DoanhThu: 35000000 },
+  { name: 'T4', DoanhThu: 51000000 }, { name: 'T5', DoanhThu: 49000000 }, { name: 'T6', DoanhThu: 60000000 },
+  { name: 'T7', DoanhThu: 62000000 }, { name: 'T8', DoanhThu: 75000000 }, { name: 'T9', DoanhThu: 71000000 },
+  { name: 'T10', DoanhThu: 82000000 },
+];
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="p-3 bg-white dark:bg-slate-800 border dark:border-slate-600 rounded-lg shadow-lg">
+        <p className="font-semibold text-gray-800 dark:text-white">{label}</p>
+        <p className="text-sm text-sky-500">{`Doanh thu: ${formatCurrency(payload[0].value)}`}</p>
+      </div>
+    );
+  }
+  return null;
+};
+const RevenueChart = () => (
+    <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md border dark:border-slate-700 h-[400px]">
+        <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">Tổng Quan Doanh Thu</h3>
+         <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={simpleChartData} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
+                <defs>
+                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.7}/>
+                        <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/>
+                    </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.1} vertical={false} />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} dy={10} stroke="#94a3b8" fontSize={12} />
+                <YAxis tickLine={false} axisLine={false} dx={-10} stroke="#94a3b8" fontSize={12} tickFormatter={(value) => `${value/1000000}tr`} />
+                <Tooltip content={<CustomTooltip />} />
+                <Area type="monotone" dataKey="DoanhThu" stroke="#0ea5e9" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
+            </AreaChart>
+        </ResponsiveContainer>
     </div>
 );
 
-// --- Component Chính ---
+// --- Component Dashboard Chính ---
 export default function DashboardHome() {
-    const [loading, setLoading] = useState(true);
-    const [stats, setStats] = useState({
-        monthlyRevenue: 0,
-        monthlyBookings: 0,
-        pendingProducts: 0,
-        newUsers: 0
-    });
+    const [stats, setStats] = useState({ revenue: 0, newBookings: 0, customers: 0, activeTours: 0 });
     const [recentBookings, setRecentBookings] = useState([]);
-    const [error, setError] = useState(null); // <<< Thêm state lỗi
+    const [topTours, setTopTours] = useState([]);
+    
+    // (FIXED) Sử dụng loading state riêng biệt (từ file AdminDashboard.jsx của bạn)
+    const [loadingStats, setLoadingStats] = useState(true);
+    const [loadingBookings, setLoadingBookings] = useState(true);
+    const [loadingTours, setLoadingTours] = useState(true);
+    const [error, setError] = useState(null);
+
+    // (FIXED) Dùng logic fetch tuần tự (từ file AdminDashboard.jsx) vì nó ổn định và đúng
+    const fetchData = useCallback(async () => {
+        setLoadingStats(true);
+        setLoadingBookings(true);
+        setLoadingTours(true);
+        setError(null);
+
+        try {
+            // --- 1. Fetch Stats ---
+            const { count: customerCount, error: customerError } = await supabase
+                .from('Users')
+                .select('*', { count: 'exact', head: true });
+            if (customerError) throw customerError;
+
+            const { data: revenueData, error: revenueError } = await supabase
+                .from('Bookings')
+                .select('total_price')
+                .eq('status', 'confirmed');
+            if (revenueError) throw revenueError;
+            const totalRevenue = revenueData.reduce((acc, b) => acc + (b.total_price || 0), 0);
+
+            const { count: newBookingsCount, error: newBookingsError } = await supabase
+                .from('Bookings')
+                .select('*', { count: 'exact', head: true })
+                .eq('status', 'pending');
+            if (newBookingsError) throw newBookingsError;
+            
+            const { count: activeToursCount, error: activeToursError } = await supabase
+                .from('Products')
+                .select('*', { count: 'exact', head: true })
+                .eq('product_type', 'tour')
+                .eq('is_published', true);
+            if (activeToursError) throw activeToursError;
+
+            setStats({
+                revenue: totalRevenue,
+                newBookings: newBookingsCount,
+                customers: customerCount,
+                activeTours: activeToursCount
+            });
+            setLoadingStats(false);
+
+            // --- 2. Fetch Đơn Đặt Gần Đây ---
+            const { data: bookingsData, error: bookingsError } = await supabase
+                .from('Bookings')
+                .select('id, created_at, total_price, status, user:Users(full_name), main_tour:Products(name, location)')
+                .order('created_at', { ascending: false })
+                .limit(5);
+            if (bookingsError) throw bookingsError;
+            setRecentBookings(bookingsData || []);
+            setLoadingBookings(false);
+
+            // --- 3. Fetch Tour Sắp Diễn Ra (Lấy 4 tour mới nhất) ---
+            const { data: toursData, error: toursError } = await supabase
+                .from('Products')
+                .select('id, name, location, image_url, stock, created_at')
+                .eq('product_type', 'tour')
+                .eq('is_published', true)
+                .order('created_at', { ascending: false }) // Lấy tour mới tạo
+                .limit(4);
+            if (toursError) throw toursError;
+            setTopTours(toursData || []);
+            setLoadingTours(false);
+
+        } catch (err) {
+            console.error("Lỗi tải dữ liệu Dashboard:", err);
+            setError(err.message);
+            toast.error(`Lỗi tải dữ liệu: ${err.message}`);
+            setLoadingStats(false);
+            setLoadingBookings(false);
+            setLoadingTours(false);
+        }
+    }, []);
 
     useEffect(() => {
-        async function fetchKpis() {
-            setLoading(true);
-            setError(null); // Reset lỗi
-            // Lấy ngày đầu tiên của tháng hiện tại
-            const now = new Date();
-            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-
-            try {
-                // Sử dụng Promise.all để fetch song song
-                const [bookingRes, pendingRes, userRes, recentRes] = await Promise.all([
-                    // 1. Doanh thu & Đơn hàng tháng này ('confirmed')
-                    supabase
-                        .from('Bookings')
-                        .select('total_price')
-                        .eq('status', 'confirmed')
-                        .gte('created_at', startOfMonth),
-                    // 2. Số sản phẩm chờ duyệt (tất cả loại)
-                    supabase
-                        .from('Products')
-                        .select('id', { count: 'exact', head: true })
-                        .eq('approval_status', 'pending'),
-                    // 3. Số người dùng mới tháng này
-                    supabase
-                        .from('Users')
-                        .select('id', { count: 'exact', head: true })
-                        .gte('created_at', startOfMonth),
-                    // 4. 5 đơn hàng mới nhất (lấy đủ thông tin cần thiết)
-                    supabase
-                        .from("Bookings")
-                        .select(`
-                            id, created_at, total_price, status,
-                            user:Users ( full_name ),
-                            main_tour:Products!product_id ( name )
-                        `)
-                        .order('created_at', { ascending: false })
-                        .limit(5)
-                ]);
-
-                // Xử lý kết quả
-                if (bookingRes.error) throw bookingRes.error;
-                if (pendingRes.error) throw pendingRes.error;
-                if (userRes.error) throw userRes.error;
-                if (recentRes.error) throw recentRes.error;
-
-                const monthlyRevenue = (bookingRes.data || []).reduce((sum, b) => sum + (b.total_price || 0), 0);
-                const monthlyBookings = (bookingRes.data || []).length;
-
-                setStats({
-                    monthlyRevenue: monthlyRevenue,
-                    monthlyBookings: monthlyBookings,
-                    pendingProducts: pendingRes.count || 0,
-                    newUsers: userRes.count || 0
-                });
-                setRecentBookings(recentRes.data || []);
-
-            } catch (error) {
-                console.error("Lỗi tải dữ liệu Dashboard:", error);
-                setError("Không thể tải dữ liệu tổng quan. Vui lòng thử lại."); // <<< Set lỗi
-                // Reset state nếu lỗi
-                setStats({ monthlyRevenue: 0, monthlyBookings: 0, pendingProducts: 0, newUsers: 0 });
-                setRecentBookings([]);
-            } finally {
-                setLoading(false);
-            }
-        }
-
-        fetchKpis();
-    }, []); // Chỉ chạy 1 lần khi mount
-
+        fetchData();
+    }, [fetchData]);
 
     return (
-        <div className="space-y-8">
-            <h1 className="text-3xl font-bold text-slate-800 dark:text-white">
-                Tổng quan
-            </h1>
+        <motion.div
+            className="space-y-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+        >
+            {/* Tiêu đề */}
+            <div>
+                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 dark:text-white">Tổng quan</h1>
+                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Tổng quan về hoạt động kinh doanh du lịch</p>
+            </div>
 
-            {/* Hiển thị lỗi nếu có */}
-            {error && (
-                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative dark:bg-red-900/30 dark:border-red-700 dark:text-red-300" role="alert">
-                    <strong className="font-bold">Lỗi!</strong>
-                    <span className="block sm:inline ml-2">{error}</span>
-                 </div>
-            )}
+            {error && ( <div className="error-banner">{error}</div> )}
 
-            {/* === 1. Các thẻ KPIs === */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard
-                    title={`Doanh thu (T${new Date().getMonth() + 1})`}
-                    value={formatCurrency(stats.monthlyRevenue)}
-                    icon={<FaFileInvoiceDollar className="text-green-600" />} // <<< Bỏ size ở đây
-                    colorClass="border-green-200 dark:border-green-700"
-                    loading={loading}
+            {/* Thẻ Thống Kê (FIXED colors) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+                <StatCard 
+                    title="Tổng Doanh Thu" 
+                    value={formatCurrency(stats.revenue)} 
+                    change="+12.5%" 
+                    icon={Bank} 
+                    iconBgColor="bg-green-100 dark:bg-green-900/30"
+                    iconTextColor="text-green-600 dark:text-green-400"
+                    loading={loadingStats} 
                 />
-                <StatCard
-                    title={`Đơn hàng (T${new Date().getMonth() + 1})`}
-                    value={stats.monthlyBookings}
-                    icon={<FaShoppingCart className="text-sky-600" />}
-                    colorClass="border-sky-200 dark:border-sky-700"
-                    loading={loading}
+                <StatCard 
+                    title="Đơn Đặt Mới" 
+                    value={stats.newBookings} 
+                    change="+2.5%" 
+                    icon={Package} 
+                    iconBgColor="bg-sky-100 dark:bg-sky-900/30"
+                    iconTextColor="text-sky-600 dark:text-sky-400"
+                    loading={loadingStats} 
                 />
-                <StatCard
-                    title="Sản phẩm chờ duyệt"
-                    value={stats.pendingProducts}
-                    icon={<FaBoxOpen className="text-yellow-600" />}
-                    colorClass="border-yellow-200 dark:border-yellow-700"
-                    loading={loading}
+                <StatCard 
+                    title="Khách Hàng" 
+                    value={stats.customers} 
+                    change="+4.2%" 
+                    icon={Users} 
+                    iconBgColor="bg-indigo-100 dark:bg-indigo-900/30"
+                    iconTextColor="text-indigo-600 dark:text-indigo-400"
+                    loading={loadingStats} 
                 />
-                <StatCard
-                    title="Người dùng mới (Tháng)"
-                    value={stats.newUsers}
-                    icon={<FaUserPlus className="text-indigo-600" />}
-                    colorClass="border-indigo-200 dark:border-indigo-700"
-                    loading={loading}
+                <StatCard 
+                    title="Tour Hoạt Động" 
+                    value={stats.activeTours} 
+                    change="" 
+                    icon={AirplaneTilt} 
+                    iconBgColor="bg-orange-100 dark:bg-orange-900/30"
+                    iconTextColor="text-orange-600 dark:text-orange-400"
+                    loading={loadingStats} 
                 />
             </div>
 
-            {/* === 2. Cập nhật mới (Đơn hàng gần đây) === */}
-            <div className="bg-white dark:bg-neutral-800 shadow-xl rounded-lg border dark:border-neutral-700">
-                <div className="p-5 border-b border-gray-200 dark:border-neutral-700">
-                    <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
-                        Đơn hàng gần đây
-                    </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">5 đơn hàng vừa được tạo hoặc cập nhật.</p>
-                </div>
-
-                {/* Chỉ hiển thị loading spinner nếu đang load lần đầu */}
-                {loading && recentBookings.length === 0 && !error ? (
-                    <div className="p-10 text-center"><FaSpinner className="animate-spin text-3xl mx-auto text-gray-400" /></div>
-                ) : !loading && recentBookings.length === 0 && !error ? ( // Hiển thị khi không có đơn hàng nào
-                    <p className="p-10 text-center text-gray-500 italic">Chưa có đơn hàng nào gần đây.</p>
-                ) : ( // Hiển thị danh sách đơn hàng
-                    <div className="flow-root">
-                        <ul role="list" className="divide-y divide-gray-200 dark:divide-neutral-700">
-                            {recentBookings.map(booking => (
-                                <li key={booking.id} className="p-5 hover:bg-gray-50 dark:hover:bg-neutral-700/50 transition-colors">
-                                    <div className="flex items-center space-x-4">
-                                        <div className="flex-shrink-0">
-                                            {/* Icon dựa trên status */}
-                                            <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                                                booking.status === 'confirmed' ? 'bg-green-100 dark:bg-green-900' :
-                                                booking.status === 'cancelled' ? 'bg-red-100 dark:bg-red-900' :
-                                                'bg-yellow-100 dark:bg-yellow-900'
-                                            }`}>
-                                                <FaShoppingCart className={`h-5 w-5 ${
-                                                    booking.status === 'confirmed' ? 'text-green-600 dark:text-green-400' :
-                                                    booking.status === 'cancelled' ? 'text-red-600 dark:text-red-400' :
-                                                    'text-yellow-600 dark:text-yellow-400'
-                                                }`} />
-                                            </div>
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                                                {/* Hiển thị tên tour trước */}
-                                                {booking.main_tour?.name || 'Tour đã bị xóa'}
-                                            </p>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                                                Đặt bởi: {booking.user?.full_name || 'Khách vãng lai'}
-                                            </p>
-                                        </div>
-                                        <div className="text-right flex-shrink-0 whitespace-nowrap">
-                                            <p className="text-sm font-semibold text-green-600 dark:text-green-400">
-                                                {formatCurrency(booking.total_price)}
-                                            </p>
-                                             <p className="text-xs text-gray-400 mt-0.5">
-                                                {formatDate(booking.created_at)}
-                                            </p>
-                                        </div>
+            {/* Biểu đồ và Tour Sắp Diễn Ra */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <motion.div className="lg:col-span-2" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+                    <RevenueChart />
+                </motion.div>
+                <motion.div className="lg:col-span-1 bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md border dark:border-slate-700" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+                    <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">Tour Sắp Diễn Ra</h3>
+                    {loadingTours ? (
+                        <div className="text-center py-10"><CircleNotch size={24} className="animate-spin text-sky-500"/></div>
+                    ) : topTours.length === 0 ? (
+                         <p className="text-sm text-center text-slate-500 py-10">Không có tour nào sắp diễn ra.</p>
+                    ) : (
+                        <div className="space-y-4">
+                            {topTours.map(tour => (
+                                <Link to={`/admin/products?search=${tour.name}`} key={tour.id} className="flex items-center gap-4 group p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                                    <img src={tour.image_url || 'https://placehold.co/100x100'} alt={tour.name} className="w-16 h-12 object-cover rounded-md flex-shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-slate-700 dark:text-white truncate group-hover:text-sky-500 transition-colors">{tour.name}</p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{tour.location || 'Nhiều điểm đến'}</p>
                                     </div>
-                                </li>
+                                    <span className="text-xs font-medium text-slate-400 dark:text-slate-500 flex-shrink-0 items-center gap-1 flex">
+                                        <User size={12}/> {tour.stock || 0}
+                                    </span>
+                                </Link>
                             ))}
-                        </ul>
-                    </div>
-                )}
-                 {/* Link xem tất cả chỉ hiện khi không loading và có lỗi hoặc có đơn hàng */}
-                 {(!loading || recentBookings.length > 0) && (
-                     <div className="p-4 text-center bg-gray-50 dark:bg-neutral-800 border-t border-gray-200 dark:border-neutral-700 rounded-b-lg">
-                        {/* <<< Sửa link đến trang Quản lý Đặt Tour >>> */}
-                        <Link to="/admin/tours" className="text-sm font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300">
-                            Xem tất cả đơn đặt tour &rarr;
-                        </Link>
-                    </div>
-                 )}
+                        </div>
+                    )}
+                </motion.div>
             </div>
-        </div>
+
+             {/* Đơn Đặt Gần Đây */}
+             <motion.div
+                className="bg-white dark:bg-slate-800 shadow-xl rounded-lg overflow-hidden border dark:border-slate-700"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+            >
+                <h3 className="text-lg font-semibold text-slate-800 dark:text-white p-5 border-b dark:border-slate-700">Đơn Đặt Gần Đây</h3>
+                 <div className="overflow-x-auto">
+                    <table className="min-w-full">
+                        <thead className="bg-gray-50 dark:bg-slate-700/40">
+                             <tr>
+                                <th className="th-style">Mã Đơn</th>
+                                <th className="th-style">Khách hàng</th>
+                                <th className="th-style">Điểm đến (Tour)</th>
+                                <th className="th-style">Ngày</th>
+                                <th className="th-style">Số Tiền</th>
+                                <th className="th-style">Trạng Thái</th>
+                            </tr>
+                        </thead>
+                         <tbody className="divide-y dark:divide-slate-700">
+                             {loadingBookings ? (
+                                 <tr><td colSpan="6" className="td-center"><CircleNotch size={24} className="animate-spin text-sky-500"/></td></tr>
+                             ) : recentBookings.length === 0 ? (
+                                 <tr><td colSpan="6" className="td-center italic text-slate-500">Không có đơn đặt nào gần đây.</td></tr>
+                             ) : (
+                                recentBookings.map((b, index) => {
+                                    const paymentStatus = getPaymentStatus(b.status);
+                                    return (
+                                        <motion.tr
+                                            key={b.id}
+                                            className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors"
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            transition={{ delay: 0.1 * index }} // Hiệu ứng xuất hiện
+                                        >
+                                            <td className="td-style font-mono text-xs">#{b.id.slice(-6).toUpperCase()}</td>
+                                            <td className="td-style font-medium dark:text-white">{b.user?.full_name || 'N/A'}</td>
+                                            <td className="td-style whitespace-normal">{b.main_tour?.name || 'N/A'}</td>
+                                            <td className="td-style text-slate-500">{formatDateShort(b.created_at)}</td>
+                                            <td className="td-style font-medium text-sky-600 dark:text-sky-400">{formatCurrency(b.total_price)}</td>
+                                            <td className="td-style">
+                                                <span className={`status-badge ${paymentStatus.color}`}>{paymentStatus.text}</span>
+                                            </td>
+                                        </motion.tr>
+                                    )
+                                })
+                             )}
+                         </tbody>
+                    </table>
+                 </div>
+             </motion.div>
+             
+             {/* CSS */}
+             <style jsx>{`
+                .th-style { @apply px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap; }
+                .td-style { @apply px-6 py-4 text-sm align-middle; }
+                .td-center { @apply px-6 py-8 text-center; }
+                .status-badge { @apply text-xs font-semibold rounded-full px-2.5 py-0.5 whitespace-nowrap; }
+                .error-banner { @apply bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative dark:bg-red-900/30 dark:border-red-700 dark:text-red-300; }
+             `}</style>
+
+        </motion.div>
     );
 }

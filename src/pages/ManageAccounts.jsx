@@ -1,147 +1,290 @@
-// src/pages/AdminManageProducts.jsx
-// (UPGRADED: UI đồng bộ, Toast Confirm, Animation + FIXED: Comment in select)
-
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Link } from 'react-router-dom';
 import { getSupabase } from "../lib/supabaseClient";
 import toast from "react-hot-toast";
-import { FaSpinner, FaCheck, FaTimes, FaPlus, FaMinus } from "react-icons/fa"; // Giữ lại một số Fa icons
 import {
-    Package, CaretLeft, CaretRight, CircleNotch, X, MagnifyingGlass, CalendarPlus,
-    PencilLine, UploadSimple, ArrowsClockwise, WarningCircle, Trash, Buildings // <<< Thêm icons
+    UsersThree, CaretLeft, CaretRight, CircleNotch, X, MagnifyingGlass,
+    PencilLine, ArrowsClockwise, WarningCircle, Trash, UserPlus, UserCircleMinus, UserCircleCheck
 } from "@phosphor-icons/react";
-import { motion, AnimatePresence } from "framer-motion"; // <<< Thêm Framer Motion
+import { motion, AnimatePresence } from "framer-motion";
 
 const supabase = getSupabase();
 
 // --- Hook Debounce (Giữ nguyên) ---
-const useDebounce = (value, delay) => { /* ... */ };
+const useDebounce = (value, delay) => {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [value, delay]);
+    return debouncedValue;
+};
 
 // --- Helper Pagination Window (Giữ nguyên) ---
-const getPaginationWindow = (currentPage, totalPages, width = 2) => { /* ... */ };
+const getPaginationWindow = (currentPage, totalPages, width = 2) => {
+    if (totalPages <= 1) return [];
+    if (totalPages <= 5 + width) {
+        return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
 
-// --- (UPGRADED) Modal Chỉnh sửa Tour ---
-const EditTourModal = ({ tour, onClose, onSuccess, suppliers }) => {
-    const [formData, setFormData] = useState({ /* ... state ... */ });
+    let pages = [];
+    pages.push(1);
+
+    let start = Math.max(2, currentPage - width);
+    let end = Math.min(totalPages - 1, currentPage + width);
+
+    if (currentPage - width > 2) {
+        pages.push('...');
+    }
+
+    for (let i = start; i <= end; i++) {
+        pages.push(i);
+    }
+
+    if (currentPage + width < totalPages - 1) {
+        pages.push('...');
+    }
+
+    pages.push(totalPages);
+    return pages;
+};
+
+// --- (NEW) Modal Thêm/Sửa Tài Khoản ---
+const AccountModal = ({ account, onClose, onSuccess }) => {
+    const isEdit = !!account; // Kiểm tra xem đây là modal Sửa hay Thêm
+    
+    // Định nghĩa các vai trò
+    const ROLES = [
+        { id: 'admin', name: 'Admin' },
+        { id: 'manager', name: 'Manager' },
+        { id: 'staff', name: 'Staff' },
+        { id: 'user', name: 'User' },
+    ];
+
+    const [formData, setFormData] = useState({
+        email: isEdit ? account.email : '',
+        password: '',
+        username: isEdit ? account.username : '',
+        full_name: isEdit ? account.full_name : '',
+        role: isEdit ? account.role : 'staff',
+        is_active: isEdit ? account.is_active : true,
+    });
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
-    useEffect(() => { /* ... load data ... */ }, [tour]);
+    const handleChange = (e) => {
+        const { name, value, type, checked } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value,
+        }));
+    };
 
-    // Handlers (Giữ nguyên logic)
-    const handleChange = (e) => { /* ... */ };
-    const handleItineraryChange = (index, field, value) => { /* ... */ };
-    const addItineraryItem = () => { /* ... */ };
-    const removeItineraryItem = (index) => { /* ... */ };
-    const handleDepartureChange = (index, field, value) => { /* ... */ };
-    const addDepartureItem = () => { /* ... */ };
-    const removeDepartureItem = (index) => { /* ... */ };
-    const handleSubmit = async (e) => { /* ... (Logic submit giữ nguyên) ... */ };
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+
+        try {
+            if (isEdit) {
+                // --- Logic Sửa Tài Khoản ---
+                // Chỉ cập nhật public.profiles
+                const { error: updateError } = await supabase
+                    .from('profiles')
+                    .update({
+                        username: formData.username,
+                        full_name: formData.full_name,
+                        role: formData.role,
+                        is_active: formData.is_active,
+                    })
+                    .eq('id', account.id);
+
+                if (updateError) throw updateError;
+                toast.success('Cập nhật tài khoản thành công!');
+
+            } else {
+                // --- Logic Thêm Tài Khoản ---
+                // 1. Tạo user trong auth.users
+                const { data: authData, error: authError } = await supabase.auth.signUp({
+                    email: formData.email,
+                    password: formData.password,
+                });
+
+                if (authError) throw authError;
+                if (!authData.user) throw new Error('Không thể tạo user trong Auth.');
+
+                // 2. Tạo profile trong public.profiles
+                const { error: profileError } = await supabase
+                    .from('profiles')
+                    .insert({
+                        id: authData.user.id, // Liên kết với auth.users
+                        email: formData.email,
+                        username: formData.username,
+                        full_name: formData.full_name,
+                        role: formData.role,
+                        is_active: formData.is_active,
+                        // created_at sẽ tự động được thêm bởi Supabase
+                    });
+                
+                if (profileError) {
+                    // Nếu tạo profile lỗi, cố gắng xóa user auth vừa tạo
+                    // Cần 1 Edge Function để làm việc này an toàn
+                    console.error("Lỗi tạo profile, user auth đã được tạo:", authData.user.id);
+                    throw new Error(`Tạo profile thất bại: ${profileError.message}. (User auth đã được tạo, cần xử lý riêng)`);
+                }
+
+                toast.success('Thêm tài khoản mới thành công!');
+            }
+            
+            onSuccess(); // Tải lại danh sách
+            onClose(); // Đóng modal
+        
+        } catch (error) {
+            console.error("Lỗi Thêm/Sửa tài khoản:", error);
+            toast.error(error.message || 'Đã xảy ra lỗi không xác định.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
-        <motion.div // <<< Thêm motion div cho backdrop
+        <motion.div
             className="fixed inset-0 bg-black/60 z-40 flex justify-center items-center p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
         >
-            {/* <<< Thêm motion div cho modal content */}
             <motion.div
-                className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col"
+                className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col"
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
                 transition={{ duration: 0.2 }}
             >
                 <div className="flex justify-between items-center p-4 border-b dark:border-slate-700 flex-shrink-0">
-                     <h3 className="text-lg font-semibold text-slate-800 dark:text-white">
-                        {tour.is_published ? 'Chỉnh sửa Tour đã đăng' : 'Hoàn thiện & Đăng Tour'}
+                    <h3 className="text-lg font-semibold text-slate-800 dark:text-white">
+                        {isEdit ? 'Chỉnh sửa Tài khoản' : 'Thêm Tài khoản mới'}
                     </h3>
                     <button onClick={onClose} disabled={loading} className="text-gray-400 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50"> <X size={20}/> </button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
-                    <div className="overflow-y-auto p-6 space-y-5"> {/* <<< Tăng space */}
-                        {/* Thông tin cơ bản */}
+                    <div className="overflow-y-auto p-6 space-y-4">
+                        
+                        {/* Email (Read-only khi Edit) */}
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-                            <h4 className="text-md font-semibold mb-3 dark:text-white border-b pb-2 dark:border-slate-700">Thông tin cơ bản</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                <div> <label className="label-style">Tên Tour *</label> <input type="text" name="name" value={formData.name} onChange={handleChange} required className="input-style" /> </div>
-                                <div> <label className="label-style">Địa điểm</label> <input type="text" name="location" value={formData.location} onChange={handleChange} className="input-style" /> </div>
-                                <div> <label className="label-style">Thời lượng (VD: 3N2Đ)</label> <input type="text" name="duration" value={formData.duration} onChange={handleChange} className="input-style" /> </div>
-                                <div>
-                                    <label className="label-style">Nhà cung cấp *</label>
-                                    <select name="supplier_id" value={formData.supplier_id} onChange={handleChange} required className="input-style">
-                                        <option value="" disabled>-- Chọn NCC --</option>
-                                        {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                    </select>
+                            <label className="label-style">Email *</label>
+                            <input 
+                                type="email" 
+                                name="email" 
+                                value={formData.email} 
+                                onChange={handleChange} 
+                                required 
+                                disabled={isEdit} // Không cho sửa email
+                                className="input-style disabled:bg-slate-100 dark:disabled:bg-slate-700" 
+                                placeholder="example@tourmanager.com"
+                            />
+                        </motion.div>
+
+                        {/* Password (Chỉ khi Thêm mới) */}
+                        {!isEdit && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+                                <label className="label-style">Mật khẩu *</label>
+                                <div className="relative">
+                                    <input 
+                                        type={showPassword ? "text" : "password"}
+                                        name="password" 
+                                        value={formData.password} 
+                                        onChange={handleChange} 
+                                        required 
+                                        minLength="6"
+                                        className="input-style"
+                                        placeholder="Tối thiểu 6 ký tự"
+                                    />
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                                    >
+                                        {showPassword ? <PencilLine size={18} /> : <PencilLine size={18} />} {/* Thay icon nếu muốn */}
+                                    </button>
                                 </div>
-                            </div>
-                            <div className="mt-4"> <label className="label-style">Mô tả chi tiết Tour</label> <textarea name="description" value={formData.description} onChange={handleChange} rows="4" className="input-style resize-y"></textarea> </div>
+                            </motion.div>
+                        )}
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Username */}
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+                                <label className="label-style">Tên đăng nhập *</label>
+                                <input 
+                                    type="text" 
+                                    name="username" 
+                                    value={formData.username} 
+                                    onChange={handleChange} 
+                                    required 
+                                    className="input-style"
+                                    placeholder="admin01"
+                                />
+                            </motion.div>
+
+                            {/* Họ và Tên */}
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+                                <label className="label-style">Họ và Tên *</label>
+                                <input 
+                                    type="text" 
+                                    name="full_name" 
+                                    value={formData.full_name} 
+                                    onChange={handleChange} 
+                                    required 
+                                    className="input-style"
+                                    placeholder="Nguyễn Văn An"
+                                />
+                            </motion.div>
+                        </div>
+
+                        {/* Vai trò */}
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+                            <label className="label-style">Vai trò *</label>
+                            <select 
+                                name="role" 
+                                value={formData.role} 
+                                onChange={handleChange} 
+                                required 
+                                className="input-style"
+                            >
+                                {ROLES.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                            </select>
                         </motion.div>
 
-                        {/* Quản lý Lịch trình */}
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-                            <h4 className="text-md font-semibold mt-4 mb-3 dark:text-white border-b pb-2 dark:border-slate-700">Lịch trình chi tiết (Theo ngày)</h4>
-                            <AnimatePresence> {/* <<< Cho hiệu ứng khi thêm/xóa */}
-                            {formData.itinerary.map((item, index) => (
-                                <motion.div
-                                    key={`itinerary-${index}`} // Cần key ổn định
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: 'auto' }}
-                                    exit={{ opacity: 0, height: 0 }}
-                                    transition={{ duration: 0.2 }}
-                                    className="flex flex-col sm:flex-row gap-2 mb-2 p-3 border rounded-md dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 overflow-hidden" // Thêm overflow-hidden
-                                >
-                                    <input type="text" placeholder={`Tiêu đề Ngày ${index+1}`} value={item.title} onChange={(e) => handleItineraryChange(index, 'title', e.target.value)} className="input-style sm:w-1/3 font-medium" />
-                                    <textarea placeholder="Nội dung hoạt động..." value={item.content} onChange={(e) => handleItineraryChange(index, 'content', e.target.value)} rows="3" className="input-style flex-1 resize-y"></textarea>
-                                    <button type="button" onClick={() => removeItineraryItem(index)} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 self-center sm:self-start mt-2 sm:mt-0" title="Xóa ngày"><Minus size={16} /></button>
-                                </motion.div>
-                            ))}
-                            </AnimatePresence>
-                            <button type="button" onClick={addItineraryItem} className="mt-2 button-secondary text-xs flex items-center gap-1"><Plus size={14} weight="bold"/> Thêm ngày</button>
-                        </motion.div>
-
-                        {/* Quản lý Lịch khởi hành */}
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-                             <h4 className="text-md font-semibold mt-4 mb-3 dark:text-white border-b pb-2 dark:border-slate-700">Lịch khởi hành & Giá *</h4>
-                             <AnimatePresence>
-                             {formData.departures.map((item, index) => (
-                                 <motion.div
-                                     key={`departure-${index}`} // Cần key ổn định
-                                     initial={{ opacity: 0, height: 0 }}
-                                     animate={{ opacity: 1, height: 'auto' }}
-                                     exit={{ opacity: 0, height: 0 }}
-                                     transition={{ duration: 0.2 }}
-                                     className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-2 items-end p-3 border rounded-md dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 overflow-hidden" // items-end
-                                 >
-                                     <div className="sm:col-span-1">
-                                         <label className="label-style text-xs">Ngày đi *</label>
-                                         <input type="date" value={item.date} onChange={(e) => handleDepartureChange(index, 'date', e.target.value)} className="input-style" required />
-                                         {item.month_hint && !item.date && <span className="text-xs text-gray-500 italic">(Tháng cũ: {item.month_hint})</span>}
-                                     </div>
-                                     <div className="sm:col-span-1">
-                                        <label className="label-style text-xs">Giá Người lớn *</label>
-                                         <input type="number" placeholder="Giá NL" value={item.adult_price} onChange={(e) => handleDepartureChange(index, 'adult_price', e.target.value)} className="input-style" required min="1" step="1000" />
-                                     </div>
-                                      <div className="sm:col-span-1">
-                                        <label className="label-style text-xs">Giá Trẻ em</label>
-                                         <input type="number" placeholder="Giá TE" value={item.child_price} onChange={(e) => handleDepartureChange(index, 'child_price', e.target.value)} className="input-style" min="0" step="1000" />
-                                     </div>
-                                     <div className="sm:col-span-1 flex justify-end">
-                                        <button type="button" onClick={() => removeDepartureItem(index)} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa ngày khởi hành"><Minus size={16} /></button>
-                                     </div>
-                                 </motion.div>
-                             ))}
-                             </AnimatePresence>
-                             <button type="button" onClick={addDepartureItem} className="mt-2 button-secondary text-xs flex items-center gap-1"><CalendarPlus size={14} weight="bold"/> Thêm ngày khởi hành</button>
-                        </motion.div>
+                        {/* Trạng thái (Chỉ khi Sửa) */}
+                        {isEdit && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
+                                <label className="label-style">Trạng thái</label>
+                                <div className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-700/50 rounded-md">
+                                    <input 
+                                        type="checkbox" 
+                                        name="is_active"
+                                        id="is_active_toggle"
+                                        checked={formData.is_active}
+                                        onChange={handleChange}
+                                        className="w-4 h-4 text-sky-600 rounded border-gray-300 focus:ring-sky-500"
+                                    />
+                                    <label htmlFor="is_active_toggle" className="text-sm dark:text-white">
+                                        {formData.is_active ? 'Đang Hoạt động' : 'Đã Ngừng'}
+                                    </label>
+                                </div>
+                            </motion.div>
+                        )}
+                        
                     </div>
                     <div className="p-4 border-t dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800 rounded-b-lg flex-shrink-0">
                         <button type="button" onClick={onClose} disabled={loading} className="modal-button-secondary">Hủy</button>
-                        <button type="submit" disabled={loading} className="modal-button-primary flex items-center justify-center gap-1.5 min-w-[140px]"> {/* <<< Thêm min-width */}
-                            {loading ? <CircleNotch size={18} className="animate-spin" /> : (tour.is_published ? <PencilLine size={18} /> : <UploadSimple size={18} />) }
-                            {tour.is_published ? 'Lưu thay đổi' : 'Hoàn tất & Đăng'}
+                        <button type="submit" disabled={loading} className="modal-button-primary flex items-center justify-center gap-1.5 min-w-[120px]">
+                            {loading ? <CircleNotch size={18} className="animate-spin" /> : (isEdit ? <PencilLine size={18} /> : <UserPlus size={18} />) }
+                            {isEdit ? 'Lưu thay đổi' : 'Thêm mới'}
                         </button>
                     </div>
                 </form>
@@ -150,203 +293,292 @@ const EditTourModal = ({ tour, onClose, onSuccess, suppliers }) => {
     );
 };
 
-// --- Component chính: Quản lý Sản phẩm (Tour) ---
-export default function AdminManageProducts() {
-    // ... (States giữ nguyên) ...
-     const [products, setProducts] = useState([]);
-    const [suppliers, setSuppliers] = useState([]);
+
+// --- Component chính: Quản lý Tài Khoản ---
+export default function AdminManageAccounts() {
+    const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isFetchingPage, setIsFetchingPage] = useState(false);
     const [error, setError] = useState(null);
-    const [modalTour, setModalTour] = useState(null);
+    const [modalAccount, setModalAccount] = useState(null); // null, 'new', hoặc {account_data}
+    
     const [searchTerm, setSearchTerm] = useState("");
     const debouncedSearch = useDebounce(searchTerm, 400);
+    
     const ITEMS_PER_PAGE = 10;
     const [currentPage, setCurrentPage] = useState(1);
     const [totalItems, setTotalItems] = useState(0);
     const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
 
-    // --- (FIXED) Fetch data ---
-    const fetchProducts = useCallback(async (isInitialLoad = false) => {
-        // ... (Logic fetch giữ nguyên, đảm bảo comment đã xóa) ...
-          if (!isInitialLoad) setIsFetchingPage(true); setError(null);
+    // --- Fetch data ---
+    const fetchAccounts = useCallback(async (isInitialLoad = false) => {
+        if (!isInitialLoad) setIsFetchingPage(true);
+        setError(null);
+        
         try {
-            const from = (currentPage - 1) * ITEMS_PER_PAGE; const to = from + ITEMS_PER_PAGE - 1;
+            const from = (currentPage - 1) * ITEMS_PER_PAGE;
+            const to = from + ITEMS_PER_PAGE - 1;
+            
+            // Query từ bảng 'profiles'
             const selectQuery = `
-                id, name, price, location, duration, supplier_id,
-                approval_status, is_published, created_at,
-                description, itinerary, departures, departure_months,
-                supplier:Suppliers(id, name)
+                id, username, full_name, email, role, is_active, created_at
             `;
-            let query = supabase.from("Products").select(selectQuery, { count: 'exact' })
-                            .eq('product_type', 'tour');
+            
+            let query = supabase.from("profiles")
+                                .select(selectQuery, { count: 'exact' });
 
-            if (debouncedSearch.trim() !== "") { /* ... search logic ... */ }
-            query = query.order('approval_status', { ascending: true })
-                         .order('is_published', { ascending: true })
-                         .order("created_at", { ascending: false })
+            // Logic tìm kiếm
+            if (debouncedSearch.trim() !== "") {
+                const searchStr = `%${debouncedSearch.trim()}%`;
+                query = query.or(`full_name.ilike.${searchStr},email.ilike.${searchStr},username.ilike.${searchStr}`);
+            }
+
+            // Sắp xếp và Phân trang
+            query = query.order("created_at", { ascending: false })
                          .range(from, to);
 
             const { data, count, error: fetchError } = await query;
-            if (fetchError) { /* ... error handling ... */ throw fetchError; }
 
-            const processedData = data?.map(p => ({ ...p, supplier_name: p.supplier?.name })) || [];
-            setProducts(processedData);
+            if (fetchError) throw fetchError;
+            
+            setAccounts(data || []);
             setTotalItems(count || 0);
 
-            if (isInitialLoad && suppliers.length === 0) { /* ... fetch suppliers ... */ }
-            if (!isInitialLoad && data.length === 0 && count > 0 && currentPage > 1) { setCurrentPage(1); }
-        } catch (err) { /* ... error handling ... */ }
-        finally { /* ... reset loading ... */ }
-    }, [currentPage, debouncedSearch, suppliers.length]);
+            // Xử lý chuyển trang nếu trang hiện tại không còn data
+            if (!isInitialLoad && data.length === 0 && count > 0 && currentPage > 1) {
+                setCurrentPage(1); // Quay về trang 1
+            }
 
-    // --- UseEffects (Giữ nguyên) ---
-    useEffect(() => { /* Trigger fetch */ }, [fetchProducts, products.length, loading]);
-    useEffect(() => { /* Reset page */ }, [debouncedSearch]);
+        } catch (err) {
+            console.error("Lỗi fetch accounts:", err);
+            setError(err);
+        } finally {
+            if (isInitialLoad) setLoading(false);
+            setIsFetchingPage(false);
+        }
+    }, [currentPage, debouncedSearch]);
 
-    // --- (UPGRADED) Event Handlers ---
-    const handleSetStatus = (id, currentStatus, newStatus) => {
-        const actionText = newStatus === 'approved' ? 'Duyệt' : (newStatus === 'rejected' ? 'Từ chối' : 'Đặt lại chờ');
-        const confirmMsg = newStatus === 'approved'
-            ? `Duyệt tour này? (Cần thêm bước 'Sửa & Đăng')`
-            : `${actionText} tour này?`;
-        const iconColor = newStatus === 'approved' ? 'text-green-500' : (newStatus === 'rejected' ? 'text-red-500' : 'text-yellow-500');
+    // --- UseEffects ---
+    useEffect(() => {
+        fetchAccounts(true);
+    }, [fetchAccounts]); // Chỉ chạy 1 lần khi mount (do fetchAccounts đã có dependencies)
 
+    // Reset về trang 1 khi tìm kiếm
+    useEffect(() => {
+        if (currentPage !== 1) {
+            setCurrentPage(1);
+        }
+    }, [debouncedSearch]); // Bỏ currentPage khỏi dependency
+
+    
+    // --- (NEW) Event Handlers ---
+
+    // Xử lý "Xóa" (thực chất là Ngừng tài khoản)
+    const handleSuspend = (account) => {
         toast((t) => (
-            <span>
-                {confirmMsg}
-               <button
-                className={`ml-3 px-3 py-1 ${newStatus === 'approved' ? 'bg-green-500' : (newStatus === 'rejected' ? 'bg-red-500' : 'bg-yellow-500')} text-white rounded text-sm font-semibold hover:bg-opacity-80`}
-                onClick={async () => {
-                    toast.dismiss(t.id);
-                    setIsFetchingPage(true);
-                    const updateData = { approval_status: newStatus, is_published: false };
-                    const { error: updateError } = await supabase.from("Products").update(updateData).eq("id", id);
-                    setIsFetchingPage(false);
-                    if (updateError) { toast.error("Lỗi: " + updateError.message); }
-                    else { toast.success(`Đã ${actionText} tour!`); fetchProducts(false); }
-                }}
-              > Xác nhận </button>
-              <button className="ml-2 modal-button-secondary text-sm" onClick={() => toast.dismiss(t.id)}> Hủy </button>
-            </span>
-          ), { icon: <WarningCircle size={20} className={iconColor}/>, duration: 6000 });
-    };
-
-    const handleDelete = (tour) => {
-         toast((t) => (
             <div className="flex flex-col items-center p-1">
                  <span className="text-center">
-                    Xóa vĩnh viễn tour <b>{tour.name}</b>?<br/>
-                    <span className="text-xs text-orange-600">Hành động này không thể hoàn tác.</span>
-                </span>
-               <div className="mt-3 flex gap-2">
+                    Ngừng hoạt động tài khoản <b>{account.username}</b>?<br/>
+                    <span className="text-xs text-orange-600">Tài khoản sẽ không thể đăng nhập.</span>
+                 </span>
+                <div className="mt-3 flex gap-2">
                  <button
                     className="modal-button-danger text-sm"
                     onClick={async () => {
                         toast.dismiss(t.id);
                         setIsFetchingPage(true);
-                        const { error: deleteError } = await supabase.from("Products").delete().eq("id", tour.id);
+                        
+                        const { error: updateError } = await supabase
+                            .from("profiles")
+                            .update({ is_active: false })
+                            .eq("id", account.id);
+                            
                         setIsFetchingPage(false);
-                        if (deleteError) { toast.error("Lỗi xóa: " + deleteError.message); }
-                        else { toast.success("Đã xóa tour."); fetchProducts(false); }
+                        if (updateError) {
+                            toast.error("Lỗi: " + updateError.message);
+                        } else {
+                            toast.success("Đã ngừng tài khoản.");
+                            fetchAccounts(false); // Tải lại
+                        }
                     }}
-                  > Xác nhận Xóa </button>
+                  > Xác nhận Ngừng </button>
                   <button className="modal-button-secondary text-sm" onClick={() => toast.dismiss(t.id)}> Hủy </button>
-               </div>
+                </div>
             </div>
           ), { icon: <WarningCircle size={24} className="text-red-500"/>, duration: 8000 });
+    };
+
+    // Định dạng ngày
+    const formatDate = (dateString) => {
+        if (!dateString) return "N/A";
+        try {
+            return new Date(dateString).toLocaleDateString('vi-VN', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+        } catch (error) {
+            return "Invalid Date";
+        }
+    };
+    
+    // Hiển thị tên Vai trò
+    const getRoleName = (roleId) => {
+        const rolesMap = {
+            admin: 'Admin',
+            manager: 'Manager',
+            staff: 'Staff',
+            user: 'User'
+        };
+        return rolesMap[roleId] || 'Không xác định';
     };
 
     // --- Pagination Window (Giữ nguyên) ---
     const paginationWindow = useMemo(() => getPaginationWindow(currentPage, totalPages, 2), [currentPage, totalPages]);
 
-     // --- Loading ban đầu (Giữ nguyên) ---
-     if (loading && products.length === 0) { /* ... */ }
+     // --- Loading ban đầu ---
+     if (loading && accounts.length === 0) {
+        return (
+            <div className="p-6 flex justify-center items-center min-h-screen dark:bg-slate-900">
+                <CircleNotch size={40} className="animate-spin text-sky-600" />
+            </div>
+        );
+    }
 
-    // --- JSX (Nâng cấp UI) ---
+    // --- JSX (Nâng cấp UI theo hình ảnh) ---
     return (
-        <motion.div // <<< Thêm motion div cho hiệu ứng fade-in trang
+        <motion.div
             className="p-4 md:p-6 space-y-6 min-h-screen dark:bg-slate-900 dark:text-white"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
         >
-            {/* Header + Search + Refresh */}
+            {/* Header + Nút Thêm */}
              <div className="flex flex-wrap items-center justify-between gap-4">
-                <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
-                    <Package weight="duotone" className="text-sky-600" size={30} /> {/* <<< Tăng size icon */}
-                    Quản lý Sản phẩm Tour
-                </h1>
-                <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-                     <div className="relative w-full sm:w-64">
-                         <MagnifyingGlass size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                         <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Tìm tên tour, NCC..." className="search-input"/>
-                     </div>
-                     <button onClick={() => fetchProducts(true)} disabled={loading || isFetchingPage} className={`button-secondary flex items-center gap-1.5 ${isFetchingPage ? 'opacity-50 cursor-wait' : ''}`}>
-                         <ArrowsClockwise size={16} className={isFetchingPage ? "animate-spin" : ""} /> Làm mới {/* <<< Icon mới */}
-                     </button>
+                <div>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+                        <UsersThree weight="duotone" className="text-sky-600" size={30} />
+                        Quản lý Tài khoản
+                    </h1>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        Quản lý tài khoản người dùng hệ thống
+                    </p>
                 </div>
+                <button 
+                    onClick={() => setModalAccount('new')} // 'new' để phân biệt với edit
+                    className="button-primary flex items-center gap-1.5"
+                >
+                    <UserPlus size={18} weight="bold" />
+                    Thêm Tài Khoản
+                </button>
             </div>
 
-             {/* Hiển thị lỗi fetch chính */}
-             {error && !loading && ( /* ... */ )}
-
-            {/* Bảng dữ liệu */}
-             <motion.div // <<< Thêm motion div cho bảng
-                 className="bg-white dark:bg-slate-800 shadow-xl rounded-lg overflow-hidden border dark:border-slate-700"
-                 initial={{ opacity: 0, y: 20 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 transition={{ delay: 0.1 }}
+            {/* Box Bảng + Search */}
+            <motion.div
+                className="bg-white dark:bg-slate-800 shadow-xl rounded-lg overflow-hidden border dark:border-slate-700"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
             >
+                {/* Header Bảng (Tiêu đề + Search) */}
+                <div className="p-4 flex flex-wrap justify-between items-center gap-3 border-b dark:border-slate-700">
+                     <h2 className="text-lg font-semibold dark:text-white">
+                        Danh Sách Tài Khoản
+                     </h2>
+                     <div className="flex items-center gap-3 w-full sm:w-auto">
+                        <div className="relative w-full sm:w-64">
+                            <MagnifyingGlass size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                            <input 
+                                type="text" 
+                                value={searchTerm} 
+                                onChange={(e) => setSearchTerm(e.target.value)} 
+                                placeholder="Tìm kiếm tài khoản..." 
+                                className="search-input"
+                            />
+                        </div>
+                        <button onClick={() => fetchAccounts(false)} disabled={isFetchingPage} className={`p-2 button-secondary ${isFetchingPage ? 'opacity-50 cursor-wait' : ''}`} title="Làm mới">
+                            <ArrowsClockwise size={18} className={isFetchingPage ? "animate-spin" : ""} />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Bảng Dữ Liệu */}
                 <div className="overflow-x-auto relative">
                     {isFetchingPage && !loading && ( <div className="loading-overlay"> <CircleNotch size={32} className="animate-spin text-sky-500" /> </div> )}
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
                         <thead className="bg-gray-50 dark:bg-slate-700/40">
                             <tr>
-                                <th className="th-style w-2/5">Tên Tour</th> {/* <<< Điều chỉnh width */}
-                                <th className="th-style w-1/5">Nhà Cung Cấp</th>
-                                <th className="th-style w-[15%]">Trạng thái Duyệt</th>
-                                <th className="th-style w-[15%]">Trạng thái Đăng</th>
-                                <th className="th-style text-right w-[15%]">Hành động</th>
+                                <th className="th-style w-[15%]">Tên đăng nhập</th>
+                                <th className="th-style w-[20%]">Họ và Tên</th>
+                                <th className="th-style w-[25%]">Email</th>
+                                <th className="th-style w-[10%]">Vai trò</th>
+                                <th className="th-style w-[10%]">Trạng thái</th>
+                                <th className="th-style w-[10%]">Ngày tạo</th>
+                                <th className="th-style text-center w-[10%]">Thao tác</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
-                             {error && !isFetchingPage && ( <tr><td colSpan="5" className="td-center text-red-500">{`Lỗi: ${error.message}`}</td></tr> )}
-                             {!error && !loading && !isFetchingPage && products.length === 0 && ( /* ... */ )}
-                             {!error && products.map((product) => (
-                                <motion.tr // <<< Thêm motion tr cho hiệu ứng khi load/thay đổi
-                                    key={product.id}
-                                    layout // Cho phép animation khi vị trí thay đổi
+                             {/* Lỗi */}
+                             {error && !isFetchingPage && ( <tr><td colSpan="7" className="td-center text-red-500">{`Lỗi: ${error.message}`}</td></tr> )}
+                             
+                             {/* Không có dữ liệu */}
+                             {!error && !loading && !isFetchingPage && accounts.length === 0 && ( 
+                                <tr><td colSpan="7" className="td-center text-gray-500">
+                                    {debouncedSearch ? `Không tìm thấy tài khoản cho "${debouncedSearch}"` : "Chưa có tài khoản nào."}
+                                </td></tr> 
+                             )}
+                             
+                             {/* Render Dữ Liệu */}
+                             {!error && accounts.map((account) => (
+                                <motion.tr
+                                    key={account.id}
+                                    layout
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                     exit={{ opacity: 0 }}
                                     className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors"
                                 >
-                                    <td className="td-style font-medium dark:text-white whitespace-normal">{product.name}</td> {/* <<< whitespace-normal cho tên dài */}
-                                    <td className="td-style text-gray-600 dark:text-gray-300">
-                                        {product.supplier ? (
-                                            <Link to={`/admin/suppliers?search=${product.supplier.name}`} className="link-style hover:text-sky-500" title={`Xem NCC ${product.supplier.name}`}>
-                                                <Buildings size={14} weight="duotone" className="inline mr-1 opacity-70"/> {/* <<< Icon NCC */}
-                                                {product.supplier.name}
-                                            </Link>
-                                        ) : "N/A"}
+                                    <td className="td-style font-medium dark:text-white">{account.username}</td>
+                                    <td className="td-style text-gray-700 dark:text-gray-200">{account.full_name}</td>
+                                    <td className="td-style text-gray-600 dark:text-gray-300">{account.email}</td>
+                                    <td className="td-style">
+                                        {/* Badge Vai trò */}
+                                        {account.role === 'admin' && <span className="badge-role-admin">{getRoleName(account.role)}</span>}
+                                        {account.role === 'manager' && <span className="badge-role-manager">{getRoleName(account.role)}</span>}
+                                        {account.role === 'staff' && <span className="badge-role-staff">{getRoleName(account.role)}</span>}
+                                        {account.role === 'user' && <span className="badge-role-user">{getRoleName(account.role)}</span>}
                                     </td>
                                     <td className="td-style">
-                                        {/* Badges */}
-                                        {product.approval_status === 'approved' && <span className="badge-green"><CheckCircle size={12} weight="fill"/> Đã duyệt</span>}
-                                        {product.approval_status === 'pending' && <span className="badge-yellow"><CircleNotch size={12} className="animate-spin"/> Chờ duyệt</span>}
-                                        {product.approval_status === 'rejected' && <span className="badge-red"><XCircle size={12} weight="fill"/> Bị từ chối</span>}
+                                        {/* Badge Trạng thái */}
+                                        {account.is_active ? <span className="badge-green">Hoạt động</span> : <span className="badge-gray">Ngừng</span>}
                                     </td>
-                                    <td className="td-style">
-                                        {product.is_published ? <span className="badge-blue"><UploadSimple size={12} weight="fill"/> Đã đăng</span> : <span className="badge-gray">Chưa đăng</span>}
-                                    </td>
-                                    <td className="td-style text-right space-x-1">
-                                        {/* Buttons Actions */}
-                                        {product.approval_status === 'pending' && ( /* ... */ )}
-                                        {product.approval_status === 'approved' && !product.is_published && ( /* ... */ )}
-                                        {product.approval_status === 'approved' && product.is_published && ( /* ... */ )}
-                                        {(product.approval_status === 'approved' || product.approval_status === 'rejected') && ( /* ... */ )}
-                                        <button onClick={() => handleDelete(product)} disabled={isFetchingPage} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa vĩnh viễn tour"> <Trash size={16}/> </button>
+                                    <td className="td-style text-gray-500">{formatDate(account.created_at)}</td>
+                                    <td className="td-style text-center space-x-2">
+                                        {/* Nút Sửa */}
+                                        <button 
+                                            onClick={() => setModalAccount(account)} 
+                                            disabled={isFetchingPage} 
+                                            className="action-button text-sky-600 hover:bg-sky-100 dark:hover:bg-sky-900/30" 
+                                            title="Sửa tài khoản"
+                                        > <PencilLine size={18}/> </button>
+                                        
+                                        {/* Nút Ngừng/Xóa */}
+                                        {account.is_active ? (
+                                            <button 
+                                                onClick={() => handleSuspend(account)} 
+                                                disabled={isFetchingPage} 
+                                                className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" 
+                                                title="Ngừng tài khoản"
+                                            > <UserCircleMinus size={18}/> </button>
+                                        ) : (
+                                            // Icon khác cho tài khoản đã ngừng (VD: Kích hoạt lại)
+                                            <button 
+                                                onClick={() => setModalAccount(account)} // Mở modal sửa để kích hoạt
+                                                disabled={isFetchingPage} 
+                                                className="action-button text-green-500 hover:bg-green-100 dark:hover:bg-green-900/30" 
+                                                title="Kích hoạt lại (trong Sửa)"
+                                            > <UserCircleCheck size={18}/> </button>
+                                        )}
                                     </td>
                                 </motion.tr>
                              ))}
@@ -355,65 +587,88 @@ export default function AdminManageProducts() {
                 </div>
             </motion.div>
 
-            {/* Pagination UI */}
+             {/* Pagination UI */}
              {!loading && totalItems > ITEMS_PER_PAGE && (
-                  <motion.div // <<< Thêm motion div cho phân trang
-                      className="flex flex-col sm:flex-row justify-between items-center mt-6 text-sm text-gray-600 dark:text-gray-400"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.2 }}
-                  >
-                      {/* ... Nội dung phân trang ... */}
-                  </motion.div>
+                <motion.div
+                    className="flex flex-col sm:flex-row justify-between items-center mt-6 text-sm text-gray-600 dark:text-gray-400"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.2 }}
+                >
+                    <div>
+                        Hiển thị <b>{(currentPage - 1) * ITEMS_PER_PAGE + 1}</b> - <b>{Math.min(currentPage * ITEMS_PER_PAGE, totalItems)}</b> trên <b>{totalItems}</b> tài khoản
+                    </div>
+                    <nav className="flex items-center gap-1 mt-3 sm:mt-0">
+                        <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1 || isFetchingPage} className="pagination-arrow"> <CaretLeft size={16} weight="bold" /> </button>
+                        {paginationWindow.map((page, index) =>
+                            typeof page === 'number' ? (
+                                <button
+                                    key={index}
+                                    onClick={() => setCurrentPage(page)}
+                                    disabled={currentPage === page || isFetchingPage}
+                                    className={`pagination-number ${currentPage === page ? 'pagination-active' : ''}`}
+                                > {page} </button>
+                            ) : (
+                                <span key={index} className="pagination-dots"> ... </span>
+                            )
+                        )}
+                        <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages || isFetchingPage} className="pagination-arrow"> <CaretRight size={16} weight="bold" /> </button>
+                    </nav>
+                </motion.div>
              )}
 
-            {/* Modal Edit */}
-            <AnimatePresence> {/* <<< Bọc modal bằng AnimatePresence */}
-                {modalTour && (
-                    <EditTourModal
-                        tour={modalTour}
-                        onClose={() => setModalTour(null)}
-                        onSuccess={() => fetchProducts(false)}
-                        suppliers={suppliers}
+            {/* Modal Edit/Add */}
+            <AnimatePresence>
+                {modalAccount && (
+                    <AccountModal
+                        key={modalAccount.id || 'new'} // Key để re-render modal
+                        account={modalAccount === 'new' ? null : modalAccount}
+                        onClose={() => setModalAccount(null)}
+                        onSuccess={() => fetchAccounts(false)} // Tải lại danh sách sau khi thành công
                     />
                 )}
             </AnimatePresence>
 
-            {/* CSS */}
+            {/* CSS (Tái sử dụng và chỉnh sửa từ file gốc) */}
             <style jsx>{`
                 /* Các class dùng chung */
                 .search-input { @apply w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-sky-400 outline-none transition disabled:opacity-50; }
-                .th-style { @apply px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap; }
-                .td-style { @apply px-6 py-4 text-sm; } /* Bỏ whitespace-nowrap mặc định */
+                .th-style { @apply px-5 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap; } /* Tăng padding */
+                .td-style { @apply px-5 py-3 text-sm; } /* Tăng padding, bỏ whitespace-nowrap */
                 .td-center { @apply px-6 py-10 text-center; }
-                .badge-base { @apply px-2.5 py-0.5 text-xs font-semibold rounded-full inline-flex items-center gap-1 whitespace-nowrap; }
+                
+                /* Badges chung */
+                .badge-base { @apply px-2.5 py-0.5 text-xs font-semibold rounded-md inline-flex items-center gap-1 whitespace-nowrap; } /* Đổi sang rounded-md */
+                
+                /* Badges Trạng thái */
                 .badge-green { @apply badge-base bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300; }
-                .badge-yellow { @apply badge-base bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300; }
-                .badge-red { @apply badge-base bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300; }
-                .badge-blue { @apply badge-base bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300; }
-                .badge-gray { @apply badge-base bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300 italic; } /* <<< Sửa dark mode */
-                .button-icon-base { @apply p-1.5 rounded-full w-7 h-7 flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 dark:focus:ring-offset-slate-800 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed; }
-                .button-icon-green { @apply button-icon-base bg-green-500 hover:bg-green-600 text-white focus:ring-green-400; }
-                .button-icon-red { @apply button-icon-base bg-red-500 hover:bg-red-600 text-white focus:ring-red-400; }
-                .button-icon-sky { @apply button-icon-base bg-sky-500 hover:bg-sky-600 text-white focus:ring-sky-400; }
-                .button-icon-gray { @apply button-icon-base bg-gray-400 hover:bg-gray-500 text-white focus:ring-gray-300; }
-                .button-blue { @apply px-3 py-1 bg-blue-600 text-white text-xs rounded-md font-semibold hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-1 dark:focus:ring-offset-slate-800 disabled:opacity-50 disabled:cursor-not-allowed; }
+                .badge-gray { @apply badge-base bg-gray-200 text-gray-700 dark:bg-slate-700 dark:text-slate-300; }
+
+                /* Badges Vai trò (Theo hình ảnh) */
+                .badge-role-admin { @apply badge-base bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300; }
+                .badge-role-manager { @apply badge-base bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300; }
+                .badge-role-staff { @apply badge-base bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300; }
+                .badge-role-user { @apply badge-base bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300; }
+
+                /* Buttons */
                 .button-secondary { @apply bg-slate-200 hover:bg-slate-300 dark:bg-neutral-700 dark:hover:bg-neutral-600 text-slate-800 dark:text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed; }
-                .button-primary { @apply bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed; }
-                .link-style { @apply inline-flex items-center gap-1 hover:underline; }
+                .button-primary { @apply bg-slate-800 hover:bg-slate-900 dark:bg-white dark:hover:bg-gray-200 text-white dark:text-slate-900 font-semibold px-4 py-2 rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed; } /* <<< Đổi màu nút Thêm mới */
+
+                /* Pagination */
                 .pagination-arrow { @apply p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors; }
                 .pagination-number { @apply w-8 h-8 rounded-md font-semibold transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed; }
                 .pagination-active { @apply bg-sky-600 text-white hover:bg-sky-600 dark:hover:bg-sky-600; }
                 .pagination-dots { @apply px-2 py-1 text-gray-500 dark:text-gray-400; }
+                
                 .loading-overlay { @apply absolute inset-0 bg-white/70 dark:bg-slate-800/70 flex items-center justify-center z-10; }
-                 /* Modal Styles */
-                .input-style { @apply border border-gray-300 dark:border-slate-600 p-2 rounded-md w-full dark:bg-slate-700 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none transition text-sm; }
+                
+                /* Modal Styles */
+                .input-style { @apply border border-gray-300 dark:border-slate-600 p-2 rounded-md w-full dark:bg-slate-700 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none transition text-sm disabled:opacity-70; }
                 .label-style { @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1; }
                 .modal-button-secondary { @apply px-4 py-2 bg-neutral-200 dark:bg-neutral-600 rounded-md font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-500 text-sm disabled:opacity-50 transition-colors; }
                 .modal-button-primary { @apply px-4 py-2 bg-sky-600 text-white rounded-md font-semibold hover:bg-sky-700 text-sm disabled:opacity-50 transition-colors; }
-                 .modal-button-danger { @apply px-4 py-2 bg-red-600 text-white rounded-md font-semibold hover:bg-red-700 text-sm disabled:opacity-50 transition-colors; }
-                 .action-button { @apply p-1.5 rounded-lg transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-offset-1 dark:focus:ring-offset-slate-800 disabled:opacity-50 disabled:cursor-not-allowed; }
-
+                .modal-button-danger { @apply px-4 py-2 bg-red-600 text-white rounded-md font-semibold hover:bg-red-700 text-sm disabled:opacity-50 transition-colors; }
+                .action-button { @apply p-1.5 rounded-lg transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-offset-1 dark:focus:ring-offset-slate-800 disabled:opacity-50 disabled:cursor-not-allowed; }
             `}</style>
         </motion.div>
     );
