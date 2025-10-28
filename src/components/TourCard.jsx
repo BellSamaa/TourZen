@@ -34,10 +34,10 @@ export default function TourCard({ tour, onEdit }) {
     setTimeout(() => setToast(false), 2000);
   };
 
-  const handleBookNow = () => {
-    // Corrected: Pass the tour object to addToCart first, THEN navigate
-    addToCart({ tour, adults: 1, children: 0 }); 
-    navigate("/payment");
+const handleBookNow = () => {
+    // Chỉ navigate và truyền dữ liệu tour qua state
+    // KHÔNG gọi addToCart ở đây nữa
+    navigate("/payment", { state: { item: tour } });
   };
 
   // --- Xử lý lấy ảnh (Đã thêm) ---
