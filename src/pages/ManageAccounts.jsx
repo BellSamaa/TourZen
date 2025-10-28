@@ -3,7 +3,7 @@ import { getSupabase } from "../lib/supabaseClient";
 import toast from "react-hot-toast";
 import {
     UsersThree, CaretLeft, CaretRight, CircleNotch, X, MagnifyingGlass,
-    PencilLine, ArrowsClockwise, WarningCircle, Trash, UserPlus, UserCircleMinus, UserCircleCheck,
+    PencilLine, ArrowsClockwise, WarningCircle, UserPlus, UserCircleMinus, UserCircleCheck,
     // <<< UPGRADE: Thêm icons mới
     Eye, EyeSlash, CheckCircle, XCircle, User, At, ShieldCheck, CalendarBlank, Hourglass 
 } from "@phosphor-icons/react";
@@ -57,7 +57,7 @@ const fieldVariant = {
     visible: { opacity: 1, y: 0 }
 };
 
-// --- Modal Thêm/Sửa Tài Khoản ---
+// --- (FIXED) Modal Thêm/Sửa Tài Khoản ---
 const AccountModal = ({ account, onClose, onSuccess }) => {
     const isEdit = !!account;
     
@@ -174,7 +174,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
-                    {/* <<< UPGRADE: Thêm container cho stagger
+                    {/* <<< FIX: Đã đóng comment đúng cách */ }
                     <motion.div 
                         className="overflow-y-auto p-6 space-y-4"
                         variants={modalFormVariants}
@@ -382,7 +382,7 @@ export default function AdminManageAccounts() {
     }, [debouncedSearch]);
 
     
-    // --- Event Handlers (Gi..."(Giữ nguyên)
+    // --- Event Handlers (Giữ nguyên)
     const handleSuspend = (account) => {
         toast((t) => (
             <div className="flex flex-col items-center p-1">
