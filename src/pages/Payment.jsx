@@ -1,5 +1,5 @@
 // src/pages/Payment.jsx
-// (GIỮ NGUYÊN CODE GỐC + THÊM CHỌN SLOT & SỐ LƯỢNG + GỌI RPC GIẢM SLOT + Sửa lỗi Date + Khôi phục JSX)
+// (V4: Giữ cấu trúc gốc + THÊM Slot & Số lượng + GỌI RPC + Sửa lỗi Date + Khôi phục JSX)
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -11,7 +11,7 @@ import {
 } from "react-icons/fa";
 import { IoIosMail, IoIosCall } from "react-icons/io";
 import { getSupabase } from "../lib/supabaseClient";
-import toast from 'react-hot-toast';
+import toast from 'react-hot-toast'; // Đảm bảo đã import toast
 
 const supabase = getSupabase();
 
@@ -120,7 +120,13 @@ export default function Payment() {
             }];
         }
         // Nếu không phải "Mua ngay" hoặc chưa chọn lịch, trả về giỏ hàng cũ
-        return cartItemsFromContext;
+        // Cần đảm bảo giỏ hàng cũ có đủ thông tin cần thiết
+        return cartItemsFromContext.map(item => ({
+             ...item,
+             image: item.image || (item.title ? `/images/tour-${slugify(item.title)}.jpg` : "/images/default.jpg"),
+             priceAdult: item.priceAdult ?? item.price ?? 0,
+             adults: item.adults || 1
+         }));
     }, [isBuyNow, buyNowItem, selectedDeparture, cartItemsFromContext, adults, children]);
     // --- KẾT THÚC SỬA LỚN ---
 
@@ -142,22 +148,21 @@ export default function Payment() {
 
     const discount = 800000;
 
-    // Logic tính tổng (Giữ nguyên từ code gốc)
+    // Logic tính tổng (Sửa lại để dùng cartItems mới)
     const total = useMemo(() => {
-        const calculateTotal = (items) => items.reduce((sum, item) => {
-            // Ưu tiên giá từ selectedDeparture nếu có (cho Buy Now)
-            const adultPrice = item.priceAdult ?? item.price ?? 0;
+        // Luôn tính toán dựa trên cartItems hiện tại
+        return cartItems.reduce((sum, item) => {
+            const adultPrice = item.priceAdult ?? 0;
             const childPrice = item.priceChild ?? 0;
-            const itemTotal = (item.adults * adultPrice) + ((item.children || 0) * childPrice) + (item.singleSupplement || 0);
-            return sum + itemTotal;
-        }, 0);
-        // Dùng totalFromContext cho giỏ hàng cũ, tính toán lại cho Buy Now
-        if (!isBuyNow && totalFromContext !== undefined) return totalFromContext;
-        return calculateTotal(cartItems);
-    }, [cartItems, isBuyNow, totalFromContext]);
+            const numAdults = Number(item.adults) || 0;
+            const numChildren = Number(item.children) || 0;
+            const itemTotal = (numAdults * adultPrice) + (numChildren * childPrice) + (Number(item.singleSupplement) || 0);
+            return sum + itemTotal;
+        }, 0);
+    }, [cartItems]); // Chỉ phụ thuộc cartItems
 
     const totalPassengers = useMemo(
-        () => cartItems.reduce((sum, item) => sum + (item.adults || 0) + (item.children || 0) + (item.infants || 0), 0),
+        () => cartItems.reduce((sum, item) => sum + (Number(item.adults) || 0) + (Number(item.children) || 0) + (Number(item.infants) || 0), 0),
         [cartItems]
     );
 
@@ -174,7 +179,7 @@ export default function Payment() {
         return Math.max(0, calculatedTotal);
     }, [total, selectedTransportCost, selectedFlightCost, discount]);
 
-    // (SỬA LẠI LẦN NỮA) Tính hạn thanh toán an toàn
+    // (SỬA LẠI LẦN CUỐI) Tính hạn thanh toán an toàn
     const paymentDeadline = useMemo(() => {
         let dateToProcess = null;
         try {
@@ -183,22 +188,22 @@ export default function Payment() {
                 dateToProcess = selectedDeparture.departure_date;
             }
             // Fallback cho giỏ hàng cũ (lấy ngày đầu tiên nếu có và hợp lệ)
-            else if (!isBuyNow && cartItems.length > 0 && Array.isArray(cartItems[0]?.departureDates) && cartItems[0].departureDates.length > 0) {
-                 // Sắp xếp ngày tháng (chuỗi) để lấy ngày sớm nhất
-                 const sortedDates = [...cartItems[0].departureDates].sort();
-                 dateToProcess = sortedDates[0];
+            else if (!isBuyNow && cartItems.length > 0) {
+                 // Giả định giỏ hàng cũ lưu ngày trong departureDates
+                 const dates = cartItems[0]?.departureDates;
+                 if (Array.isArray(dates) && dates.length > 0) {
+                     const sortedDates = [...dates].sort();
+                     dateToProcess = sortedDates[0];
+                 }
             }
 
             if (dateToProcess) {
-                // Cố gắng parse ngày tháng
-                const parsedDate = new Date(dateToProcess + 'T00:00:00Z'); // Thêm Z để đảm bảo UTC
-                // Kiểm tra xem parse có thành công không
+                const parsedDate = new Date(dateToProcess + 'T00:00:00Z');
                 if (!isNaN(parsedDate.getTime())) {
-                    parsedDate.setDate(parsedDate.getDate() - 7); // Tính lùi 7 ngày
-                    return parsedDate; // Trả về đối tượng Date hợp lệ
+                    parsedDate.setDate(parsedDate.getDate() - 7);
+                    return parsedDate;
                 } else {
                      console.warn("Invalid date format in paymentDeadline:", dateToProcess);
-                     return null; // Ngày không hợp lệ
                 }
             }
         } catch (error) {
@@ -212,12 +217,9 @@ export default function Payment() {
         if (paymentDeadline instanceof Date && !isNaN(paymentDeadline)) {
             try {
                 return paymentDeadline.toLocaleDateString("vi-VN", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-            } catch (e) {
-                console.error("Error formatting date:", e);
-                return "Lỗi định dạng ngày";
-            }
+            } catch (e) { console.error("Error formatting date:", e); return "Lỗi ngày"; }
         }
-        return "N/A (Chọn lịch trình)";
+        return "N/A"; // Hiển thị N/A nếu không có ngày
     }, [paymentDeadline]);
     // --- KẾT THÚC SỬA ---
 
@@ -229,19 +231,18 @@ export default function Payment() {
             setCurrentUser(user);
             if (user) {
                 setContactInfo(prev => ({ ...prev, email: user.email }));
-                const { data: userData, error } = await supabase.from('Users').select('full_name').eq('id', user.id).single();
+                // Chỉ lấy full_name nếu Users table tồn tại và có dữ liệu
+                const { data: userData, error } = await supabase.from('Users').select('full_name').eq('id', user.id).maybeSingle();
                 if (userData) { setContactInfo(prev => ({ ...prev, name: userData.full_name || prev.name })); }
-                if (error && error.code !== 'PGRST116') { // Ignore error if user not found in Users table
-                    console.warn("Lỗi lấy full_name:", error.message);
-                }
+                // Không log lỗi nếu chỉ là không tìm thấy user (PGRST116)
+                else if (error && error.code !== 'PGRST116') { console.warn("Lỗi lấy full_name:", error.message); }
             }
             setLoadingUser(false);
         }
         async function getApprovedServices() {
             setLoadingServices(true);
             const { data: servicesData, error } = await supabase
-                .from('Products')
-                .select('*')
+                .from('Products').select('*')
                 .in('product_type', ['transport', 'flight'])
                 .eq('approval_status', 'approved');
             if (error) { toast.error("Lỗi tải tùy chọn vận chuyển/chuyến bay."); }
@@ -293,7 +294,7 @@ export default function Payment() {
     // --- (SỬA LỚN) HÀM CHECKOUT ---
     const handleCheckout = async (e) => {
         e.preventDefault();
-        // 1. Kiểm tra (Thêm kiểm tra cho Buy Now)
+        // 1. Kiểm tra
         if (isBuyNow && !selectedDeparture) { showNotification("Vui lòng chọn một lịch khởi hành."); return; }
         if (!contactInfo.name || !contactInfo.phone || !contactInfo.email) { showNotification("Vui lòng điền đầy đủ thông tin liên lạc."); return; }
         if (isBuyNow && adults <= 0) { showNotification("Phải có ít nhất 1 người lớn."); return; }
@@ -308,61 +309,55 @@ export default function Payment() {
         const bookingIds = [];
 
         for (const item of cartItems) {
-            // Tính toán như code gốc
-            const quantity = (item.adults || 0) + (item.children || 0) + (item.infants || 0);
-            const adultPrice = item.priceAdult ?? item.price ?? 0;
+            const quantity = (Number(item.adults) || 0) + (Number(item.children) || 0) + (Number(item.infants) || 0); // Đảm bảo là số
+            const adultPrice = item.priceAdult ?? 0;
             const childPrice = item.priceChild ?? 0;
-            const itemTotalPrice = (item.adults * adultPrice) + ((item.children || 0) * childPrice) + (item.singleSupplement || 0);
+            const itemTotalPrice = ((Number(item.adults) || 0) * adultPrice) + ((Number(item.children) || 0) * childPrice) + (Number(item.singleSupplement) || 0);
             const productId = item.tourId ?? item.id;
 
             if (!productId) { console.error(`Item "${item.title}" thiếu ID sản phẩm.`); showNotification(`Sản phẩm "${item.title}" trong giỏ hàng bị lỗi ID.`); bookingErrorOccurred = true; break; }
 
-            // --- (MỚI) Gọi RPC book_tour_slot NẾU LÀ BUY NOW ---
-            let bookedIdSuccess = !isBuyNow; // Mặc định thành công nếu là giỏ hàng cũ
+            // --- Gọi RPC NẾU LÀ BUY NOW VÀ CÓ departure_id ---
+            let bookedIdSuccess = !isBuyNow; // Mặc định true nếu là giỏ hàng cũ
             if (isBuyNow && item.departure_id) {
-                const guestCountForRPC = quantity; // Số lượng khách cần đặt
-                toast.loading(`Đang giữ chỗ...`);
-                const { data: bookedId, error: rpcError } = await supabase.rpc('book_tour_slot', {
-                    departure_id_input: item.departure_id,
-                    guest_count_input: guestCountForRPC
-                });
-                toast.dismiss();
-                if (rpcError || !bookedId) {
-                    console.error("Lỗi RPC:", rpcError);
-                    toast.error(`Hết chỗ hoặc lỗi khi giữ chỗ.`);
-                    bookingErrorOccurred = true;
-                    bookedIdSuccess = false; // Đánh dấu thất bại
-                    break; // Dừng lại nếu không giữ được chỗ
-                }
-                 bookedIdSuccess = true; // Đánh dấu thành công
+                 const guestCountForRPC = quantity;
+                 toast.loading(`Đang giữ chỗ...`);
+                 const { data: bookedId, error: rpcError } = await supabase.rpc('book_tour_slot', {
+                     departure_id_input: item.departure_id,
+                     guest_count_input: guestCountForRPC
+                 });
+                 toast.dismiss();
+                 if (rpcError || !bookedId) {
+                     console.error("Lỗi RPC:", rpcError);
+                     toast.error(`Hết chỗ hoặc lỗi khi giữ chỗ.`);
+                     bookingErrorOccurred = true;
+                     bookedIdSuccess = false;
+                     break;
+                 }
+                 bookedIdSuccess = true;
             }
-            // --- KẾT THÚC GỌI RPC ---
+            // --- Kết thúc RPC ---
 
-            // Chỉ insert nếu không có lỗi VÀ (là giỏ hàng cũ HOẶC đã book slot thành công)
+            // Chỉ insert nếu không lỗi VÀ (là giỏ hàng cũ HOẶC đã book slot thành công)
             if (!bookingErrorOccurred && bookedIdSuccess) {
-                 // (SỬA) Tạo payload dựa trên CSDL của bạn (ảnh image_6e27fc.png)
+                 // Payload (Đảm bảo đúng cột CSDL của bạn)
                 const bookingPayload = {
-                    user_id: currentUser.id,
-                    product_id: productId,
-                    quantity: quantity,            // Cột của bạn
-                    tota_price: itemTotalPrice,    // Cột của bạn (kiểm tra lại tên)
-                    status: 'pending',
-                    notes: notes,
-                    num_adult: item.adults,        // Cột của bạn
-                    num_child: item.children || 0, // Cột của bạn
-                    // Thêm lịch khởi hành nếu có (chỉ có khi isBuyNow)
+                    user_id: currentUser.id, product_id: productId, quantity: quantity,
+                    tota_price: itemTotalPrice, status: 'pending', notes: notes,
+                    num_adult: Number(item.adults) || 0, num_child: Number(item.children) || 0,
                     departure_id: item.departure_id || null,
-                    departure_date: item.departure_date || null, // Cột của bạn
+                    departure_date: item.departure_date || null, // Cột của bạn (kiểu timestamptz)
                 };
 
-                // Lệnh insert (Giữ nguyên)
                 const { data: bookingData, error: insertError } = await supabase
                     .from('Bookings').insert(bookingPayload).select().single();
 
                 if (insertError) {
                      console.error(`Lỗi khi lưu booking:`, insertError);
                      let friendlyMessage = insertError.message;
-                     // ... (logic hiển thị lỗi giữ nguyên) ...
+                     if (insertError.message.includes("violates row-level security policy")) { friendlyMessage = "Lỗi bảo mật: Bạn không có quyền đặt tour."; }
+                     else if (insertError.code === "23503") { friendlyMessage = `Lỗi dữ liệu: Tour hoặc Lịch trình không tồn tại.`; }
+                     else if (insertError.code === "42703") { friendlyMessage = "Lỗi DB: Cột không tồn tại."; }
                      toast.error(`Lỗi lưu đặt chỗ: ${friendlyMessage}`);
 
                      // --- (QUAN TRỌNG) TODO: Hoàn trả slot nếu insert lỗi ---
@@ -377,9 +372,7 @@ export default function Payment() {
                 } else if (bookingData) {
                     bookingIds.push(bookingData.id);
                 }
-            } else if (bookingErrorOccurred) {
-                 break;
-            }
+            } else if (bookingErrorOccurred) { break; }
         } // Hết vòng lặp
 
         if (bookingErrorOccurred) { setIsSubmitting(false); return; }
@@ -428,7 +421,12 @@ export default function Payment() {
 
     // Giữ nguyên logic kiểm tra giỏ hàng rỗng
     if (!cartItems || cartItems.length === 0) {
-        return <div className="text-center py-20 text-xl font-semibold dark:text-white">Giỏ hàng của bạn đang trống.</div>;
+        // Nếu là Buy Now nhưng chưa chọn lịch, cũng coi như rỗng
+        if(isBuyNow && !selectedDeparture) {
+             // Để tránh lỗi render khi buyNowItem có nhưng selectedDeparture chưa có
+        } else {
+            return <div className="text-center py-20 text-xl font-semibold dark:text-white">Giỏ hàng của bạn đang trống.</div>;
+        }
      }
 
     // --- (SỬA) JSX ---
@@ -522,7 +520,7 @@ export default function Payment() {
                          {/* Thông tin liên lạc (Giữ nguyên logic, thêm disabled) */}
                          <div className={`bg-white dark:bg-neutral-800 p-6 rounded-lg shadow-md transition-opacity ${isBuyNow && !selectedDeparture ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}>
                              <h2 className="text-xl font-bold mb-4 dark:text-white">{isBuyNow ? '3.' : ''} THÔNG TIN LIÊN LẠC</h2>
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                  <InfoInput icon={FaUserFriends} name="name" placeholder="Họ tên *" value={contactInfo.name} onChange={(e) => handleInputChange(e, setContactInfo)} required disabled={isBuyNow && !selectedDeparture} />
                                  <InfoInput icon={IoIosCall} name="phone" type="tel" placeholder="Điện thoại *" value={contactInfo.phone} onChange={(e) => handleInputChange(e, setContactInfo)} required disabled={isBuyNow && !selectedDeparture} />
                                  <InfoInput icon={IoIosMail} name="email" type="email" placeholder="Email *" value={contactInfo.email} onChange={(e) => handleInputChange(e, setContactInfo)} required disabled={(isBuyNow && !selectedDeparture) || !!currentUser}/>
@@ -575,7 +573,7 @@ export default function Payment() {
 
                          {/* Phương thức thanh toán */}
                          <div className={`bg-white dark:bg-neutral-800 p-6 rounded-lg shadow-md transition-opacity ${isBuyNow && !selectedDeparture ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}>
-                             <h2 className="text-xl font-bold mb-4 dark:text-white">PHƯƠNG THỨC THANH TOÁN</h2>
+                            <h2 className="text-xl font-bold mb-4 dark:text-white">PHƯƠNG THỨC THANH TOÁN</h2>
                               <div className="space-y-4">
                                   <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${paymentMethod === "direct" ? "border-blue-500 ring-2 ring-blue-500" : "dark:border-neutral-600"} ${isBuyNow && !selectedDeparture ? 'cursor-not-allowed' : ''}`} >
                                       <input type="radio" name="paymentMethod" value="direct" checked={paymentMethod === "direct"} onChange={(e)=> setPaymentMethod(e.target.value)} className="w-5 h-5 text-sky-600 focus:ring-sky-500" disabled={isBuyNow && !selectedDeparture}/>
