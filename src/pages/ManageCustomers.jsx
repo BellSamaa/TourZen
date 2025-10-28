@@ -1,9 +1,12 @@
 // ManageCustomersSupabase.jsx
-/* NÂNG CẤP LỚN v3:
-  1. (UI) Tinh chỉnh toàn bộ giao diện: tăng padding, font chữ, độ "thoáng".
-  2. (UI) Thêm hiệu ứng hover tinh tế cho hàng (translate-y) và nút (scale).
-  3. (UI) Thiết kế lại ô input-inline cho đẹp mắt hơn.
-  4. (UI) Đánh bóng Modal (padding, typography, hover).
+/* NÂNG CẤP LỚN v4: "Luxury & Professional"
+  1. (Font) Thêm Google Font "Poppins" cho toàn trang.
+  2. (UI) Tiêu đề chính H1 dùng Gradient Text.
+  3. (UI) Thẻ Stats có shadow 3D và hiệu ứng hover "nổi" lên.
+  4. (UI) Tăng padding "cực lớn" cho bảng để tạo độ "thoáng" và sang trọng.
+  5. (UI) Nền trang và nền modal dùng gradient siêu mịn.
+  6. (UI) Modal dùng Backdrop Blur (làm mờ nền).
+  7. (UI) Phân cấp Typography rõ rệt (Tên to, SĐT nhỏ).
 */
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
@@ -56,34 +59,34 @@ const formatStatsNumber = (num) => {
 
 const getCustomerTierStyle = (tier) => {
   switch (tier) {
-    case "VIP": return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300";
-    case "Thường xuyên": return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300";
-    case "Mới": return "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300";
-    default: return "bg-gray-100 text-gray-600 dark:bg-gray-700/30 dark:text-gray-300";
+    case "VIP": return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
+    case "Thường xuyên": return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
+    case "Mới": return "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300";
+    default: return "bg-gray-100 text-gray-800 dark:bg-gray-700/30 dark:text-gray-300";
   }
 };
 const CUSTOMER_TIERS = ['Tiêu chuẩn', 'VIP', 'Thường xuyên', 'Mới'];
 
-// --- (NÂNG CẤP) Hiệu ứng cho Thẻ Stats ---
+// --- (NÂNG CẤP) Hiệu ứng Thẻ Stats ---
 const cardVariants = {
   hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.4 } }
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } }
 };
 
 const StatCard = ({ title, value, icon, loading }) => (
   <motion.div
-    className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-lg shadow-gray-200/40 dark:shadow-black/20 border border-gray-100 dark:border-slate-700/50 flex items-center gap-4 transition-transform duration-300 hover:scale-[1.03]"
+    className="bg-gradient-to-br from-white to-gray-50 dark:from-slate-800 dark:to-slate-700 p-6 rounded-2xl shadow-xl shadow-gray-200/50 dark:shadow-black/30 border border-gray-100 dark:border-slate-700/50 flex items-center gap-5 transition-all duration-300 hover:shadow-2xl dark:hover:shadow-black/40 hover:-translate-y-1.5"
     variants={cardVariants}
   >
-    <div className="p-3.5 rounded-full bg-sky-100 dark:bg-sky-900/50 text-sky-600 dark:text-sky-400">
+    <div className="p-4 rounded-xl bg-sky-100 dark:bg-sky-900/50 text-sky-600 dark:text-sky-400">
       {icon}
     </div>
     <div>
-      <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p>
+      <p className="text-base font-medium text-gray-500 dark:text-gray-400">{title}</p>
       {loading ? (
-        <div className="h-7 w-24 bg-gray-200 dark:bg-slate-700 rounded animate-pulse mt-1"></div>
+        <div className="h-8 w-24 bg-gray-200 dark:bg-slate-700 rounded animate-pulse mt-1"></div>
       ) : (
-        <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
+        <p className="text-3xl font-bold text-gray-900 dark:text-white">{value}</p>
       )}
     </div>
   </motion.div>
@@ -95,6 +98,7 @@ const CustomerStats = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Logic fetch (giữ nguyên)
     const fetchStats = async () => {
       try {
         const { count: totalCount } = await supabase.from("Users").select("id", { count: "exact", head: true }).eq("role", "user");
@@ -114,15 +118,15 @@ const CustomerStats = () => {
 
   return (
     <motion.div
-      className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6"
+      className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
       initial="hidden"
       animate="visible"
-      variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
+      variants={{ visible: { transition: { staggerChildren: 0.1, delayChildren: 0.1 } } }}
     >
-      <StatCard title="Tổng khách hàng" value={stats.total} loading={loading} icon={<UsersThree size={24} weight="duotone" />} />
-      <StatCard title="Khách hàng VIP" value={stats.vip} loading={loading} icon={<Crown size={24} weight="duotone" />} />
-      <StatCard title="Khách hàng mới" value={stats.new} loading={loading} icon={<Sparkle size={24} weight="duotone" />} />
-      <StatCard title="Tổng chi tiêu" value={formatStatsNumber(stats.spend)} loading={loading} icon={<Wallet size={24} weight="duotone" />} />
+      <StatCard title="Tổng khách hàng" value={stats.total} loading={loading} icon={<UsersThree size={28} weight="duotone" />} />
+      <StatCard title="Khách hàng VIP" value={stats.vip} loading={loading} icon={<Crown size={28} weight="duotone" />} />
+      <StatCard title="Khách hàng mới" value={stats.new} loading={loading} icon={<Sparkle size={28} weight="duotone" />} />
+      <StatCard title="Tổng chi tiêu" value={formatStatsNumber(stats.spend)} loading={loading} icon={<Wallet size={28} weight="duotone" />} />
     </motion.div>
   );
 };
@@ -135,6 +139,7 @@ const CustomerBookingsModal = ({ customer, onClose }) => {
 
   useEffect(() => {
     if (!customer) return;
+    // Logic fetch RPC (giữ nguyên)
     const fetchBookings = async () => {
       setLoading(true); setError(null);
       try {
@@ -151,53 +156,53 @@ const CustomerBookingsModal = ({ customer, onClose }) => {
 
   const getProductIcon = (type) => {
     switch (type) {
-      case 'tour': return <Package weight="duotone" className="text-blue-500" size={22} />;
-      case 'hotel': return <Bed weight="duotone" className="text-green-500" size={22} />;
-      case 'flight': return <Airplane weight="duotone" className="text-purple-500" size={22} />;
-      default: return <Info weight="duotone" className="text-gray-400" size={22} />;
+      case 'tour': return <Package weight="duotone" className="text-blue-500" size={24} />;
+      case 'hotel': return <Bed weight="duotone" className="text-green-500" size={24} />;
+      case 'flight': return <Airplane weight="duotone" className="text-purple-500" size={24} />;
+      default: return <Info weight="duotone" className="text-gray-400" size={24} />;
     }
   };
   const getStatusBadge = (status) => {
     switch (status) {
-      case 'confirmed': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
-      case 'pending': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300';
-      case 'cancelled': return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300';
-      default: return 'bg-gray-100 text-gray-600 dark:bg-gray-700/30 dark:text-gray-300';
+      case 'confirmed': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+      case 'pending': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300';
+      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700/30 dark:text-gray-300';
     }
   };
 
   return (
     <motion.div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-center p-4"
+      className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex justify-center items-center p-4"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
       <motion.div
-        className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col"
+        className="bg-white dark:bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 p-8 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-gray-200 dark:border-slate-700"
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.2, ease: "easeOut" }}
       >
-        <div className="flex justify-between items-center mb-5 pb-5 border-b dark:border-slate-700">
-          <h3 className="text-xl sm:text-2xl font-semibold flex items-center gap-3">
-            <Receipt size={28} className="text-sky-600" />
+        <div className="flex justify-between items-center mb-6 pb-6 border-b dark:border-slate-700">
+          <h3 className="text-2xl font-bold flex items-center gap-3">
+            <Receipt size={30} className="text-sky-600 dark:text-sky-400" />
             <span>Đơn hàng của: <span className="text-sky-600 dark:text-sky-400">{customer.full_name || customer.email}</span></span>
           </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
-            <X size={22} weight="bold" />
+            <X size={24} weight="bold" />
           </button>
         </div>
         
-        <div className="overflow-y-auto space-y-3 pr-2 -mr-4 simple-scrollbar">
+        <div className="overflow-y-auto pr-2 -mr-4 simple-scrollbar">
           {loading && (
-            <div className="flex justify-center items-center p-16"> <CircleNotch size={36} className="animate-spin text-sky-500" /> </div>
+            <div className="flex justify-center items-center p-20"> <CircleNotch size={40} className="animate-spin text-sky-500" /> </div>
           )}
-          {error && <p className="text-center text-red-500 p-16">{error}</p>}
+          {error && <p className="text-center text-red-500 p-20">{error}</p>}
           
           {!loading && !error && bookings.length === 0 && (
-            <p className="text-center text-gray-500 p-16 italic">Khách hàng này chưa có đơn hàng nào.</p>
+            <p className="text-center text-gray-500 p-20 italic text-lg">Khách hàng này chưa có đơn hàng nào.</p>
           )}
 
           {!loading && !error && bookings.length > 0 && (
@@ -212,12 +217,12 @@ const CustomerBookingsModal = ({ customer, onClose }) => {
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
                 {bookings.map(b => (
-                  <tr key={b.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors">
+                  <tr key={b.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors duration-150">
                     <td className="td-style">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-4">
                         {getProductIcon(b.Products?.product_type)}
                         <div>
-                          <div className="font-semibold text-gray-900 dark:text-white">
+                          <div className="font-semibold text-base text-gray-900 dark:text-white">
                             {b.Products?.name || <span className="italic text-gray-400">Dịch vụ đã bị xóa</span>}
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400 capitalize">
@@ -229,11 +234,11 @@ const CustomerBookingsModal = ({ customer, onClose }) => {
                     <td className="td-style text-sm">
                       {new Date(b.created_at).toLocaleDateString('vi-VN')}
                     </td>
-                    <td className="td-style text-right font-medium whitespace-nowrap">
+                    <td className="td-style text-right font-semibold text-lg whitespace-nowrap">
                       {formatCurrency(b.total_price)}
                     </td>
                     <td className="td-style text-center">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${getStatusBadge(b.status)}`}>
+                      <span className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider ${getStatusBadge(b.status)}`}>
                         {b.status}
                       </span>
                     </td>
@@ -269,7 +274,7 @@ export default function ManageCustomersSupabase() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
-  // --- (NÂNG CẤP) Fetch customers (Thêm cột ngay_sinh) ---
+  // --- Fetch customers (Giữ nguyên logic) ---
   const fetchCustomers = useCallback(async (isInitialLoad = false) => {
     if (!isInitialLoad) setIsFetchingPage(true);
     setError(null);
@@ -341,7 +346,7 @@ export default function ManageCustomersSupabase() {
   }, [debouncedSearch]);
 
 
-  // --- (NÂNG CẤP) Handlers cho INLINE EDIT (Thêm ngay_sinh) ---
+  // --- Handlers cho INLINE EDIT (Giữ nguyên logic) ---
   const handleStartEdit = (customer) => {
     setEditingCustomerId(customer.id);
     setEditingData({
@@ -412,38 +417,44 @@ export default function ManageCustomersSupabase() {
 
   const paginationWindow = useMemo(() => getPaginationWindow(currentPage, totalPages, 2), [currentPage, totalPages]);
 
+  // --- (NÂNG CẤP) Loading Screen ---
   if (loading) {
     return (
-      <div className="flex flex-col justify-center items-center h-screen bg-gray-50/50 dark:bg-slate-900">
-        <CircleNotch className="animate-spin text-sky-500" size={48} />
-        <p className="text-slate-500 dark:text-slate-400 mt-4 font-medium"> Đang tải dữ liệu... </p>
+      <div className="flex flex-col justify-center items-center h-screen bg-gradient-to-b from-gray-50 to-white dark:from-slate-900 dark:to-slate-800">
+        <CircleNotch className="animate-spin text-sky-500" size={52} />
+        <p className="text-slate-500 dark:text-slate-400 mt-5 font-semibold text-lg"> Đang tải dữ liệu... </p>
       </div>
     );
   }
 
   return (
     <motion.div
-      className="p-4 sm:p-6 space-y-6 min-h-screen bg-gray-50/50 dark:bg-slate-900 dark:text-white"
+      className="max-w-8xl mx-auto p-6 sm:p-8 space-y-8 min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-slate-900 dark:to-slate-800"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
     >
-      {/* Tiêu đề & Nút Thêm */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* (NÂNG CẤP) Tiêu đề & Nút Thêm */}
+      <div className="flex flex-wrap items-center justify-between gap-5">
         <div>
-          <h1 className="text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
-            <UserList size={32} weight="duotone" className="text-sky-600" />
+          <motion.h1 
+            className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-sky-500 to-purple-600 flex items-center gap-3"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            <UserList size={36} weight="duotone" />
             Quản lý Khách hàng
-          </h1>
-          <p className="text-base text-gray-500 dark:text-gray-400 mt-1.5">
-            Chỉnh sửa thông tin, phân loại và xem lịch sử đơn hàng.
+          </motion.h1>
+          <p className="text-lg text-gray-500 dark:text-gray-400 mt-2 font-medium">
+            Chỉnh sửa, phân loại và xem lịch sử đơn hàng của khách.
           </p>
         </div>
         <button
           onClick={() => toast('Chức năng "Thêm Khách Hàng" cần quy trình mời (invite) riêng.', { icon: "ℹ️" })}
-          className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white rounded-lg shadow-md shadow-sky-600/30 hover:bg-sky-700 hover:shadow-lg hover:shadow-sky-600/40 transition-all font-semibold focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+          className="flex items-center gap-2.5 px-6 py-3 bg-gradient-to-r from-sky-500 to-sky-600 text-white rounded-xl shadow-lg shadow-sky-500/30 hover:shadow-xl hover:shadow-sky-500/40 hover:-translate-y-0.5 transition-all duration-300 font-semibold focus:outline-none focus:ring-4 focus:ring-sky-300"
         >
-          <Plus size={18} weight="bold" />
+          <Plus size={20} weight="bold" />
           Thêm Khách Hàng
         </button>
       </div>
@@ -452,17 +463,17 @@ export default function ManageCustomersSupabase() {
       <CustomerStats />
 
       {/* Bảng dữ liệu */}
-      <div className="bg-white dark:bg-slate-800 shadow-2xl shadow-gray-200/50 dark:shadow-black/30 rounded-xl overflow-hidden border border-gray-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-800 shadow-2xl shadow-gray-200/50 dark:shadow-black/30 rounded-2xl overflow-hidden border border-gray-200 dark:border-slate-700">
         {/* Thanh tìm kiếm */}
-        <div className="p-4 border-b border-gray-200 dark:border-slate-700">
-          <div className="relative flex-grow w-full max-w-md">
-            <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+        <div className="p-5 border-b border-gray-200 dark:border-slate-700">
+          <div className="relative flex-grow w-full max-w-lg">
+            <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               placeholder="Tìm kiếm khách hàng (tên, email, SĐT...)"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-11 pr-4 py-2.5 rounded-lg border border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-sky-400 focus:bg-white dark:focus:bg-slate-700 outline-none transition-all"
+              className="w-full pl-12 pr-5 py-3.5 text-base rounded-xl border border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-sky-400 focus:bg-white dark:focus:bg-slate-700 outline-none transition-all duration-300"
             />
           </div>
         </div>
@@ -471,7 +482,7 @@ export default function ManageCustomersSupabase() {
         <div className="overflow-x-auto relative">
           {(isFetchingPage || isSaving) && (
             <div className="absolute inset-0 bg-white/70 dark:bg-slate-800/70 flex items-center justify-center z-10">
-              <CircleNotch size={32} className="animate-spin text-sky-500" />
+              <CircleNotch size={36} className="animate-spin text-sky-500" />
             </div>
           )}
           <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
@@ -493,8 +504,15 @@ export default function ManageCustomersSupabase() {
               animate="visible"
               variants={{ visible: { transition: { staggerChildren: 0.05 } } }}
             >
-              {error && !isFetchingPage && ( <tr><td colSpan="8" className="p-8 text-center text-red-500">{error}</td></tr> )}
-              {!error && !loading && !isFetchingPage && customers.length === 0 && ( <tr><td colSpan="8" className="p-8 text-center text-gray-500 italic">{debouncedSearch ? "Không tìm thấy khách hàng." : "Chưa có dữ liệu."}</td></tr> )}
+              {error && !isFetchingPage && ( <tr><td colSpan="8" className="p-10 text-center text-red-500">{error}</td></tr> )}
+              {!error && !loading && !isFetchingPage && customers.length === 0 && ( 
+                <tr>
+                  <td colSpan="8" className="p-16 text-center text-gray-500">
+                    <Archive size={48} className="mx-auto text-gray-400" />
+                    <span className="mt-4 text-lg font-medium">{debouncedSearch ? "Không tìm thấy khách hàng." : "Chưa có dữ liệu."}</span>
+                  </td>
+                </tr> 
+              )}
               
               {!error && customers.map((c) => {
                 const isEditing = editingCustomerId === c.id;
@@ -505,21 +523,21 @@ export default function ManageCustomersSupabase() {
                     key={c.id}
                     className={`transition-colors duration-200 ${isEditing ? 'bg-sky-50 dark:bg-sky-900/10' : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'}`}
                     variants={cardVariants}
-                    layout
+                    whileHover={{ y: -2 }}
                   >
                     {/* Họ và tên */}
                     <td className="td-style">
                       {isEditing ? (
                         <input type="text" value={editingData.full_name} onChange={(e) => handleEditDataChange('full_name', e.target.value)} className="inline-input-style" />
                       ) : (
-                        <span className="font-semibold text-base text-gray-900 dark:text-white">{c.full_name || <span className="italic text-gray-400">...</span>}</span>
+                        <span className="font-bold text-lg text-slate-900 dark:text-white">{c.full_name || <span className="italic text-gray-400">...</span>}</span>
                       )}
                     </td>
                     
                     {/* Liên hệ */}
                     <td className="td-style whitespace-nowrap">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{c.email}</span>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{c.email}</span>
                         {isEditing ? (
                           <input type="text" placeholder="Số điện thoại" value={editingData.phone_number} onChange={(e) => handleEditDataChange('phone_number', e.target.value)} className="inline-input-style text-sm mt-1" />
                         ) : (
@@ -529,7 +547,7 @@ export default function ManageCustomersSupabase() {
                     </td>
                     
                     {/* Địa chỉ */}
-                    <td className="td-style max-w-xs">
+                    <td className="td-style max-w-sm">
                       {isEditing ? (
                          <input type="text" placeholder="Địa chỉ" value={editingData.address} onChange={(e) => handleEditDataChange('address', e.target.value)} className="inline-input-style" />
                       ) : (
@@ -549,10 +567,10 @@ export default function ManageCustomersSupabase() {
                     </td>
                     
                     {/* Số đơn */}
-                    <td className="td-style text-center font-medium text-base">{c.order_count}</td>
+                    <td className="td-style text-center font-bold text-lg text-sky-600 dark:text-sky-400">{c.order_count}</td>
                     
                     {/* Tổng chi tiêu */}
-                    <td className="td-style text-right font-semibold text-gray-800 dark:text-gray-200 whitespace-nowrap">
+                    <td className="td-style text-right font-bold text-lg text-gray-800 dark:text-gray-200 whitespace-nowrap">
                       {formatCurrency(c.total_spend)}
                     </td>
                     
@@ -563,24 +581,24 @@ export default function ManageCustomersSupabase() {
                           {CUSTOMER_TIERS.map(tier => (<option key={tier} value={tier}>{tier}</option>))}
                         </select>
                       ) : (
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${tierStyle}`}>
+                        <span className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold ${tierStyle}`}>
                           {c.customer_tier || 'Tiêu chuẩn'}
                         </span>
                       )}
                     </td>
                     
                     {/* Thao tác (Actions) */}
-                    <td className="td-style text-center whitespace-nowrap space-x-1">
+                    <td className="td-style text-center whitespace-nowrap space-x-2">
                       {isEditing ? (
                         <>
-                          <button onClick={handleSaveEdit} disabled={isSaving} className="action-button text-green-500 hover:bg-green-100 dark:hover:bg-green-900/30" title="Lưu"><Check size={18} weight="bold" /></button>
-                          <button onClick={handleCancelEdit} disabled={isSaving} className="action-button text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700/30" title="Hủy"><XCircle size={18} weight="bold" /></button>
+                          <button onClick={handleSaveEdit} disabled={isSaving} className="action-button text-green-500 hover:bg-green-100 dark:hover:bg-green-900/30" title="Lưu"><Check size={20} weight="bold" /></button>
+                          <button onClick={handleCancelEdit} disabled={isSaving} className="action-button text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700/30" title="Hủy"><XCircle size={20} weight="bold" /></button>
                         </>
                       ) : (
                         <>
-                          <button onClick={() => setViewingBookingsCustomer(c)} disabled={isFetchingPage || editingCustomerId} className="action-button text-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/30" title="Xem các đơn hàng"><List size={18} weight="bold" /></button>
-                          <button onClick={() => handleStartEdit(c)} disabled={isFetchingPage || editingCustomerId} className="action-button text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa thông tin"><PencilSimple size={18} weight="bold" /></button>
-                          <button onClick={() => openDeleteConfirm(c)} disabled={isFetchingPage || editingCustomerId} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa hồ sơ"><FaTrash size={16} /></button>
+                          <button onClick={() => setViewingBookingsCustomer(c)} disabled={isFetchingPage || editingCustomerId} className="action-button text-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/30" title="Xem các đơn hàng"><List size={20} weight="bold" /></button>
+                          <button onClick={() => handleStartEdit(c)} disabled={isFetchingPage || editingCustomerId} className="action-button text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa thông tin"><PencilSimple size={20} weight="bold" /></button>
+                          <button onClick={() => openDeleteConfirm(c)} disabled={isFetchingPage || editingCustomerId} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa hồ sơ"><FaTrash size={18} /></button>
                         </>
                       )}
                     </td>
@@ -594,8 +612,8 @@ export default function ManageCustomersSupabase() {
 
       {/* --- Pagination UI --- */}
       {!loading && totalItems > ITEMS_PER_PAGE && (
-        <div className="flex flex-col sm:flex-row justify-between items-center mt-6 text-sm text-gray-600 dark:text-gray-400">
-          <div> Hiển thị <span className="font-semibold dark:text-white">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> - <span className="font-semibold dark:text-white">{Math.min(currentPage * ITEMS_PER_PAGE, totalItems)}</span> / <span className="font-semibold dark:text-white">{totalItems}</span> khách hàng </div>
+        <div className="flex flex-col sm:flex-row justify-between items-center mt-6 text-base text-gray-600 dark:text-gray-400">
+          <div> Hiển thị <span className="font-semibold text-gray-900 dark:text-white">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> - <span className="font-semibold text-gray-900 dark:text-white">{Math.min(currentPage * ITEMS_PER_PAGE, totalItems)}</span> trên <span className="font-semibold text-gray-900 dark:text-white">{totalItems}</span> khách hàng </div>
           <div className="flex items-center gap-1 mt-3 sm:mt-0">
             <button onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1 || isFetchingPage} className="pagination-arrow" aria-label="Trang trước"><CaretLeft weight="bold" /></button>
             {paginationWindow.map((pageNumber, idx) => pageNumber === "..." ? ( <span key={`dots-${idx}`} className="pagination-dots">...</span> ) : (
@@ -618,16 +636,16 @@ export default function ManageCustomersSupabase() {
       
       <AnimatePresence>
         {showDeleteConfirm && selectedCustomer && (
-          <motion.div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <motion.div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex justify-center items-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <motion.div 
-              className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-2xl w-full max-w-sm text-center"
+              className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border border-gray-200 dark:border-slate-700"
               initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
             >
-              <h4 className="text-xl font-semibold text-red-600 dark:text-red-500 mb-3"> Xác nhận xóa hồ sơ </h4>
-              <p className="mb-6 text-gray-700 dark:text-gray-300">
-                Bạn có chắc muốn xóa hồ sơ của{" "} <b>{selectedCustomer.full_name || selectedCustomer.email}</b>?
+              <h4 className="text-xl font-bold text-red-600 dark:text-red-500 mb-4"> Xác nhận xóa hồ sơ </h4>
+              <p className="mb-8 text-base text-gray-700 dark:text-gray-300">
+                Bạn có chắc muốn xóa hồ sơ của{" "} <b className="text-gray-900 dark:text-white">{selectedCustomer.full_name || selectedCustomer.email}</b>?
                 <br/>
-                <span className="text-sm text-orange-600 dark:text-orange-400">(Hành động này không xóa tài khoản đăng nhập.)</span>
+                <span className="text-sm font-medium text-orange-600 dark:text-orange-400">(Hành động này không xóa tài khoản đăng nhập.)</span>
               </p>
               <div className="flex justify-center gap-4">
                 <button className="modal-button-secondary" onClick={closeDeleteConfirm}> Hủy </button>
@@ -637,23 +655,34 @@ export default function ManageCustomersSupabase() {
           </motion.div>
         )}
       </AnimatePresence>
+      
+      {/* (MỚI) Thêm Google Font "Poppins" */}
+      <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap');
+        :root {
+          --font-poppins: 'Poppins', sans-serif;
+        }
+        body, .font-sans {
+          font-family: var(--font-poppins), sans-serif;
+        }
+      `}</style>
 
-      {/* --- CSS (NÂNG CẤP TOÀN DIỆN) --- */}
+      {/* --- CSS (NÂNG CẤP TOÀN DIỆN V4) --- */}
       <style jsx>{`
         .th-style { 
-          @apply px-5 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider; 
+          @apply px-6 py-5 text-left text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider; 
         }
         .td-style { 
-          @apply px-5 py-5 text-sm text-gray-600 dark:text-gray-300 align-top; /* Tăng padding */
+          @apply px-6 py-6 text-sm text-gray-600 dark:text-gray-300 align-middle; /* Tăng padding */
         }
         .action-button { 
           @apply p-2 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-2 dark:focus:ring-offset-slate-800 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-110 active:scale-95; 
         }
         .pagination-arrow { 
-          @apply p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors; 
+          @apply p-2.5 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors; 
         }
         .pagination-number { 
-          @apply w-9 h-9 rounded-md font-semibold transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed; 
+          @apply w-10 h-10 rounded-md font-semibold transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-base; 
         }
         .pagination-active { 
           @apply bg-sky-600 text-white hover:bg-sky-600 dark:hover:bg-sky-600; 
@@ -664,29 +693,25 @@ export default function ManageCustomersSupabase() {
         
         /* (NÂNG CẤP) CSS cho Inline Editing */
         .inline-input-style {
-          @apply p-2 border-0 border-b-2 border-sky-300 dark:border-sky-700 rounded-none w-full bg-transparent dark:bg-transparent focus:ring-0 focus:border-sky-500 outline-none transition text-sm;
+          @apply p-2.5 border border-slate-300 dark:border-slate-600 rounded-lg w-full bg-white dark:bg-slate-700 focus:ring-2 focus:ring-sky-400 focus:border-sky-400 outline-none transition duration-200 text-sm;
         }
         .inline-select-style {
-          @apply p-2 border-0 border-b-2 border-sky-300 dark:border-sky-700 rounded-none w-full bg-transparent dark:bg-transparent focus:ring-0 focus:border-sky-500 outline-none transition text-xs;
+          @apply p-2.5 border border-slate-300 dark:border-slate-600 rounded-lg w-full bg-white dark:bg-slate-700 focus:ring-2 focus:ring-sky-400 focus:border-sky-400 outline-none transition duration-200 text-xs;
         }
 
         /* (NÂNG CẤP) Modal buttons */
         .modal-button-secondary { 
-          @apply px-5 py-2.5 bg-neutral-200 dark:bg-neutral-700 rounded-lg font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-600 text-sm transition-all; 
+          @apply px-6 py-3 bg-neutral-200 dark:bg-neutral-700 rounded-lg font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-600 text-sm transition-all duration-200; 
         }
         .modal-button-danger { 
-          @apply px-5 py-2.5 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 text-sm transition-all shadow-md shadow-red-500/30; 
+          @apply px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 text-sm transition-all duration-200 shadow-lg shadow-red-500/30; 
         }
 
         /* (NÂNG CẤP) Scrollbar cho Modal */
-        .simple-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-        .simple-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
+        .simple-scrollbar::-webkit-scrollbar { width: 8px; }
+        .simple-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .simple-scrollbar::-webkit-scrollbar-thumb {
-          background: #ccc;
+          background: #d1d5db; /* gray-300 */
           border-radius: 10px;
         }
         .dark .simple-scrollbar::-webkit-scrollbar-thumb {
