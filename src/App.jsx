@@ -17,7 +17,7 @@ import TourList from "./pages/TourList.jsx";
 import TourDetail from "./pages/TourDetail.jsx";
 import Payment from "./pages/Payment.jsx";
 import PaymentSuccess from "./pages/PaymentSuccess.jsx";
-import CartPage from "./pages/CartPage.jsx";
+import CartPage from "./pages/Cart.jsx";
 import Login from "./pages/Login.jsx";
 import About from "./pages/About.jsx";
 import Services from "./pages/Services.jsx";
