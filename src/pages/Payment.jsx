@@ -65,71 +65,61 @@ export default function Payment() {
     const location = useLocation();
     const { items: cartItemsFromContext, clearCart, total: totalFromContext } = useCart();
 
-    // --- (SỬA LỚN) Logic "Buy Now" (Mua ngay) ---
-    const buyNowItem = location.state?.item; // Chỉ nhận thông tin tour
+    // --- Logic "Buy Now" ---
+    const buyNowItem = location.state?.item;
     const isBuyNow = !!buyNowItem;
 
-    // (MỚI) State cho Lịch khởi hành
+    // --- State cho Lịch khởi hành (MỚI) ---
     const [departures, setDepartures] = useState([]);
     const [departuresLoading, setDeparturesLoading] = useState(true);
     const [selectedDepartureId, setSelectedDepartureId] = useState(null);
 
-    // (MỚI) State cho số lượng khách
+    // --- State cho số lượng khách (MỚI) ---
     const [adults, setAdults] = useState(1);
     const [children, setChildren] = useState(0);
 
-    // (MỚI) Lịch khởi hành được chọn
+    // --- Dữ liệu được chọn (MỚI) ---
     const selectedDeparture = useMemo(() => {
-        // Đảm bảo departures là mảng trước khi find
         if (!Array.isArray(departures)) return null;
         return departures.find(d => d.id === selectedDepartureId);
     }, [departures, selectedDepartureId]);
 
-    // (MỚI) Tính toán số chỗ còn lại
     const maxGuests = useMemo(() => {
         if (!selectedDeparture) return 0;
-        return (selectedDeparture.max_slots || 0) - (selectedDeparture.booked_slots || 0); // An toàn hơn
+        return (selectedDeparture.max_slots || 0) - (selectedDeparture.booked_slots || 0);
     }, [selectedDeparture]);
     const currentGuests = adults + children;
 
+    // --- cartItems (Sửa lại để kết hợp Buy Now và Giỏ hàng cũ) ---
     const cartItems = useMemo(() => {
-        // Chỉ hoạt động khi là Buy Now VÀ đã chọn lịch
+        // Nếu là Buy Now VÀ đã chọn lịch
         if (isBuyNow && buyNowItem && selectedDeparture) {
             const slug = buyNowItem.name ? slugify(buyNowItem.name) : '';
             const image = buyNowItem.image_url ||
                           (buyNowItem.galleryImages && buyNowItem.galleryImages[0]) ||
                           (slug ? `/images/tour-${slug}.jpg` : "/images/default.jpg");
-
             return [{
-                key: selectedDeparture.id,
-                title: buyNowItem.name,
-                image: image,
-                priceAdult: selectedDeparture.adult_price, // Lấy giá ĐÚNG từ selectedDeparture
-                priceChild: selectedDeparture.child_price,
-                priceInfant: 0,
-                singleSupplement: 0,
-                departure_id: selectedDeparture.id, // (MỚI)
-                departure_date: selectedDeparture.departure_date, // (MỚI)
-                adults: adults, // Lấy từ state
-                children: children, // Lấy từ state
-                infants: 0,
-                tourId: buyNowItem.id,
-                id: buyNowItem.id,
-                location: buyNowItem.location,
-                // --- Xóa bỏ month và departureDates cũ ---
+                key: selectedDeparture.id, title: buyNowItem.name, image: image,
+                priceAdult: selectedDeparture.adult_price, priceChild: selectedDeparture.child_price,
+                departure_id: selectedDeparture.id, departure_date: selectedDeparture.departure_date,
+                adults: adults, children: children, infants: 0,
+                tourId: buyNowItem.id, id: buyNowItem.id, location: buyNowItem.location,
             }];
         }
-        // Nếu không phải "Mua ngay" hoặc chưa chọn lịch, trả về giỏ hàng cũ
-        // Cần đảm bảo giỏ hàng cũ có đủ thông tin cần thiết
-        return cartItemsFromContext.map(item => ({
-             ...item,
-             image: item.image || (item.title ? `/images/tour-${slugify(item.title)}.jpg` : "/images/default.jpg"),
-             priceAdult: item.priceAdult ?? item.price ?? 0,
-             adults: item.adults || 1
-         }));
+        // Nếu là giỏ hàng cũ
+        if (!isBuyNow) {
+             return cartItemsFromContext.map(item => ({
+                 ...item,
+                 image: item.image || (item.title ? `/images/tour-${slugify(item.title)}.jpg` : "/images/default.jpg"),
+                 priceAdult: item.priceAdult ?? item.price ?? 0,
+                 adults: item.adults || 1
+             }));
+        }
+        // Trường hợp Buy Now nhưng chưa chọn lịch => mảng rỗng
+        return [];
     }, [isBuyNow, buyNowItem, selectedDeparture, cartItemsFromContext, adults, children]);
-    // --- KẾT THÚC SỬA LỚN ---
 
+    // --- Các state khác (Giữ nguyên) ---
     const [currentUser, setCurrentUser] = useState(null);
     const [loadingUser, setLoadingUser] = useState(true);
     const [contactInfo, setContactInfo] = useState({ name: "", phone: "", email: "", address: "" });
@@ -139,18 +129,15 @@ export default function Payment() {
     const [agreedToTerms, setAgreedToTerms] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [notification, setNotification] = useState({ message: "", type: "" });
-
     const [availableTransport, setAvailableTransport] = useState([]);
     const [availableFlights, setAvailableFlights] = useState([]);
     const [selectedTransport, setSelectedTransport] = useState('');
     const [selectedFlight, setSelectedFlight] = useState('');
     const [loadingServices, setLoadingServices] = useState(true);
-
     const discount = 800000;
 
-    // Logic tính tổng (Sửa lại để dùng cartItems mới)
+    // --- Tính toán tổng (Sửa lại để dùng cartItems mới) ---
     const total = useMemo(() => {
-        // Luôn tính toán dựa trên cartItems hiện tại
         return cartItems.reduce((sum, item) => {
             const adultPrice = item.priceAdult ?? 0;
             const childPrice = item.priceChild ?? 0;
@@ -159,13 +146,9 @@ export default function Payment() {
             const itemTotal = (numAdults * adultPrice) + (numChildren * childPrice) + (Number(item.singleSupplement) || 0);
             return sum + itemTotal;
         }, 0);
-    }, [cartItems]); // Chỉ phụ thuộc cartItems
+    }, [cartItems]);
 
-    const totalPassengers = useMemo(
-        () => cartItems.reduce((sum, item) => sum + (Number(item.adults) || 0) + (Number(item.children) || 0) + (Number(item.infants) || 0), 0),
-        [cartItems]
-    );
-
+    const totalPassengers = useMemo(() => cartItems.reduce((sum, item) => sum + (Number(item.adults) || 0) + (Number(item.children) || 0) + (Number(item.infants) || 0), 0), [cartItems]);
     const selectedTransportCost = useMemo(() => {
         const transport = availableTransport.find(t => t.id === selectedTransport);
         return transport?.price || 0;
@@ -179,7 +162,7 @@ export default function Payment() {
         return Math.max(0, calculatedTotal);
     }, [total, selectedTransportCost, selectedFlightCost, discount]);
 
-    // (SỬA LẠI LẦN CUỐI) Tính hạn thanh toán an toàn
+    // --- (SỬA LẠI LẦN CUỐI) Tính hạn thanh toán an toàn ---
     const paymentDeadline = useMemo(() => {
         let dateToProcess = null;
         try {
@@ -189,8 +172,7 @@ export default function Payment() {
             }
             // Fallback cho giỏ hàng cũ (lấy ngày đầu tiên nếu có và hợp lệ)
             else if (!isBuyNow && cartItems.length > 0) {
-                 // Giả định giỏ hàng cũ lưu ngày trong departureDates
-                 const dates = cartItems[0]?.departureDates;
+                 const dates = cartItems[0]?.departureDates; // Dùng lại departureDates từ code gốc
                  if (Array.isArray(dates) && dates.length > 0) {
                      const sortedDates = [...dates].sort();
                      dateToProcess = sortedDates[0];
@@ -198,10 +180,10 @@ export default function Payment() {
             }
 
             if (dateToProcess) {
-                const parsedDate = new Date(dateToProcess + 'T00:00:00Z');
+                const parsedDate = new Date(dateToProcess + 'T00:00:00Z'); // Thêm Z để đảm bảo UTC
                 if (!isNaN(parsedDate.getTime())) {
-                    parsedDate.setDate(parsedDate.getDate() - 7);
-                    return parsedDate;
+                    parsedDate.setDate(parsedDate.getDate() - 7); // Tính lùi 7 ngày
+                    return parsedDate; // Trả về đối tượng Date hợp lệ
                 } else {
                      console.warn("Invalid date format in paymentDeadline:", dateToProcess);
                 }
@@ -219,11 +201,12 @@ export default function Payment() {
                 return paymentDeadline.toLocaleDateString("vi-VN", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
             } catch (e) { console.error("Error formatting date:", e); return "Lỗi ngày"; }
         }
-        return "N/A"; // Hiển thị N/A nếu không có ngày
-    }, [paymentDeadline]);
+        // Sửa lại text mặc định
+        return isBuyNow ? "N/A (Chọn lịch trình)" : "N/A";
+    }, [paymentDeadline, isBuyNow]);
     // --- KẾT THÚC SỬA ---
 
-    // (SỬA) useEffect
+    // --- useEffect (Sửa lại để fetch Departures) ---
     useEffect(() => {
         async function getUserData() {
             setLoadingUser(true);
@@ -238,7 +221,7 @@ export default function Payment() {
                 else if (error && error.code !== 'PGRST116') { console.warn("Lỗi lấy full_name:", error.message); }
             }
             setLoadingUser(false);
-        }
+         }
         async function getApprovedServices() {
             setLoadingServices(true);
             const { data: servicesData, error } = await supabase
@@ -272,7 +255,7 @@ export default function Payment() {
         else { setDeparturesLoading(false); }
     }, [buyNowItem, isBuyNow]);
 
-    // (MỚI) Hàm xử lý tăng giảm số lượng
+    // --- Các handlers (Thêm handler số lượng) ---
     const handleIncrease = (type) => {
         if (!selectedDeparture) return;
         if (currentGuests >= maxGuests) {
@@ -287,8 +270,7 @@ export default function Payment() {
         if (type === 'adult' && adults > 1) setAdults(a => a - 1);
         if (type === 'child' && children > 0) setChildren(c => c - 1);
     };
-
-    const handleInputChange = (e, setState) => setState((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const handleInputChange = (e, setState) => { setState((prev) => ({ ...prev, [e.target.name]: e.target.value })); };
     const showNotification = (message, type = "error") => { setNotification({ message, type }); setTimeout(() => setNotification({ message: "", type: "" }), 4000); };
 
     // --- (SỬA LỚN) HÀM CHECKOUT ---
@@ -309,18 +291,23 @@ export default function Payment() {
         const bookingIds = [];
 
         for (const item of cartItems) {
-            const quantity = (Number(item.adults) || 0) + (Number(item.children) || 0) + (Number(item.infants) || 0); // Đảm bảo là số
+            // Đảm bảo adults, children là số hợp lệ
+            const numAdults = Number(item.adults) || 0;
+            const numChildren = Number(item.children) || 0;
+            const numInfants = Number(item.infants) || 0;
+
+            const quantity = numAdults + numChildren + numInfants;
             const adultPrice = item.priceAdult ?? 0;
             const childPrice = item.priceChild ?? 0;
-            const itemTotalPrice = ((Number(item.adults) || 0) * adultPrice) + ((Number(item.children) || 0) * childPrice) + (Number(item.singleSupplement) || 0);
+            const itemTotalPrice = (numAdults * adultPrice) + (numChildren * childPrice) + (Number(item.singleSupplement) || 0);
             const productId = item.tourId ?? item.id;
 
             if (!productId) { console.error(`Item "${item.title}" thiếu ID sản phẩm.`); showNotification(`Sản phẩm "${item.title}" trong giỏ hàng bị lỗi ID.`); bookingErrorOccurred = true; break; }
 
             // --- Gọi RPC NẾU LÀ BUY NOW VÀ CÓ departure_id ---
-            let bookedIdSuccess = !isBuyNow; // Mặc định true nếu là giỏ hàng cũ
+            let bookedIdSuccess = !isBuyNow;
             if (isBuyNow && item.departure_id) {
-                 const guestCountForRPC = quantity;
+                 const guestCountForRPC = quantity; // Dùng quantity đã tính
                  toast.loading(`Đang giữ chỗ...`);
                  const { data: bookedId, error: rpcError } = await supabase.rpc('book_tour_slot', {
                      departure_id_input: item.departure_id,
@@ -344,9 +331,12 @@ export default function Payment() {
                 const bookingPayload = {
                     user_id: currentUser.id, product_id: productId, quantity: quantity,
                     tota_price: itemTotalPrice, status: 'pending', notes: notes,
-                    num_adult: Number(item.adults) || 0, num_child: Number(item.children) || 0,
+                    num_adult: numAdults, num_child: numChildren,
                     departure_id: item.departure_id || null,
                     departure_date: item.departure_date || null, // Cột của bạn (kiểu timestamptz)
+                    // Giữ lại transport/flight từ code gốc nếu CSDL của bạn có các cột này
+                    transport_product_id: selectedTransport || null,
+                    flight_product_id: selectedFlight || null,
                 };
 
                 const { data: bookingData, error: insertError } = await supabase
@@ -385,8 +375,9 @@ export default function Payment() {
             ${selectedTransportInfo ? `<li><b>Vận chuyển:</b> ${selectedTransportInfo.name} (${formatCurrency(selectedTransportInfo.price)})</li>` : ''}
             ${selectedFlightInfo ? `<li><b>Chuyến bay:</b> ${selectedFlightInfo.name} (${selectedFlightInfo.details?.code || ''} - ${formatCurrency(selectedFlightInfo.price)})</li>` : ''}
         `;
+        // Sửa lại hiển thị ngày/tháng
         const tour_details_html = `<ul>${cartItems
-          .map(item => `<li><b>${item.title}</b> (${item.adults} NL, ${item.children || 0} TE) - ${item.departure_date ? `Ngày đi: ${item.departure_date}` : (item.month ? `Tháng: ${item.month}`: 'Chưa chọn lịch')}</li>`) // Hiển thị ngày đi nếu có
+          .map(item => `<li><b>${item.title}</b> (${item.adults} NL, ${item.children || 0} TE) - ${item.departure_date ? `Ngày đi: ${item.departure_date}` : (item.month ? `Tháng: ${item.month}`: 'Chưa chọn lịch')}</li>`)
           .join("")} ${service_details_html} </ul>`;
 
         try {
@@ -420,12 +411,15 @@ export default function Payment() {
 
 
     // Giữ nguyên logic kiểm tra giỏ hàng rỗng
+    // Thêm kiểm tra này để tránh lỗi render khi buyNowItem có nhưng selectedDeparture chưa có
     if (!cartItems || cartItems.length === 0) {
-        // Nếu là Buy Now nhưng chưa chọn lịch, cũng coi như rỗng
-        if(isBuyNow && !selectedDeparture) {
-             // Để tránh lỗi render khi buyNowItem có nhưng selectedDeparture chưa có
-        } else {
-            return <div className="text-center py-20 text-xl font-semibold dark:text-white">Giỏ hàng của bạn đang trống.</div>;
+        if(isBuyNow && !selectedDeparture && !departuresLoading) {
+             // Để component render phần chọn lịch khi đang loading hoặc chưa chọn
+        } else if (!isBuyNow && cartItemsFromContext.length === 0) {
+             return <div className="text-center py-20 text-xl font-semibold dark:text-white">Giỏ hàng của bạn đang trống.</div>;
+        } else if (isBuyNow && !buyNowItem) {
+             // Trường hợp lỗi không có buyNowItem
+             return <div className="text-center py-20 text-xl font-semibold dark:text-white">Lỗi: Không tìm thấy thông tin tour.</div>;
         }
      }
 
@@ -593,15 +587,20 @@ export default function Payment() {
                          <div className="bg-white dark:bg-neutral-800 p-6 rounded-lg shadow-md sticky top-24 self-start">
                              <h2 className="text-xl font-bold mb-4 border-b pb-2 dark:border-neutral-700 dark:text-white">TÓM TẮT ĐƠN HÀNG</h2>
 
-                             {/* Chỉ hiển thị nếu có item */}
-                             {cartItems.length === 0 ? (
+                             {/* Chỉ hiển thị nếu có item (hoặc đang loading departures) */}
+                             {cartItems.length === 0 && !departuresLoading ? (
                                 <div className="text-center py-10 text-gray-500 italic">
                                     {isBuyNow ? "Vui lòng chọn lịch khởi hành và số lượng khách." : "Giỏ hàng trống."}
                                 </div>
                              ) : (
                                 <>
                                     <div className="space-y-4 max-h-60 overflow-y-auto pr-2 mb-4">
-                                        {cartItems.map((item) => {
+                                        {/* Hiển thị loading hoặc danh sách item */}
+                                        {isBuyNow && departuresLoading ? (
+                                             <div className="flex justify-center items-center p-4">
+                                                 <FaSpinner className="animate-spin text-sky-500" />
+                                             </div>
+                                        ) : cartItems.map((item) => {
                                             const adultPrice = item.priceAdult ?? item.price ?? 0;
                                             const childPrice = item.priceChild ?? 0;
                                             const itemDisplayTotal = (item.adults * adultPrice) + ((item.children || 0) * childPrice) + (item.singleSupplement || 0);
@@ -641,7 +640,7 @@ export default function Payment() {
                                     {notification.message && ( <p className={`mt-4 text-sm font-medium ${ notification.type === "error" ? "text-red-600" : notification.type === 'warning' ? 'text-yellow-600' : "text-green-600" }`}> {notification.message} </p> )}
                                     <button type="submit"
                                          // (SỬA) Thêm điều kiện disable cho Buy Now
-                                         disabled={isSubmitting || loadingUser || (!currentUser && !loadingUser) || loadingServices || (isBuyNow && (!selectedDeparture || currentGuests > maxGuests))}
+                                         disabled={isSubmitting || loadingUser || (!currentUser && !loadingUser) || loadingServices || (isBuyNow && (!selectedDeparture || currentGuests <= 0 || currentGuests > maxGuests))}
                                          className="w-full mt-6 bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                      >
                                          {isSubmitting ? <FaSpinner className="animate-spin" /> : <FaCreditCard />}
