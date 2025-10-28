@@ -1,15 +1,20 @@
 // src/pages/CartPage.jsx
+// (SỬA LẠI NÚT THANH TOÁN)
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { useCart } from '../context/CartContext'; // Giả sử bạn dùng CartContext
+import { Link, useNavigate } from 'react-router-dom'; // Import useNavigate
+import { useCart } from '../context/CartContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft } from 'lucide-react';
 
 // Hàm định dạng tiền tệ
-const formatPrice = (num) => num.toLocaleString('vi-VN') + '₫';
+const formatPrice = (num) => typeof num === 'number' ? num.toLocaleString('vi-VN') + '₫' : '0₫'; // Added check for number type
 
-// Component cho một sản phẩm trong giỏ hàng
+// Component CartItem (Giữ nguyên)
 function CartItem({ item, updateQuantity, removeItem }) {
+  // Check if item and item.price exist before accessing properties
+  const itemPrice = item && typeof item.price === 'number' ? item.price : 0;
+  const itemQuantity = item && typeof item.quantity === 'number' ? item.quantity : 0;
+
   return (
     <motion.div
       layout
@@ -18,32 +23,32 @@ function CartItem({ item, updateQuantity, removeItem }) {
       exit={{ opacity: 0, x: -50, transition: { duration: 0.3 } }}
       className="flex items-center gap-4 py-4 border-b border-neutral-200 dark:border-neutral-700"
     >
-      <img src={item.image} alt={item.title} className="w-24 h-24 md:w-32 md:h-32 rounded-lg object-cover shadow-sm" />
-      <div className="flex-grow">
-        <h3 className="font-bold text-neutral-800 dark:text-white">{item.title}</h3>
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">{item.location}</p>
-        <p className="text-primary font-semibold mt-1">{formatPrice(item.price)}</p>
+      <img src={item?.image || '/images/default.jpg'} alt={item?.title || 'Tour image'} className="w-24 h-24 md:w-32 md:h-32 rounded-lg object-cover shadow-sm flex-shrink-0" onError={(e) => { e.target.onerror = null; e.target.src='/images/default.jpg'; }} />
+      <div className="flex-grow min-w-0"> {/* Added min-w-0 */}
+        <h3 className="font-bold text-neutral-800 dark:text-white truncate">{item?.title || 'Tour không tên'}</h3> {/* Added truncate */}
+        <p className="text-sm text-neutral-500 dark:text-neutral-400 truncate">{item?.location || 'Chưa rõ'}</p> {/* Added truncate */}
+        <p className="text-primary font-semibold mt-1">{formatPrice(itemPrice)}</p>
       </div>
-      <div className="flex items-center gap-3">
-        <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="p-1.5 rounded-full bg-neutral-200 dark:bg-neutral-700 hover:bg-neutral-300 disabled:opacity-50" disabled={item.quantity <= 1}>
+      <div className="flex items-center gap-3 flex-shrink-0"> {/* Added flex-shrink-0 */}
+        <button onClick={() => updateQuantity(item.id, itemQuantity - 1)} className="p-1.5 rounded-full bg-neutral-200 dark:bg-neutral-700 hover:bg-neutral-300 disabled:opacity-50" disabled={itemQuantity <= 1}>
           <Minus size={16} />
         </button>
-        <span className="font-bold w-8 text-center">{item.quantity}</span>
-        <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="p-1.5 rounded-full bg-neutral-200 dark:bg-neutral-700 hover:bg-neutral-300">
+        <span className="font-bold w-8 text-center">{itemQuantity}</span>
+        <button onClick={() => updateQuantity(item.id, itemQuantity + 1)} className="p-1.5 rounded-full bg-neutral-200 dark:bg-neutral-700 hover:bg-neutral-300">
           <Plus size={16} />
         </button>
       </div>
-      <div className="text-right w-32 hidden md:block">
-        <p className="font-bold text-lg text-primary">{formatPrice(item.price * item.quantity)}</p>
+      <div className="text-right w-32 hidden md:block flex-shrink-0"> {/* Added flex-shrink-0 */}
+        <p className="font-bold text-lg text-primary">{formatPrice(itemPrice * itemQuantity)}</p>
       </div>
-      <button onClick={() => removeItem(item.id)} className="text-neutral-500 hover:text-red-500 transition-colors">
+      <button onClick={() => removeItem(item.id)} className="text-neutral-500 hover:text-red-500 transition-colors flex-shrink-0"> {/* Added flex-shrink-0 */}
         <Trash2 size={20} />
       </button>
     </motion.div>
   );
 }
 
-// Component khi giỏ hàng trống
+// Component EmptyCart (Giữ nguyên)
 function EmptyCart() {
     return (
         <div className="text-center py-20">
@@ -59,20 +64,28 @@ function EmptyCart() {
 
 // Trang giỏ hàng chính
 export default function CartPage() {
-  // Thay thế bằng logic context thật của bạn
-  const { cartItems, updateQuantity, removeItem, clearCart } = useCart() || { 
-    cartItems: [
-        { id: 3, title: "Phú Quốc – Thiên đường nghỉ dưỡng", location: "Kiên Giang", price: 5890000, quantity: 1, image: '/images/phuquoc.jpg' },
-        { id: 5, title: "Đà Nẵng – Hội An – Cố đô Huế", location: "Miền Trung", price: 6590000, quantity: 2, image: '/images/danang.jpg' },
-    ], 
+  const navigate = useNavigate(); // <-- Thêm hook useNavigate
+  const { cartItems = [], updateQuantity, removeItem, clearCart } = useCart() || { // Default to empty array and provide defaults
+    cartItems: [],
     updateQuantity: (id, qty) => console.log(`Update ${id} to ${qty}`),
     removeItem: id => console.log(`Remove ${id}`),
     clearCart: () => console.log('Clear cart')
   };
 
-  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const tax = subtotal * 0.08; // Giả sử thuế 8%
+  const subtotal = cartItems.reduce((sum, item) => sum + (item?.price || 0) * (item?.quantity || 0), 0);
+  const tax = subtotal * 0.08;
   const total = subtotal + tax;
+
+  // <-- Thêm hàm xử lý khi bấm nút thanh toán -->
+  const handleCheckout = () => {
+      // Có thể thêm kiểm tra giỏ hàng có rỗng không ở đây nếu cần
+      if (cartItems.length > 0) {
+          navigate('/payment'); // Chuyển hướng đến trang Payment
+      } else {
+          // Thông báo cho người dùng nếu giỏ hàng trống (tùy chọn)
+          alert("Giỏ hàng đang trống, không thể thanh toán.");
+      }
+  };
 
   return (
     <div className="container mx-auto px-6 py-12">
@@ -85,7 +98,7 @@ export default function CartPage() {
               <h1 className="text-4xl font-extrabold text-neutral-800 dark:text-white">Giỏ hàng của bạn</h1>
               <p className="text-neutral-500 mt-2">Bạn đang có {cartItems.length} sản phẩm trong giỏ hàng.</p>
             </div>
-            
+
             <div className="flex flex-col lg:flex-row gap-8">
               {/* Cột danh sách sản phẩm */}
               <div className="w-full lg:w-2/3 bg-white dark:bg-neutral-800 rounded-xl shadow-soft p-6">
@@ -98,7 +111,8 @@ export default function CartPage() {
                 <div>
                   <AnimatePresence>
                     {cartItems.map(item => (
-                      <CartItem key={item.id} item={item} updateQuantity={updateQuantity} removeItem={removeItem} />
+                       // Ensure item has a unique key, fallback to id if key is missing
+                      <CartItem key={item.key || item.id} item={item} updateQuantity={updateQuantity} removeItem={removeItem} />
                     ))}
                   </AnimatePresence>
                 </div>
@@ -131,6 +145,7 @@ export default function CartPage() {
                     <span>Tổng cộng</span>
                     <span>{formatPrice(total)}</span>
                   </div>
+                  {/* Mã giảm giá (Giữ nguyên) */}
                   <div className="mt-6">
                     <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-200 mb-2">Mã giảm giá</p>
                     <div className="flex">
@@ -138,9 +153,14 @@ export default function CartPage() {
                       <button className="bg-neutral-800 dark:bg-neutral-600 text-white px-4 rounded-r-md font-semibold hover:bg-black">Áp dụng</button>
                     </div>
                   </div>
-                  <button className="mt-6 w-full bg-secondary hover:bg-secondary-dark text-white font-bold py-3 rounded-lg transition-all transform hover:scale-105 text-lg shadow-lg">
+                  {/* --- SỬA NÚT THANH TOÁN --- */}
+                  <button
+                    onClick={handleCheckout} // Gọi hàm xử lý khi bấm
+                    className="mt-6 w-full bg-secondary hover:bg-secondary-dark text-white font-bold py-3 rounded-lg transition-all transform hover:scale-105 text-lg shadow-lg"
+                  >
                     Tiến hành thanh toán
                   </button>
+                  {/* --- KẾT THÚC SỬA --- */}
                 </div>
               </aside>
             </div>
