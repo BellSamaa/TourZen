@@ -1,5 +1,5 @@
 // src/pages/Home.jsx
-// (Phiên bản đầy đủ, đã sửa lỗi 400, lỗi RPC và lỗi cú pháp JSX)
+// (Phiên bản cuối cùng, sửa lỗi 400, Swiper, JSX, dựa trên file gốc)
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
@@ -18,7 +18,7 @@ import "swiper/css/navigation";
 const supabase = getSupabase();
 
 // ===================================
-// === (SỬA LỖI) CÁC HÀM HELPER ===
+// === CÁC HÀM HELPER ===
 // ===================================
 
 /**
@@ -45,7 +45,7 @@ const formatCurrency = (num) => {
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(num);
 };
 // ===================================
-// === KẾT THÚC CODE SỬA LỖI ===
+// === KẾT THÚC HELPER ===
 // ===================================
 
 
@@ -97,29 +97,26 @@ const features = [
 
 /**
  * Component Thẻ Tour (Tái sử dụng)
- * (SỬA: Dùng 'price' và Link tới '/tour/:id')
+ * (SỬA: Dùng 'selling_price_adult' và Link tới '/tour/:id')
  */
 const TourCard = ({ tour, isFeatured = false }) => (
     <Link 
-        // (SỬA LỖI) Dùng Link và trỏ tới /tour/:id để khớp với file gốc
         to={`/tour/${tour.id}`} 
         className="group block bg-white dark:bg-neutral-800 shadow-lg rounded-2xl overflow-hidden transform transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 border dark:border-neutral-700"
     >
         <div className="relative h-56 w-full overflow-hidden">
             <img 
                 src={tour.image_url || tour.image || 'https://placehold.co/600x400/eee/ccc?text=Tour+Image'} 
-                alt={tour.name || tour.title}
+                alt={tour.name} // (SỬA) Dùng 'name'
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                 onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/600x400/eee/ccc?text=No+Image'; }}
             />
-            {/* Badge Nổi bật */}
             {isFeatured && (
                 <div className="absolute top-4 left-4 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg">
                     <Fire size={14} weight="bold" />
                     Nổi Bật
                 </div>
             )}
-             {/* Badge Địa điểm */}
             <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur-sm text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
                 <MapPin size={14} />
                 {tour.location || 'Việt Nam'}
@@ -127,8 +124,8 @@ const TourCard = ({ tour, isFeatured = false }) => (
         </div>
         
         <div className="p-5 space-y-3">
-            <h3 className="text-xl font-bold text-neutral-800 dark:text-white group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors truncate" title={tour.name || tour.title}>
-                {tour.name || tour.title}
+            <h3 className="text-xl font-bold text-neutral-800 dark:text-white group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors truncate" title={tour.name}>
+                {tour.name} {/* (SỬA) Dùng 'name' */}
             </h3>
             
             <div className="flex justify-between items-center text-sm text-neutral-600 dark:text-neutral-400">
@@ -145,8 +142,8 @@ const TourCard = ({ tour, isFeatured = false }) => (
             <div className="pt-3 border-t dark:border-neutral-700 flex justify-between items-center">
                 <p className="text-xs text-neutral-500">Giá chỉ từ</p>
                 <p className="text-2xl font-extrabold text-red-600">
-                    {/* (SỬA LỖI 400) Dùng 'price' thay vì 'selling_price_adult' */}
-                    {formatCurrency(tour.price || 0)}
+                    {/* (SỬA LỖI 400) Dùng 'selling_price_adult' */}
+                    {formatCurrency(tour.selling_price_adult || 0)}
                 </p>
             </div>
         </div>
@@ -167,8 +164,6 @@ const LoadingSpinner = () => (
 export default function Home() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('mienBac');
-  
-  // (SỬA) Dùng state thay vì const
   const [featuredTours, setFeaturedTours] = useState([]);
   const [newestTours, setNewestTours] = useState([]); // Tour mới nhất
   const [sliderTours, setSliderTours] = useState([]); // Tour cho slider
@@ -180,6 +175,9 @@ export default function Home() {
             setLoading(true);
             setError(null);
             try {
+                // (SỬA LỖI 400) Chỉ lấy các cột tồn tại và cần thiết
+                const queryColumns = 'id, name, location, duration, image_url, image, selling_price_adult, rating';
+
                 // Chạy song song 2 luồng fetch
                 const [featuredPromise, newestPromise] = await Promise.all([
                     // 1. Lấy Tour Nổi Bật (Mua nhiều nhất)
@@ -188,8 +186,7 @@ export default function Home() {
                     // 2. Lấy Tour Mới Nhất
                     supabase
                         .from('Products')
-                        // (SỬA LỖI 400) Lấy 'price' thay vì 'selling_price_adult'
-                        .select('id, name, title, location, duration, image_url, image, price, rating')
+                        .select(queryColumns) // (SỬA) Dùng queryColumns
                         .eq('product_type', 'tour')
                         .eq('approval_status', 'approved')
                         .eq('is_published', true)
@@ -198,7 +195,10 @@ export default function Home() {
                 ]);
 
                 // Xử lý Tour Mới Nhất
-                if (newestPromise.error) throw newestPromise.error;
+                if (newestPromise.error) {
+                    console.error("Lỗi Query Tour Mới Nhất:", newestPromise.error);
+                    throw new Error(`Lỗi query Products: ${newestPromise.error.message}. Vui lòng kiểm tra lại tên cột trong bảng Products.`);
+                }
                 const allNewTours = newestPromise.data || [];
                 setNewestTours(allNewTours);
                 
@@ -207,7 +207,9 @@ export default function Home() {
 
                 // Xử lý Tour Nổi Bật
                 if (featuredPromise.error) {
-                    console.warn("RPC Error (get_most_booked_tours):", featuredPromise.error.message);
+                    // (SỬA) Báo lỗi cụ thể hơn nếu RPC lỗi
+                    console.error("Lỗi RPC (get_most_booked_tours):", featuredPromise.error.message);
+                    setError("Lỗi khi tải Tour Nổi Bật. Vui lòng đảm bảo hàm SQL 'get_most_booked_tours' đã được tạo/cập nhật đúng.");
                     // (Fallback) Nếu RPC lỗi, tạm lấy 4 tour mới nhất làm nổi bật
                     setFeaturedTours(allNewTours.slice(0, 4));
                 } else {
@@ -216,7 +218,8 @@ export default function Home() {
 
             } catch (err) {
                 console.error("Lỗi tải dữ liệu trang chủ:", err);
-                setError("Không thể tải dữ liệu. Vui lòng thử lại sau.");
+                // (SỬA) Hiển thị lỗi rõ ràng hơn
+                setError(err.message || "Không thể tải dữ liệu. Vui lòng thử lại sau.");
             } finally {
                 setLoading(false);
             }
@@ -228,14 +231,25 @@ export default function Home() {
 
   return (
     <div className="bg-slate-50 dark:bg-neutral-900 text-slate-800 dark:text-neutral-200 overflow-x-hidden">
-      {/* <FlyingPlane /> */} {/* (Tùy chọn: Bật/tắt máy bay) */}
+      {/* <FlyingPlane /> */} {/* (Tùy chọn) */}
 
-      {/* SLIDE GIỚI THIỆU (SỬA: Dùng sliderTours từ state) */}
+      {/* SLIDE GIỚI THIỆU (SỬA: Dùng sliderTours, tắt loop nếu ít slide) */}
       <section className="relative w-full h-[90vh] -mt-[76px] text-white">
-        <Swiper modules={[Autoplay, Pagination, Navigation]} autoplay={{ delay: 5000, disableOnInteraction: false }} pagination={{ clickable: true }} navigation loop className="h-full">
+        <Swiper 
+            modules={[Autoplay, Pagination, Navigation]} 
+            autoplay={{ delay: 5000, disableOnInteraction: false }} 
+            pagination={{ clickable: true }} 
+            navigation 
+            loop={sliderTours.length > 1} // (SỬA) Tắt loop nếu chỉ có 1 slide
+            className="h-full"
+        >
           {loading && sliderTours.length === 0 ? (
                 <SwiperSlide>
-                     <div className="h-full bg-gray-800 flex justify-center items-center"><CircleNotch size={40} className="animate-spin" /></div>
+                     <div className="h-full bg-gray-700 flex justify-center items-center"><CircleNotch size={40} className="animate-spin text-white" /></div>
+                </SwiperSlide>
+          ) : sliderTours.length === 0 && !loading ? (
+                <SwiperSlide>
+                     <div className="h-full bg-gray-700 flex justify-center items-center text-gray-400">Không có tour nào để hiển thị</div>
                 </SwiperSlide>
           ) : (
             sliderTours.map((tour) => (
@@ -243,7 +257,7 @@ export default function Home() {
               <div className="h-full bg-cover bg-center" style={{ backgroundImage: `url(${tour.image_url || tour.image})` }}>
                 <div className="w-full h-full flex flex-col justify-center items-center text-center bg-black/50 p-4">
                   <motion.h1 initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }} className="text-4xl md:text-6xl font-bold mb-4 drop-shadow-lg">
-                    {tour.title || tour.name}
+                    {tour.name} {/* (SỬA) Dùng 'name' */}
                   </motion.h1>
                   <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2 }} className="text-lg mb-6 drop-shadow-lg">
                     <FaMapMarkerAlt className="inline mr-2" />{tour.location}
@@ -271,7 +285,8 @@ export default function Home() {
             <p className="text-slate-500 dark:text-neutral-400 max-w-2xl mx-auto mb-12">Những hành trình được yêu thích nhất, sẵn sàng đưa bạn đến những miền đất hứa.</p>
             
             {loading && <LoadingSpinner />}
-            {error && <p className="text-center text-red-500">{error}</p>}
+            {/* (SỬA) Hiển thị lỗi rõ ràng hơn */}
+            {error && <p className="text-center text-red-500 bg-red-100 dark:bg-red-900/20 p-4 rounded-md">{error}</p>}
             {!loading && !error && featuredTours.length > 0 && (
                 <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
                 {featuredTours.map((tour) => (
@@ -319,7 +334,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* BLOG DU LỊCH (SỬA: Sửa lỗi cú pháp và dark mode) */}
+      {/* BLOG DU LỊCH (Giữ nguyên) */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-6">
             <div className="text-center mb-12">
@@ -331,14 +346,13 @@ export default function Home() {
                 <motion.div key={post.id} whileHover={{ y: -8 }} className="bg-white dark:bg-neutral-800 rounded-2xl shadow-md hover:shadow-xl overflow-hidden cursor-pointer transition-all duration-300 group">
                     <div className="overflow-hidden h-56">
                         <img src={post.image} alt={post.title} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300" />
-Â                  </div>
-Â                  <div className="p-6">
-Â                      <h3 className="font-semibold text-lg mb-2 h-14 dark:text-white">{post.title}</h3>
-Â                      <p className="text-slate-500 dark:text-neutral-400 text-sm mb-4 line-clamp-2">{post.excerpt}</p>
-                        {/* (SỬA LỖI) Xóa dòng text rác, chỉ giữ lại button */}
-Â                      <button className="font-semibold text-sky-600 hover:text-sky-700">Đọc thêm →</button>
-Â                  </div>
-Â              </motion.div>
+                    </div>
+                    <div className="p-6">
+                        <h3 className="font-semibold text-lg mb-2 h-14 dark:text-white">{post.title}</h3>
+                        <p className="text-slate-500 dark:text-neutral-400 text-sm mb-4 line-clamp-2">{post.excerpt}</p>
+                        <button className="font-semibold text-sky-600 hover:text-sky-700">Đọc thêm →</button>
+                    </div>
+                </motion.div>
             ))}
             </div>
         </div>
