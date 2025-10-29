@@ -318,28 +318,65 @@ export default function AdminManageProducts() {
 
 
     // --- fetchProducts (Giữ nguyên - Giả định hàm này đã hoàn chỉnh) ---
+  // --- fetchProducts (SỬA LẠI ĐẦY ĐỦ LOGIC) ---
     const fetchProducts = useCallback(async (isInitialLoad = false) => {
         if (isInitialLoad) setLoading(true);
         setIsFetchingPage(true);
         setError(null);
 
-        // (Code logic fetch ... - Giả định)
-        // ...
-        // const { data, error, count } = await query;
-        // ...
+        try {
+            // Tính toán phân trang
+            const from = (currentPage - 1) * ITEMS_PER_PAGE;
+            const to = from + ITEMS_PER_PAGE - 1;
 
-        // Giả lập fetch để code chạy được
-        console.log("Fetching page", currentPage, "Search:", debouncedSearch);
-        // setProducts(data || []);
-        // setTotalItems(count || 0);
-        // setTotalPages(Math.ceil((count || 0) / ITEMS_PER_PAGE));
-        // if (error) setError(error.message);
-        
-        if (isInitialLoad) setLoading(false);
-        setIsFetchingPage(false);
+            // --- Bắt đầu Supabase Query ---
+            let query = supabase
+                .from('Products')
+                .select(`
+                    id, name, tour_code, image_url, location, duration,
+                    approval_status, is_published, supplier_id,
+                    supplier:supplier_id ( name ), 
+                    Departures ( id, departure_date, max_slots, booked_slots )
+                `, { count: 'exact' }) // 'exact' để lấy tổng số lượng (totalItems)
+                .order('created_at', { ascending: false }) // Sắp xếp theo mới nhất
+                .range(from, to); // Phân trang
 
-    }, [currentPage, debouncedSearch, suppliers.length, ITEMS_PER_PAGE]);
+            // Thêm logic tìm kiếm (search)
+            if (debouncedSearch) {
+                // Tìm theo tên tour (name) hoặc mã tour (tour_code)
+                query = query.or(`name.ilike.%${debouncedSearch}%,tour_code.ilike.%${debouncedSearch}%`);
+                
+                // Nếu muốn tìm cả theo tên NCC (cần query phức tạp hơn hoặc query suppliers trước)
+                // Hiện tại chúng ta chỉ tìm theo 2 trường trên
+            }
+            
+            // --- Thực thi Query ---
+            const { data, error: queryError, count } = await query;
+            // --- Kết thúc Query ---
 
+            if (queryError) {
+                throw queryError;
+            }
+
+            // --- (QUAN TRỌNG) Cập nhật state với dữ liệu thật ---
+            setProducts(data || []);
+            setTotalItems(count || 0);
+            setTotalPages(Math.ceil((count || 0) / ITEMS_PER_PAGE));
+            // --- (HẾT QUAN TRỌNG) ---
+
+        } catch (error) {
+            console.error("Lỗi fetch products:", error);
+            setError(error.message);
+            toast.error("Tải sản phẩm thất bại: " + error.message);
+            setProducts([]);
+            setTotalItems(0);
+            setTotalPages(0);
+        } finally {
+            if (isInitialLoad) setLoading(false);
+            setIsFetchingPage(false);
+        }
+
+    }, [currentPage, debouncedSearch, ITEMS_PER_PAGE]); // Bỏ suppliers.length vì không cần thiết
     // --- useEffects (Giữ nguyên) ---
     useEffect(() => { fetchProducts(true); }, [fetchProducts]);
     useEffect(() => { 
