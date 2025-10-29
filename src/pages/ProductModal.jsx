@@ -342,7 +342,9 @@ export default function ProductModal({ show, onClose, onSuccess, productToEdit, 
                 if (departuresToUpsert.length > 0) {
                      const { error: upsertError } = await supabase
                          .from('Departures')
-                         .upsert(departuresToUpsert, { onConflict: 'id' });
+                         .upsert(departuresToUpsert, { onConflict: 'id' })
+                         .select('id'); // <-- SỬA LỖI: Thêm .select('id')
+                         
                      if (upsertError) throw upsertError;
                 }
             }
@@ -352,13 +354,14 @@ export default function ProductModal({ show, onClose, onSuccess, productToEdit, 
             onSuccess(); // Tải lại danh sách
             onClose(); // Đóng modal
 
-        } catch (error) {
-            console.error("Lỗi lưu tour:", error);
-            toast.error("Lỗi: " + error.message);
-        } finally {
-            setLoading(false);
-        }
-    };
+} catch (error) {
+            console.error("Chi tiết lỗi Supabase:", error); // In toàn bộ object lỗi ra console
+            toast.error(`Lỗi: ${error.details || error.message}`); // Ưu tiên hiển thị 'details' nếu có
+        }
+        finally {
+            setLoading(false);
+        }
+    };
 
 
     if (!show) return null;
