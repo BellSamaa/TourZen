@@ -161,7 +161,7 @@ export default function DashboardHome() {
             // --- 2. Fetch Đơn Đặt Gần Đây ---
             const { data: bookingsData, error: bookingsError } = await supabase
                 .from('Bookings')
-                .select('id, created_at, total_price, status, user:Users(full_name), main_tour:Products(name, location)')
+                .select('id, created_at, total_price, status, user:Users(full_name), main_tour:Products!product_id(name, location)') 
                 .order('created_at', { ascending: false })
                 .limit(5);
             if (bookingsError) throw bookingsError;

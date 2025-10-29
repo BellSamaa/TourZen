@@ -469,7 +469,7 @@ export default function AdminManageProducts() {
 
 
 {/* Pagination UI */}
-             {!loading && totalItems > ITEMS_PER_PAGE && (
+                {!loading && totalItems > ITEMS_PER_PAGE && (
                   <div className="flex flex-col sm:flex-row justify-between items-center mt-6 text-sm text-gray-600 dark:text-gray-400">
                       {/* Phần hiển thị số lượng */}
                       <div> Hiển thị <span className="font-semibold dark:text-white">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> - <span className="font-semibold dark:text-white">{Math.min(currentPage * ITEMS_PER_PAGE, totalItems)}</span> / <span className="font-semibold dark:text-white">{totalItems}</span> tours </div>
