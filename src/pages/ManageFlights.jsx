@@ -1,13 +1,12 @@
 // src/pages/ManageFlights.jsx
-// (SỬA) Thêm quản lý số lượng (inventory)
-// (SỬA) Thêm cảnh báo sắp hết hàng
+// (SỬA) Thêm tính năng Chỉnh sửa (Edit)
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { getSupabase } from "../lib/supabaseClient";
 import { useAuth } from "../context/AuthContext";
 import toast from 'react-hot-toast';
-// (SỬA) Thêm WarningCircle
-import { Plus, Trash, CircleNotch, AirplaneTilt, WarningCircle } from '@phosphor-icons/react';
+// (SỬA) Thêm Pencil, X
+import { Plus, Trash, CircleNotch, AirplaneTilt, WarningCircle, Pencil, X as CancelIcon } from '@phosphor-icons/react';
 
 const supabase = getSupabase();
 const productType = 'flight'; 
@@ -30,7 +29,7 @@ const getDetailLabel = (field) => {
 const initialFormData = {
   name: '',
   price: '',
-  inventory: 99, // <-- (THÊM MỚI)
+  inventory: 99, 
   details: {
     airline: '',
     route: '',
@@ -55,6 +54,9 @@ export default function ManageFlights() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState(initialFormData);
+  
+  // (THÊM MỚI) State cho chỉnh sửa
+  const [editingId, setEditingId] = useState(null);
 
   // Tìm Supplier ID từ User ID
   useEffect(() => {
@@ -82,10 +84,10 @@ export default function ManageFlights() {
         setLoading(false);
         return;
     } 
-    setLoading(true);
+     setLoading(true);
     const { data, error } = await supabase
       .from('Products')
-      .select('*') // Lấy tất cả, bao gồm 'inventory'
+      .select('*') 
       .eq('product_type', productType)
       .eq('supplier_id', supplierId)
       .order('created_at', { ascending: false });
@@ -94,7 +96,6 @@ export default function ManageFlights() {
       toast.error('Lỗi tải danh sách chuyến bay!');
     } else {
       setFlights(data || []);
-      // (THÊM MỚI) Logic thông báo sắp hết hàng
       const lowStock = data.filter(f => f.inventory <= 5 && f.inventory > 0);
       if (lowStock.length > 0) {
           toast.custom((t) => (
@@ -128,14 +129,12 @@ export default function ManageFlights() {
     fetchFlights();
   }, [fetchFlights]);
 
-  // Xử lý thay đổi input (hỗ trợ nested details)
+  // Xử lý thay đổi input
   const handleChange = (e) => {
     const { name, value, type: inputType } = e.target;
-    // (SỬA) Thêm 'inventory'
     if (name === 'name' || name === 'price' || name === 'inventory') {
       let newValue = value;
       if ((name === 'price' || name === 'inventory') && inputType === 'number') {
-        // (SỬA) Dùng parseInt
         newValue = value === '' ? '' : parseInt(value) || 0; 
       }
       setFormData(prev => ({ ...prev, [name]: newValue }));
@@ -149,8 +148,26 @@ export default function ManageFlights() {
       }));
     }
   };
+  
+  // (THÊM MỚI) Xử lý bấm nút Sửa
+  const handleEditClick = (flight) => {
+    setEditingId(flight.id);
+    setFormData({
+        name: flight.name,
+        price: flight.price || '',
+        inventory: flight.inventory ?? 99,
+        details: flight.details || initialFormData.details
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  
+  // (THÊM MỚI) Xử lý Hủy Sửa
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setFormData(initialFormData);
+  };
 
-  // Xử lý submit (Chỉ Thêm mới)
+  // (SỬA) Xử lý submit (Thêm MỚI và CẬP NHẬT)
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!supplierId) {
@@ -163,33 +180,52 @@ export default function ManageFlights() {
     }
     setIsSubmitting(true);
 
-    // --- SỬA LỖI 400 TẠI ĐÂY ---
-    const dataToSubmit = {
-        name: formData.name,
-        product_type: productType,
-        supplier_id: supplierId,
-        price: formData.price === '' ? null : formData.price, 
-        details: formData.details,
-        approval_status: 'pending', 
-        
-        // Bổ sung các trường NOT NULL
-        tour_code: formData.details.code, // Lấy mã chuyến bay làm tour_code
-        inventory: formData.inventory, // (SỬA) Lấy từ form
-        image_url: 'https://placehold.co/600x400/0ea5e9/white?text=Flight', // Ảnh mặc định
-    };
-    // --- KẾT THÚC SỬA ---
+    let error;
 
-    // Chỉ thực hiện INSERT
-    const { error } = await supabase
-      .from('Products')
-      .insert(dataToSubmit);
+    if (editingId) {
+        // --- Chế độ CẬP NHẬT ---
+        const dataToUpdate = {
+            name: formData.name,
+            price: formData.price === '' ? null : formData.price, 
+            inventory: formData.inventory,
+            details: formData.details,
+            tour_code: formData.details.code, // Đồng bộ tour_code
+            // Không cập nhật approval_status khi sửa
+        };
+        
+        const { error: updateError } = await supabase
+            .from('Products')
+            .update(dataToUpdate)
+            .eq('id', editingId)
+            .eq('supplier_id', supplierId); // Đảm bảo đúng chủ
+        error = updateError;
+
+    } else {
+        // --- Chế độ THÊM MỚI (Như cũ) ---
+        const dataToSubmit = {
+            name: formData.name,
+            product_type: productType,
+            supplier_id: supplierId,
+            price: formData.price === '' ? null : formData.price, 
+            details: formData.details,
+            approval_status: 'pending', 
+            tour_code: formData.details.code, 
+            inventory: formData.inventory, 
+            image_url: 'https://placehold.co/600x400/0ea5e9/white?text=Flight',
+        };
+        const { error: insertError } = await supabase
+          .from('Products')
+          .insert(dataToSubmit);
+        error = insertError;
+    }
 
     if (error) {
       toast.error("Có lỗi xảy ra: " + error.message);
       console.error("Lỗi Submit Flights:", error);
     } else {
-      toast.success('Thêm mới thành công! Chờ duyệt.');
-      setFormData(initialFormData); // Reset form
+      toast.success(editingId ? 'Cập nhật thành công!' : 'Thêm mới thành công! Chờ duyệt.');
+      setFormData(initialFormData);
+      setEditingId(null);
       await fetchFlights(); 
     }
     setIsSubmitting(false);
@@ -208,6 +244,7 @@ export default function ManageFlights() {
         toast.error("Lỗi khi xóa: " + error.message);
       } else {
         toast.success('Xóa thành công!');
+        if (editingId === productId) { handleCancelEdit(); } // Hủy edit nếu đang sửa item bị xóa
         await fetchFlights(); 
       }
     }
@@ -234,11 +271,26 @@ export default function ManageFlights() {
         </div>
       )}
 
-      {/* FORM THÊM NHANH */}
+      {/* FORM THÊM MỚI / CHỈNH SỬA */}
       {supplierId && (
-        <form onSubmit={handleSubmit} className="bg-white dark:bg-neutral-800 p-6 rounded-lg shadow-md mb-8 border dark:border-neutral-700">
-            <h2 className="text-xl font-semibold mb-4">Thêm nhanh Chuyến bay</h2>
-            {/* (SỬA) Layout grid */}
+        <form onSubmit={handleSubmit} className="bg-white dark:bg-neutral-800 p-6 rounded-lg shadow-md mb-8 border dark:border-neutral-700 relative">
+            {/* (SỬA) Tiêu đề động */}
+            <h2 className="text-xl font-semibold mb-4">
+                {editingId ? 'Chỉnh sửa Chuyến bay' : 'Thêm nhanh Chuyến bay'}
+            </h2>
+            
+            {/* (THÊM MỚI) Nút Hủy Sửa */}
+            {editingId && (
+                <button 
+                    type="button" 
+                    onClick={handleCancelEdit}
+                    className="absolute top-4 right-4 p-2 rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-neutral-700"
+                    title="Hủy chỉnh sửa"
+                >
+                    <CancelIcon size={20} />
+                </button>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="md:col-span-2">
                     <label htmlFor="name" className="block text-sm font-medium mb-1 dark:text-neutral-300">Tên hiển thị *</label>
@@ -248,9 +300,8 @@ export default function ManageFlights() {
                     <label htmlFor="price" className="block text-sm font-medium mb-1 dark:text-neutral-300">Giá (VNĐ)</label>
                     <input id="price" type="number" name="price" placeholder="Giá vé (hoặc giá combo)" value={formData.price} onChange={handleChange} className="w-full p-2 border rounded-md dark:bg-neutral-700 dark:border-neutral-600 focus:ring-sky-500 focus:border-sky-500 dark:text-white" />
                 </div>
-                {/* (THÊM MỚI) Input Số lượng */}
                 <div>
-                    <label htmlFor="inventory" className="block text-sm font-medium mb-1 dark:text-neutral-300">Số lượng *</label>
+                    <label htmlFor="inventory" className="block text-sm font-medium mb-1 dark:text-neutral-300">Số lượng (Slot) *</label>
                     <input id="inventory" type="number" name="inventory" placeholder="99" value={formData.inventory} onChange={handleChange} required min="0" className="w-full p-2 border rounded-md dark:bg-neutral-700 dark:border-neutral-600 focus:ring-sky-500 focus:border-sky-500 dark:text-white" />
                 </div>
 
@@ -268,14 +319,28 @@ export default function ManageFlights() {
                     <input id="route" type="text" name="route" value={formData.details.route} onChange={handleChange} required className="w-full p-2 border rounded-md dark:bg-neutral-700 dark:border-neutral-600 focus:ring-sky-500 focus:border-sky-500 dark:text-white" />
                 </div>
             </div>
-            <button
-                type="submit"
-                disabled={isSubmitting}
-                className="mt-4 inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
-            >
-                {isSubmitting ? <CircleNotch size={20} className="animate-spin" /> : <Plus size={20} />}
-                Thêm & Chờ duyệt
-            </button>
+            
+            {/* (SỬA) Nút động */}
+            <div className="flex items-center gap-3 mt-4">
+                <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                >
+                    {isSubmitting ? <CircleNotch size={20} className="animate-spin" /> : (editingId ? <Pencil size={20} /> : <Plus size={20} />)}
+                    {editingId ? 'Cập nhật' : 'Thêm & Chờ duyệt'}
+                </button>
+                {editingId && (
+                     <button
+                        type="button"
+                        onClick={handleCancelEdit}
+                        disabled={isSubmitting}
+                        className="inline-flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-neutral-600 dark:hover:bg-neutral-500 dark:text-white font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                        Hủy
+                    </button>
+                )}
+            </div>
         </form>
       )}
 
@@ -293,9 +358,8 @@ export default function ManageFlights() {
                 <th scope="col" className="px-6 py-3">Tên</th>
                 <th scope="col" className="px-6 py-3">Mã CB</th>
                 <th scope="col" className="px-6 py-3">Hãng bay</th>
-          _     <th scope="col" className="px-6 py-3">Tuyến bay</th>
+                <th scope="col" className="px-6 py-3">Tuyến bay</th>
                 <th scope="col" className="px-6 py-3">Giá</th>
-                {/* (THÊM MỚI) Cột số lượng */}
                 <th scope="col" className="px-6 py-3">Số lượng</th>
                 <th scope="col" className="px-6 py-3">Trạng thái duyệt</th>
                 <th scope="col" className="px-6 py-3 text-right">Hành động</th>
@@ -303,18 +367,21 @@ export default function ManageFlights() {
             </thead>
             <tbody className="divide-y dark:divide-neutral-700">
               {flights.map((flight) => (
-                <tr key={flight.id} className="hover:bg-neutral-50 dark:hover:bg-neutral-700/50">
+                <tr key={flight.id} className={`hover:bg-neutral-50 dark:hover:bg-neutral-700/50 ${editingId === flight.id ? 'bg-sky-50 dark:bg-sky-900/30' : ''}`}>
                   <td className="px-6 py-4 font-medium whitespace-nowrap">{flight.name}</td>
                   <td className="px-6 py-4">{flight.details?.code || 'N/A'}</td>
                   <td className="px-6 py-4">{flight.details?.airline || 'N/A'}</td>
                   <td className="px-6 py-4">{flight.details?.route || 'N/A'}</td>
                   <td className="px-6 py-4">{formatPrice(flight.price)}</td>
-                    {/* (THÊM MỚI) Data số lượng */}
                     <td className={`px-6 py-4 font-medium ${flight.inventory <= 5 ? 'text-red-500' : ''}`}>
                         {flight.inventory}
                     </td>
                   <td className="px-6 py-4"><ApprovalBadge status={flight.approval_status} /></td>
                   <td className="px-6 py-4 text-right flex gap-2 justify-end">
+                      {/* (THÊM MỚI) Nút Sửa */}
+                      <button onClick={() => handleEditClick(flight)} className="p-2 text-blue-500 hover:text-blue-700 dark:hover:text-blue-400" title="Sửa">
+                          <Pencil size={18} />
+                      </button>
                     <button onClick={() => handleDelete(flight.id, flight.name)} className="p-2 text-red-500 hover:text-red-700 dark:hover:text-red-400" title="Xóa">
                       <Trash size={18} />
                     </button>
@@ -323,7 +390,6 @@ export default function ManageFlights() {
               ))}
               {flights.length === 0 && (
                 <tr>
-                    {/* (SỬA) colSpan="8" */}
                     <td colSpan="8" className="text-center py-10 text-neutral-500 italic">Bạn chưa thêm chuyến bay nào.</td>
                 </tr>
               )}

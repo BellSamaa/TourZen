@@ -1,6 +1,5 @@
 // src/pages/ManageSuppliers.jsx
-// (UPGRADED: Giao diện Dashboard + Giữ logic con trong Modal)
-// (FIXED: Tính toán số liệu thống kê động + Hiển thị Inventory)
+// (UPGRADED: Sửa Modal Edit, Sửa logic Thống kê, Sửa logic Icon)
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -13,27 +12,23 @@ import {
     CheckSquareOffset, Prohibit, Briefcase,
     ToggleLeft, ToggleRight,
     FloppyDisk,
-    Star, MagnifyingGlass, Funnel, List // (MỚI) Thêm icon
+    Star, MagnifyingGlass, Funnel, List
 } from '@phosphor-icons/react';
 
 const supabase = getSupabase();
 
-// (FIXED) Form NCC chính
 const initialFormData = { name: '', user_id: '', phone: '', email: '', address: '' };
 
-// --- Hàm format tiền tệ (Giữ nguyên) ---
 const formatCurrency = (number) => {
     if (typeof number !== "number" || isNaN(number)) return "0 ₫";
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(number);
 };
 
 // ====================================================================
-// (MỚI) Component Thống kê
-// (SỬA) Bỏ icon màu bên trái để giống 100% ảnh
+// Component Thống kê
 // ====================================================================
 const StatCard = ({ title, value, icon }) => (
     <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-lg border border-gray-100 dark:border-slate-700 flex items-center gap-4">
-        {/* (MỚI) Thêm icon vào (theo yêu cầu "thêm icon") nhưng để bên trong */}
         {icon && <div className="text-sky-600 dark:text-sky-400">{icon}</div>}
         <div>
             <div className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</div>
@@ -43,15 +38,15 @@ const StatCard = ({ title, value, icon }) => (
 );
 
 // ====================================================================
-// Component Modal Chỉnh sửa Dịch vụ (Hotel, Taxi, Flight)
-// (Giữ nguyên từ code cũ của bạn)
+// (FIX 3) Component Modal Chỉnh sửa Dịch vụ (Đã nâng cấp)
 // ====================================================================
 const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
     const [loading, setLoading] = useState(false);
+    // (SỬA) State phức tạp hơn để chứa details và inventory
     const [formData, setFormData] = useState({
-        name: '', price: 0, description: '',
-        product_type: 'hotel', supplier_id: supplierId,
-        approval_status: 'pending', is_published: false
+        name: '', price: 0, description: '', product_type: 'hotel', 
+        supplier_id: supplierId, approval_status: 'pending', is_published: false,
+        inventory: 99, details: {}, tour_code: ''
     });
     const [isNew, setIsNew] = useState(true);
 
@@ -59,70 +54,135 @@ const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
         if (product && product.id) { // Nếu là Sửa
             setIsNew(false);
             setFormData({
-                name: product.name || '',
+                ...product,
                 price: product.price || 0,
-                description: product.description || '',
-                product_type: product.product_type || 'hotel',
-                supplier_id: product.supplier_id || supplierId,
-                approval_status: product.approval_status || 'pending',
-                is_published: product.is_published || false
+                inventory: product.inventory ?? 99,
+                details: product.details || {},
             });
         } else { // Nếu là Thêm mới
             setIsNew(true);
             setFormData({
-                name: '', price: 0, description: '',
-                product_type: 'hotel', supplier_id: supplierId,
-                approval_status: 'pending', is_published: false // Mới tạo luôn chờ duyệt
+                name: '', price: 0, description: '', product_type: 'hotel', 
+                supplier_id: supplierId, approval_status: 'pending', is_published: false,
+                inventory: 99, details: {}, tour_code: ''
             });
         }
     }, [product, supplierId]);
 
+    // (SỬA) HandleChange hỗ trợ nested 'details'
     const handleChange = (e) => {
         const { name, value, type } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: type === 'number' ? parseFloat(value) || 0 : value
-        }));
+        
+        if (name === 'name' || name === 'price' || name === 'inventory' || name === 'description' || name === 'product_type' || name === 'tour_code') {
+             setFormData(prev => ({
+                ...prev,
+                [name]: type === 'number' ? parseFloat(value) || 0 : value
+            }));
+        } else {
+            // Giả định các trường còn lại thuộc 'details'
+            setFormData(prev => ({
+                ...prev,
+                details: {
+                    ...prev.details,
+                    [name]: value
+                }
+            }));
+        }
     };
     
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
+
+        // (SỬA) Dùng formData đã được cập nhật
+        const { id, created_at, ...dataToSubmit } = formData; 
         
         let error;
         if (isNew) {
             // Thêm mới
             const { data, error: insertError } = await supabase
                 .from('Products')
-                .insert(formData)
+                .insert(dataToSubmit) // Gửi toàn bộ formData đã được chuẩn hóa
                 .select()
                 .single();
             error = insertError;
-            if (!error) onSaved(data); // Trả về data mới
+            if (!error) onSaved(data);
         } else {
             // Cập nhật
             const { data, error: updateError } = await supabase
                 .from('Products')
-                .update(formData)
+                .update(dataToSubmit)
                 .eq('id', product.id)
                 .select()
                 .single();
             error = updateError;
-            if (!error) onSaved(data); // Trả về data đã cập nhật
+            if (!error) onSaved(data);
         }
         
         setLoading(false);
         if (error) {
             toast.error("Lỗi: " + error.message);
+            console.error("Lỗi submit modal:", error, dataToSubmit);
         } else {
             toast.success(isNew ? "Thêm dịch vụ thành công!" : "Cập nhật thành công!");
             onClose();
         }
     };
 
+    // (SỬA) Render form động dựa trên product_type
+    const renderDynamicFields = () => {
+        const type = formData.product_type;
+        
+        if (type === 'flight') {
+            return (
+                <>
+                    <div>
+                        <label htmlFor="tour_code" className="label-style">Mã Chuyến bay (tour_code) *</label>
+                        <input id="tour_code" type="text" name="tour_code" value={formData.tour_code || ''} onChange={handleChange} required className="input-style" />
+                    </div>
+                    <div>
+                        <label htmlFor="airline" className="label-style">Hãng bay (details.airline)</label>
+                        <input id="airline" type="text" name="airline" value={formData.details?.airline || ''} onChange={handleChange} className="input-style" />
+                    </div>
+                    <div>
+                        <label htmlFor="route" className="label-style">Tuyến bay (details.route)</label>
+                        <input id="route" type="text" name="route" value={formData.details?.route || ''} onChange={handleChange} className="input-style" />
+                    </div>
+                </>
+            );
+        }
+        
+        if (type === 'transport') {
+             return (
+                <>
+                    <div>
+                        <label htmlFor="tour_code" className="label-style">Mã Dịch vụ (tour_code) *</label>
+                        <input id="tour_code" type="text" name="tour_code" value={formData.tour_code || ''} onChange={handleChange} required className="input-style" />
+                    </div>
+                    <div>
+                        <label htmlFor="vehicle_type" className="label-style">Loại xe (details.vehicle_type)</label>
+                        <input id="vehicle_type" type="text" name="vehicle_type" value={formData.details?.vehicle_type || ''} onChange={handleChange} className="input-style" />
+                    </div>
+                     <div>
+                        <label htmlFor="seats" className="label-style">Số chỗ (details.seats)</label>
+                        <input id="seats" type="number" name="seats" value={formData.details?.seats || 0} onChange={handleChange} className="input-style" />
+                    </div>
+                </>
+            );
+        }
+
+        // Mặc định (hotel)
+         return (
+             <div>
+                <label htmlFor="description" className="label-style">Mô tả</label>
+                <textarea id="description" name="description" value={formData.description || ''} onChange={handleChange} rows="4" className="input-style resize-y"></textarea>
+            </div>
+         );
+    };
+
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4">
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
                 <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
                     <div className="flex justify-between items-center p-4 border-b dark:border-slate-700">
                         <h3 className="text-xl font-semibold text-slate-800 dark:text-white">
@@ -132,16 +192,17 @@ const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
                             <X size={20} />
                         </button>
                     </div>
-                    <div className="p-6 space-y-5 overflow-y-auto">
+                    {/* (SỬA) Tăng chiều rộng modal và chia grid */}
+                    <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4 overflow-y-auto">
                         <div>
                             <label htmlFor="edit-product-type" className="label-style">Loại Dịch vụ *</label>
                             <select id="edit-product-type" name="product_type" value={formData.product_type} onChange={handleChange} required className="input-style !text-base" disabled={!isNew}>
                                 <option value="hotel">Hotel (Khách sạn)</option>
-                                <option value="car">TourZenTaxi (Xe)</option>
-                                <option value="plane">TourZenFlight (Bay)</option>
+                                <option value="transport">Transport (Vận chuyển)</option>
+                                <option value="flight">Flight (Hàng không)</option>
                             </select>
                         </div>
-                        <div>
+                        <div className="md:col-span-1">
                             <label htmlFor="edit-product-name" className="label-style">Tên Dịch vụ *</label>
                             <input id="edit-product-name" type="text" name="name" value={formData.name} onChange={handleChange} required className="input-style" />
                         </div>
@@ -149,9 +210,14 @@ const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
                             <label htmlFor="edit-product-price" className="label-style">Giá (VNĐ) *</label>
                             <input id="edit-product-price" type="number" name="price" value={formData.price} onChange={handleChange} required min="0" step="1000" className="input-style" />
                         </div>
-                        <div>
-                            <label htmlFor="edit-product-description" className="label-style">Mô tả</label>
-                            <textarea id="edit-product-description" name="description" value={formData.description} onChange={handleChange} rows="4" className="input-style resize-y"></textarea>
+                         <div>
+                            <label htmlFor="edit-product-inventory" className="label-style">Số lượng (Inventory) *</label>
+                            <input id="edit-product-inventory" type="number" name="inventory" value={formData.inventory} onChange={handleChange} required min="0" className="input-style" />
+                        </div>
+                        
+                        {/* Fields động */}
+                        <div className="md:col-span-2 space-y-4 border-t dark:border-slate-700 pt-4 mt-2">
+                             {renderDynamicFields()}
                         </div>
                     </div>
                     <div className="p-5 border-t dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800 rounded-b-lg">
@@ -166,10 +232,11 @@ const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
         </div>
     );
 };
+// ====================================================================
+
 
 // ====================================================================
 // Component con hiển thị Sản phẩm cần duyệt
-// (Giữ nguyên từ code "dung hòa")
 // ====================================================================
 const SupplierProductsApproval = ({ supplierId, supplierName }) => {
     const [products, setProducts] = useState([]);
@@ -178,7 +245,6 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
 
     const fetchProductsForSupplier = useCallback(async () => {
         setLoading(true);
-        // (SỬA) Lấy * để bao gồm cả 'inventory'
         const { data, error } = await supabase
             .from('Products')
             .select('*') 
@@ -194,7 +260,6 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
         fetchProductsForSupplier();
     }, [fetchProductsForSupplier]);
 
-    // ... (Toàn bộ logic handleProductSaved, handleApproval, handleTogglePublished, handleDelete giữ nguyên y đúc) ...
     const handleProductSaved = (savedProduct) => {
         const exists = products.find(p => p.id === savedProduct.id);
         if (exists) {
@@ -250,14 +315,16 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
             setProducts(prev => prev.filter(p => p.id !== productId));
         }
     };
+    
+    // (FIX 2) Sửa logic Icon
     const ProductIcon = ({ type }) => {
         const iconSize = 18;
         if (type === 'hotel') return <Buildings size={iconSize} title="Hotel" />;
-        // (SỬA) Sửa lại cho đúng type
-        if (type === 'transport') return <Car size={iconSize} title="TourZenTaxi" />;
-        if (type === 'flight') return <AirplaneTilt size={iconSize} title="TourZenFlight" />;
+        if (type === 'transport') return <Car size={iconSize} title="Vận chuyển (Transport)" />;
+        if (type === 'flight') return <AirplaneTilt size={iconSize} title="Hàng không (Flight)" />;
         return <Package size={iconSize} />;
     };
+    
     const ApprovalBadge = ({ status }) => {
       const iconSize = 14;
       switch (status) {
@@ -269,18 +336,17 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
           return <span className="badge-yellow-sm"><Clock size={iconSize} /> Chờ duyệt</span>;
       }
     };
-    // ... (Hết phần logic) ...
 
     return (
-        // (SỬA) Bỏ nút Hiện/Ẩn, render trực tiếp
         <div>
             <div className="flex justify-between items-center mb-3">
                  <h4 className="text-base font-semibold text-sky-700 dark:text-sky-400">
-                    Dịch vụ (Hotel, Taxi, Flight)
+                    Dịch vụ (Hotel, Transport, Flight)
                  </h4>
                 <button 
-                    onClick={() => setEditingProduct({ isNew: true })} // Mở modal ở trạng thái "Mới"
+                    onClick={() => setEditingProduct({ isNew: true })}
                     className="button-primary !text-sm !px-3 !py-1.5 flex items-center gap-1.5"
+                    title="Thêm dịch vụ (do Admin tạo)"
                 >
                     <Plus size={16} /> Thêm DV
                 </button>
@@ -300,9 +366,7 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
                                     <ProductIcon type={p.product_type} />
                                     <span className="font-medium dark:text-neutral-100" title={p.description || p.name}>{p.name}</span>
                                     <span className="text-sky-600 dark:text-sky-400 font-semibold">({formatCurrency(p.price)})</span>
-                                    {/* ========== SỬA LỖI TẠI ĐÂY ========== */}
                                     <span className="text-xs text-neutral-500 dark:text-neutral-400 font-mono">(SL: {p.inventory ?? 'N/A'})</span>
-                                    {/* ==================================== */}
                                 </div>
                                 
                                 <div className="flex items-center gap-3 flex-shrink-0">
@@ -317,6 +381,7 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
                                     </button>
                                     
                                     <div className="flex items-center gap-0.5">
+                                        {/* (SỬA) Nút Sửa giờ đây mở modal đã nâng cấp */}
                                         <button onClick={() => setEditingProduct(p)} className="action-button text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa"><Pencil size={16}/></button>
                                         <button onClick={() => handleDelete(p.id)} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa"><Trash size={16}/></button>
 
@@ -342,15 +407,17 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
                     product={editingProduct.isNew ? null : editingProduct}
                     onClose={() => setEditingProduct(null)}
                     onSaved={handleProductSaved}
-                    supplierId={supplierId} // Truyền supplierId vào modal
+                    supplierId={supplierId} 
                 />
             )}
         </div>
     );
 };
 // ====================================================================
+
+
+// ====================================================================
 // Component con Quản lý Đặt chỗ (Bookings)
-// (Giữ nguyên từ code "dung hòa")
 // ====================================================================
 const SupplierBookingsManagement = ({ supplierId, supplierContact }) => {
     const [bookings, setBookings] = useState([]);
@@ -358,10 +425,8 @@ const SupplierBookingsManagement = ({ supplierId, supplierContact }) => {
     
     const fetchBookingsForSupplier = useCallback(async () => { 
         setLoading(true);
-        // ... logic fetch thật của bạn sẽ ở đây ...
-        // Giả lập fetch
         setTimeout(() => {
-             setBookings([]); // Giả lập không có data
+             setBookings([]); 
              setLoading(false);
         }, 1000);
     }, [supplierId]);
@@ -390,7 +455,7 @@ const SupplierBookingsManagement = ({ supplierId, supplierContact }) => {
 };
 
 // ====================================================================
-// (MỚI) Modal để chứa 2 component con (Giữ nguyên)
+// Modal để chứa 2 component con
 // ====================================================================
 const ServicesModal = ({ supplier, onClose }) => {
     return (
@@ -405,21 +470,17 @@ const ServicesModal = ({ supplier, onClose }) => {
               </button>
           </div>
           <div className="p-6 space-y-6 overflow-y-auto">
-            {/* Tiêu đề phụ */}
             <h4 className="text-lg font-semibold text-slate-700 dark:text-slate-200">
               Nhà cung cấp: <span className="text-sky-600 dark:text-sky-400">{supplier.name}</span>
             </h4>
             
-            {/* Component Dịch vụ */}
             <SupplierProductsApproval 
               supplierId={supplier.id} 
               supplierName={supplier.name}
             />
             
-            {/* Ngăn cách */}
             <hr className="dark:border-slate-700 my-6"/>
 
-            {/* Component Đặt chỗ */}
             <SupplierBookingsManagement
               supplierId={supplier.id}
               supplierContact={supplier}
@@ -434,10 +495,12 @@ const ServicesModal = ({ supplier, onClose }) => {
   };
   
 // ====================================================================
-// (FIXED) Hàm lấy loại NCC (Dùng cho cả Bảng và Thống kê)
+// (FIX 1) Hàm lấy loại NCC (Sửa logic đếm)
 // ====================================================================
 const getSupplierType = (name) => {
     const lowerName = name.toLowerCase();
+    
+    // Ưu tiên 1: Tên chứa từ khóa cụ thể
     if (lowerName.includes('khách sạn') || lowerName.includes('resort') || lowerName.includes('hotel')) {
         return { type: 'Hotel', className: 'badge-green' };
     }
@@ -447,28 +510,36 @@ const getSupplierType = (name) => {
     if (lowerName.includes('vận chuyển') || lowerName.includes('transport') || lowerName.includes('sài gòn')) {
         return { type: 'Transport', className: 'badge-orange' };
     }
+    
+    // (SỬA) Ưu tiên 2: Tên chứa "TourZenSupplier"
+    // (Bạn có thể đổi 'Transport' thành 'Airline' nếu muốn)
+    if (lowerName.includes('tourzensupplier')) {
+         return { type: 'Transport', className: 'badge-orange' };
+    }
+    
+    // Mặc định
     return { type: 'Tour Operator', className: 'badge-blue' };
 };
+// ====================================================================
+
 
 // ====================================================================
-// Component chính: ManageSuppliers (Áp dụng UI Dashboard)
+// Component chính: ManageSuppliers
 // ====================================================================
 export default function ManageSuppliers() {
     const [suppliers, setSuppliers] = useState([]);
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isFetchingPage, setIsFetchingPage] = useState(false); 
-    const [isModalOpen, setIsModalOpen] = useState(false); // Modal Thêm/Sửa NCC
+    const [isModalOpen, setIsModalOpen] = useState(false); 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState(initialFormData);
     const [editingId, setEditingId] = useState(null);
     const [error, setError] = useState(null); 
-    const [searchTerm, setSearchTerm] = useState(''); // (MỚI) State tìm kiếm
+    const [searchTerm, setSearchTerm] = useState('');
     
-    // (MỚI) State cho modal dịch vụ con
-    const [viewingServicesFor, setViewingServicesFor] = useState(null); // (Chứa supplier object)
+    const [viewingServicesFor, setViewingServicesFor] = useState(null); 
 
-    // (FIXED) Bổ sung logic fetchSuppliers (thêm các trường contact)
     const fetchSuppliers = useCallback(async (isInitialLoad = false) => {
         if(!isInitialLoad) setIsFetchingPage(true); 
         setError(null);
@@ -493,12 +564,11 @@ export default function ManageSuppliers() {
         setIsFetchingPage(false);
     }, []);
 
-    // (FIXED) Bổ sung logic fetchUsers
     const fetchUsers = async () => {
         const { data, error } = await supabase
             .from('Users')
             .select('id, full_name, email')
-            .eq('role', 'supplier'); // Chỉ lấy user là supplier
+            .eq('role', 'supplier'); 
         if (error) {
             console.error("Fetch Users Error:", error);
         } else {
@@ -508,7 +578,7 @@ export default function ManageSuppliers() {
 
     useEffect(() => { fetchSuppliers(true); fetchUsers(); }, [fetchSuppliers]);
 
-    // --- (FIXED) Bổ sung logic Modal NCC ---
+    // --- Logic Modal NCC ---
     const handleOpenModal = (supplier = null) => {
         if (supplier) {
             setEditingId(supplier.id);
@@ -574,7 +644,7 @@ export default function ManageSuppliers() {
     };
     // --- Hết logic Modal NCC ---
 
-    // --- (MỚI) Logic cho UI Dashboard ---
+    // --- Logic UI Dashboard ---
     const filteredSuppliers = useMemo(() => {
         if (!searchTerm) return suppliers;
         return suppliers.filter(s => 
@@ -584,14 +654,14 @@ export default function ManageSuppliers() {
         );
     }, [suppliers, searchTerm]);
 
-    // (FIXED) Tính toán thống kê động
     const stats = useMemo(() => {
         let hotel = 0;
         let airline = 0;
         let transport = 0;
 
         suppliers.forEach(s => {
-            const typeInfo = getSupplierType(s.name);
+            // (SỬA) Dùng hàm đã fix
+            const typeInfo = getSupplierType(s.name); 
             switch (typeInfo.type) {
                 case 'Hotel':
                     hotel++;
@@ -615,9 +685,8 @@ export default function ManageSuppliers() {
         };
     }, [suppliers]);
 
-
+    // (SỬA) Logic trạng thái
     const getStatus = (supplier) => {
-        // Giả lập, bạn có thể thay bằng logic thật
         if (!supplier.user_id) {
              return { text: 'Ngừng', className: 'badge-status-inactive' };
         }
@@ -625,13 +694,11 @@ export default function ManageSuppliers() {
     };
     
     const getRating = (id) => {
-        const num = (id.charCodeAt(id.length - 1) % 15 + 35) / 10.0; // Random từ 3.5 -> 5.0
+        const num = (id.charCodeAt(id.length - 1) % 15 + 35) / 10.0;
         return num.toFixed(1);
     };
     // --- Hết logic UI ---
 
-
-     // --- Loading ban đầu (Giữ nguyên) ---
      if (loading && suppliers.length === 0) { 
         return (
           <div className="flex flex-col justify-center items-center h-screen bg-gray-50 dark:bg-slate-900">
@@ -642,10 +709,8 @@ export default function ManageSuppliers() {
       }
 
     return (
-        // (MỚI) Bố cục Dashboard
         <div className="p-4 sm:p-6 space-y-6 min-h-screen bg-gray-50 dark:bg-slate-900 dark:text-white">
             
-            {/* (MỚI) Tiêu đề & Nút Thêm */}
             <div className="flex flex-wrap justify-between items-center gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-800 dark:text-white">
@@ -663,33 +728,30 @@ export default function ManageSuppliers() {
                 </button>
             </div>
             
-            {/* (MỚI) Thẻ Thống kê (Đã sửa để dùng SỐ LIỆU ĐỘNG) */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
                 <StatCard 
                     title="Tổng nhà cung cấp" 
-                    value={stats.total} // Dữ liệu động
-                    icon={<Briefcase size={22} weight="duotone"/>} // Thêm icon
+                    value={stats.total} 
+                    icon={<Briefcase size={22} weight="duotone"/>}
                 />
                  <StatCard 
                     title="Khách sạn" 
-                    value={stats.hotel} // Dữ liệu động
-                    icon={<Buildings size={22} weight="duotone"/>} // Thêm icon
+                    value={stats.hotel} 
+                    icon={<Buildings size={22} weight="duotone"/>}
                 />
                  <StatCard 
                     title="Hàng không" 
-                    value={stats.airline} // Dữ liệu động
-                    icon={<AirplaneTilt size={22} weight="duotone"/>} // Thêm icon
+                    value={stats.airline} 
+                    icon={<AirplaneTilt size={22} weight="duotone"/>}
                 />
                  <StatCard 
                     title="Vận chuyển" 
-                    value={stats.transport} // Dữ liệu động
-                    icon={<Car size={22} weight="duotone"/>} // Thêm icon
+                    value={stats.transport} 
+                    icon={<Car size={22} weight="duotone"/>}
                 />
             </div>
             
-            {/* (MỚI) Bảng dữ liệu */}
             <div className="bg-white dark:bg-slate-800 shadow-xl rounded-xl overflow-hidden border border-gray-100 dark:border-slate-700">
-                {/* Thanh công cụ Bảng */}
                 <div className="flex flex-wrap items-center justify-between gap-4 p-4 border-b dark:border-slate-700">
                     <h3 className="text-lg font-semibold text-slate-800 dark:text-white">Danh Sách Nhà Cung Cấp</h3>
                     <div className="flex items-center gap-2">
@@ -709,7 +771,6 @@ export default function ManageSuppliers() {
                     </div>
                 </div>
 
-                {/* Bảng */}
                 <div className="overflow-x-auto relative">
                     {(isFetchingPage && !loading) && ( <div className="loading-overlay"> <CircleNotch size={32} className="animate-spin text-sky-500" /> </div> )}
                     <table className="min-w-full divide-y divide-gray-100 dark:divide-slate-700">
@@ -740,7 +801,6 @@ export default function ManageSuppliers() {
                                     <td className="td-style-new font-mono">NCC-{supplier.id.slice(-4).toUpperCase()}</td>
                                     <td className="td-style-new max-w-xs">
                                         <div className="flex items-center gap-2">
-                                            {/* (MỚI) Thêm icon Briefcase vào bảng */}
                                             <Briefcase size={18} weight="duotone" className="text-gray-500 flex-shrink-0" />
                                             <span className="font-semibold text-gray-800 dark:text-white truncate">{supplier.name}</span>
                                         </div>
@@ -770,7 +830,6 @@ export default function ManageSuppliers() {
                                     </td>
                                     <td className="td-style-new text-right whitespace-nowrap">
                                         <div className="flex gap-1 justify-end">
-                                            {/* (MỚI) Nút mở Modal Dịch vụ con */}
                                             <button onClick={() => setViewingServicesFor(supplier)} className="action-button text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700/50" title="Quản lý Dịch vụ"><List size={16} /></button>
                                             
                                             <button onClick={() => handleOpenModal(supplier)} className="action-button text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa NCC"><Pencil size={16} /></button>
@@ -784,7 +843,7 @@ export default function ManageSuppliers() {
                 </div>
             </div>
 
-            {/* (FIXED) Modal Thêm/Sửa NCC chính */}
+            {/* Modal Thêm/Sửa NCC chính */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4">
                     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
@@ -842,7 +901,7 @@ export default function ManageSuppliers() {
                 </div>
              )}
 
-            {/* (MỚI) Modal Dịch vụ con */}
+            {/* Modal Dịch vụ con */}
             {viewingServicesFor && (
                 <ServicesModal 
                     supplier={viewingServicesFor} 
@@ -850,9 +909,8 @@ export default function ManageSuppliers() {
                 />
             )}
 
-            {/* (MỚI) Toàn bộ CSS cho Dashboard */}
+            {/* CSS */}
             <style jsx>{`
-                /* (MỚI) Nút Thêm NCC (Dark) */
                 .button-primary-dark { 
                     @apply bg-gray-800 hover:bg-gray-900 dark:bg-sky-600 dark:hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed shadow-md; 
                 }
@@ -862,30 +920,21 @@ export default function ManageSuppliers() {
                 .search-input-style {
                     @apply border border-gray-300 dark:border-slate-600 p-2 pl-9 rounded-lg w-full sm:w-64 bg-white dark:bg-slate-700 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none transition text-sm;
                 }
-
-                /* (MỚI) CSS Bảng */
                 .loading-overlay { @apply absolute inset-0 bg-white/70 dark:bg-slate-800/70 flex items-center justify-center z-10; }
                 .th-style-new { @apply px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap; }
                 .td-style-new { @apply px-4 py-3 text-sm text-gray-700 dark:text-gray-300 align-middle; } 
                 .action-button { @apply p-1.5 rounded-lg transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-offset-1 dark:focus:ring-offset-slate-800 disabled:opacity-50 disabled:cursor-not-allowed; }
-
-                /* (MỚI) Badges */
                 .badge-base { @apply px-2.5 py-0.5 text-xs font-semibold rounded-full inline-flex items-center; }
                 .badge-blue { @apply bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200; }
                 .badge-green { @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200; }
                 .badge-purple { @apply bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200; }
                 .badge-orange { @apply bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200; }
-                
                 .badge-status-active { @apply bg-gray-700 text-white dark:bg-gray-200 dark:text-gray-800; }
                 .badge-status-inactive { @apply bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-100; }
-
-                /* (CŨ) Badges cho dịch vụ con (giữ lại) */
                 .badge-sm-base { @apply px-2.5 py-1 text-xs font-medium rounded-full inline-flex items-center gap-1.5; }
                 .badge-green-sm { @apply badge-sm-base bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300; }
                 .badge-yellow-sm { @apply badge-sm-base bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300; }
                 .badge-red-sm { @apply badge-sm-base bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300; }
-                
-                /* (CŨ) Styles cho Modal (giữ lại) */
                 .input-style { @apply border border-gray-300 dark:border-slate-600 p-2.5 rounded-md w-full dark:bg-slate-700 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none transition text-sm; }
                 .label-style { @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5; }
                 .modal-button-secondary { @apply px-5 py-2.5 bg-neutral-200 dark:bg-neutral-600 rounded-md font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-500 text-sm disabled:opacity-50; }
