@@ -1,5 +1,5 @@
 // src/pages/Payment.jsx
-// (V8: Đã sửa lỗi build Vercel dòng 576 VÀ sửa lỗi logic)
+// (V9: Sửa lỗi 400 (Bad Request) khi insert vào Bookings)
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -444,7 +444,7 @@ export default function Payment() {
         setIsSubmitting(true);
         let bookingErrorOccurred = false;
         let successfulBookingIds = [];
-        const bookingPromises = []; 
+        const bookingPromises = []; // Khai báo mảng
 
         // 2. Xử lý từng tour
         for (const item of displayItems) {
@@ -487,8 +487,10 @@ export default function Payment() {
             };
 
             // Thêm vào DB (sẽ chạy đồng loạt)
+            // SỬA LỖI 400: Bỏ .single() và chỉ .select('id').
+            // insert() trả về một mảng, nên chúng ta không dùng .single()
             bookingPromises.push(
-                supabase.from('Bookings').insert(bookingPayload).select().single()
+                supabase.from('Bookings').insert(bookingPayload).select('id')
             );
         } // Hết vòng lặp
 
@@ -496,25 +498,28 @@ export default function Payment() {
         if (!bookingErrorOccurred) {
             try {
                 const results = await Promise.all(bookingPromises);
-                successfulBookingIds = results.map(r => r.data?.id).filter(Boolean);
+                
+                // SỬA LỖI 400: results là [{ data: [{id: 123}] }, ...]
+                // Ta cần truy cập r.data[0].id
+                successfulBookingIds = results.map(r => r.data?.[0]?.id).filter(Boolean);
 
                 // Nếu tất cả thành công
                 // TODO: Gửi email xác nhận
                 
-if (!isBuyNow) clearCart(); // Xóa giỏ hàng nếu không phải Buy Now
+                if (!isBuyNow) clearCart(); // Xóa giỏ hàng nếu không phải Buy Now
                 toast.success("Đặt tour thành công! Kiểm tra email để xem chi tiết.");
                 
-                // SỬA LỖI: Gửi đầy đủ thông tin mà trang Success cần
+                // SỬA LỖI (PaymentSuccess): Gửi đầy đủ thông tin
                 navigate('/booking-success', { 
                     state: { 
-                        bookingIds: successfulBookingIds, // Vẫn gửi ID
-                        method: paymentMethod,             // Gửi phương thức thanh toán
-                        branch: selectedBranch,            // Gửi chi nhánh (nếu có)
-                        deadline: formattedDeadline        // Gửi hạn thanh toán (nếu có)
+                        bookingIds: successfulBookingIds,
+                        method: paymentMethod,
+                        branch: selectedBranch,
+                        deadline: formattedDeadline
                     } 
                 });
 
-            } catch (insertError) {
+            } catch (insertError) { 
                  console.error("Lỗi insert Bookings:", insertError);
                  toast.error("Lỗi khi lưu đơn hàng. Đang thử hoàn lại chỗ...");
                  bookingErrorOccurred = true;
