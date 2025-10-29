@@ -1,5 +1,6 @@
 // src/pages/AdminManageProducts.jsx
 // (V3.2: Hoàn thiện 100% logic EditTourModal + Thêm giá Trẻ em/Sơ sinh + Chỉ fetch 'tour')
+// (V3.3: SỬA LỖI BUILD - Thay thế icon FontAwesome (Fa) bằng Phosphor)
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from 'react-router-dom';
@@ -8,8 +9,9 @@ import toast from "react-hot-toast";
 import {
     CheckSquare, Package, CaretLeft, CaretRight, CircleNotch, X, MagnifyingGlass, CalendarPlus,
     PencilLine, UploadSimple, WarningCircle, CheckCircle, Clock, XCircle, Ticket, Triangle,
-    Trash, FloppyDisk, Info, CloudArrowUp, Minus, Plus, ToggleLeft, ToggleRight, // Thêm icons
-    FaSpinner, FaSyncAlt, FaThList, FaThLarge, FaImage, FaRegSave, FaTimes
+    Trash, FloppyDisk, Info, CloudArrowUp, Minus, Plus, ToggleLeft, ToggleRight,
+    // (SỬA) Thay thế icons FontAwesome (Fa) bằng icons của Phosphor
+    Image, ArrowClockwise, List, GridFour
 } from "@phosphor-icons/react";
 import { motion } from "framer-motion";
 
@@ -613,7 +615,8 @@ export default function AdminManageProducts() {
                          onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/600x400/cccccc/ffffff?text=Image+Error'; }} />
                 ) : (
                     <div className="h-full w-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
-                        <FaImage className="text-4xl text-slate-400 dark:text-slate-500" />
+                        {/* (SỬA) Thay thế FaImage */}
+                        <Image className="text-4xl text-slate-400 dark:text-slate-500" />
                     </div>
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-90"></div>
@@ -650,7 +653,8 @@ export default function AdminManageProducts() {
                              onError={(e) => { e.target.onerror = null; e.target.style.display='none'; }}/>
                     ) : (
                         <div className="h-12 w-16 bg-slate-200 dark:bg-slate-700 flex items-center justify-center rounded-md flex-shrink-0">
-                            <FaImage className="text-2xl text-slate-400 dark:text-slate-500" />
+                            {/* (SỬA) Thay thế FaImage */}
+                            <Image className="text-2xl text-slate-400 dark:text-slate-500" />
                         </div>
                     )}
                     <div>
@@ -691,10 +695,13 @@ export default function AdminManageProducts() {
                      </div>
                      {/* Nút đổi View */}
                      <div className="flex items-center bg-slate-200 dark:bg-slate-700 rounded-lg p-1">
-                        <button onClick={() => setViewMode('list')} className={`p-2 rounded-md ${viewMode === 'list' ? 'bg-white dark:bg-slate-900 text-sky-600 shadow' : 'text-slate-600 dark:text-slate-300'}`} title="Xem dạng danh sách"><FaThList /></button>
-                        <button onClick={() => setViewMode('grid')} className={`p-2 rounded-md ${viewMode === 'grid' ? 'bg-white dark:bg-slate-900 text-sky-600 shadow' : 'text-slate-600 dark:text-slate-300'}`} title="Xem dạng lưới"><FaThLarge /></button>
+                        {/* (SỬA) Thay thế FaThList */}
+                        <button onClick={() => setViewMode('list')} className={`p-2 rounded-md ${viewMode === 'list' ? 'bg-white dark:bg-slate-900 text-sky-600 shadow' : 'text-slate-600 dark:text-slate-300'}`} title="Xem dạng danh sách"><List /></button>
+                        {/* (SỬA) Thay thế FaThLarge */}
+                        <button onClick={() => setViewMode('grid')} className={`p-2 rounded-md ${viewMode === 'grid' ? 'bg-white dark:bg-slate-900 text-sky-600 shadow' : 'text-slate-600 dark:text-slate-300'}`} title="Xem dạng lưới"><GridFour /></button>
                      </div>
-                     <button onClick={() => fetchProducts(true)} disabled={loading || isFetchingPage} className={`button-secondary flex items-center gap-2 flex-shrink-0 ${isFetchingPage ? 'opacity-50 cursor-not-allowed' : ''}`}> <FaSyncAlt className={isFetchingPage ? "animate-spin" : ""} /> Làm mới </button>
+                     {/* (SỬA) Thay thế FaSyncAlt */}
+                     <button onClick={() => fetchProducts(true)} disabled={loading || isFetchingPage} className={`button-secondary flex items-center gap-2 flex-shrink-0 ${isFetchingPage ? 'opacity-50 cursor-not-allowed' : ''}`}> <ArrowClockwise className={isFetchingPage ? "animate-spin" : ""} /> Làm mới </button>
                 </div>
             </div>
 

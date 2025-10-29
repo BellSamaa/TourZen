@@ -551,7 +551,7 @@ export default function ManageSuppliers() {
             </div>
 
             {/* Modal Form Thêm/Sửa NCC (Giữ nguyên) */}
-             {isModalOpen && ( /* ... */ )}
+             {isModalOpen && (null)}
             {/* CSS */}
             <style jsx>{`
                 /* Các class CSS dùng chung */
