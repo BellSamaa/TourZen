@@ -1,5 +1,6 @@
 // src/pages/Payment.jsx
 // (V9: Sửa lỗi 400 (Bad Request) khi insert vào Bookings)
+// (V10: Sửa lỗi logic hiển thị dịch vụ, thêm hiển thị inventory)
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -12,7 +13,8 @@ import {
     FaUserTie // Icon Người già
 } from "react-icons/fa";
 import { IoIosMail, IoIosCall } from "react-icons/io";
-import { Buildings, Ticket, CircleNotch, X } from "@phosphor-icons/react"; // Icons Phosphor
+// (SỬA) Thêm WarningCircle
+import { Buildings, Ticket, CircleNotch, X, WarningCircle } from "@phosphor-icons/react"; 
 import { getSupabase } from "../lib/supabaseClient";
 import toast from 'react-hot-toast';
 import { useAuth } from "../context/AuthContext.jsx"; // Cần user auth
@@ -251,7 +253,8 @@ export default function Payment() {
             setLoadingServices(true);
             const { data, error } = await supabase
                 .from('Products')
-                .select('id, name, price, product_type, details')
+                // (SỬA) Lấy thêm inventory
+                .select('id, name, price, product_type, details, inventory')
                 .neq('product_type', 'tour')
                 .eq('approval_status', 'approved') // <-- CHỈ LẤY ĐÃ DUYỆT
                 .eq('is_published', true); // Chỉ lấy dịch vụ đang hoạt động
@@ -260,8 +263,10 @@ export default function Payment() {
             else if (data) {
                 setAvailableServices({
                     hotels: data.filter(s => s.product_type === 'hotel'),
-                    transport: data.filter(s => s.product_type === 'car'), // Sửa: 'car'
-                    flights: data.filter(s => s.product_type === 'plane') // Sửa: 'plane'
+                    // (SỬA) Lọc đúng 'transport'
+                    transport: data.filter(s => s.product_type === 'transport'), 
+                    // (SỬA) Lọc đúng 'flight'
+                    flights: data.filter(s => s.product_type === 'flight') 
                 });
             }
             setLoadingServices(false);
@@ -706,7 +711,13 @@ export default function Payment() {
                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5"><Buildings/> Khách sạn</label>
                                                <select value={selectedHotel} onChange={(e) => setSelectedHotel(e.target.value)} className="input-style w-full">
                                                     <option value="">Không chọn</option>
-                                                    {availableServices.hotels.map(s => <option key={s.id} value={s.id}>{s.name} ({formatCurrency(s.price)})</option>)}
+                                                    {/* (SỬA) Hiển thị inventory và disable nếu hết hàng */}
+                                                    {availableServices.hotels.map(s => 
+                                                        <option key={s.id} value={s.id} disabled={s.inventory <= 0}>
+                                                            {s.name} ({formatCurrency(s.price)})
+                                                            {s.inventory <= 0 ? ' (Hết hàng)' : ` (Còn ${s.inventory})`}
+                                                        </option>
+                                                    )}
                                                </select>
                                            </div>
                                        )}
@@ -716,7 +727,13 @@ export default function Payment() {
                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5"><FaCar/> Di chuyển</label>
                                                <select value={selectedTransport} onChange={(e) => setSelectedTransport(e.target.value)} className="input-style w-full">
                                                     <option value="">Không chọn</option>
-                                                    {availableServices.transport.map(s => <option key={s.id} value={s.id}>{s.name} ({formatCurrency(s.price)})</option>)}
+                                                    {/* (SỬA) Hiển thị inventory và disable nếu hết hàng */}
+                                                    {availableServices.transport.map(s => 
+                                                        <option key={s.id} value={s.id} disabled={s.inventory <= 0}>
+                                                            {s.name} ({formatCurrency(s.price)})
+                                                            {s.inventory <= 0 ? ' (Hết hàng)' : ` (Còn ${s.inventory})`}
+                                                        </option>
+                                                    )}
                                                </select>
                                            </div>
                                        )}
@@ -726,7 +743,13 @@ export default function Payment() {
                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5"><FaPlane/> Vé máy bay</label>
                                                <select value={selectedFlight} onChange={(e) => setSelectedFlight(e.target.value)} className="input-style w-full">
                                                     <option value="">Không chọn</option>
-                                                    {availableServices.flights.map(s => <option key={s.id} value={s.id}>{s.name} ({formatCurrency(s.price)})</option>)}
+                                                    {/* (SỬA) Hiển thị inventory và disable nếu hết hàng */}
+                                                    {availableServices.flights.map(s => 
+                                                        <option key={s.id} value={s.id} disabled={s.inventory <= 0}>
+                                                            {s.name} ({formatCurrency(s.price)})
+                                                            {s.inventory <= 0 ? ' (Hết hàng)' : ` (Còn ${s.inventory})`}
+                                                        </option>
+                                                    )}
                                                </select>
                                            </div>
                                        )}

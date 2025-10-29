@@ -1,6 +1,6 @@
 // src/pages/ManageSuppliers.jsx
 // (UPGRADED: Giao diện Dashboard + Giữ logic con trong Modal)
-// (FIXED: Tính toán số liệu thống kê động)
+// (FIXED: Tính toán số liệu thống kê động + Hiển thị Inventory)
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -178,9 +178,10 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
 
     const fetchProductsForSupplier = useCallback(async () => {
         setLoading(true);
+        // (SỬA) Lấy * để bao gồm cả 'inventory'
         const { data, error } = await supabase
             .from('Products')
-            .select('*')
+            .select('*') 
             .eq('supplier_id', supplierId)
             .neq('product_type', 'tour'); 
             
@@ -252,8 +253,9 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
     const ProductIcon = ({ type }) => {
         const iconSize = 18;
         if (type === 'hotel') return <Buildings size={iconSize} title="Hotel" />;
-        if (type === 'car') return <Car size={iconSize} title="TourZenTaxi" />;
-        if (type === 'plane') return <AirplaneTilt size={iconSize} title="TourZenFlight" />;
+        // (SỬA) Sửa lại cho đúng type
+        if (type === 'transport') return <Car size={iconSize} title="TourZenTaxi" />;
+        if (type === 'flight') return <AirplaneTilt size={iconSize} title="TourZenFlight" />;
         return <Package size={iconSize} />;
     };
     const ApprovalBadge = ({ status }) => {
@@ -298,6 +300,9 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
                                     <ProductIcon type={p.product_type} />
                                     <span className="font-medium dark:text-neutral-100" title={p.description || p.name}>{p.name}</span>
                                     <span className="text-sky-600 dark:text-sky-400 font-semibold">({formatCurrency(p.price)})</span>
+                                    {/* ========== SỬA LỖI TẠI ĐÂY ========== */}
+                                    <span className="text-xs text-neutral-500 dark:text-neutral-400 font-mono">(SL: {p.inventory ?? 'N/A'})</span>
+                                    {/* ==================================== */}
                                 </div>
                                 
                                 <div className="flex items-center gap-3 flex-shrink-0">
