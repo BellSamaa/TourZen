@@ -468,20 +468,29 @@ export default function AdminManageProducts() {
             )}
 
 
-            {/* Pagination UI */}
+{/* Pagination UI */}
              {!loading && totalItems > ITEMS_PER_PAGE && (
                   <div className="flex flex-col sm:flex-row justify-between items-center mt-6 text-sm text-gray-600 dark:text-gray-400">
+                      {/* Phần hiển thị số lượng */}
                       <div> Hiển thị <span className="font-semibold dark:text-white">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> - <span className="font-semibold dark:text-white">{Math.min(currentPage * ITEMS_PER_PAGE, totalItems)}</span> / <span className="font-semibold dark:text-white">{totalItems}</span> tours </div>
+                      {/* Phần nút bấm */}
                       <div className="flex items-center gap-1 mt-3 sm:mt-0">
                            <button onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1 || isFetchingPage} className="pagination-arrow" aria-label="Trang trước"><CaretLeft weight="bold" /></button>
                            {paginationWindow.map((pageNumber, idx) => pageNumber === "..." ? ( <span key={`dots-${idx}`} className="pagination-dots">...</span> ) : (
-                               <button key={pageNumber} onClick={() => setCurrentPage(pageNumber)} disabled={isFetchingPage} className={`pagination-number ${ currentPage === pageNumber ? "pagination-active" : "" }`}>{pageNumber}</button>
+                               <button
+                                   key={pageNumber}
+                                   onClick={() => setCurrentPage(pageNumber)}
+                                   disabled={isFetchingPage}
+                                   // Đảm bảo dùng currentPage ở đây
+                                   className={`pagination-number ${ currentPage === pageNumber ? "pagination-active" : "" }`}
+                               >
+                                   {pageNumber}
+                               </button>
                            ))}
                            <button onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages || isFetchingPage} className="pagination-arrow" aria-label="Trang sau"><CaretRight weight="bold" /></button>
                       </div>
                   </div>
              )}
-
             {/* Modal Edit */}
             {modalTour && ( <EditTourModal tour={modalTour} onClose={() => setModalTour(null)} onSuccess={() => fetchProducts(false)} suppliers={suppliers} /> )}
 
