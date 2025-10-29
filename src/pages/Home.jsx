@@ -1,5 +1,5 @@
 // src/pages/Home.jsx
-// (Phiên bản cuối cùng, sửa lỗi 400 - cột 'image' không tồn tại)
+// (Phiên bản cuối cùng, sửa lỗi 400 - Dùng cột 'price')
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
@@ -97,7 +97,7 @@ const features = [
 
 /**
  * Component Thẻ Tour (Tái sử dụng)
- * (SỬA: Chỉ dùng image_url)
+ * (SỬA: Dùng 'price')
  */
 const TourCard = ({ tour, isFeatured = false }) => (
     <Link
@@ -106,20 +106,18 @@ const TourCard = ({ tour, isFeatured = false }) => (
     >
         <div className="relative h-56 w-full overflow-hidden">
             <img
-                src={tour.image_url || 'https://placehold.co/600x400/eee/ccc?text=Tour+Image'} // Chỉ dùng image_url
+                src={tour.image_url || 'https://placehold.co/600x400/eee/ccc?text=Tour+Image'}
                 alt={tour.name}
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                 onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/600x400/eee/ccc?text=No+Image'; }}
             />
             {isFeatured && (
                  <div className="absolute top-4 left-4 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg">
-                    <Fire size={14} weight="bold" />
-                    Nổi Bật
+                    <Fire size={14} weight="bold" /> Nổi Bật
                 </div>
             )}
             <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur-sm text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
-                <MapPin size={14} />
-                {tour.location || 'Việt Nam'}
+                <MapPin size={14} /> {tour.location || 'Việt Nam'}
             </div>
         </div>
         <div className="p-5 space-y-3">
@@ -127,19 +125,14 @@ const TourCard = ({ tour, isFeatured = false }) => (
                 {tour.name}
             </h3>
             <div className="flex justify-between items-center text-sm text-neutral-600 dark:text-neutral-400">
-                 <span className="flex items-center gap-1.5">
-                    <Clock size={16} className="text-sky-500" />
-                    {tour.duration || 'N/A ngày'}
-                </span>
-                <span className="flex items-center gap-1.5">
-                    <Star size={16} className="text-yellow-500" />
-                    {tour.rating?.toFixed(1) || '4.5'}
-                </span>
+                 <span className="flex items-center gap-1.5"> <Clock size={16} className="text-sky-500" /> {tour.duration || 'N/A ngày'} </span>
+                 <span className="flex items-center gap-1.5"> <Star size={16} className="text-yellow-500" /> {tour.rating?.toFixed(1) || '4.5'} </span>
             </div>
             <div className="pt-3 border-t dark:border-neutral-700 flex justify-between items-center">
                 <p className="text-xs text-neutral-500">Giá chỉ từ</p>
                 <p className="text-2xl font-extrabold text-red-600">
-                    {formatCurrency(tour.selling_price_adult || 0)}
+                    {/* (SỬA LỖI 400) Dùng 'price' */}
+                    {formatCurrency(tour.price || 0)}
                 </p>
             </div>
         </div>
@@ -168,14 +161,14 @@ export default function Home() {
             setLoading(true);
             setError(null);
             try {
-                // (SỬA LỖI 400) Bỏ cột 'image' không tồn tại
-                const queryColumns = 'id, name, location, duration, image_url, selling_price_adult, rating'; // Bỏ 'image'
+                // (SỬA LỖI 400) Dùng 'price' thay vì 'selling_price_adult'
+                const queryColumns = 'id, name, location, duration, image_url, price, rating'; // Sửa cột giá
 
                 const [featuredPromise, newestPromise] = await Promise.all([
                     supabase.rpc('get_most_booked_tours', { limit_count: 4 }),
                     supabase
                         .from('Products')
-                        .select(queryColumns) // (SỬA) Dùng queryColumns đã sửa
+                        .select(queryColumns) // (SỬA)
                         .eq('product_type', 'tour')
                         .eq('approval_status', 'approved')
                         .eq('is_published', true)
@@ -186,7 +179,6 @@ export default function Home() {
                 // Xử lý Tour Mới Nhất
                 if (newestPromise.error) {
                     console.error("Lỗi Query Tour Mới Nhất:", newestPromise.error);
-                    // (SỬA) Ném lỗi rõ ràng hơn
                     throw new Error(`Lỗi query Products: ${newestPromise.error.message}. Cột '${newestPromise.error.details?.split('"')[1]}' không tồn tại?`);
                 }
                 const allNewTours = newestPromise.data || [];
@@ -196,9 +188,9 @@ export default function Home() {
                 // Xử lý Tour Nổi Bật
                 if (featuredPromise.error) {
                     console.error("Lỗi RPC (get_most_booked_tours):", featuredPromise.error);
-                     // (SỬA) Ném lỗi rõ ràng hơn
                     throw new Error(`Lỗi RPC get_most_booked_tours: ${featuredPromise.error.message}. Hàm SQL có vấn đề hoặc cột trả về không đúng?`);
                 } else {
+                    // Dữ liệu từ RPC đã được sửa để trả về 'price' (trong lệnh SQL trước)
                     setFeaturedTours(featuredPromise.data || []);
                 }
 
@@ -218,49 +210,49 @@ export default function Home() {
     <div className="bg-slate-50 dark:bg-neutral-900 text-slate-800 dark:text-neutral-200 overflow-x-hidden">
       {/* <FlyingPlane /> */} {/* (Tùy chọn) */}
 
-      {/* SLIDE GIỚI THIỆU (SỬA: Chỉ dùng image_url) */}
+      {/* SLIDE GIỚI THIỆU */}
       <section className="relative w-full h-[90vh] -mt-[76px] text-white">
-        <Swiper
+          <Swiper
             modules={[Autoplay, Pagination, Navigation]}
             autoplay={{ delay: 5000, disableOnInteraction: false }}
             pagination={{ clickable: true }}
             navigation
-            loop={sliderTours.length > 1} // Tắt loop nếu ít slide
+            loop={sliderTours.length > 1}
             className="h-full"
-        >
-          {loading && sliderTours.length === 0 ? (
+          >
+              {loading && sliderTours.length === 0 ? (
                  <SwiperSlide>
                      <div className="h-full bg-gray-700 flex justify-center items-center"><CircleNotch size={40} className="animate-spin text-white" /></div>
                 </SwiperSlide>
-            )
-          : sliderTours.length === 0 && !loading ? (
+              )
+              : sliderTours.length === 0 && !loading ? (
                  <SwiperSlide>
                      <div className="h-full bg-gray-700 flex justify-center items-center text-gray-400">Không có tour nào để hiển thị</div>
                 </SwiperSlide>
-            )
-          : (
-            sliderTours.map((tour) => (
-            <SwiperSlide key={`slide-${tour.id}`}>
-              <div className="h-full bg-cover bg-center" style={{ backgroundImage: `url(${tour.image_url})` }}> {/* (SỬA) Chỉ dùng image_url */}
-                <div className="w-full h-full flex flex-col justify-center items-center text-center bg-black/50 p-4">
-                    <motion.h1 initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }} className="text-4xl md:text-6xl font-bold mb-4 drop-shadow-lg">
-                        {tour.name}
-                    </motion.h1>
-                    <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2 }} className="text-lg mb-6 drop-shadow-lg">
-                        <FaMapMarkerAlt className="inline mr-2" />{tour.location}
-                    </motion.p>
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8, delay: 0.4 }}>
-                        <Link to={`/tour/${tour.id}`} className="bg-sky-600 hover:bg-sky-700 text-white px-8 py-3 rounded-lg font-semibold shadow-lg transition-transform transform hover:scale-105">
-                            Khám phá ngay
-                        </Link>
-                    </motion.div>
-                </div>
-              </div>
-            </SwiperSlide>
-          ))
-          )}
-        </Swiper>
-      </section>
+              )
+              : (
+                sliderTours.map((tour) => (
+                    <SwiperSlide key={`slide-${tour.id}`}>
+                        <div className="h-full bg-cover bg-center" style={{ backgroundImage: `url(${tour.image_url})` }}>
+                            <div className="w-full h-full flex flex-col justify-center items-center text-center bg-black/50 p-4">
+                                <motion.h1 initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }} className="text-4xl md:text-6xl font-bold mb-4 drop-shadow-lg">
+                                    {tour.name}
+                                </motion.h1>
+                                <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2 }} className="text-lg mb-6 drop-shadow-lg">
+                                    <FaMapMarkerAlt className="inline mr-2" />{tour.location}
+                                </motion.p>
+                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8, delay: 0.4 }}>
+                                    <Link to={`/tour/${tour.id}`} className="bg-sky-600 hover:bg-sky-700 text-white px-8 py-3 rounded-lg font-semibold shadow-lg transition-transform transform hover:scale-105">
+                                        Khám phá ngay
+                                    </Link>
+                                </motion.div>
+                            </div>
+                        </div>
+                    </SwiperSlide>
+                ))
+              )}
+          </Swiper>
+      </section>
 
       {/* TOUR NỔI BẬT */}
       <section className="py-20">
