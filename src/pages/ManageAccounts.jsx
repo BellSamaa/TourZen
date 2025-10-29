@@ -510,11 +510,12 @@ export default function AdminManageAccounts() {
                         <table className="min-w-full">
                             <thead className="border-b-2 border-slate-100 dark:border-slate-700">
                                 <tr>
-                                    <th className="th-style-pro w-[20%]"><div className="flex items-center gap-1.5"><User size={14}/>Tên đăng nhập</div></th>
+                                    {/* === THAY ĐỔI TẠI ĐÂY: Tiêu đề cột và Độ rộng === */}
+                                    <th className="th-style-pro w-[30%]"><div className="flex items-center gap-1.5"><User size={14}/>Họ và Tên</div></th>
                                     <th className="th-style-pro w-[25%]"><div className="flex items-center gap-1.5"><At size={14}/>Email</div></th>
                                     <th className="th-style-pro w-[15%]"><div className="flex items-center gap-1.5"><ShieldCheck size={14}/>Vai trò</div></th>
-                                    <th className="th-style-pro w-[15%]"><div className="flex items-center gap-1.5"><Hourglass size={14}/>Trạng thái</div></th>
-                                    <th className="th-style-pro w-[15%]"><div className="flex items-center gap-1.5"><CalendarBlank size={14}/>Ngày tạo</div></th>
+                                    <th className="th-style-pro w-[10%]"><div className="flex items-center gap-1.5"><Hourglass size={14}/>Trạng thái</div></th>
+                                    <th className="th-style-pro w-[10%]"><div className="flex items-center gap-1.5"><CalendarBlank size={14}/>Ngày tạo</div></th>
                                     <th className="th-style-pro text-center w-[10%]">Thao tác</th>
                                 </tr>
                             </thead>
@@ -546,10 +547,12 @@ export default function AdminManageAccounts() {
                                             exit={{ opacity: 0, x: -50, transition: { duration: 0.2 } }}
                                             className="hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
                                         >
+                                            {/* === THAY ĐỔI TẠI ĐÂY: Hoán đổi full_name và username === */}
                                             <td className="td-style-pro">
-                                                <div className="font-sora font-semibold text-slate-800 dark:text-slate-100">{account.username}</div>
-                                                <div className="font-inter text-sm text-slate-500 dark:text-slate-400">{account.full_name}</div>
+                                                <div className="font-sora font-semibold text-slate-800 dark:text-slate-100">{account.full_name}</div>
+                                                <div className="font-inter text-sm text-slate-500 dark:text-slate-400">ID: {account.username}</div>
                                             </td>
+                                            
                                             <td className="td-style-pro font-inter text-slate-600 dark:text-slate-400">{account.email}</td>
                                             <td className="td-style-pro">
                                                 <span className="badge-pro">

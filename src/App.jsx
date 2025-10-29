@@ -1,5 +1,5 @@
 // src/App.jsx
-// (ĐÃ SỬA: Tạo các component giả (mock) để file có thể biên dịch độc lập)
+// (ĐÃ SỬA: Sửa lỗi cú pháp JSX <DummyPage(...) /> và thêm route con cho Supplier)
 
 import React from "react";
 // SỬA: Thêm useLocation
@@ -11,42 +11,16 @@ import { AnimatePresence, motion } from "framer-motion";
 // import Navbar from "./components/Navbar.jsx";
 // import Footer from "./components/Footer.jsx";
 // import ScrollToTop from "./components/ScrollToTop.jsx";
-// import Home from "./pages/Home.jsx";
-// import TourList from "./pages/TourList.jsx";
-// import TourDetail from "./pages/TourDetail.jsx";
-// import Payment from "./pages/Payment.jsx";
-// import PaymentSuccess from "./pages/PaymentSuccess.jsx";
-// import Cart from "./pages/Cart.jsx";
-// import Login from "./pages/Login.jsx";
-// import About from "./pages/About.jsx";
-// import Services from "./pages/Services.jsx";
-// import MyBookings from "./pages/MyBookings.jsx";
-// import PromotionPage from "./pages/PromotionPage.jsx";
-// import NotFound from "./pages/NotFound.jsx";
+// ... (tất cả các import khác) ...
 
 // === 2. IMPORT LAYOUT VÀ CÁC TRANG ADMIN ===
-// SỬA: Đã comment out các import và tạo component giả bên dưới
-// import AdminDashboard from "./pages/AdminDashboard.jsx"; // Layout Admin
-// import SupplierDashboard from "./pages/SupplierDashboard.jsx"; // Layout NCC
-// import DashboardHome from './pages/DashboardHome.jsx';
-// import Reports from './pages/Reports.jsx';
-// import AdminManageProducts from './pages/AdminManageProducts.jsx';
-// import ManageTour from './pages/ManageTour.jsx';
-// import ManageCustomers from './pages/ManageCustomers.jsx';
-// import ManageSuppliers from './pages/ManageSuppliers.jsx';
-// import ManageAccounts from './pages/ManageAccounts.jsx';
+// ... (tất cả các import khác) ...
 
 // Context Providers
-// SỬA: Đã comment out các import và tạo component giả bên dưới
-// import { CartProvider } from "./context/CartContext.jsx";
-// import { AuthProvider } from "./context/AuthContext.jsx";
+// ... (tất cả các import khác) ...
 
 // CSS Imports
-// SỬA: Comment out vì các file này không tồn tại trong môi trường preview
-// import "swiper/css";
-// import "swiper/css/navigation";
-// import "swiper/css/pagination";
-// import "./index.css";
+// ... (tất cả các import khác) ...
 
 
 // =================================================================
@@ -149,8 +123,8 @@ const SupplierDashboard = () => (
              </nav>
         </aside>
         <main className="flex-1 p-6 bg-gray-100 dark:bg-neutral-800">
-            {/* Giả lập Outlet hoặc trang mặc định */}
-            <DummyPage("Supplier Dashboard") />
+            {/* SỬA LỖI: Dùng Outlet để render route con (giống AdminDashboard) */}
+            <Outlet />
         </main>
     </div>
 );
@@ -163,6 +137,10 @@ const ManageTour = DummyPage("ManageTour (Bookings)");
 const ManageCustomers = DummyPage("ManageCustomers");
 const ManageSuppliers = DummyPage("ManageSuppliers");
 const ManageAccounts = DummyPage("ManageAccounts");
+
+// SỬA: Thêm trang giả cho Supplier
+const SupplierDashboardHome = DummyPage("Supplier Dashboard Home");
+
 
 // Context Providers
 const CartProvider = ({ children }) => <>{children}</>;
@@ -255,9 +233,11 @@ export default function App() {
                     </Route>
 
                     {/* 2. Supplier Dashboard Routes */}
-                    <Route path="/supplier/*" element={<SupplierDashboard />}> {/* Vẫn giữ /* */}
-                         {/* Các route con của supplier sẽ nằm trong SupplierDashboard.jsx (thông qua Outlet) */}
-                         {/* (Các route con giả lập sẽ được render bởi Outlet trong SupplierDashboard) */}
+                    {/* SỬA LỖI: Thêm các route con giả lập cho Supplier */}
+                    <Route path="/supplier/*" element={<SupplierDashboard />}>
+                         <Route index element={<Navigate to="dashboard" replace />} />
+                         <Route path="dashboard" element={<SupplierDashboardHome />} />
+                         <Route path="*" element={<AdminNotFound />} /> 
                     </Route>
 
                 </Routes>
@@ -301,4 +281,3 @@ function AdminNotFound() {
     </div>
   );
 }
-

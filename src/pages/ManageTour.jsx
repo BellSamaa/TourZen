@@ -1,5 +1,6 @@
 // src/pages/ManageTour.jsx
 // (V6: Cho phép Admin sửa chi tiết đơn hàng (các trường an toàn))
+// (V7: Sửa logic tải dịch vụ & style nút trạng thái modal)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -293,21 +294,39 @@ const EditBookingModal = ({
                             <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="hotel_product_id_edit"><Buildings size={18}/> Khách sạn:</label>
                             <select id="hotel_product_id_edit" name="hotel_product_id" value={formData.hotel_product_id} onChange={handleChange} className="input-style w-full mt-1">
                                 <option value="">Không chọn</option>
-                                {allServices.hotels.map(s => <option key={s.id} value={s.id}>{s.name} ({formatCurrency(s.price)})</option>)}
+                                {/* (SỬA) Hiển thị inventory giống Payment.jsx */}
+                                {allServices.hotels.map(s => 
+                                    <option key={s.id} value={s.id} disabled={s.inventory <= 0}>
+                                        {s.name} ({formatCurrency(s.price)})
+                                        {s.inventory <= 0 ? ' (Hết hàng)' : ` (Còn ${s.inventory})`}
+                                    </option>
+                                )}
                             </select>
                         </div>
                         <div>
                             <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="transport_product_id_edit"><Car size={18}/> Vận chuyển:</label>
                             <select id="transport_product_id_edit" name="transport_product_id" value={formData.transport_product_id} onChange={handleChange} className="input-style w-full mt-1">
                                 <option value="">Không chọn</option>
-                                {allServices.transport.map(s => <option key={s.id} value={s.id}>{s.name} ({formatCurrency(s.price)})</option>)}
+                                {/* (SỬA) Hiển thị inventory giống Payment.jsx */}
+                                {allServices.transport.map(s => 
+                                    <option key={s.id} value={s.id} disabled={s.inventory <= 0}>
+                                        {s.name} ({formatCurrency(s.price)})
+                                        {s.inventory <= 0 ? ' (Hết hàng)' : ` (Còn ${s.inventory})`}
+                                    </option>
+                                )}
                             </select>
                         </div>
                         <div>
                             <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="flight_product_id_edit"><AirplaneTilt size={18}/> Chuyến bay:</label>
                             <select id="flight_product_id_edit" name="flight_product_id" value={formData.flight_product_id} onChange={handleChange} className="input-style w-full mt-1">
                                 <option value="">Không chọn</option>
-                                {allServices.flights.map(s => <option key={s.id} value={s.id}>{s.name} ({formatCurrency(s.price)})</option>)}
+                                {/* (SỬA) Hiển thị inventory giống Payment.jsx */}
+                                {allServices.flights.map(s => 
+                                    <option key={s.id} value={s.id} disabled={s.inventory <= 0}>
+                                        {s.name} ({formatCurrency(s.price)})
+                                        {s.inventory <= 0 ? ' (Hết hàng)' : ` (Còn ${s.inventory})`}
+                                    </option>
+                                )}
                             </select>
                         </div>
                         <div>
@@ -329,13 +348,46 @@ const EditBookingModal = ({
                         <input id="total_price_edit" name="total_price" type="number" value={formData.total_price} onChange={handleChange} className="input-style w-48 !text-2xl font-bold !text-red-600 dark:!text-red-400 text-right" />
                      </div>
 
-                     {/* Thay đổi trạng thái (Giữ nguyên) */}
+                     {/* (SỬA) Thay đổi trạng thái (Style mới) */}
                      <div className="pt-5 border-t dark:border-slate-700">
-                        <label className="label-modal text-base font-semibold mb-2">Cập nhật trạng thái (Hành động riêng):</label>
-                        <div className="flex flex-wrap gap-3 mt-1">
-                             <button onClick={() => handleLocalStatusChange('confirmed')} disabled={booking.status === 'confirmed'} className="button-status bg-green-600 hover:bg-green-700 ..."> <CheckCircle weight="bold"/> Xác nhận </button>
-                             <button onClick={() => handleLocalStatusChange('cancelled')} disabled={booking.status === 'cancelled'} className="button-status bg-red-600 hover:bg-red-700 ..."> <XCircle weight="bold"/> Hủy đơn </button>
-                             <button onClick={() => handleLocalStatusChange('pending')} disabled={booking.status === 'pending'} className="button-status bg-gray-500 hover:bg-gray-600 ..."> <Clock weight="bold"/> Đặt lại Chờ xử lý </button>
+                        <label className="label-modal text-base font-semibold mb-2">Cập nhật trạng thái:</label>
+                        <div className="flex flex-col sm:flex-row gap-3 mt-1">
+                             {/* Option 1: Confirmed */}
+                             <button 
+                                onClick={() => handleLocalStatusChange('confirmed')} 
+                                disabled={booking.status === 'confirmed'} 
+                                className={`flex-1 button-status-base ${
+                                    booking.status === 'confirmed' 
+                                    ? 'bg-green-600 text-white shadow-inner' 
+                                    : 'bg-white dark:bg-slate-700 hover:bg-green-50 dark:hover:bg-green-900/30 border border-green-500 text-green-600 dark:text-green-400'
+                                }`}
+                             > 
+                                <CheckCircle weight="bold"/> Xác nhận 
+                             </button>
+                             {/* Option 2: Pending */}
+                             <button 
+                                onClick={() => handleLocalStatusChange('pending')} 
+                                disabled={booking.status === 'pending'} 
+                                className={`flex-1 button-status-base ${
+                                    booking.status === 'pending' 
+                                    ? 'bg-gray-500 text-white shadow-inner' 
+                                    : 'bg-white dark:bg-slate-700 hover:bg-gray-50 dark:hover:bg-gray-900/30 border border-gray-500 text-gray-600 dark:text-gray-400'
+                                }`}
+                             > 
+                                <Clock weight="bold"/> Chờ xử lý 
+                             </button>
+                             {/* Option 3: Cancelled */}
+                             <button 
+                                onClick={() => handleLocalStatusChange('cancelled')} 
+                                disabled={booking.status === 'cancelled'} 
+                                className={`flex-1 button-status-base ${
+                                    booking.status === 'cancelled' 
+                                    ? 'bg-red-600 text-white shadow-inner' 
+                                    : 'bg-white dark:bg-slate-700 hover:bg-red-50 dark:hover:bg-red-900/30 border border-red-500 text-red-600 dark:text-red-400'
+                                }`}
+                             > 
+                                <XCircle weight="bold"/> Hủy đơn 
+                             </button>
                         </div>
                         {booking.status === 'confirmed' && booking.user?.email && (
                             <button onClick={() => sendConfirmationEmail(booking.user.email)} className="button-secondary text-sm mt-4 flex items-center gap-1.5"> <Envelope/> Gửi lại email xác nhận </button>
@@ -354,7 +406,8 @@ const EditBookingModal = ({
             <style jsx>{`
                  .label-modal { @apply font-medium text-gray-500 dark:text-gray-400 block text-xs uppercase tracking-wider mb-0.5; }
                  .value-modal { @apply text-gray-800 dark:text-white text-base; }
-                 .button-status { @apply flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white rounded-md transition-all duration-200 transform hover:-translate-y-0.5 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed; }
+                 /* (SỬA) Style mới cho nút trạng thái */
+                 .button-status-base { @apply flex items-center justify-center gap-1.5 px-4 py-3 text-sm font-semibold rounded-md transition-all duration-200 disabled:opacity-100 disabled:cursor-not-allowed min-w-[120px]; }
                  .simple-scrollbar::-webkit-scrollbar { width: 6px; }
                  .simple-scrollbar::-webkit-scrollbar-track { background: transparent; }
                  .simple-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -652,18 +705,21 @@ export default function ManageTour() {
                 if (toursError) throw toursError;
                 setAllTours(toursData || []);
                 
-                // --- (MỚI) Fetch Services (approved) ---
+                // --- (MỚI/SỬA) Fetch Services (approved) ---
                 const { data: servicesData, error: servicesError } = await supabase
                     .from('Products')
-                    .select('id, name, price, product_type, details')
-                    .in('product_type', ['hotel', 'car', 'plane']) // Giả sử type là 'car', 'plane'
+                    // (SỬA) Lấy thêm inventory
+                    .select('id, name, price, product_type, details, inventory')
+                    // (SỬA) Lọc đúng product_type
+                    .in('product_type', ['hotel', 'transport', 'flight']) 
                     .eq('approval_status', 'approved')
                     .eq('is_published', true);
                 if (servicesError) throw servicesError;
                 setAllServices({
+                    // (SỬA) Lọc đúng product_type
                     hotels: servicesData.filter(s => s.product_type === 'hotel'),
-                    transport: servicesData.filter(s => s.product_type === 'car'),
-                    flights: servicesData.filter(s => s.product_type === 'plane')
+                    transport: servicesData.filter(s => s.product_type === 'transport'),
+                    flights: servicesData.filter(s => s.product_type === 'flight')
                 });
                 
             } catch (err) {
