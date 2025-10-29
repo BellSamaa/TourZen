@@ -343,7 +343,7 @@ export default function ProductModal({ show, onClose, onSuccess, productToEdit, 
                      const { error: upsertError } = await supabase
                          .from('Departures')
                          .upsert(departuresToUpsert, { onConflict: 'id' })
-                         .select('id'); // <-- SỬA LỖI: Thêm .select('id')
+                         .select(); 
                          
                      if (upsertError) throw upsertError;
                 }
