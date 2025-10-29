@@ -333,17 +333,16 @@ export default function ManageTour() {
 
             let query = supabase
                 .from('Bookings')
-                .select(`
+                   .select(`
                     id, created_at, departure_date, status, total_price, quantity,
                     num_adult, num_child, num_elder, num_infant, departure_id,
                     user:user_id ( id, full_name, email ),
-                    product:product_id ( id, name, image_url ), /* Lấy thêm image_url */
+                    product:product_id ( id, name, image_url ), // <-- ĐÃ XÓA COMMENT
                     hotel:hotel_product_id (id, name),
                     transport:transport_product_id (id, name),
                     flight:flight_product_id (id, name),
                     voucher_code, voucher_discount, notes, payment_method
-                `, { count: 'exact' }); // Lấy count để phân trang
-
+                `, { count: 'exact' });
             // Apply filter
             if (filterStatus !== 'all') {
                 query = query.eq('status', filterStatus);
