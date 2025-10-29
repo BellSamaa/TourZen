@@ -488,7 +488,7 @@ export default function Payment() {
 
             // Thêm vào DB (sẽ chạy đồng loạt)
             bookingPromises.push(
-                supabase.from('Bookings').insert(bookingPayload).select('id').single()
+                supabase.from('Bookings').insert(bookingPayload).select().single()
             );
         } // Hết vòng lặp
 
