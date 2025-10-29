@@ -1,18 +1,16 @@
 // src/pages/AdminManageProducts.jsx
-// (V3.1: Khôi phục JSX + Nâng cấp nút Sửa)
+// (V3.2: Hoàn thiện 100% logic EditTourModal + Thêm giá Trẻ em/Sơ sinh + Chỉ fetch 'tour')
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from 'react-router-dom';
 import { getSupabase } from "../lib/supabaseClient";
 import toast from "react-hot-toast";
-import { FaSpinner, FaSyncAlt, FaThList, FaThLarge, FaImage, FaRegSave, FaTimes, FaMinus, FaPlus } from "react-icons/fa"; // Bổ sung icon cần thiết
 import {
     CheckSquare, Package, CaretLeft, CaretRight, CircleNotch, X, MagnifyingGlass, CalendarPlus,
-    PencilLine, UploadSimple, WarningCircle, CheckCircle, Clock, XCircle, Ticket, Triangle, // Icons Phosphor
-    Trash, FloppyDisk, Info // Thêm icons
+    PencilLine, UploadSimple, WarningCircle, CheckCircle, Clock, XCircle, Ticket, Triangle,
+    Trash, FloppyDisk, Info, CloudArrowUp, Minus, Plus, ToggleLeft, ToggleRight, // Thêm icons
+    FaSpinner, FaSyncAlt, FaThList, FaThLarge, FaImage, FaRegSave, FaTimes
 } from "@phosphor-icons/react";
-
-// (Giả định) Thêm motion từ framer-motion nếu component Modal có dùng
 import { motion } from "framer-motion";
 
 const supabase = getSupabase();
@@ -80,8 +78,7 @@ const SlotSummary = ({ departures }) => {
     );
 };
 
-
-// --- (KHÔI PHỤC ĐẦY ĐỦ) Component con DeparturesManager ---
+// --- Component con DeparturesManager (Giữ nguyên) ---
 const DeparturesManager = ({ tourId }) => {
     const [departures, setDepartures] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -141,7 +138,6 @@ const DeparturesManager = ({ tourId }) => {
         if (type === 'number') { finalValue = name === 'max_slots' ? parseInt(value) || 0 : parseFloat(value) || 0; }
         setEditingRow(prev => ({ ...prev, [name]: finalValue }));
     };
-    // Hàm format tiền tệ (cần thiết cho hiển thị)
     const formatCurrency = (num) => {
         if (typeof num !== 'number' || isNaN(num)) return "0 ₫";
         return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(num);
@@ -216,34 +212,121 @@ const DeparturesManager = ({ tourId }) => {
 // --- KẾT THÚC KHÔI PHỤC ---
 
 
-// --- (KHÔI PHỤC ĐẦY ĐỦ) Modal Chỉnh sửa Tour ---
-// (Lưu ý: Các hàm xử lý bên trong vẫn đang ở dạng /* ... */ như file gốc bạn cung cấp)
+// ====================================================================
+// --- (SỬA LỚN) Modal Chỉnh sửa Tour (Hoàn thiện logic) ---
+// ====================================================================
 const EditTourModal = ({ tour, onClose, onSuccess, suppliers }) => {
     const [formData, setFormData] = useState({
-        name: '', description: '', price: 0, location: '', duration: '',
-        supplier_id: '', image_url: '', tour_code: '',
-        itinerary: [],
+        name: '', description: '', price: 0, child_price: 0, infant_price: 0, // <-- (SỬA) Thêm giá
+        location: '', duration: '', supplier_id: '', image_url: '', tour_code: '',
+        itinerary: [{ title: 'Ngày 1', content: '' }],
     });
+    
+    // (SỬA) State riêng cho is_published vì nó là nút toggle
+    const [isPublished, setIsPublished] = useState(false);
+
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
 
     useEffect(() => {
-        setFormData({
-            name: tour.name || '', description: tour.description || '', price: tour.price || 0,
-            location: tour.location || '', duration: tour.duration || '', supplier_id: tour.supplier_id || '',
-            image_url: tour.image_url || '', tour_code: tour.tour_code || '',
-            itinerary: Array.isArray(tour.itinerary) ? tour.itinerary.map((item, index) => (
-                typeof item === 'string' ? { title: `Ngày ${index + 1}`, content: item } : { title: item.title || `Ngày ${index + 1}`, content: item.content || item }
-            )) : [{ title: 'Ngày 1', content: '' }],
-        });
-    }, [tour]);
+        if (tour) {
+            setFormData({
+                name: tour.name || '', description: tour.description || '',
+                price: tour.price || 0,
+                child_price: tour.child_price || 0, // (SỬA)
+                infant_price: tour.infant_price || 0, // (SỬA)
+                location: tour.location || '', duration: tour.duration || '',
+                supplier_id: tour.supplier_id || (suppliers.length > 0 ? suppliers[0].id : ''),
+                image_url: tour.image_url || '', tour_code: tour.tour_code || '',
+                // Xử lý itinerary: đảm bảo là array of objects
+                itinerary: Array.isArray(tour.itinerary) && tour.itinerary.length > 0
+                    ? tour.itinerary.map((item, index) => {
+                        if (typeof item === 'string') {
+                            return { title: `Ngày ${index + 1}`, content: item };
+                        }
+                        return { title: item.title || `Ngày ${index + 1}`, content: item.content || '' };
+                    })
+                    : [{ title: 'Ngày 1', content: '' }],
+            });
+            setIsPublished(tour.is_published || false);
+        }
+    }, [tour, suppliers]);
 
-    const handleChange = (e) => { /* ... (Chưa định nghĩa) ... */ };
-    const handleItineraryChange = (index, field, value) => { /* ... (Chưa định nghĩa) ... */ };
-    const addItineraryItem = () => { /* ... (Chưa định nghĩa) ... */ };
-    const removeItineraryItem = (index) => { /* ... (Chưa định nghĩa) ... */ };
-    const handleImageUpload = async (e) => { /* ... (Chưa định nghĩa) ... */ };
-    const handleSubmit = async (e) => { /* ... (Chưa định nghĩa) ... */ };
+    // --- (SỬA) Hoàn thiện các Handlers ---
+
+    const handleChange = (e) => {
+        const { name, value, type } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: type === 'number' ? parseFloat(value) || 0 : value
+        }));
+    };
+
+    const handleItineraryChange = (index, field, value) => {
+        const newItinerary = [...formData.itinerary];
+        newItinerary[index] = { ...newItinerary[index], [field]: value };
+        setFormData(prev => ({ ...prev, itinerary: newItinerary }));
+    };
+
+    const addItineraryItem = () => {
+        setFormData(prev => ({ ...prev, itinerary: [...prev.itinerary, { title: `Ngày ${prev.itinerary.length + 1}`, content: '' }] }));
+    };
+
+    const removeItineraryItem = (index) => {
+        if (formData.itinerary.length <= 1) {
+            toast.error("Phải có ít nhất 1 ngày trong lịch trình.");
+            return;
+        }
+        setFormData(prev => ({ ...prev, itinerary: prev.itinerary.filter((_, i) => i !== index) }));
+    };
+
+    const handleImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        setUploading(true);
+        const toastId = toast.loading("Đang tải ảnh lên...");
+        const fileName = `tour_${Date.now()}_${file.name}`;
+        
+        const { error } = await supabase.storage
+            .from("product-images") // Giả định bucket là 'product-images'
+            .upload(fileName, file);
+            
+        if (error) {
+            toast.error("Lỗi upload ảnh: " + error.message, { id: toastId });
+        } else {
+            // (SỬA) Lấy URL public chính xác
+            const { data } = supabase.storage.from('product-images').getPublicUrl(fileName);
+            const url = data.publicUrl;
+            setFormData((prev) => ({ ...prev, image_url: url }));
+            toast.success("Tải ảnh thành công!", { id: toastId });
+        }
+        setUploading(false);
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        
+        const dataToSave = {
+            ...formData,
+            is_published: isPublished // (SỬA) Lấy từ state riêng
+        };
+        
+        const { error } = await supabase
+            .from('Products')
+            .update(dataToSave)
+            .eq('id', tour.id);
+
+        if (error) {
+            toast.error("Lỗi cập nhật: " + error.message);
+        } else {
+            toast.success("Cập nhật tour thành công!");
+            onSuccess(); // Tải lại danh sách
+            onClose(); // Đóng modal
+        }
+        setLoading(false);
+    };
+    // --- Kết thúc Handlers ---
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-40 flex justify-center items-center p-4">
@@ -253,172 +336,275 @@ const EditTourModal = ({ tour, onClose, onSuccess, suppliers }) => {
             >
                 <div className="flex justify-between items-center p-4 border-b dark:border-neutral-700 flex-shrink-0">
                     <h3 className="text-xl font-semibold dark:text-white">
-                        {tour.is_published ? 'Chỉnh sửa Tour đã đăng' : 'Hoàn thiện & Đăng Tour'}
+                        {isPublished ? 'Chỉnh sửa Tour đã đăng' : 'Hoàn thiện & Đăng Tour'}
                     </h3>
                     <button onClick={onClose} disabled={loading || uploading} className="text-gray-400 p-2 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-50"><X size={20}/></button>
                 </div>
-                <div className="flex-1 flex flex-col overflow-hidden">
-                    <form id="main-tour-form" onSubmit={handleSubmit} className="overflow-y-auto p-6 space-y-5">
-                        {/* Thông tin cơ bản */}
-                        <fieldset className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                           {/* ... Inputs cho name, tour_code, price, location, duration, supplier_id ... */}
-                           <p className="text-center col-span-full">(Các trường input cho form chính ở đây)</p>
-                        </fieldset>
-                        {/* Ảnh */}
+                
+                <form id="main-tour-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
+                    {/* Thông tin cơ bản */}
+                    <fieldset className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="md:col-span-2">
+                            <label className="label-style">Tên Tour *</label>
+                            <input type="text" name="name" value={formData.name} onChange={handleChange} required className="input-style" />
+                        </div>
                         <div>
-                           {/* ... Input URL + Nút Tải lên + Ảnh preview ... */}
+                            <label className="label-style">Mã Tour</label>
+                            <input type="text" name="tour_code" value={formData.tour_code} onChange={handleChange} className="input-style" />
                         </div>
-                        {/* Mô tả */}
-                        <div> {/* ... Textarea Mô tả ... */} </div>
-                        {/* Lịch trình */}
-                        <div className="border-t pt-4 dark:border-neutral-700">
-                           {/* ... JSX Lịch trình (map, input, textarea, nút xóa/thêm) ... */}
+                        
+                        {/* (SỬA) Thêm 3 trường giá */}
+                        <div>
+                            <label className="label-style">Giá Người lớn (VNĐ) *</label>
+                            <input type="number" name="price" value={formData.price} onChange={handleChange} required className="input-style" min="0" />
                         </div>
-                        {/* Quản lý Lịch khởi hành */}
-                        <div className="border-t pt-4 dark:border-neutral-700">
-                            <DeparturesManager tourId={tour.id} />
+                        <div>
+                            <label className="label-style">Giá Trẻ em (VNĐ)</label>
+                            <input type="number" name="child_price" value={formData.child_price} onChange={handleChange} className="input-style" min="0" />
                         </div>
-                    </form>
-                    <div className="p-4 border-t dark:border-neutral-700 flex justify-end gap-3 bg-gray-50 dark:bg-neutral-800 rounded-b-lg flex-shrink-0">
-                        {/* ... Nút Hủy và Lưu/Đăng ... */}
-                        <button type="button" onClick={onClose} className="modal-button-secondary">Hủy</button>
-                        <button type="submit" form="main-tour-form" className="modal-button-primary">Lưu và Đăng</button>
+                        <div>
+                            <label className="label-style">Giá Sơ sinh (VNĐ)</label>
+                            <input type="number" name="infant_price" value={formData.infant_price} onChange={handleChange} className="input-style" min="0" />
+                            <p className="text-xs text-neutral-500 mt-1">Lưu ý: Trẻ dưới 40cm (0 VNĐ) sẽ được free.</p>
+                        </div>
+
+                        <div>
+                            <label className="label-style">Địa điểm</label>
+                            <input type="text" name="location" value={formData.location} onChange={handleChange} className="input-style" />
+                        </div>
+                        <div>
+                            <label className="label-style">Thời lượng (VD: 3N2Đ)</label>
+                            <input type="text" name="duration" value={formData.duration} onChange={handleChange} className="input-style" />
+                        </div>
+                        <div>
+                           <label className="label-style">Nhà cung cấp *</label>
+                           <select name="supplier_id" value={formData.supplier_id} onChange={handleChange} required className="input-style">
+                                <option value="">-- Chọn NCC --</option>
+                                {suppliers.map((s) => ( <option key={s.id} value={s.id}>{s.name}</option> )) }
+                           </select>
+                        </div>
+                    </fieldset>
+                    
+                    {/* (SỬA) Ảnh */}
+                    <div>
+                        <label className="label-style">Ảnh minh họa (URL hoặc Tải lên)</label>
+                        <div className="flex items-center gap-2">
+                            <input type="text" name="image_url" placeholder="https://..." value={formData.image_url} onChange={handleChange} className="input-style flex-1"/>
+                            <label className="modal-button-secondary px-3 py-2 cursor-pointer whitespace-nowrap flex items-center gap-2">
+                                <CloudArrowUp size={18} />
+                                {uploading ? <CircleNotch size={18} className="animate-spin" /> : "Tải lên"}
+                                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploading} />
+                            </label>
+                        </div>
+                        {formData.image_url && ( <img src={formData.image_url} alt="Preview" className="mt-2 rounded-lg w-40 h-28 object-cover border dark:border-neutral-600 shadow-sm"/> )}
+                    </div>
+                    
+                    {/* (SỬA) Mô tả */}
+                    <div>
+                        <label className="label-style">Mô tả Tour</label>
+                        <textarea name="description" value={formData.description} onChange={handleChange} className="input-style h-24" placeholder="Mô tả ngắn gọn..."/>
+                    </div>
+                    
+                    {/* (SỬA) Lịch trình */}
+                    <div className="border-t pt-4 dark:border-neutral-700">
+                        <h4 className="text-lg font-semibold mb-2 dark:text-white">Lịch trình chi tiết (Theo ngày)</h4>
+                        <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                            {formData.itinerary.map((item, index) => (
+                                <div key={index} className="flex flex-col sm:flex-row gap-2 p-3 border rounded-md dark:border-neutral-600 bg-gray-50 dark:bg-neutral-700/50">
+                                    <input type="text" placeholder="Tiêu đề (VD: Ngày 1)" value={item.title} onChange={(e) => handleItineraryChange(index, 'title', e.target.value)} className="input-style sm:w-1/3 font-medium !py-1.5" />
+                                    <textarea placeholder="Nội dung hoạt động..." value={item.content} onChange={(e) => handleItineraryChange(index, 'content', e.target.value)} rows="2" className="input-style flex-1 resize-y !py-1.5"></textarea>
+                                    <button type="button" onClick={() => removeItineraryItem(index)} className="button-icon-red self-center" title="Xóa ngày"><Minus size={14} /></button>
+                                </div>
+                            ))}
+                        </div>
+                        <button type="button" onClick={addItineraryItem} className="mt-2 text-sm text-sky-600 flex items-center gap-1 hover:underline"><Plus size={14} /> Thêm ngày</button>
+                    </div>
+
+                    {/* Quản lý Lịch khởi hành */}
+                    <div className="border-t pt-4 dark:border-neutral-700">
+                        <DeparturesManager tourId={tour.id} />
+                    </div>
+                </form>
+                
+                <div className="p-4 border-t dark:border-neutral-700 flex justify-between items-center gap-3 bg-gray-50 dark:bg-neutral-800 rounded-b-lg flex-shrink-0">
+                    {/* (SỬA) Nút Bật/Tắt Publish */}
+                    <button 
+                        type="button"
+                        onClick={() => setIsPublished(!isPublished)}
+                        title={isPublished ? "Bấm để Ẩn tour" : "Bấm để Hiển thị tour"}
+                        className={`font-semibold text-sm px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${isPublished ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                    >
+                        {isPublished ? <ToggleRight weight="fill" size={20} /> : <ToggleLeft size={20} />}
+                        {isPublished ? 'Đang Hiển Thị' : 'Đã Ẩn'}
+                    </button>
+                    
+                    <div className="flex gap-3">
+                        <button type="button" onClick={onClose} disabled={loading} className="modal-button-secondary">Hủy</button>
+                        <button type="submit" form="main-tour-form" disabled={loading || uploading} className="modal-button-primary flex items-center gap-2">
+                            {loading && <CircleNotch size={18} className="animate-spin" />}
+                            Lưu
+                        </button>
                     </div>
                 </div>
             </motion.div>
         </div>
     );
 };
-// --- KẾT THÚC KHÔI PHỤC ---
+// --- KẾT THÚC SỬA ---
 
 
 // --- Component chính: Quản lý Sản phẩm (Tour) ---
 export default function AdminManageProducts() {
-    // ... (state giữ nguyên) ...
+    // ... (Các state giữ nguyên) ...
     const [products, setProducts] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
     const [loading, setLoading] = useState(true);
-    
-    // --- (SỬA) Bổ sung các state bị thiếu ---
     const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
-    const [viewMode, setViewMode] = useState('list'); // 'list' or 'grid'
-    const [modalTour, setModalTour] = useState(null); // State cho modal
-    
-    // State cho Pagination
+    const [viewMode, setViewMode] = useState('list'); 
+    const [modalTour, setModalTour] = useState(null); 
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(0);
     const [totalItems, setTotalItems] = useState(0);
-    const [isFetchingPage, setIsFetchingPage] = useState(false); // Loading khi chuyển trang/search
-    
-    // Hằng số và Debounce
+    const [isFetchingPage, setIsFetchingPage] = useState(false);
     const ITEMS_PER_PAGE = 10;
     const debouncedSearch = useDebounce(searchTerm, 500);
-    // --- Kết thúc SỬA ---
 
-
-    // --- fetchProducts (Giữ nguyên - Giả định hàm này đã hoàn chỉnh) ---
-  // --- fetchProducts (SỬA LẠI ĐẦY ĐỦ LOGIC) ---
+    // --- (SỬA) fetchProducts: Bỏ "Tour" ra khỏi logic, vì trang này CHỈ DÀNH CHO TOUR ---
     const fetchProducts = useCallback(async (isInitialLoad = false) => {
         if (isInitialLoad) setLoading(true);
         setIsFetchingPage(true);
         setError(null);
 
         try {
-            // Tính toán phân trang
             const from = (currentPage - 1) * ITEMS_PER_PAGE;
             const to = from + ITEMS_PER_PAGE - 1;
 
-            // --- Bắt đầu Supabase Query ---
             let query = supabase
                 .from('Products')
                 .select(`
                     id, name, tour_code, image_url, location, duration,
+                    price, child_price, infant_price, itinerary,
                     approval_status, is_published, supplier_id,
                     supplier:supplier_id ( name ), 
                     Departures ( id, departure_date, max_slots, booked_slots )
-                `, { count: 'exact' }) // 'exact' để lấy tổng số lượng (totalItems)
-                .order('created_at', { ascending: false }) // Sắp xếp theo mới nhất
-                .range(from, to); // Phân trang
+                `, { count: 'exact' })
+                .eq('product_type', 'tour') // <-- (SỬA) Chỉ lấy 'tour'
+                .order('created_at', { ascending: false })
+                .range(from, to);
 
-            // Thêm logic tìm kiếm (search)
             if (debouncedSearch) {
-                // Tìm theo tên tour (name) hoặc mã tour (tour_code)
                 query = query.or(`name.ilike.%${debouncedSearch}%,tour_code.ilike.%${debouncedSearch}%`);
-                
-                // Nếu muốn tìm cả theo tên NCC (cần query phức tạp hơn hoặc query suppliers trước)
-                // Hiện tại chúng ta chỉ tìm theo 2 trường trên
             }
             
-            // --- Thực thi Query ---
             const { data, error: queryError, count } = await query;
-            // --- Kết thúc Query ---
-
-            if (queryError) {
-                throw queryError;
+            if (queryError) throw queryError;
+            
+            // (SỬA) Fetch suppliers riêng
+            if (isInitialLoad) {
+                const { data: supData, error: supError } = await supabase.from('Suppliers').select('id, name');
+                if (supError) throw supError;
+                setSuppliers(supData || []);
             }
 
-            // --- (QUAN TRỌNG) Cập nhật state với dữ liệu thật ---
             setProducts(data || []);
             setTotalItems(count || 0);
             setTotalPages(Math.ceil((count || 0) / ITEMS_PER_PAGE));
-            // --- (HẾT QUAN TRỌNG) ---
 
         } catch (error) {
             console.error("Lỗi fetch products:", error);
             setError(error.message);
             toast.error("Tải sản phẩm thất bại: " + error.message);
-            setProducts([]);
-            setTotalItems(0);
-            setTotalPages(0);
         } finally {
             if (isInitialLoad) setLoading(false);
             setIsFetchingPage(false);
         }
 
-    }, [currentPage, debouncedSearch, ITEMS_PER_PAGE]); // Bỏ suppliers.length vì không cần thiết
-    // --- useEffects (Giữ nguyên) ---
+    }, [currentPage, debouncedSearch, ITEMS_PER_PAGE]);
+
     useEffect(() => { fetchProducts(true); }, [fetchProducts]);
-    useEffect(() => { 
-        setCurrentPage(1); // Reset về trang 1 khi search
-    }, [debouncedSearch]);
+    useEffect(() => { setCurrentPage(1); }, [debouncedSearch]);
 
-    // --- Handlers (Giữ nguyên - Giả định) ---
-    const handleSetStatus = async (id, newStatus) => { /* ... */ };
-    const handleDelete = async (tour) => { /* ... */ };
-    const paginationWindow = useMemo(() => getPaginationWindow(currentPage, totalPages, 2), [currentPage, totalPages]);
+    // --- (SỬA) Hàm Duyệt/Từ chối ---
+    const handleSetStatus = async (id, newStatus, currentStatus) => {
+        if (newStatus === currentStatus) return;
+        setIsFetchingPage(true);
+        
+        const { error } = await supabase
+            .from('Products')
+            .update({ 
+                approval_status: newStatus,
+                // Tự động publish nếu duyệt, ẩn nếu từ chối
+                is_published: newStatus === 'approved' 
+            })
+            .eq('id', id);
+            
+        if (error) {
+            toast.error("Cập nhật thất bại: " + error.message);
+        } else {
+            toast.success(newStatus === 'approved' ? 'Đã duyệt & cho hiển thị tour!' : 'Đã từ chối tour.');
+            // Cập nhật lại UI
+            setProducts(prev => 
+                prev.map(p => 
+                    p.id === id ? { ...p, approval_status: newStatus, is_published: newStatus === 'approved' } : p
+                )
+            );
+        }
+        setIsFetchingPage(false);
+    };
 
-    // --- (SỬA) JSX cho Nút bấm Actions ---
+    // --- (SỬA) Nút Bấm Actions (thêm nút Duyệt/Từ chối) ---
     const ActionButtons = ({ product }) => (
         <div className="flex items-center justify-end gap-2 flex-wrap">
-            {/* ... JSX các nút Duyệt, Từ chối, Sửa & Đăng, Đặt lại chờ, Xóa ... */}
-            
-            {/* Sửa nút Sửa: */}
-            {product.approval_status === 'approved' && (
+            {product.approval_status !== 'approved' && (
                 <button
-                    onClick={() => setModalTour(product)} // Đảm bảo gọi setModalTour
+                    onClick={() => handleSetStatus(product.id, 'approved', product.approval_status)}
                     disabled={isFetchingPage}
-                    className="button-sky text-xs flex items-center gap-1.5 !px-3 !py-1.5"
-                    title="Sửa thông tin & Lịch khởi hành"
+                    className="button-green text-xs flex items-center gap-1.5 !px-3 !py-1.5"
+                    title="Duyệt tour này"
                 >
-                    <PencilLine weight="bold" size={14}/> Sửa
+                    <CheckCircle weight="bold" size={14}/> Duyệt
+                </button>
+            )}
+            {product.approval_status !== 'rejected' && (
+                 <button
+                    onClick={() => handleSetStatus(product.id, 'rejected', product.approval_status)}
+                    disabled={isFetchingPage}
+                    className="button-red text-xs flex items-center gap-1.5 !px-3 !py-1.5"
+                    title="Từ chối tour này"
+                >
+                    <XCircle weight="bold" size={14}/> Từ chối
                 </button>
             )}
             
-            {/* (Các nút khác giữ nguyên - Tạm ẩn) */}
-            {/*
-            {product.approval_status !== 'approved' && (
-                <button onClick={() => handleSetStatus(product.id, 'approved')} ...>Duyệt</button>
+            {/* Nút Sửa (luôn hiển thị để admin sửa) */}
+            <button
+                onClick={() => setModalTour(product)} 
+                disabled={isFetchingPage}
+                className="button-sky text-xs flex items-center gap-1.5 !px-3 !py-1.5"
+                title="Sửa thông tin & Lịch khởi hành"
+            >
+                <PencilLine weight="bold" size={14}/> Sửa
+            </button>
+            
+            {/* Nút Đặt lại (chỉ hiện khi đã duyệt/từ chối) */}
+            {product.approval_status !== 'pending' && (
+                 <button
+                    onClick={() => handleSetStatus(product.id, 'pending', product.approval_status)}
+                    disabled={isFetchingPage}
+                    className="button-yellow text-xs flex items-center gap-1.5 !px-3 !py-1.5"
+                    title="Đặt lại trạng thái Chờ duyệt"
+                >
+                    <Clock weight="bold" size={14}/> Đặt lại
+                </button>
             )}
-            {product.approval_status !== 'rejected' && (
-                <button onClick={() => handleSetStatus(product.id, 'rejected')} ...>Từ chối</button>
-            )}
-            */}
         </div>
     );
     // --- KẾT THÚC SỬA ---
 
-    // --- KHÔI PHỤC JSX Card ---
+    const paginationWindow = useMemo(() => getPaginationWindow(currentPage, totalPages, 2), [currentPage, totalPages]);
+    
+    // --- (Giữ nguyên) JSX cho Card và List Item ---
     const TourCard = ({ product }) => (
         <div className="flex flex-col bg-white dark:bg-slate-800 shadow-lg rounded-lg overflow-hidden border dark:border-slate-700 transition-all duration-300 hover:shadow-xl">
             <div className="relative h-48 w-full flex-shrink-0">
@@ -432,7 +618,7 @@ export default function AdminManageProducts() {
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-90"></div>
                 <div className="absolute top-2 right-2 z-10"><ApprovalStatus status={product.approval_status} /></div>
-                <div className="absolute bottom-2 left-2 z-10"><SlotSummary departures={product.Departures} /></div>
+                <div className="absolute bottom-2 left-2 z-10"><SlotSummary departures={product.Departures || []} /></div>
                 {product.approval_status === 'approved' && (
                     <div className="absolute top-2 left-2 z-10">
                         {product.is_published ? <span className="badge-blue">Đã đăng</span> : <span className="badge-gray">Chưa đăng</span>}
@@ -444,7 +630,7 @@ export default function AdminManageProducts() {
                     {product.name}
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-                    NCC: <Link to={`/admin/suppliers?search=${product.supplier?.name}`} className="font-medium hover:underline">{product.supplier?.name || 'N/A'}</Link>
+                    NCC: <Link to={`/admin/suppliers`} className="font-medium hover:underline">{product.supplier?.name || 'N/A'}</Link>
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
                     Mã: {product.tour_code || "N/A"}
@@ -455,9 +641,6 @@ export default function AdminManageProducts() {
             </div>
         </div>
     );
-    // --- KẾT THÚC KHÔI PHỤC ---
-
-    // --- KHÔI PHỤC JSX List Item ---
     const TourListItem = ({ product }) => (
         <tr className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
             <td className="px-6 py-4">
@@ -477,11 +660,11 @@ export default function AdminManageProducts() {
                 </div>
             </td>
             <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
-                 <Link to={`/admin/suppliers?search=${product.supplier?.name}`} className="link-style hover:text-sky-500" title={`Xem NCC ${product.supplier?.name}`}>
+                 <Link to={`/admin/suppliers`} className="link-style hover:text-sky-500" title={`Xem NCC ${product.supplier?.name}`}>
                     {product.supplier?.name || "N/A"}
                  </Link>
             </td>
-            <td className="px-6 py-4 text-sm"><SlotSummary departures={product.Departures} /></td>
+            <td className="px-6 py-4 text-sm"><SlotSummary departures={product.Departures || []} /></td>
             <td className="px-6 py-4 text-sm"><ApprovalStatus status={product.approval_status} /></td>
             <td className="px-6 py-4 text-sm">
                 {product.is_published ? <span className="badge-blue">Đã đăng</span> : <span className="badge-gray">Chưa đăng</span>}
@@ -491,9 +674,8 @@ export default function AdminManageProducts() {
             </td>
         </tr>
     );
-    // --- KẾT THÚC KHÔI PHỤC ---
 
-    // --- JSX Chính (Giữ nguyên) ---
+    // --- (Giữ nguyên) JSX Chính ---
     return (
         <div className="p-4 md:p-6 space-y-6 min-h-screen dark:bg-slate-900 dark:text-white">
             {/* Header + Search + Refresh */}
@@ -561,7 +743,7 @@ export default function AdminManageProducts() {
             )}
 
 
-{/* Pagination UI */}
+            {/* Pagination UI */}
                 {!loading && totalItems > ITEMS_PER_PAGE && (
                   <div className="flex flex-col sm:flex-row justify-between items-center mt-6 text-sm text-gray-600 dark:text-gray-400">
                       {/* Phần hiển thị số lượng */}
@@ -574,7 +756,6 @@ export default function AdminManageProducts() {
                                    key={pageNumber}
                                    onClick={() => setCurrentPage(pageNumber)}
                                    disabled={isFetchingPage}
-                                   // Đảm bảo dùng currentPage ở đây
                                    className={`pagination-number ${ currentPage === pageNumber ? "pagination-active" : "" }`}
                                >
                                    {pageNumber}
@@ -586,9 +767,16 @@ export default function AdminManageProducts() {
              )}
             {/* Kết thúc Pagination UI */}
             {/* Modal Edit */}
-            {modalTour && ( <EditTourModal tour={modalTour} onClose={() => setModalTour(null)} onSuccess={() => fetchProducts(false)} suppliers={suppliers} /> )}
+            {modalTour && ( 
+                <EditTourModal 
+                    tour={modalTour} 
+                    onClose={() => setModalTour(null)} 
+                    onSuccess={() => fetchProducts(false)} 
+                    suppliers={suppliers} 
+                /> 
+            )}
 
-            {/* CSS */}
+            {/* (SỬA) Thêm CSS cho các nút trạng thái mới */}
             <style jsx>{`
                 /* (CSS cũ giữ nguyên) */
                 .loading-overlay { @apply absolute inset-0 bg-white/70 dark:bg-slate-800/70 flex items-center justify-center z-10; }
@@ -624,8 +812,11 @@ export default function AdminManageProducts() {
                 /* (SỬA) Nút bấm có chữ */
                 .button-base-text { @apply px-3 py-1.5 text-xs rounded-md font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 dark:focus:ring-offset-slate-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5; }
                 .button-blue { @apply button-base-text bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-400; }
-                .button-sky { @apply button-base-text bg-sky-600 text-white hover:bg-sky-700 focus:ring-sky-400; } /* Class mới cho nút Sửa */
-
+                .button-sky { @apply button-base-text bg-sky-600 text-white hover:bg-sky-700 focus:ring-sky-400; }
+                /* (BỔ SUNG) */
+                .button-green { @apply button-base-text bg-green-600 text-white hover:bg-green-700 focus:ring-green-400; }
+                .button-red { @apply button-base-text bg-red-600 text-white hover:bg-red-700 focus:ring-red-400; }
+                .button-yellow { @apply button-base-text bg-yellow-500 text-white hover:bg-yellow-600 focus:ring-yellow-400; }
             `}</style>
         </div>
     );
