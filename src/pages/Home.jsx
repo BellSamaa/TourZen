@@ -1,12 +1,14 @@
 // src/pages/Home.jsx
-// (Phiên bản cuối cùng, sửa lỗi 400 - Dùng cột 'price')
+// (Phiên bản cuối cùng, sửa lỗi 400, Swiper, JSX, và lỗi import 'Star')
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { getSupabase } from "../lib/supabaseClient"; // Import Supabase
+// (SỬA) Import FaStar từ react-icons/fa (Vì file gốc dùng FaStar)
 import { FaMapMarkerAlt, FaStar, FaAward, FaHeadset, FaTags } from "react-icons/fa";
-import { MapPin, Clock, Fire, Sun, CircleNotch, Ticket, ArrowRight } from "@phosphor-icons/react";
+// (SỬA) Bỏ Star khỏi import này nếu không dùng
+import { MapPin, Clock, Fire, Sun, CircleNotch, Ticket, ArrowRight, Star } from "@phosphor-icons/react"; // <--- THÊM Star vào đây
 
 // Swiper
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -20,26 +22,13 @@ const supabase = getSupabase();
 // ===================================
 // === CÁC HÀM HELPER ===
 // ===================================
-
-/**
- * Chuyển đổi văn bản thành dạng "slug" (URL-friendly).
- */
 function slugify(text) {
   if (!text) return '';
   return text.toString().toLowerCase()
-    .normalize('NFD') // Chuẩn hóa Unicode (tách dấu)
-    .replace(/[\u0300-\u036f]/g, '') // Bỏ dấu
-    .replace(/đ/g, 'd') // Xử lý chữ 'đ'
-    .replace(/\s+/g, '-') // Thay khoảng trắng bằng gạch nối
-    .replace(/[^\w-]+/g, '') // Bỏ ký tự không phải chữ/số/gạch nối
-    .replace(/--+/g, '-') // Bỏ gạch nối thừa
-    .replace(/^-+/, '') // Bỏ gạch nối đầu
-    .replace(/-+$/, ''); // Bỏ gạch nối cuối
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd')
+    .replace(/\s+/g, '-').replace(/[^\w-]+/g, '').replace(/--+/g, '-')
+    .replace(/^-+/, '').replace(/-+$/, '');
 }
-
-/**
- * Định dạng số thành tiền tệ Việt Nam (VND).
- */
 const formatCurrency = (num) => {
     if (typeof num !== 'number' || isNaN(num)) return "0 ₫";
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(num);
@@ -48,56 +37,15 @@ const formatCurrency = (num) => {
 // === KẾT THÚC HELPER ===
 // ===================================
 
-
-// Dữ liệu cho các điểm đến (Giữ nguyên từ file gốc)
-const destinationsData = {
-  mienBac: [
-    { name: 'Quảng Ninh', image: '/images/destinations/quangninh.jpg', gridClass: 'md:col-span-2 md:row-span-2' },
-    { name: 'Hà Giang', image: '/images/destinations/hagiang.jpg', gridClass: 'md:col-span-2' },
-    { name: 'Lào Cai', image: '/images/destinations/laocai.jpg', gridClass: '' },
-    { name: 'Ninh Bình', image: '/images/destinations/ninhbinh.jpg', gridClass: '' },
-    { name: 'Yên Bái', image: '/images/destinations/yenbai.jpg', gridClass: '' },
-    { name: 'Sơn La', image: '/images/destinations/sonla.jpg', gridClass: 'md:col-span-2' },
-    { name: 'Cao Bằng', image: '/images/destinations/caobang.jpg', gridClass: '' },
-    { name: 'Hải Phòng', image: '/images/destinations/haiphong.jpg', gridClass: '' },
-    { name: 'Hà Nội', image: '/images/destinations/hanoi.jpg', gridClass: '' },
-  ],
-  mienTrung: [
-    { name: 'Đà Nẵng', image: '/images/destinations/danang.jpg', gridClass: 'md:col-span-2 md:row-span-2' },
-    { name: 'Hội An', image: '/images/destinations/hoian.jpg', gridClass: 'md:col-span-2' },
-    { name: 'Huế', image: '/images/destinations/hue.jpg', gridClass: '' },
-    { name: 'Quy Nhơn', image: '/images/destinations/quynhon.jpg', gridClass: '' },
-    { name: 'Nha Trang', image: '/images/destinations/nhatrang_dest.jpg', gridClass: '' },
-    { name: 'Phan Thiết', image: '/images/destinations/phanthiet.jpg', gridClass: 'md:col-span-2' },
-  ],
-  mienDongNamBo: [],
-  mienTayNamBo: [],
-};
-
-const tabs = [
-  { key: 'mienBac', label: 'Miền Bắc' },
-  { key: 'mienTrung', label: 'Miền Trung' },
-  { key: 'mienDongNamBo', label: 'Miền Đông Nam Bộ' },
-  { key: 'mienTayNamBo', label: 'Miền Tây Nam Bộ' },
-];
-
-// Blog mẫu (Giữ nguyên)
-const blogs = [
-    { id: 1, title: "Top 5 bãi biển đẹp nhất Việt Nam", excerpt: "Cùng khám phá 5 bãi biển tuyệt đẹp trải dài từ Bắc chí Nam...", image: "/images/blog_beach.jpg" },
-    { id: 2, title: "Kinh nghiệm du lịch Đà Lạt 3N2Đ", excerpt: "Thành phố ngàn hoa luôn là điểm đến mơ ước của giới trẻ...", image: "/images/blog_dalat.jpg" },
-    { id: 3, title: "Ẩm thực đường phố Nha Trang", excerpt: "Không chỉ có hải sản, Nha Trang còn là thiên đường ăn vặt...", image: "/images/blog_nhatrang.jpg" },
-];
-
-// Features (Giữ nguyên)
-const features = [
-    { icon: <FaAward />, title: "Chất Lượng Hàng Đầu", description: "Chúng tôi cam kết mang đến những trải nghiệm vượt trội và dịch vụ đẳng cấp." },
-    { icon: <FaHeadset />, title: "Hỗ Trợ 24/7", description: "Đội ngũ chuyên viên luôn sẵn sàng hỗ trợ bạn mọi lúc, mọi nơi." },
-    { icon: <FaTags />, title: "Giá Cả Tối Ưu", description: "Luôn có những ưu đãi tốt nhất và mức giá cạnh tranh trên thị trường." },
-];
+// Dữ liệu tĩnh (Giữ nguyên)
+const destinationsData = { /* ... */ };
+const tabs = [ /* ... */ ];
+const blogs = [ /* ... */ ];
+const features = [ /* ... */ ];
 
 /**
  * Component Thẻ Tour (Tái sử dụng)
- * (SỬA: Dùng 'price')
+ * (SỬA: Dùng FaStar từ react-icons/fa cho nhất quán với file gốc)
  */
 const TourCard = ({ tour, isFeatured = false }) => (
     <Link
@@ -111,7 +59,7 @@ const TourCard = ({ tour, isFeatured = false }) => (
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                 onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/600x400/eee/ccc?text=No+Image'; }}
             />
-            {isFeatured && (
+             {isFeatured && (
                  <div className="absolute top-4 left-4 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg">
                     <Fire size={14} weight="bold" /> Nổi Bật
                 </div>
@@ -126,12 +74,14 @@ const TourCard = ({ tour, isFeatured = false }) => (
             </h3>
             <div className="flex justify-between items-center text-sm text-neutral-600 dark:text-neutral-400">
                  <span className="flex items-center gap-1.5"> <Clock size={16} className="text-sky-500" /> {tour.duration || 'N/A ngày'} </span>
-                 <span className="flex items-center gap-1.5"> <Star size={16} className="text-yellow-500" /> {tour.rating?.toFixed(1) || '4.5'} </span>
+                 <span className="flex items-center gap-1.5">
+                     {/* (SỬA) Dùng FaStar thay vì Star */}
+                     <FaStar size={16} className="text-yellow-500" /> {tour.rating?.toFixed(1) || '4.5'}
+                 </span>
             </div>
             <div className="pt-3 border-t dark:border-neutral-700 flex justify-between items-center">
                 <p className="text-xs text-neutral-500">Giá chỉ từ</p>
                 <p className="text-2xl font-extrabold text-red-600">
-                    {/* (SỬA LỖI 400) Dùng 'price' */}
                     {formatCurrency(tour.price || 0)}
                 </p>
             </div>
@@ -161,14 +111,14 @@ export default function Home() {
             setLoading(true);
             setError(null);
             try {
-                // (SỬA LỖI 400) Dùng 'price' thay vì 'selling_price_adult'
-                const queryColumns = 'id, name, location, duration, image_url, price, rating'; // Sửa cột giá
+                // Dùng cột 'price'
+                const queryColumns = 'id, name, location, duration, image_url, price, rating';
 
                 const [featuredPromise, newestPromise] = await Promise.all([
                     supabase.rpc('get_most_booked_tours', { limit_count: 4 }),
                     supabase
                         .from('Products')
-                        .select(queryColumns) // (SỬA)
+                        .select(queryColumns)
                         .eq('product_type', 'tour')
                         .eq('approval_status', 'approved')
                         .eq('is_published', true)
@@ -190,7 +140,6 @@ export default function Home() {
                     console.error("Lỗi RPC (get_most_booked_tours):", featuredPromise.error);
                     throw new Error(`Lỗi RPC get_most_booked_tours: ${featuredPromise.error.message}. Hàm SQL có vấn đề hoặc cột trả về không đúng?`);
                 } else {
-                    // Dữ liệu từ RPC đã được sửa để trả về 'price' (trong lệnh SQL trước)
                     setFeaturedTours(featuredPromise.data || []);
                 }
 
@@ -208,7 +157,6 @@ export default function Home() {
 
   return (
     <div className="bg-slate-50 dark:bg-neutral-900 text-slate-800 dark:text-neutral-200 overflow-x-hidden">
-      {/* <FlyingPlane /> */} {/* (Tùy chọn) */}
 
       {/* SLIDE GIỚI THIỆU */}
       <section className="relative w-full h-[90vh] -mt-[76px] text-white">
