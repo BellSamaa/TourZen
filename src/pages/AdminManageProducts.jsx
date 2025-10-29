@@ -491,6 +491,7 @@ export default function AdminManageProducts() {
                       </div>
                   </div>
              )}
+            {/* Kết thúc Pagination UI */}
             {/* Modal Edit */}
             {modalTour && ( <EditTourModal tour={modalTour} onClose={() => setModalTour(null)} onSuccess={() => fetchProducts(false)} suppliers={suppliers} /> )}
 
