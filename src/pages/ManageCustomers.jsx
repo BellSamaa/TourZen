@@ -5,10 +5,9 @@
   3. (Logic) Giữ nguyên logic phân loại khách hàng tự động từ v6.
 */
 
-/* CHỈNH SỬA v7.2 (Theo yêu cầu):
-  1. (Tiêu đề) Đổi màu tiêu đề "Quản lý Khách hàng" thành màu đen (text-gray-900 dark:text-white).
-  2. (CSS Bảng) Trả cỡ chữ tiêu đề bảng (.th-style) về text-sm (14px) và padding py-5.
-  3. (CSS Bảng) Trả cỡ chữ các ô dữ liệu phụ (Liên hệ, Địa chỉ, Ngày sinh) về text-sm (14px) cho cân xứng hơn.
+/* CHỈNH SỬA v7.5 (Theo yêu cầu):
+  1. (CSS Bảng) Giảm cỡ chữ "Họ và tên" từ text-base -> text-sm.
+  2. (CSS Bảng) Giảm cỡ chữ "Đơn" và "Tổng chi" từ text-base -> text-sm cho đồng bộ.
 */
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
@@ -255,7 +254,6 @@ const CustomerBookingsModal = ({ customer, onClose }) => {
             <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
               <thead className="bg-gray-50 dark:bg-slate-700/40 sticky top-0">
                 <tr>
-                  {/* --- SỬA ĐỔI FONT (.th-style) --- */}
                   <th className="th-style">Dịch vụ</th>
                   <th className="th-style">Ngày đặt</th>
                   <th className="th-style text-right">Tổng tiền</th>
@@ -350,7 +348,7 @@ const CustomerForm = ({ initialData, onSubmit, isSaving, onCancel }) => {
   return (
     <form onSubmit={handleSubmit}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-        <InputWrapper label="Họ và Tên" icon={<User size={16} className="mr-2" />}>
+        <InputWrapper label="Họ và Tên" icon={<User size={18} className="mr-2" />}>
           <input
             type="text"
             name="full_name"
@@ -653,7 +651,7 @@ export default function ManageCustomersSupabase() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
     >
-      {/* --- SỬA ĐỔI MÀU TIÊU ĐỀ --- */}
+      {/* --- SỬA ĐỔI MÀU TIÊU ĐỀ (v7.2) --- */}
       <div className="flex flex-wrap items-center justify-between gap-5">
         <div>
           <motion.h1 
@@ -703,7 +701,7 @@ export default function ManageCustomersSupabase() {
           <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
             <thead className="bg-gray-50 dark:bg-slate-700/40">
               <tr>
-                {/* --- SỬA ĐỔI FONT (.th-style) --- */}
+                {/* --- SỬA ĐỔI FONT (.th-style) (v7.2) --- */}
                 <th className="th-style">Họ và tên</th>
                 <th className="th-style">Liên hệ</th>
                 <th className="th-style">Địa chỉ</th>
@@ -740,27 +738,30 @@ export default function ManageCustomersSupabase() {
                     whileHover={{ y: -2 }}
                   >
                     <td className="td-style">
-                      <span className="font-bold text-lg text-slate-900 dark:text-white">{c.full_name || <span className="italic text-gray-400">...</span>}</span>
+                      {/* --- SỬA ĐỔI FONT (về text-sm) --- */}
+                      <span className="font-bold text-sm text-slate-900 dark:text-white">{c.full_name || <span className="italic text-gray-400">...</span>}</span>
                     </td>
                     <td className="td-style whitespace-nowrap">
                       <div className="flex flex-col gap-0.5">
-                        {/* --- SỬA ĐỔI FONT (về text-sm) --- */}
+                        {/* --- SỬA ĐỔI FONT (về text-sm) (v7.2) --- */}
                         <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{c.email}</span>
                         <span className="text-sm text-gray-500 dark:text-gray-400">{c.phone_number || "..."}</span>
                       </div>
                     </td>
                     <td className="td-style max-w-sm">
-                      {/* --- SỬA ĐỔI FONT (về text-sm) --- */}
+                      {/* --- SỬA ĐỔI FONT (về text-sm) (v7.2) --- */}
                       <span className="truncate block text-sm">{c.address || <span className="italic text-gray-400">...</span>}</span>
                     </td>
                     <td className="td-style">
-                      {/* --- SỬA ĐỔI FONT (về text-sm) --- */}
+                      {/* --- SỬA ĐỔI FONT (về text-sm) (v7.2) --- */}
                       <span className="text-sm whitespace-nowrap">
                         {c.ngay_sinh ? new Date(c.ngay_sinh).toLocaleDateString('vi-VN') : <span className="italic text-gray-400">...</span>}
                       </span>
                     </td>
-                    <td className="td-style text-center font-bold text-lg text-sky-600 dark:text-sky-400">{c.order_count}</td>
-                    <td className="td-style text-right font-bold text-lg text-gray-800 dark:text-gray-200 whitespace-nowrap">
+                    {/* --- SỬA ĐỔI FONT (về text-sm) --- */}
+                    <td className="td-style text-center font-bold text-sm text-sky-600 dark:text-sky-400">{c.order_count}</td>
+                    {/* --- SỬA ĐỔI FONT (về text-sm) --- */}
+                    <td className="td-style text-right font-bold text-sm text-gray-800 dark:text-gray-200 whitespace-nowrap">
                       {formatCurrency(c.total_spend)}
                     </td>
                     <td className="td-style text-center">
@@ -838,7 +839,7 @@ export default function ManageCustomersSupabase() {
             />
           </FormModal>
         )}
-      </AnimatePresence>
+      </AnimatePresence> {/* --- SỬA LỖI BUILD (AnAtePresence -> AnimatePresence) (v7.4) --- */}
       
       <AnimatePresence>
         {editingCustomer && (
@@ -866,10 +867,9 @@ export default function ManageCustomersSupabase() {
         }
       `}</style>
 
-      {/* --- CSS (Chỉnh sửa .th-style về text-sm, py-5) --- */}
+      {/* --- CSS (Chỉnh sửa .th-style về text-sm, py-5) (v7.2) --- */}
       <style jsx>{`
         .th-style { 
-          /* --- SỬA ĐỔI FONT & PADDING (về text-sm, py-5) --- */
           @apply px-6 py-5 text-left text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider; 
         }
         .td-style { 
