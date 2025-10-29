@@ -1,9 +1,9 @@
 // src/pages/Home.jsx
-// (Phiên bản cuối cùng, sửa lỗi 400, Swiper, JSX, dựa trên file gốc)
+// (Phiên bản cuối cùng, sửa lỗi 400 - cột 'image' không tồn tại)
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom"; // Sửa: Dùng Link
+import { Link, useNavigate } from "react-router-dom";
 import { getSupabase } from "../lib/supabaseClient"; // Import Supabase
 import { FaMapMarkerAlt, FaStar, FaAward, FaHeadset, FaTags } from "react-icons/fa";
 import { MapPin, Clock, Fire, Sun, CircleNotch, Ticket, ArrowRight } from "@phosphor-icons/react";
@@ -97,22 +97,22 @@ const features = [
 
 /**
  * Component Thẻ Tour (Tái sử dụng)
- * (SỬA: Dùng 'selling_price_adult' và Link tới '/tour/:id')
+ * (SỬA: Chỉ dùng image_url)
  */
 const TourCard = ({ tour, isFeatured = false }) => (
-    <Link 
-        to={`/tour/${tour.id}`} 
+    <Link
+        to={`/tour/${tour.id}`}
         className="group block bg-white dark:bg-neutral-800 shadow-lg rounded-2xl overflow-hidden transform transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 border dark:border-neutral-700"
     >
         <div className="relative h-56 w-full overflow-hidden">
-            <img 
-                src={tour.image_url || tour.image || 'https://placehold.co/600x400/eee/ccc?text=Tour+Image'} 
-                alt={tour.name} // (SỬA) Dùng 'name'
+            <img
+                src={tour.image_url || 'https://placehold.co/600x400/eee/ccc?text=Tour+Image'} // Chỉ dùng image_url
+                alt={tour.name}
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                 onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/600x400/eee/ccc?text=No+Image'; }}
             />
             {isFeatured && (
-                <div className="absolute top-4 left-4 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg">
+                 <div className="absolute top-4 left-4 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg">
                     <Fire size={14} weight="bold" />
                     Nổi Bật
                 </div>
@@ -122,14 +122,12 @@ const TourCard = ({ tour, isFeatured = false }) => (
                 {tour.location || 'Việt Nam'}
             </div>
         </div>
-        
         <div className="p-5 space-y-3">
             <h3 className="text-xl font-bold text-neutral-800 dark:text-white group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors truncate" title={tour.name}>
-                {tour.name} {/* (SỬA) Dùng 'name' */}
+                {tour.name}
             </h3>
-            
             <div className="flex justify-between items-center text-sm text-neutral-600 dark:text-neutral-400">
-                <span className="flex items-center gap-1.5">
+                 <span className="flex items-center gap-1.5">
                     <Clock size={16} className="text-sky-500" />
                     {tour.duration || 'N/A ngày'}
                 </span>
@@ -138,11 +136,9 @@ const TourCard = ({ tour, isFeatured = false }) => (
                     {tour.rating?.toFixed(1) || '4.5'}
                 </span>
             </div>
-
             <div className="pt-3 border-t dark:border-neutral-700 flex justify-between items-center">
                 <p className="text-xs text-neutral-500">Giá chỉ từ</p>
                 <p className="text-2xl font-extrabold text-red-600">
-                    {/* (SỬA LỖI 400) Dùng 'selling_price_adult' */}
                     {formatCurrency(tour.selling_price_adult || 0)}
                 </p>
             </div>
@@ -150,9 +146,7 @@ const TourCard = ({ tour, isFeatured = false }) => (
     </Link>
 );
 
-/**
- * Component Spinner Tải
- */
+/** Component Spinner Tải */
 const LoadingSpinner = () => (
     <div className="flex justify-center items-center h-64">
         <CircleNotch size={40} className="animate-spin text-sky-600" />
@@ -160,13 +154,12 @@ const LoadingSpinner = () => (
     </div>
 );
 
-
 export default function Home() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('mienBac');
   const [featuredTours, setFeaturedTours] = useState([]);
-  const [newestTours, setNewestTours] = useState([]); // Tour mới nhất
-  const [sliderTours, setSliderTours] = useState([]); // Tour cho slider
+  const [newestTours, setNewestTours] = useState([]);
+  const [sliderTours, setSliderTours] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -175,50 +168,42 @@ export default function Home() {
             setLoading(true);
             setError(null);
             try {
-                // (SỬA LỖI 400) Chỉ lấy các cột tồn tại và cần thiết
-                const queryColumns = 'id, name, location, duration, image_url, image, selling_price_adult, rating';
+                // (SỬA LỖI 400) Bỏ cột 'image' không tồn tại
+                const queryColumns = 'id, name, location, duration, image_url, selling_price_adult, rating'; // Bỏ 'image'
 
-                // Chạy song song 2 luồng fetch
                 const [featuredPromise, newestPromise] = await Promise.all([
-                    // 1. Lấy Tour Nổi Bật (Mua nhiều nhất)
-                    supabase.rpc('get_most_booked_tours', { limit_count: 4 }), // Lấy 4 tour
-                    
-                    // 2. Lấy Tour Mới Nhất
+                    supabase.rpc('get_most_booked_tours', { limit_count: 4 }),
                     supabase
                         .from('Products')
-                        .select(queryColumns) // (SỬA) Dùng queryColumns
+                        .select(queryColumns) // (SỬA) Dùng queryColumns đã sửa
                         .eq('product_type', 'tour')
                         .eq('approval_status', 'approved')
                         .eq('is_published', true)
                         .order('created_at', { ascending: false })
-                        .limit(8) // Lấy 8 tour mới
+                        .limit(8)
                 ]);
 
                 // Xử lý Tour Mới Nhất
                 if (newestPromise.error) {
                     console.error("Lỗi Query Tour Mới Nhất:", newestPromise.error);
-                    throw new Error(`Lỗi query Products: ${newestPromise.error.message}. Vui lòng kiểm tra lại tên cột trong bảng Products.`);
+                    // (SỬA) Ném lỗi rõ ràng hơn
+                    throw new Error(`Lỗi query Products: ${newestPromise.error.message}. Cột '${newestPromise.error.details?.split('"')[1]}' không tồn tại?`);
                 }
                 const allNewTours = newestPromise.data || [];
                 setNewestTours(allNewTours);
-                
-                // Dùng 5 tour mới nhất cho Slider
                 setSliderTours(allNewTours.slice(0, 5));
 
                 // Xử lý Tour Nổi Bật
                 if (featuredPromise.error) {
-                    // (SỬA) Báo lỗi cụ thể hơn nếu RPC lỗi
-                    console.error("Lỗi RPC (get_most_booked_tours):", featuredPromise.error.message);
-                    setError("Lỗi khi tải Tour Nổi Bật. Vui lòng đảm bảo hàm SQL 'get_most_booked_tours' đã được tạo/cập nhật đúng.");
-                    // (Fallback) Nếu RPC lỗi, tạm lấy 4 tour mới nhất làm nổi bật
-                    setFeaturedTours(allNewTours.slice(0, 4));
+                    console.error("Lỗi RPC (get_most_booked_tours):", featuredPromise.error);
+                     // (SỬA) Ném lỗi rõ ràng hơn
+                    throw new Error(`Lỗi RPC get_most_booked_tours: ${featuredPromise.error.message}. Hàm SQL có vấn đề hoặc cột trả về không đúng?`);
                 } else {
                     setFeaturedTours(featuredPromise.data || []);
                 }
 
             } catch (err) {
                 console.error("Lỗi tải dữ liệu trang chủ:", err);
-                // (SỬA) Hiển thị lỗi rõ ràng hơn
                 setError(err.message || "Không thể tải dữ liệu. Vui lòng thử lại sau.");
             } finally {
                 setLoading(false);
@@ -233,43 +218,42 @@ export default function Home() {
     <div className="bg-slate-50 dark:bg-neutral-900 text-slate-800 dark:text-neutral-200 overflow-x-hidden">
       {/* <FlyingPlane /> */} {/* (Tùy chọn) */}
 
-      {/* SLIDE GIỚI THIỆU (SỬA: Dùng sliderTours, tắt loop nếu ít slide) */}
+      {/* SLIDE GIỚI THIỆU (SỬA: Chỉ dùng image_url) */}
       <section className="relative w-full h-[90vh] -mt-[76px] text-white">
-        <Swiper 
-            modules={[Autoplay, Pagination, Navigation]} 
-            autoplay={{ delay: 5000, disableOnInteraction: false }} 
-            pagination={{ clickable: true }} 
-            navigation 
-            loop={sliderTours.length > 1} // (SỬA) Tắt loop nếu chỉ có 1 slide
+        <Swiper
+            modules={[Autoplay, Pagination, Navigation]}
+            autoplay={{ delay: 5000, disableOnInteraction: false }}
+            pagination={{ clickable: true }}
+            navigation
+            loop={sliderTours.length > 1} // Tắt loop nếu ít slide
             className="h-full"
         >
           {loading && sliderTours.length === 0 ? (
-                <SwiperSlide>
+                 <SwiperSlide>
                      <div className="h-full bg-gray-700 flex justify-center items-center"><CircleNotch size={40} className="animate-spin text-white" /></div>
                 </SwiperSlide>
-          ) : sliderTours.length === 0 && !loading ? (
-                <SwiperSlide>
+            )
+          : sliderTours.length === 0 && !loading ? (
+                 <SwiperSlide>
                      <div className="h-full bg-gray-700 flex justify-center items-center text-gray-400">Không có tour nào để hiển thị</div>
                 </SwiperSlide>
-          ) : (
+            )
+          : (
             sliderTours.map((tour) => (
             <SwiperSlide key={`slide-${tour.id}`}>
-              <div className="h-full bg-cover bg-center" style={{ backgroundImage: `url(${tour.image_url || tour.image})` }}>
+              <div className="h-full bg-cover bg-center" style={{ backgroundImage: `url(${tour.image_url})` }}> {/* (SỬA) Chỉ dùng image_url */}
                 <div className="w-full h-full flex flex-col justify-center items-center text-center bg-black/50 p-4">
-                  <motion.h1 initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }} className="text-4xl md:text-6xl font-bold mb-4 drop-shadow-lg">
-                    {tour.name} {/* (SỬA) Dùng 'name' */}
-                  </motion.h1>
-                  <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2 }} className="text-lg mb-6 drop-shadow-lg">
-                    <FaMapMarkerAlt className="inline mr-2" />{tour.location}
-                  </motion.p>
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8, delay: 0.4 }}>
-                    <Link 
-                        to={`/tour/${tour.id}`} 
-                        className="bg-sky-600 hover:bg-sky-700 text-white px-8 py-3 rounded-lg font-semibold shadow-lg transition-transform transform hover:scale-105"
-                    >
-                        Khám phá ngay
-                    </Link>
-                  </motion.div>
+                    <motion.h1 initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }} className="text-4xl md:text-6xl font-bold mb-4 drop-shadow-lg">
+                        {tour.name}
+                    </motion.h1>
+                    <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2 }} className="text-lg mb-6 drop-shadow-lg">
+                        <FaMapMarkerAlt className="inline mr-2" />{tour.location}
+                    </motion.p>
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8, delay: 0.4 }}>
+                        <Link to={`/tour/${tour.id}`} className="bg-sky-600 hover:bg-sky-700 text-white px-8 py-3 rounded-lg font-semibold shadow-lg transition-transform transform hover:scale-105">
+                            Khám phá ngay
+                        </Link>
+                    </motion.div>
                 </div>
               </div>
             </SwiperSlide>
@@ -278,103 +262,101 @@ export default function Home() {
         </Swiper>
       </section>
 
-      {/* TOUR NỔI BẬT (SỬA: Dùng TourCard) */}
+      {/* TOUR NỔI BẬT */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-6 text-center">
-            <h2 className="text-3xl font-bold mb-4 dark:text-white">🌍 Tour Du Lịch Nổi Bật</h2>
-            <p className="text-slate-500 dark:text-neutral-400 max-w-2xl mx-auto mb-12">Những hành trình được yêu thích nhất, sẵn sàng đưa bạn đến những miền đất hứa.</p>
-            
+            <h2 className="text-3xl font-bold mb-4 dark:text-white">🌍 Tour Du Lịch Nổi Bật</h2>
+            <p className="text-slate-500 dark:text-neutral-400 max-w-2xl mx-auto mb-12">Những hành trình được yêu thích nhất...</p>
             {loading && <LoadingSpinner />}
-            {/* (SỬA) Hiển thị lỗi rõ ràng hơn */}
             {error && <p className="text-center text-red-500 bg-red-100 dark:bg-red-900/20 p-4 rounded-md">{error}</p>}
             {!loading && !error && featuredTours.length > 0 && (
-                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-                {featuredTours.map((tour) => (
-                    <TourCard key={tour.id} tour={tour} isFeatured={true} />
-                ))}
-                </div>
+                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    {featuredTours.map((tour) => (
+                        <TourCard key={tour.id} tour={tour} isFeatured={true} />
+                    ))}
+                </div>
             )}
-            {!loading && !error && featuredTours.length === 0 && (
+             {!loading && !error && featuredTours.length === 0 && (
                 <p className="text-center text-neutral-500 italic">Chưa có tour nổi bật.</p>
-            )}
+             )}
         </div>
       </section>
       
-      {/* ĐIỂM ĐẾN YÊU THÍCH (SỬA: Sửa lỗi dark mode) */}
+      {/* ĐIỂM ĐẾN YÊU THÍCH */}
       <section className="py-20 bg-white dark:bg-neutral-800">
-        <div className="max-w-7xl mx-auto px-6">
-            <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-4 dark:text-white">🏖️ Điểm Đến Yêu Thích</h2>
-            <p className="text-slate-500 dark:text-neutral-400 max-w-2xl mx-auto">Khám phá vẻ đẹp bất tận của Việt Nam qua những điểm đến không thể bỏ lỡ.</p>
-            </div>
-            <div className="flex justify-center flex-wrap gap-x-6 gap-y-2 mb-8 border-b dark:border-neutral-700">
-            {tabs.map((tab) => (
-                <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`px-3 py-2 font-semibold transition-colors duration-300 relative ${activeTab === tab.key ? 'text-sky-600' : 'text-slate-500 dark:text-neutral-300 hover:text-sky-500'}`}>
-                {tab.label}
-                {activeTab === tab.key && <motion.div className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-sky-600" layoutId="underline" />}
-                </button>
-            ))}
-            </div>
-            <motion.div key={activeTab} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="grid grid-cols-2 md:grid-cols-4 md:grid-flow-row-dense gap-4 auto-rows-[250px]">
-            {destinationsData[activeTab] && destinationsData[activeTab].length > 0 ? (
-                destinationsData[activeTab].map((dest, index) => (
-                <motion.div key={`${activeTab}-${index}`} className={`relative rounded-2xl overflow-hidden shadow-lg group cursor-pointer ${dest.gridClass}`} whileHover={{ scale: 1.03 }} transition={{ type: 'spring', stiffness: 300 }}>
-                    <img src={dest.image} alt={dest.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end p-5">
-                    <h3 className="text-white text-xl font-bold drop-shadow-lg">{dest.name}</h3>
-                    </div>
-                </motion.div>
-                ))
-            ) : (
-                <div className="col-span-full text-center text-slate-500 dark:text-neutral-400 py-10">
-                <p>Chưa có điểm đến nào cho khu vực này. Vui lòng quay lại sau.</p>
-                </div>
-            )}
-            </motion.div>
-        </div>
+        <div className="max-w-7xl mx-auto px-6">
+            <div className="text-center mb-12">
+                <h2 className="text-3xl font-bold mb-4 dark:text-white">🏖️ Điểm Đến Yêu Thích</h2>
+                <p className="text-slate-500 dark:text-neutral-400 max-w-2xl mx-auto">Khám phá vẻ đẹp bất tận của Việt Nam...</p>
+            </div>
+            <div className="flex justify-center flex-wrap gap-x-6 gap-y-2 mb-8 border-b dark:border-neutral-700">
+                {tabs.map((tab) => (
+                    <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`px-3 py-2 font-semibold transition-colors duration-300 relative ${activeTab === tab.key ? 'text-sky-600' : 'text-slate-500 dark:text-neutral-300 hover:text-sky-500'}`}>
+                        {tab.label}
+                        {activeTab === tab.key && <motion.div className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-sky-600" layoutId="underline" />}
+                    </button>
+                ))}
+            </div>
+            <motion.div key={activeTab} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="grid grid-cols-2 md:grid-cols-4 md:grid-flow-row-dense gap-4 auto-rows-[250px]">
+                {destinationsData[activeTab] && destinationsData[activeTab].length > 0 ? (
+                    destinationsData[activeTab].map((dest, index) => (
+                        <motion.div key={`${activeTab}-${index}`} className={`relative rounded-2xl overflow-hidden shadow-lg group cursor-pointer ${dest.gridClass}`} whileHover={{ scale: 1.03 }} transition={{ type: 'spring', stiffness: 300 }}>
+                            <img src={dest.image} alt={dest.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end p-5">
+                                <h3 className="text-white text-xl font-bold drop-shadow-lg">{dest.name}</h3>
+                            </div>
+                        </motion.div>
+                    ))
+                ) : (
+                    <div className="col-span-full text-center text-slate-500 dark:text-neutral-400 py-10">
+                        <p>Chưa có điểm đến nào cho khu vực này. Vui lòng quay lại sau.</p>
+                    </div>
+                )}
+            </motion.div>
+        </div>
       </section>
 
-      {/* BLOG DU LỊCH (Giữ nguyên) */}
+      {/* BLOG DU LỊCH */}
       <section className="py-20">
-        <div className="max-w-7xl mx-auto px-6">
-            <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold mb-4 dark:text-white">📰 Cẩm Nang Du Lịch</h2>
-                <p className="text-slate-500 dark:text-neutral-400 max-w-2xl mx-auto">Những bài viết chia sẻ kinh nghiệm, mẹo hay và cảm hứng cho chuyến đi sắp tới của bạn.</p>
-            </div>
-            <div className="grid md:grid-cols-3 gap-8">
-            {blogs.map((post) => (
-                <motion.div key={post.id} whileHover={{ y: -8 }} className="bg-white dark:bg-neutral-800 rounded-2xl shadow-md hover:shadow-xl overflow-hidden cursor-pointer transition-all duration-300 group">
-                    <div className="overflow-hidden h-56">
-                        <img src={post.image} alt={post.title} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                    </div>
-                    <div className="p-6">
-                        <h3 className="font-semibold text-lg mb-2 h-14 dark:text-white">{post.title}</h3>
-                        <p className="text-slate-500 dark:text-neutral-400 text-sm mb-4 line-clamp-2">{post.excerpt}</p>
-                        <button className="font-semibold text-sky-600 hover:text-sky-700">Đọc thêm →</button>
-                    </div>
-                </motion.div>
-            ))}
-            </div>
-        </div>
+        <div className="max-w-7xl mx-auto px-6">
+             <div className="text-center mb-12">
+                <h2 className="text-3xl font-bold mb-4 dark:text-white">📰 Cẩm Nang Du Lịch</h2>
+                <p className="text-slate-500 dark:text-neutral-400 max-w-2xl mx-auto">Những bài viết chia sẻ kinh nghiệm...</p>
+            </div>
+            <div className="grid md:grid-cols-3 gap-8">
+                {blogs.map((post) => (
+                    <motion.div key={post.id} whileHover={{ y: -8 }} className="bg-white dark:bg-neutral-800 rounded-2xl shadow-md hover:shadow-xl overflow-hidden cursor-pointer transition-all duration-300 group">
+                        <div className="overflow-hidden h-56">
+                            <img src={post.image} alt={post.title} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                        </div>
+                        <div className="p-6">
+                            <h3 className="font-semibold text-lg mb-2 h-14 dark:text-white">{post.title}</h3>
+                            <p className="text-slate-500 dark:text-neutral-400 text-sm mb-4 line-clamp-2">{post.excerpt}</p>
+                            <button className="font-semibold text-sky-600 hover:text-sky-700">Đọc thêm →</button>
+                        </div>
+                    </motion.div>
+                ))}
+            </div>
+        </div>
       </section>
       
-      {/* TẠI SAO CHỌN CHÚNG TÔI (SỬA: Sửa lỗi dark mode) */}
+      {/* TẠI SAO CHỌN CHÚNG TÔI */}
       <section className="py-20 bg-white dark:bg-neutral-800">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-            <h2 className="text-3xl font-bold mb-4 dark:text-white">💖 Tại Sao Chọn TourZen?</h2>
-            <p className="text-slate-500 dark:text-neutral-400 max-w-2xl mx-auto mb-12">Chúng tôi không chỉ bán tour, chúng tôi mang đến những hành trình và kỷ niệm trọn đời.</p>
-            <div className="grid md:grid-cols-3 gap-10">
-            {features.map((feature, index) => (
-                <motion.div key={index} initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.5 }} transition={{ duration: 0.5, delay: index * 0.1 }} className="flex flex-col items-center">
-                    <div className="bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 w-20 h-20 rounded-full flex items-center justify-center text-4xl mb-4">
-                        {feature.icon}
-                    </div>
-                    <h3 className="text-xl font-semibold mb-2 dark:text-white">{feature.title}</h3>
-                    <p className="text-slate-500 dark:text-neutral-400 leading-relaxed">{feature.description}</p>
-                </motion.div>
-            ))}
-            </div>
-        </div>
+        <div className="max-w-7xl mx-auto px-6 text-center">
+            <h2 className="text-3xl font-bold mb-4 dark:text-white">💖 Tại Sao Chọn TourZen?</h2>
+            <p className="text-slate-500 dark:text-neutral-400 max-w-2xl mx-auto mb-12">Chúng tôi không chỉ bán tour...</p>
+            <div className="grid md:grid-cols-3 gap-10">
+                {features.map((feature, index) => (
+                    <motion.div key={index} initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.5 }} transition={{ duration: 0.5, delay: index * 0.1 }} className="flex flex-col items-center">
+                        <div className="bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 w-20 h-20 rounded-full flex items-center justify-center text-4xl mb-4">
+                            {feature.icon}
+                        </div>
+                        <h3 className="text-xl font-semibold mb-2 dark:text-white">{feature.title}</h3>
+                        <p className="text-slate-500 dark:text-neutral-400 leading-relaxed">{feature.description}</p>
+                    </motion.div>
+                ))}
+            </div>
+        </div>
       </section>
     </div>
   );
