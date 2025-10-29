@@ -1,6 +1,7 @@
 // src/pages/Payment.jsx
 // (V9: Sửa lỗi 400 (Bad Request) khi insert vào Bookings)
 // (V10: Sửa lỗi logic hiển thị dịch vụ, thêm hiển thị inventory)
+// (V11: Xóa code bị lặp ở cuối file)
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -426,7 +427,7 @@ export default function Payment() {
         setIsCheckingVoucher(false);
     };
 
-// --- (CẬP NHẬT) HÀM CHECKOUT (ĐÃ SỬA: Thêm logic trừ inventory Dịch vụ) ---
+// --- (CẬP NHẬT) HÀM CHECKOUT (ĐÃ SỬA: Thêm 'async' và logic trừ inventory Dịch vụ) ---
     const handleCheckout = async (e) => {
         e.preventDefault();
 
@@ -561,7 +562,7 @@ export default function Payment() {
             );
         } // Hết vòng lặp
 
-        // 3. Xử lý kết quả insert (Như cũ)
+        // 3. Xử lý kết quả insert
         if (!bookingErrorOccurred) {
             try {
                 const results = await Promise.all(bookingPromises);
@@ -604,43 +605,6 @@ export default function Payment() {
         setIsSubmitting(false);
     };
     // --- KẾT THÚC CHECKOUT ---
-
-        // 3. Xử lý kết quả insert
-        if (!bookingErrorOccurred) {
-            try {
-                const results = await Promise.all(bookingPromises);
-                
-                // SỬA LỖI 400: results là [{ data: [{id: 123}] }, ...]
-                // Ta cần truy cập r.data[0].id
-                successfulBookingIds = results.map(r => r.data?.[0]?.id).filter(Boolean);
-
-                // Nếu tất cả thành công
-                // TODO: Gửi email xác nhận
-                
-                if (!isBuyNow) clearCart(); // Xóa giỏ hàng nếu không phải Buy Now
-                toast.success("Đặt tour thành công! Kiểm tra email để xem chi tiết.");
-                
-                // SỬA LỖI (PaymentSuccess): Gửi đầy đủ thông tin
-                navigate('/booking-success', { 
-                    state: { 
-                        bookingIds: successfulBookingIds,
-                        method: paymentMethod,
-                        branch: selectedBranch,
-                        deadline: formattedDeadline
-                    } 
-                });
-
-            } catch (insertError) { 
-                 console.error("Lỗi insert Bookings:", insertError);
-                 toast.error("Lỗi khi lưu đơn hàng. Đang thử hoàn lại chỗ...");
-                 bookingErrorOccurred = true;
-                 // TODO: Rollback RPC (gọi RPC khác để trừ đi guest_count_input)
-            }
-        }
-
-        setIsSubmitting(false);
-    };
-    // --- KẾT THÚC CHECKOUT ---
 
     // --- Render ---
     if (!isBuyNow && cartItemsFromContext.length === 0) {
