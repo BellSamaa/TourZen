@@ -444,7 +444,7 @@ export default function Payment() {
         setIsSubmitting(true);
         let bookingErrorOccurred = false;
         let successfulBookingIds = [];
-        const bookingPromises = []; // <-- SỬA LỖI: Khai báo mảng
+        const bookingPromises = []; 
 
         // 2. Xử lý từng tour
         for (const item of displayItems) {
