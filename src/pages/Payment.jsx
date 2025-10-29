@@ -498,9 +498,14 @@ export default function Payment() {
         if (!bookingErrorOccurred) {
             try {
                 const results = await Promise.all(bookingPromises);
-                
-                // SỬA LỖI 400: results là [{ data: [{id: 123}] }, ...]
-                // Ta cần truy cập r.data[0].id
+                // --- THÊM ĐOẠN CODE KIỂM TRA NÀY ---
+                console.log("Database insert results:", results);
+                if (!results || results.length === 0 || !results[0].data || results[0].data.length === 0) {
+                    // Nếu insert không trả về dữ liệu (do RLS chặn), ném lỗi
+                    throw new Error("LỖI IM LẶNG: Insert đã chạy nhưng không trả về dữ liệu. (Kiểm tra RLS trên Bảng Bookings!)");
+                }
+                // --- KẾT THÚC ĐOẠN CODE KIỂM TRA ---
+
                 successfulBookingIds = results.map(r => r.data?.[0]?.id).filter(Boolean);
 
                 // Nếu tất cả thành công
