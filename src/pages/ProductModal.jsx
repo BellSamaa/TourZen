@@ -7,7 +7,8 @@ import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import { 
     X, FloppyDisk, CircleNotch, Plus, Trash, CalendarBlank, Ticket, CurrencyCny, Users, 
-    Image as ImageIcon, CloudArrowUp, ListDashes 
+    Image as ImageIcon, CloudArrowUp, ListDashes,
+    Minus // <-- (SỬA) ĐÃ THÊM ICON BỊ THIẾU
 } from '@phosphor-icons/react';
 
 const supabase = getSupabase();
