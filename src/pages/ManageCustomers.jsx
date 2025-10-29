@@ -838,7 +838,7 @@ export default function ManageCustomersSupabase() {
             />
           </FormModal>
         )}
-      </AnAtePresence>
+      </AnimatePresence>
       
       <AnimatePresence>
         {editingCustomer && (
