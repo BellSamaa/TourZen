@@ -1,10 +1,10 @@
 // src/pages/Home.jsx
-// (Phiên bản đầy đủ, kết nối Supabase, đã sửa lỗi 400 và lỗi điều hướng)
+// (Phiên bản đầy đủ, đã sửa lỗi 400, lỗi RPC và lỗi cú pháp JSX)
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom"; // Sửa: Dùng Link thay vì navigate on click
-import { getSupabase } from "../lib/supabaseClient"; // (Hãy chắc chắn đường dẫn này đúng)
+import { Link, useNavigate } from "react-router-dom"; // Sửa: Dùng Link
+import { getSupabase } from "../lib/supabaseClient"; // Import Supabase
 import { FaMapMarkerAlt, FaStar, FaAward, FaHeadset, FaTags } from "react-icons/fa";
 import { MapPin, Clock, Fire, Sun, CircleNotch, Ticket, ArrowRight } from "@phosphor-icons/react";
 
@@ -56,13 +56,19 @@ const destinationsData = {
     { name: 'Hà Giang', image: '/images/destinations/hagiang.jpg', gridClass: 'md:col-span-2' },
     { name: 'Lào Cai', image: '/images/destinations/laocai.jpg', gridClass: '' },
     { name: 'Ninh Bình', image: '/images/destinations/ninhbinh.jpg', gridClass: '' },
-    // ... (Giữ nguyên các điểm đến khác) ...
+    { name: 'Yên Bái', image: '/images/destinations/yenbai.jpg', gridClass: '' },
+    { name: 'Sơn La', image: '/images/destinations/sonla.jpg', gridClass: 'md:col-span-2' },
+    { name: 'Cao Bằng', image: '/images/destinations/caobang.jpg', gridClass: '' },
+    { name: 'Hải Phòng', image: '/images/destinations/haiphong.jpg', gridClass: '' },
+    { name: 'Hà Nội', image: '/images/destinations/hanoi.jpg', gridClass: '' },
   ],
   mienTrung: [
     { name: 'Đà Nẵng', image: '/images/destinations/danang.jpg', gridClass: 'md:col-span-2 md:row-span-2' },
     { name: 'Hội An', image: '/images/destinations/hoian.jpg', gridClass: 'md:col-span-2' },
     { name: 'Huế', image: '/images/destinations/hue.jpg', gridClass: '' },
-    // ... (Giữ nguyên các điểm đến khác) ...
+    { name: 'Quy Nhơn', image: '/images/destinations/quynhon.jpg', gridClass: '' },
+    { name: 'Nha Trang', image: '/images/destinations/nhatrang_dest.jpg', gridClass: '' },
+    { name: 'Phan Thiết', image: '/images/destinations/phanthiet.jpg', gridClass: 'md:col-span-2' },
   ],
   mienDongNamBo: [],
   mienTayNamBo: [],
@@ -279,7 +285,7 @@ export default function Home() {
         </div>
       </section>
       
-      {/* ĐIỂM ĐẾN YÊU THÍCH (Giữ nguyên) */}
+      {/* ĐIỂM ĐẾN YÊU THÍCH (SỬA: Sửa lỗi dark mode) */}
       <section className="py-20 bg-white dark:bg-neutral-800">
         <div className="max-w-7xl mx-auto px-6">
             <div className="text-center mb-12">
@@ -288,27 +294,7 @@ export default function Home() {
             </div>
             <div className="flex justify-center flex-wrap gap-x-6 gap-y-2 mb-8 border-b dark:border-neutral-700">
             {tabs.map((tab) => (
-                <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`px-3 py-2 font-semibold transition-colors duration-300 relative ${activeTab === tab.key ? 'text-sky-600' : 'text-slate-500 hover:text-sky-500'}`}>
-                {tab.label}
-                {activeTab === tab.key && <motion.div className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-sky-600" layoutId="underline" />}
-                </button>
-            ))}
-            </div>
-            <motion.div key={activeTab} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="grid grid-cols-2 md:grid-cols-4 md:grid-flow-row-dense gap-4 auto-rows-[250px]">
-            {destinationsData[activeTab] && destinationsData[activeTab].length > 0 ? (
-                destinationsData[activeTab].map((dest, index) => (
-                <motion.div key={`${activeTab}-${index}`} className={`relative rounded-2xl overflow-hidden shadow-lg group cursor-pointer ${dest.gridClass}`} whileHover={{ scale: 1.03 }} transition={{ type: 'spring', stiffness: 300 }}>
-                    <img src={dest.image} alt={dest.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end p-5">
-                    <h3 className="text-white text-xl font-bold drop-shadow-lg">{dest.name}</h3>
-                    </div>
-                </motion.div>
-                ))
-          _Bỏ_ lỡ.</p>
-            </div>
-            <div className="flex justify-center flex-wrap gap-x-6 gap-y-2 mb-8 border-b dark:border-neutral-700">
-            {tabs.map((tab) => (
-                <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`px-3 py-2 font-semibold transition-colors duration-300 relative ${activeTab === tab.key ? 'text-sky-600' : 'text-slate-500 hover:text-sky-500'}`}>
+                <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`px-3 py-2 font-semibold transition-colors duration-300 relative ${activeTab === tab.key ? 'text-sky-600' : 'text-slate-500 dark:text-neutral-300 hover:text-sky-500'}`}>
                 {tab.label}
                 {activeTab === tab.key && <motion.div className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-sky-600" layoutId="underline" />}
                 </button>
@@ -325,7 +311,7 @@ export default function Home() {
                 </motion.div>
                 ))
             ) : (
-                <div className="col-span-full text-center text-slate-500 py-10">
+                <div className="col-span-full text-center text-slate-500 dark:text-neutral-400 py-10">
                 <p>Chưa có điểm đến nào cho khu vực này. Vui lòng quay lại sau.</p>
                 </div>
             )}
@@ -333,7 +319,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* BLOG DU LỊCH (Giữ nguyên) */}
+      {/* BLOG DU LỊCH (SỬA: Sửa lỗi cú pháp và dark mode) */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-6">
             <div className="text-center mb-12">
@@ -345,65 +331,20 @@ export default function Home() {
                 <motion.div key={post.id} whileHover={{ y: -8 }} className="bg-white dark:bg-neutral-800 rounded-2xl shadow-md hover:shadow-xl overflow-hidden cursor-pointer transition-all duration-300 group">
                     <div className="overflow-hidden h-56">
                         <img src={post.image} alt={post.title} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                    </div>
-                    <div className="p-6">
-                        <h3 className="font-semibold text-lg mb-2 h-14 dark:text-white">{post.title}</h3>
-                        <p className="text-slate-500 dark:text-neutral-400 text-sm mb-4 line-clamp-2">{post.excerpt}</p>
-                        <button className="font-semibold text-sky-600 hover:text-sky-700">Đọc thêm →</button>
-                  _Bỏ_ lỡ.</p>
-            </div>
-            <div className="flex justify-center flex-wrap gap-x-6 gap-y-2 mb-8 border-b dark:border-neutral-700">
-            {tabs.map((tab) => (
-                <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`px-3 py-2 font-semibold transition-colors duration-300 relative ${activeTab === tab.key ? 'text-sky-600' : 'text-slate-500 hover:text-sky-500'}`}>
-                {tab.label}
-                {activeTab === tab.key && <motion.div className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-sky-600" layoutId="underline" />}
-                </button>
-            ))}
-            </div>
-            <motion.div key={activeTab} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="grid grid-cols-2 md:grid-cols-4 md:grid-flow-row-dense gap-4 auto-rows-[250px]">
-            {destinationsData[activeTab] && destinationsData[activeTab].length > 0 ? (
-                destinationsData[activeTab].map((dest, index) => (
-                <motion.div key={`${activeTab}-${index}`} className={`relative rounded-2xl overflow-hidden shadow-lg group cursor-pointer ${dest.gridClass}`} whileHover={{ scale: 1.03 }} transition={{ type: 'spring', stiffness: 300 }}>
-                    <img src={dest.image} alt={dest.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end p-5">
-                    <h3 className="text-white text-xl font-bold drop-shadow-lg">{dest.name}</h3>
-                    </div>
-                </motion.div>
-                ))
-            ) : (
-                <div className="col-span-full text-center text-slate-500 py-10">
-                <p>Chưa có điểm đến nào cho khu vực này. Vui lòng quay lại sau.</p>
-                </div>
-            )}
-            </motion.div>
-        </div>
-      </section>
-
-      {/* BLOG DU LỊCH (Giữ nguyên) */}
-      <section className="py-20">
-        <div className="max-w-7xl mx-auto px-6">
-            <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold mb-4 dark:text-white">📰 Cẩm Nang Du Lịch</h2>
-                <p className="text-slate-500 dark:text-neutral-400 max-w-2xl mx-auto">Những bài viết chia sẻ kinh nghiệm, mẹo hay và cảm hứng cho chuyến đi sắp tới của bạn.</p>
-            </div>
-            <div className="grid md:grid-cols-3 gap-8">
-            {blogs.map((post) => (
-                <motion.div key={post.id} whileHover={{ y: -8 }} className="bg-white dark:bg-neutral-800 rounded-2xl shadow-md hover:shadow-xl overflow-hidden cursor-pointer transition-all duration-300 group">
-                    <div className="overflow-hidden h-56">
-                        <img src={post.image} alt={post.title} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                    </div>
-                    <div className="p-6">
-                        <h3 className="font-semibold text-lg mb-2 h-14 dark:text-white">{post.title}</h3>
-                        <p className="text-slate-500 dark:text-neutral-400 text-sm mb-4 line-clamp-2">{post.excerpt}</p>
-                        <button className="font-semibold text-sky-600 hover:text-sky-700">Đọc thêm →</button>
-                    </div>
-                </motion.div>
+Â                  </div>
+Â                  <div className="p-6">
+Â                      <h3 className="font-semibold text-lg mb-2 h-14 dark:text-white">{post.title}</h3>
+Â                      <p className="text-slate-500 dark:text-neutral-400 text-sm mb-4 line-clamp-2">{post.excerpt}</p>
+                        {/* (SỬA LỖI) Xóa dòng text rác, chỉ giữ lại button */}
+Â                      <button className="font-semibold text-sky-600 hover:text-sky-700">Đọc thêm →</button>
+Â                  </div>
+Â              </motion.div>
             ))}
             </div>
         </div>
       </section>
       
-      {/* TẠI SAO CHỌN CHÚNG TÔI (Giữ nguyên) */}
+      {/* TẠI SAO CHỌN CHÚNG TÔI (SỬA: Sửa lỗi dark mode) */}
       <section className="py-20 bg-white dark:bg-neutral-800">
         <div className="max-w-7xl mx-auto px-6 text-center">
             <h2 className="text-3xl font-bold mb-4 dark:text-white">💖 Tại Sao Chọn TourZen?</h2>
@@ -411,7 +352,7 @@ export default function Home() {
             <div className="grid md:grid-cols-3 gap-10">
             {features.map((feature, index) => (
                 <motion.div key={index} initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.5 }} transition={{ duration: 0.5, delay: index * 0.1 }} className="flex flex-col items-center">
-                    <div className="bg-sky-100 text-sky-600 w-20 h-20 rounded-full flex items-center justify-center text-4xl mb-4">
+                    <div className="bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 w-20 h-20 rounded-full flex items-center justify-center text-4xl mb-4">
                         {feature.icon}
                     </div>
                     <h3 className="text-xl font-semibold mb-2 dark:text-white">{feature.title}</h3>
