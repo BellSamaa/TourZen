@@ -340,7 +340,7 @@ export default function ManageTour() {
                     user:user_id ( id, full_name, email ),
                     product:product_id ( id, name, image_url ),
                     hotel:hotel_product_id (id, name),
-                    transport:transport_product_id (id, name),
+                    transport:Products!Bookings_transport_product_id_fkey (id, name),
                     flight:flight_product_id (id, name),
                     voucher_code, voucher_discount, notes, payment_method
                 `, { count: 'exact' }); // Lấy count để phân trang
