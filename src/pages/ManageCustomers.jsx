@@ -1,12 +1,10 @@
 // ManageCustomersSupabase.jsx
-/* NÂNG CẤP LỚN v4: "Luxury & Professional"
-  1. (Font) Thêm Google Font "Poppins" cho toàn trang.
-  2. (UI) Tiêu đề chính H1 dùng Gradient Text.
-  3. (UI) Thẻ Stats có shadow 3D và hiệu ứng hover "nổi" lên.
-  4. (UI) Tăng padding "cực lớn" cho bảng để tạo độ "thoáng" và sang trọng.
-  5. (UI) Nền trang và nền modal dùng gradient siêu mịn.
-  6. (UI) Modal dùng Backdrop Blur (làm mờ nền).
-  7. (UI) Phân cấp Typography rõ rệt (Tên to, SĐT nhỏ).
+/* NÂNG CẤP LỚN v5: "Modal Form & Add Function"
+  1. (Font) Đảm bảo font 'Poppins' được áp dụng cho toàn bộ component.
+  2. (UX) Thay thế "Inline Editing" (chỉnh sửa tại chỗ) bằng "Modal Form" (form trong popup).
+  3. (Form) Form chỉnh sửa giờ đây hiển thị đầy đủ thông tin (bao gồm cả email - không cho sửa).
+  4. (Feature) Sửa lỗi nút "Thêm Khách Hàng". Giờ đây nút này sẽ mở một form modal để thêm khách hàng mới.
+  5. (Code) Tái cấu trúc, tạo component `CustomerForm` để dùng chung cho cả Thêm mới và Chỉnh sửa.
 */
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
@@ -14,6 +12,7 @@ import { FaSpinner, FaSearch, FaTrash } from "react-icons/fa";
 import {
   UserList, CaretLeft, CaretRight, CircleNotch, X, Plus, UsersThree, Crown, Sparkle, Wallet,
   PencilSimple, Check, XCircle, List, Package, Bed, Airplane, Receipt, Cake, Info,
+  User, Envelope, Phone, House, CalendarBlank
 } from "@phosphor-icons/react";
 import { getSupabase } from "../lib/supabaseClient";
 import toast from "react-hot-toast";
@@ -21,7 +20,6 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const supabase = getSupabase();
 const ITEMS_PER_PAGE = 10;
-const VIP_THRESHOLD = 20000000;
 
 // --- Hooks & Helpers (Giữ nguyên) ---
 const useDebounce = (value, delay) => {
@@ -92,7 +90,7 @@ const StatCard = ({ title, value, icon, loading }) => (
   </motion.div>
 );
 
-// --- Component Lấy Dữ Liệu Thống Kê (ĐÃ SỬA LỖI ĐẾM VIP) ---
+// --- Component Lấy Dữ Liệu Thống Kê (Giữ nguyên) ---
 const CustomerStats = () => {
   const [stats, setStats] = useState({ total: 0, vip: 0, new: 0, spend: 0 });
   const [loading, setLoading] = useState(true);
@@ -101,14 +99,12 @@ const CustomerStats = () => {
     const fetchStats = async () => {
       setLoading(true);
       try {
-        // 1. Tổng khách hàng (role 'user')
         const { count: totalCount, error: totalErr } = await supabase
           .from("Users")
           .select("id", { count: "exact", head: true })
           .eq("role", "user");
         if (totalErr) throw totalErr;
 
-        // 2. Tổng chi tiêu (từ Bookings)
         const { data: spendData, error: spendErr } = await supabase
           .from("Bookings")
           .select("total_price")
@@ -119,7 +115,6 @@ const CustomerStats = () => {
           0
         );
 
-        // 3. Khách hàng mới (30 ngày qua)
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const { count: newCount, error: newErr } = await supabase
@@ -129,22 +124,20 @@ const CustomerStats = () => {
           .gte("created_at", thirtyDaysAgo.toISOString());
         if (newErr) console.warn("Lỗi fetch new users:", newErr.message);
 
-        // 4. (SỬA LỖI) Đếm khách hàng VIP từ cột "customer_tier"
         const { count: vipCount, error: vipErr } = await supabase
           .from("Users")
           .select("id", { count: "exact", head: true })
           .eq("role", "user")
-          .eq("customer_tier", "VIP"); // <<< ĐÂY LÀ THAY ĐỔI QUAN TRỌNG
+          .eq("customer_tier", "VIP"); 
           
         if (vipErr) {
             console.error("Lỗi đếm VIP:", vipErr);
             throw vipErr;
         }
         
-        // 5. Cập nhật State
         setStats({
           total: totalCount || 0,
-          vip: vipCount || 0, // <<< Sử dụng số đếm mới
+          vip: vipCount || 0,
           new: newCount || 0,
           spend: totalSpend,
         });
@@ -175,7 +168,7 @@ const CustomerStats = () => {
   );
 };
 
-// --- (NÂNG CẤP) Component Modal Xem Chi Tiết Đơn Hàng ---
+// --- (NÂNG CẤP) Component Modal Xem Chi Tiết Đơn Hàng (Giữ nguyên) ---
 const CustomerBookingsModal = ({ customer, onClose }) => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -183,7 +176,6 @@ const CustomerBookingsModal = ({ customer, onClose }) => {
 
   useEffect(() => {
     if (!customer) return;
-    // Logic fetch RPC (giữ nguyên)
     const fetchBookings = async () => {
       setLoading(true); setError(null);
       try {
@@ -297,6 +289,182 @@ const CustomerBookingsModal = ({ customer, onClose }) => {
   );
 };
 
+// --- (MỚI v5) Component Form Tái Sử Dụng ---
+const CustomerForm = ({ initialData, onSubmit, isSaving, onCancel }) => {
+  const [formData, setFormData] = useState({
+    full_name: initialData?.full_name || '',
+    email: initialData?.email || '',
+    phone_number: initialData?.phone_number || '',
+    address: initialData?.address || '',
+    ngay_sinh: initialData?.ngay_sinh ? initialData.ngay_sinh.split('T')[0] : '',
+    customer_tier: initialData?.customer_tier || 'Tiêu chuẩn',
+  });
+  const isEditMode = !!initialData;
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!formData.full_name?.trim()) {
+      toast.error("Tên khách hàng không được để trống.");
+      return;
+    }
+    if (!formData.email?.trim()) {
+      toast.error("Email không được để trống.");
+      return;
+    }
+    // Convert empty string to null for optional fields
+    const dataToSubmit = {
+      ...formData,
+      phone_number: formData.phone_number?.trim() || null,
+      address: formData.address?.trim() || null,
+      ngay_sinh: formData.ngay_sinh || null,
+    };
+    onSubmit(dataToSubmit);
+  };
+
+  const InputWrapper = ({ label, icon, children }) => (
+    <div className="mb-5">
+      <label className="flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+        {icon}
+        {label}
+      </label>
+      <div className="relative">
+        {children}
+      </div>
+    </div>
+  );
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+        <InputWrapper label="Họ và Tên" icon={<User size={18} className="mr-2" />}>
+          <input
+            type="text"
+            name="full_name"
+            value={formData.full_name}
+            onChange={handleChange}
+            className="form-input-style"
+            placeholder="Nguyễn Văn A"
+            required
+          />
+        </InputWrapper>
+
+        <InputWrapper label="Email" icon={<Envelope size={18} className="mr-2" />}>
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            className={`form-input-style ${isEditMode ? 'bg-gray-100 dark:bg-slate-700 cursor-not-allowed' : ''}`}
+            placeholder="example@gmail.com"
+            required
+            disabled={isEditMode} // Không cho sửa email khi edit
+          />
+        </InputWrapper>
+
+        <InputWrapper label="Số Điện Thoại" icon={<Phone size={18} className="mr-2" />}>
+          <input
+            type="tel"
+            name="phone_number"
+            value={formData.phone_number}
+            onChange={handleChange}
+            className="form-input-style"
+            placeholder="090..."
+          />
+        </InputWrapper>
+
+        <InputWrapper label="Ngày Sinh" icon={<CalendarBlank size={18} className="mr-2" />}>
+          <input
+            type="date"
+            name="ngay_sinh"
+            value={formData.ngay_sinh}
+            onChange={handleChange}
+            className="form-input-style"
+          />
+        </InputWrapper>
+      </div>
+
+      <InputWrapper label="Địa chỉ" icon={<House size={18} className="mr-2" />}>
+        <textarea
+          name="address"
+          value={formData.address}
+          onChange={handleChange}
+          className="form-input-style min-h-[80px]"
+          placeholder="Số 1, đường..."
+        />
+      </InputWrapper>
+
+      <InputWrapper label="Phân loại khách hàng" icon={<Crown size={18} className="mr-2" />}>
+        <select
+          name="customer_tier"
+          value={formData.customer_tier}
+          onChange={handleChange}
+          className="form-input-style"
+        >
+          {CUSTOMER_TIERS.map(tier => (
+            <option key={tier} value={tier}>{tier}</option>
+          ))}
+        </select>
+      </InputWrapper>
+
+      {/* Nút bấm */}
+      <div className="flex justify-end gap-4 pt-6 border-t dark:border-slate-700 mt-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={isSaving}
+          className="modal-button-secondary"
+        >
+          Hủy
+        </button>
+        <button
+          type="submit"
+          disabled={isSaving}
+          className="modal-button-primary"
+        >
+          {isSaving ? (
+            <CircleNotch size={20} className="animate-spin" />
+          ) : (
+            isEditMode ? "Lưu thay đổi" : "Thêm Khách Hàng"
+          )}
+        </button>
+      </div>
+    </form>
+  );
+};
+
+// --- (MỚI v5) Component Modal Chung ---
+const FormModal = ({ title, onClose, children }) => (
+  <motion.div
+    className="fixed inset-0 bg-black/70 backdrop-blur-md z-40 flex justify-center items-center p-4"
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    exit={{ opacity: 0 }}
+  >
+    <motion.div
+      className="bg-white dark:bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 p-8 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col border border-gray-200 dark:border-slate-700"
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
+    >
+      <div className="flex justify-between items-center mb-6 pb-6 border-b dark:border-slate-700">
+        <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{title}</h3>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+          <X size={24} weight="bold" />
+        </button>
+      </div>
+      <div className="overflow-y-auto pr-2 -mr-4 simple-scrollbar">
+        {children}
+      </div>
+    </motion.div>
+  </motion.div>
+);
+
 
 // --- Component Chính ---
 export default function ManageCustomersSupabase() {
@@ -311,14 +479,16 @@ export default function ManageCustomersSupabase() {
   const [totalItems, setTotalItems] = useState(0);
   const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
 
-  const [editingCustomerId, setEditingCustomerId] = useState(null);
-  const [editingData, setEditingData] = useState({});
+  // --- (THAY ĐỔI v5) State cho Modal Form ---
   const [isSaving, setIsSaving] = useState(false);
+  const [isAddingCustomer, setIsAddingCustomer] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState(null); // Thay vì editingCustomerId
+  
   const [viewingBookingsCustomer, setViewingBookingsCustomer] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
-  // --- Fetch customers (Giữ nguyên logic) ---
+  // --- Fetch customers (Logic giữ nguyên) ---
   const fetchCustomers = useCallback(async (isInitialLoad = false) => {
     if (!isInitialLoad) setIsFetchingPage(true);
     setError(null);
@@ -390,44 +560,26 @@ export default function ManageCustomersSupabase() {
   }, [debouncedSearch]);
 
 
-  // --- Handlers cho INLINE EDIT (Giữ nguyên logic) ---
-  const handleStartEdit = (customer) => {
-    setEditingCustomerId(customer.id);
-    setEditingData({
-      full_name: customer.full_name || '',
-      address: customer.address || '',
-      phone_number: customer.phone_number || '',
-      customer_tier: customer.customer_tier || 'Tiêu chuẩn',
-      ngay_sinh: customer.ngay_sinh || '',
-    });
-  };
-
-  const handleCancelEdit = () => {
-    setEditingCustomerId(null); setEditingData({}); setIsSaving(false);
-  };
-
-  const handleEditDataChange = (field, value) => {
-    setEditingData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleSaveEdit = async () => {
-    if (!editingCustomerId || isSaving) return;
-    if (!editingData.full_name?.trim()) { toast.error("Tên khách hàng không được để trống."); return; }
+  // --- (MỚI v5) Handlers cho Modal Form ---
+  
+  // Handler để LƯU KHÁCH HÀNG CẬP NHẬT
+  const handleUpdateCustomer = async (formData) => {
+    if (!editingCustomer || isSaving) return;
 
     setIsSaving(true);
     const updateData = {
-        full_name: editingData.full_name.trim(),
-        address: editingData.address?.trim() || null,
-        phone_number: editingData.phone_number?.trim() || null,
-        customer_tier: editingData.customer_tier,
-        ngay_sinh: editingData.ngay_sinh || null,
+        full_name: formData.full_name,
+        address: formData.address,
+        phone_number: formData.phone_number,
+        customer_tier: formData.customer_tier,
+        ngay_sinh: formData.ngay_sinh,
     };
 
     try {
-      const { error } = await supabase.from("Users").update(updateData).eq("id", editingCustomerId);
+      const { error } = await supabase.from("Users").update(updateData).eq("id", editingCustomer.id);
       if (error) throw error;
       toast.success("Cập nhật khách hàng thành công!");
-      handleCancelEdit();
+      setEditingCustomer(null);
       fetchCustomers();
     } catch (err) {
       console.error("Lỗi lưu:", err);
@@ -436,6 +588,39 @@ export default function ManageCustomersSupabase() {
       setIsSaving(false);
     }
   };
+
+  // Handler để THÊM KHÁCH HÀNG MỚI
+  const handleAddNewCustomer = async (formData) => {
+    if (isSaving) return;
+    setIsSaving(true);
+    
+    // Thêm 'role: user' vào data
+    const insertData = {
+      ...formData,
+      role: 'user'
+    };
+
+    try {
+      // Vì email là unique, Supabase Auth có thể từ chối nếu email đã tồn tại
+      // Đây chỉ là thêm profile, không phải tạo tài khoản auth
+      const { error } = await supabase.from("Users").insert([insertData]); 
+      if (error) {
+        if (error.code === '23505') { // Lỗi unique violation
+          throw new Error("Email này đã tồn tại trong hệ thống.");
+        }
+        throw error;
+      }
+      toast.success("Thêm khách hàng mới thành công!");
+      setIsAddingCustomer(null);
+      fetchCustomers(); // Tải lại trang đầu
+    } catch (err) {
+      console.error("Lỗi thêm mới:", err);
+      toast.error(`Thêm thất bại: ${err.message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
 
   // --- Delete Handlers (Giữ nguyên) ---
   const openDeleteConfirm = (c) => {
@@ -447,6 +632,8 @@ export default function ManageCustomersSupabase() {
   const handleDelete = async () => {
     if (!selectedCustomer) return;
     try {
+      // NOTE: This might fail if RLS (Row Level Security) is strict
+      // This only deletes the 'Users' profile, not the auth user
       const { error } = await supabase.from("Users").delete().eq("id", selectedCustomer.id);
       if (error) throw error;
       toast.success(`Đã xóa hồ sơ "${selectedCustomer.full_name || selectedCustomer.email}"!`);
@@ -464,7 +651,7 @@ export default function ManageCustomersSupabase() {
   // --- (NÂNG CẤP) Loading Screen ---
   if (loading) {
     return (
-      <div className="flex flex-col justify-center items-center h-screen bg-gradient-to-b from-gray-50 to-white dark:from-slate-900 dark:to-slate-800">
+      <div className="flex flex-col justify-center items-center h-screen bg-gradient-to-b from-gray-50 to-white dark:from-slate-900 dark:to-slate-800 font-sans">
         <CircleNotch className="animate-spin text-sky-500" size={52} />
         <p className="text-slate-500 dark:text-slate-400 mt-5 font-semibold text-lg"> Đang tải dữ liệu... </p>
       </div>
@@ -473,12 +660,12 @@ export default function ManageCustomersSupabase() {
 
   return (
     <motion.div
-      className="max-w-8xl mx-auto p-6 sm:p-8 space-y-8 min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-slate-900 dark:to-slate-800"
+      className="max-w-8xl mx-auto p-6 sm:p-8 space-y-8 min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-slate-900 dark:to-slate-800 font-sans" // (FIX v5) Thêm 'font-sans'
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
     >
-      {/* (NÂNG CẤP) Tiêu đề & Nút Thêm */}
+      {/* (NÂNG CẤP v5) Tiêu đề & Nút Thêm (đã sửa) */}
       <div className="flex flex-wrap items-center justify-between gap-5">
         <div>
           <motion.h1 
@@ -495,7 +682,7 @@ export default function ManageCustomersSupabase() {
           </p>
         </div>
         <button
-          onClick={() => toast('Chức năng "Thêm Khách Hàng" cần quy trình mời (invite) riêng.', { icon: "ℹ️" })}
+          onClick={() => setIsAddingCustomer(true)} // (FIX v5) Mở modal thêm
           className="flex items-center gap-2.5 px-6 py-3 bg-gradient-to-r from-sky-500 to-sky-600 text-white rounded-xl shadow-lg shadow-sky-500/30 hover:shadow-xl hover:shadow-sky-500/40 hover:-translate-y-0.5 transition-all duration-300 font-semibold focus:outline-none focus:ring-4 focus:ring-sky-300"
         >
           <Plus size={20} weight="bold" />
@@ -552,62 +739,45 @@ export default function ManageCustomersSupabase() {
               {!error && !loading && !isFetchingPage && customers.length === 0 && ( 
                 <tr>
                   <td colSpan="8" className="p-16 text-center text-gray-500">
-                    <Archive size={48} className="mx-auto text-gray-400" />
+                    <UserList size={48} className="mx-auto text-gray-400" />
                     <span className="mt-4 text-lg font-medium">{debouncedSearch ? "Không tìm thấy khách hàng." : "Chưa có dữ liệu."}</span>
                   </td>
                 </tr> 
               )}
               
               {!error && customers.map((c) => {
-                const isEditing = editingCustomerId === c.id;
-                const tierStyle = getCustomerTierStyle(isEditing ? editingData.customer_tier : c.customer_tier);
+                const tierStyle = getCustomerTierStyle(c.customer_tier);
                 
                 return (
                   <motion.tr
                     key={c.id}
-                    className={`transition-colors duration-200 ${isEditing ? 'bg-sky-50 dark:bg-sky-900/10' : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'}`}
+                    className="transition-colors duration-200 hover:bg-slate-50 dark:hover:bg-slate-700/30"
                     variants={cardVariants}
                     whileHover={{ y: -2 }}
                   >
                     {/* Họ và tên */}
                     <td className="td-style">
-                      {isEditing ? (
-                        <input type="text" value={editingData.full_name} onChange={(e) => handleEditDataChange('full_name', e.target.value)} className="inline-input-style" />
-                      ) : (
-                        <span className="font-bold text-lg text-slate-900 dark:text-white">{c.full_name || <span className="italic text-gray-400">...</span>}</span>
-                      )}
+                      <span className="font-bold text-lg text-slate-900 dark:text-white">{c.full_name || <span className="italic text-gray-400">...</span>}</span>
                     </td>
                     
                     {/* Liên hệ */}
                     <td className="td-style whitespace-nowrap">
                       <div className="flex flex-col gap-0.5">
                         <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{c.email}</span>
-                        {isEditing ? (
-                          <input type="text" placeholder="Số điện thoại" value={editingData.phone_number} onChange={(e) => handleEditDataChange('phone_number', e.target.value)} className="inline-input-style text-sm mt-1" />
-                        ) : (
-                          <span className="text-sm text-gray-500 dark:text-gray-400">{c.phone_number || "..."}</span>
-                        )}
+                        <span className="text-sm text-gray-500 dark:text-gray-400">{c.phone_number || "..."}</span>
                       </div>
                     </td>
                     
                     {/* Địa chỉ */}
                     <td className="td-style max-w-sm">
-                      {isEditing ? (
-                         <input type="text" placeholder="Địa chỉ" value={editingData.address} onChange={(e) => handleEditDataChange('address', e.target.value)} className="inline-input-style" />
-                      ) : (
-                        <span className="truncate block text-sm">{c.address || <span className="italic text-gray-400">...</span>}</span>
-                      )}
+                      <span className="truncate block text-sm">{c.address || <span className="italic text-gray-400">...</span>}</span>
                     </td>
 
                     {/* Ngày Sinh */}
                     <td className="td-style">
-                      {isEditing ? (
-                         <input type="date" value={editingData.ngay_sinh} onChange={(e) => handleEditDataChange('ngay_sinh', e.target.value)} className="inline-input-style text-sm" />
-                      ) : (
-                        <span className="text-sm whitespace-nowrap">
-                          {c.ngay_sinh ? new Date(c.ngay_sinh).toLocaleDateString('vi-VN') : <span className="italic text-gray-400">...</span>}
-                        </span>
-                      )}
+                      <span className="text-sm whitespace-nowrap">
+                        {c.ngay_sinh ? new Date(c.ngay_sinh).toLocaleDateString('vi-VN') : <span className="italic text-gray-400">...</span>}
+                      </span>
                     </td>
                     
                     {/* Số đơn */}
@@ -620,31 +790,18 @@ export default function ManageCustomersSupabase() {
                     
                     {/* Loại (Customer Tier) */}
                     <td className="td-style text-center">
-                      {isEditing ? (
-                        <select value={editingData.customer_tier} onChange={(e) => handleEditDataChange('customer_tier', e.target.value)} className="inline-select-style">
-                          {CUSTOMER_TIERS.map(tier => (<option key={tier} value={tier}>{tier}</option>))}
-                        </select>
-                      ) : (
-                        <span className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold ${tierStyle}`}>
-                          {c.customer_tier || 'Tiêu chuẩn'}
-                        </span>
-                      )}
+                      <span className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold ${tierStyle}`}>
+                        {c.customer_tier || 'Tiêu chuẩn'}
+                      </span>
                     </td>
                     
-                    {/* Thao tác (Actions) */}
+                    {/* (THAY ĐỔI v5) Thao tác (Actions) */}
                     <td className="td-style text-center whitespace-nowrap space-x-2">
-                      {isEditing ? (
                         <>
-                          <button onClick={handleSaveEdit} disabled={isSaving} className="action-button text-green-500 hover:bg-green-100 dark:hover:bg-green-900/30" title="Lưu"><Check size={20} weight="bold" /></button>
-                          <button onClick={handleCancelEdit} disabled={isSaving} className="action-button text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700/30" title="Hủy"><XCircle size={20} weight="bold" /></button>
+                          <button onClick={() => setViewingBookingsCustomer(c)} disabled={isFetchingPage || !!editingCustomer || isAddingCustomer} className="action-button text-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/30" title="Xem các đơn hàng"><List size={20} weight="bold" /></button>
+                          <button onClick={() => setEditingCustomer(c)} disabled={isFetchingPage || !!editingCustomer || isAddingCustomer} className="action-button text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa thông tin"><PencilSimple size={20} weight="bold" /></button>
+                          <button onClick={() => openDeleteConfirm(c)} disabled={isFetchingPage || !!editingCustomer || isAddingCustomer} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa hồ sơ"><FaTrash size={18} /></button>
                         </>
-                      ) : (
-                        <>
-                          <button onClick={() => setViewingBookingsCustomer(c)} disabled={isFetchingPage || editingCustomerId} className="action-button text-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/30" title="Xem các đơn hàng"><List size={20} weight="bold" /></button>
-                          <button onClick={() => handleStartEdit(c)} disabled={isFetchingPage || editingCustomerId} className="action-button text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa thông tin"><PencilSimple size={20} weight="bold" /></button>
-                          <button onClick={() => openDeleteConfirm(c)} disabled={isFetchingPage || editingCustomerId} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa hồ sơ"><FaTrash size={18} /></button>
-                        </>
-                      )}
                     </td>
                   </motion.tr>
                 );
@@ -654,7 +811,7 @@ export default function ManageCustomersSupabase() {
         </div>
       </div>
 
-      {/* --- Pagination UI --- */}
+      {/* --- Pagination UI (Giữ nguyên) --- */}
       {!loading && totalItems > ITEMS_PER_PAGE && (
         <div className="flex flex-col sm:flex-row justify-between items-center mt-6 text-base text-gray-600 dark:text-gray-400">
           <div> Hiển thị <span className="font-semibold text-gray-900 dark:text-white">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> - <span className="font-semibold text-gray-900 dark:text-white">{Math.min(currentPage * ITEMS_PER_PAGE, totalItems)}</span> trên <span className="font-semibold text-gray-900 dark:text-white">{totalItems}</span> khách hàng </div>
@@ -699,6 +856,34 @@ export default function ManageCustomersSupabase() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* (MỚI v5) Modal Thêm Khách Hàng */}
+      <AnimatePresence>
+        {isAddingCustomer && (
+          <FormModal title="Thêm Khách Hàng Mới" onClose={() => setIsAddingCustomer(false)}>
+            <CustomerForm
+              isSaving={isSaving}
+              onSubmit={handleAddNewCustomer}
+              onCancel={() => setIsAddingCustomer(false)}
+            />
+          </FormModal>
+        )}
+      </AnimatePresence>
+      
+      {/* (MỚI v5) Modal Sửa Khách Hàng */}
+      <AnimatePresence>
+        {editingCustomer && (
+          <FormModal title="Chỉnh Sửa Thông Tin Khách Hàng" onClose={() => setEditingCustomer(null)}>
+            <CustomerForm
+              initialData={editingCustomer}
+              isSaving={isSaving}
+              onSubmit={handleUpdateCustomer}
+              onCancel={() => setEditingCustomer(null)}
+            />
+          </FormModal>
+        )}
+      </AnimatePresence>
+      
       
       {/* (MỚI) Thêm Google Font "Poppins" */}
       <style jsx global>{`
@@ -711,13 +896,13 @@ export default function ManageCustomersSupabase() {
         }
       `}</style>
 
-      {/* --- CSS (NÂNG CẤP TOÀN DIỆN V4) --- */}
+      {/* --- CSS (NÂNG CẤP TOÀN DIỆN v5) --- */}
       <style jsx>{`
         .th-style { 
           @apply px-6 py-5 text-left text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider; 
         }
         .td-style { 
-          @apply px-6 py-6 text-sm text-gray-600 dark:text-gray-300 align-middle; /* Tăng padding */
+          @apply px-6 py-6 text-sm text-gray-600 dark:text-gray-300 align-middle;
         }
         .action-button { 
           @apply p-2 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-2 dark:focus:ring-offset-slate-800 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-110 active:scale-95; 
@@ -735,20 +920,20 @@ export default function ManageCustomersSupabase() {
           @apply px-2 py-1 text-gray-500 dark:text-gray-400; 
         }
         
-        /* (NÂNG CẤP) CSS cho Inline Editing */
-        .inline-input-style {
-          @apply p-2.5 border border-slate-300 dark:border-slate-600 rounded-lg w-full bg-white dark:bg-slate-700 focus:ring-2 focus:ring-sky-400 focus:border-sky-400 outline-none transition duration-200 text-sm;
-        }
-        .inline-select-style {
-          @apply p-2.5 border border-slate-300 dark:border-slate-600 rounded-lg w-full bg-white dark:bg-slate-700 focus:ring-2 focus:ring-sky-400 focus:border-sky-400 outline-none transition duration-200 text-xs;
+        /* (MỚI v5) CSS cho Form Input */
+        .form-input-style {
+          @apply p-3.5 border border-slate-300 dark:border-slate-600 rounded-lg w-full bg-white dark:bg-slate-700/50 focus:ring-2 focus:ring-sky-400 focus:border-sky-400 outline-none transition duration-200 text-base;
         }
 
         /* (NÂNG CẤP) Modal buttons */
         .modal-button-secondary { 
-          @apply px-6 py-3 bg-neutral-200 dark:bg-neutral-700 rounded-lg font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-600 text-sm transition-all duration-200; 
+          @apply px-6 py-3 bg-neutral-200 dark:bg-neutral-700 rounded-lg font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-600 text-sm transition-all duration-200 disabled:opacity-50; 
         }
         .modal-button-danger { 
           @apply px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 text-sm transition-all duration-200 shadow-lg shadow-red-500/30; 
+        }
+        .modal-button-primary {
+          @apply flex items-center justify-center px-6 py-3 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 text-sm transition-all duration-200 shadow-lg shadow-sky-500/30 disabled:opacity-50;
         }
 
         /* (NÂNG CẤP) Scrollbar cho Modal */
@@ -765,3 +950,4 @@ export default function ManageCustomersSupabase() {
     </motion.div>
   );
 }
+
