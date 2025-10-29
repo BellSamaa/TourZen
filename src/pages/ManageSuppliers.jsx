@@ -1,6 +1,7 @@
 // src/pages/ManageSuppliers.jsx
 // (UPGRADED: Thêm CRUD + Bật/Tắt cho Dịch vụ con)
 // (UPGRADED: Tăng kích thước / padding cho dễ nhìn)
+// (FIXED: Bổ sung logic CRUD cho NCC chính + Modal)
 
 import React, { useState, useEffect, useCallback, Fragment } from 'react';
 import { Link } from 'react-router-dom';
@@ -17,7 +18,8 @@ import {
 
 const supabase = getSupabase();
 
-const initialFormData = { name: '', user_id: '' };
+// (FIXED) Bổ sung đầy đủ trường cho form NCC chính
+const initialFormData = { name: '', user_id: '', phone: '', email: '', address: '' };
 
 // --- Hàm format tiền tệ (Giữ nguyên) ---
 const formatCurrency = (number) => {
@@ -27,7 +29,7 @@ const formatCurrency = (number) => {
 
 // ====================================================================
 // (MỚI) Component Modal Chỉnh sửa Dịch vụ (Hotel, Taxi, Flight)
-// (Nâng cấp để handle Thêm/Sửa)
+// (Giữ nguyên)
 // ====================================================================
 const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
     const [loading, setLoading] = useState(false);
@@ -154,7 +156,7 @@ const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
     );
 };
 // ====================================================================
-// Component con hiển thị Sản phẩm cần duyệt (Nâng cấp UI nhẹ)
+// Component con hiển thị Sản phẩm cần duyệt (Giữ nguyên)
 // ====================================================================
 const SupplierProductsApproval = ({ supplierId, supplierName }) => {
     const [products, setProducts] = useState([]);
@@ -371,7 +373,7 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
     );
 };
 // ====================================================================
-// Component con Quản lý Đặt chỗ (Bookings) (Nâng cấp UI nhẹ)
+// Component con Quản lý Đặt chỗ (Bookings) (Giữ nguyên)
 // ====================================================================
 const SupplierBookingsManagement = ({ supplierId, supplierContact }) => {
     // ... (Giữ nguyên logic của component này, chỉ sửa UI nhẹ) ...
@@ -413,24 +415,36 @@ const SupplierBookingsManagement = ({ supplierId, supplierContact }) => {
                 {!loading && ` (${bookings.length})`}
             </button>
             {/* ... (Phần còn lại của JSX cho Bookings giữ nguyên, giả định cũng sẽ bỏ text-xs để dùng text-sm) ... */}
+            
+            {/* (FIXED) Thêm hiển thị rỗng nếu mở */}
+            {isOpen && (
+                <div className="mt-3 pl-4 border-l-2 border-indigo-300 dark:border-indigo-700 space-y-2.5">
+                     {loading ? (
+                         <div className="py-2 flex items-center gap-1.5 text-sm text-neutral-500"> <CircleNotch size={16} className="animate-spin" /> Đang tải... </div>
+                     ) : (
+                         <p className="text-sm italic text-neutral-500 py-1">
+                            {bookings.length === 0 ? "Không có đặt chỗ nào." : "(Hiển thị danh sách đặt chỗ ở đây)"}
+                         </p>
+                     )}
+                </div>
+            )}
         </div>
     );
 };
 
 
 // ====================================================================
-// Component chính: ManageSuppliers (Giữ nguyên)
+// Component chính: ManageSuppliers (FIXED: Bổ sung logic)
 // ====================================================================
 export default function ManageSuppliers() {
-    // ... (Tất cả state, fetchSuppliers, fetchUsers, handlers giữ nguyên) ...
     const [suppliers, setSuppliers] = useState([]);
-    const [users, setUsers] = useState([]);
+    const [users, setUsers] = useState([]); // (FIXED) Dùng cho modal
     const [loading, setLoading] = useState(true);
     const [isFetchingPage, setIsFetchingPage] = useState(false); 
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [formData, setFormData] = useState(initialFormData);
-    const [editingId, setEditingId] = useState(null);
+    const [isModalOpen, setIsModalOpen] = useState(false); // (FIXED) Modal NCC chính
+    const [isSubmitting, setIsSubmitting] = useState(false); // (FIXED) Dùng cho modal
+    const [formData, setFormData] = useState(initialFormData); // (FIXED) Dùng cho modal
+    const [editingId, setEditingId] = useState(null); // (FIXED) Dùng cho modal
     const [error, setError] = useState(null); 
     
     // (Giữ nguyên)
@@ -457,13 +471,107 @@ export default function ManageSuppliers() {
         setLoading(false); 
         setIsFetchingPage(false);
     }, []);
-    const fetchUsers = async () => { /* ... */ };
+
+    // (FIXED) Bổ sung logic fetchUsers
+    const fetchUsers = async () => {
+        const { data, error } = await supabase
+            .from('Users')
+            .select('id, full_name, email')
+            .eq('role', 'supplier'); // Chỉ lấy user là supplier
+        if (error) {
+            console.error("Fetch Users Error:", error);
+        } else {
+            setUsers(data || []);
+        }
+    };
+
     useEffect(() => { fetchSuppliers(true); fetchUsers(); }, [fetchSuppliers]);
-    const handleOpenModal = (supplier = null) => { /* ... */ };
-    const handleCloseModal = () => { /* ... */ };
-    const handleChange = (e) => { /* ... */ };
-    const handleSubmit = async (e) => { /* ... */ };
-    const handleDelete = (supplierId, supplierName) => { /* ... */ };
+    
+    // (FIXED) Bổ sung logic Modal NCC
+    const handleOpenModal = (supplier = null) => {
+        if (supplier) {
+            setEditingId(supplier.id);
+            setFormData({
+                name: supplier.name || '',
+                user_id: supplier.user_id || '',
+                phone: supplier.phone || '',
+                email: supplier.email || '',
+                address: supplier.address || ''
+            });
+        } else {
+            setEditingId(null);
+            setFormData(initialFormData);
+        }
+        setIsModalOpen(true);
+    };
+
+    const handleCloseModal = () => {
+        setIsModalOpen(false);
+        setEditingId(null);
+        setFormData(initialFormData);
+    };
+
+    // (FIXED) Bổ sung logic handleChange
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    // (FIXED) Bổ sung logic handleSubmit
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!formData.name) {
+            toast.error("Tên nhà cung cấp là bắt buộc.");
+            return;
+        }
+        setIsSubmitting(true);
+        
+        const dataToSubmit = {
+            ...formData,
+            user_id: formData.user_id || null // Đảm bảo gửi null nếu trống
+        };
+
+        let error;
+        if (editingId) {
+            // Cập nhật
+            const { error: updateError } = await supabase
+                .from('Suppliers')
+                .update(dataToSubmit)
+                .eq('id', editingId);
+            error = updateError;
+        } else {
+            // Thêm mới
+            const { error: insertError } = await supabase
+                .from('Suppliers')
+                .insert(dataToSubmit);
+            error = insertError;
+        }
+
+        if (error) {
+            toast.error("Lỗi: " + error.message);
+        } else {
+            toast.success(editingId ? "Cập nhật thành công!" : "Thêm NCC thành công!");
+            handleCloseModal();
+            fetchSuppliers(false); // Tải lại danh sách
+        }
+        setIsSubmitting(false);
+    };
+
+    // (FIXED) Bổ sung logic handleDelete
+    const handleDelete = async (supplierId, supplierName) => {
+        if (!window.confirm(`Bạn có chắc muốn xóa nhà cung cấp "${supplierName}"? Hành động này không thể hoàn tác.`)) return;
+        
+        // (Lưu ý) Lý tưởng nhất là bạn nên có logic xóa dịch vụ con trước
+        // Hoặc cài đặt 'on delete cascade' trong database
+        
+        const { error } = await supabase.from('Suppliers').delete().eq('id', supplierId);
+        if (error) {
+            toast.error("Lỗi xóa NCC: " + error.message);
+        } else {
+            toast.success("Đã xóa nhà cung cấp.");
+            fetchSuppliers(false); // Tải lại danh sách
+        }
+    };
 
 
      // --- Loading ban đầu (Giữ nguyên) ---
@@ -569,7 +677,6 @@ export default function ManageSuppliers() {
                                         )}
                                         {!(supplier.phone || supplier.email || supplier.address) && ( <span className="italic">Chưa có thông tin</span> )}
                                     </td>
-                                    {/* (NÂNG CẤP) Tăng padding y, align-top */}
                                     <td className="td-style py-4 text-right whitespace-nowrap align-top">
                                         <div className="flex gap-1 justify-end">
                                             <button onClick={() => handleOpenModal(supplier)} className="action-button text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa NCC"><Pencil size={16} /></button>
@@ -583,8 +690,67 @@ export default function ManageSuppliers() {
                 </div>
             </div>
 
-            {/* Modal Form Thêm/Sửa NCC (Giữ nguyên) */}
-             {isModalOpen && ( /* ... */ null )} {/* (FIXED) Đã sửa lỗi syntax */}
+            {/* (FIXED) Bổ sung JSX cho Modal NCC chính */}
+            {isModalOpen && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4">
+                    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+                        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+                            <div className="flex justify-between items-center p-5 border-b dark:border-slate-700">
+                                <h3 className="text-xl font-semibold text-slate-800 dark:text-white">
+                                    {editingId ? 'Chỉnh sửa Nhà cung cấp' : 'Thêm Nhà cung cấp mới'}
+                                </h3>
+                                <button type="button" onClick={handleCloseModal} disabled={isSubmitting} className="text-gray-400 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50">
+                                    <X size={20} />
+                                </button>
+                            </div>
+                            
+                            <div className="p-6 space-y-4 overflow-y-auto">
+                                <div>
+                                    <label htmlFor="name" className="label-style">Tên Nhà cung cấp *</label>
+                                    <input id="name" type="text" name="name" value={formData.name} onChange={handleChange} required className="input-style" />
+                                </div>
+                                
+                                <div>
+                                    <label htmlFor="user_id" className="label-style">Tài khoản quản lý (Nếu có)</label>
+                                    <select id="user_id" name="user_id" value={formData.user_id} onChange={handleChange} className="input-style">
+                                        <option value="">-- Không liên kết --</option>
+                                        {users.map(user => (
+                                            <option key={user.id} value={user.id}>
+                                                {user.full_name} ({user.email})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                     <div>
+                                        <label htmlFor="phone" className="label-style">Số điện thoại (NCC)</label>
+                                        <input id="phone" type="tel" name="phone" value={formData.phone} onChange={handleChange} className="input-style" />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="email" className="label-style">Email (NCC)</label>
+                                        <input id="email" type="email" name="email" value={formData.email} onChange={handleChange} className="input-style" />
+                                    </div>
+                                </div>
+                               
+                                <div>
+                                    <label htmlFor="address" className="label-style">Địa chỉ (NCC)</label>
+                                    <textarea id="address" name="address" value={formData.address} onChange={handleChange} rows="3" className="input-style resize-y"></textarea>
+                                </div>
+                            </div>
+                            
+                            <div className="p-5 border-t dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800 rounded-b-lg">
+                                <button type="button" onClick={handleCloseModal} disabled={isSubmitting} className="modal-button-secondary">Hủy</button>
+                                <button type="submit" disabled={isSubmitting} className="modal-button-primary flex items-center justify-center gap-1.5">
+                                    {isSubmitting && <CircleNotch size={18} className="animate-spin" />}
+                                    <FloppyDisk size={18} /> Lưu
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+            
             {/* CSS */}
             <style jsx>{`
                 /* Các class CSS dùng chung */

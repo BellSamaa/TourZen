@@ -1,10 +1,17 @@
+// src/pages/PromotionPage.jsx
+// (SỬA: Thêm kiểm tra VIP)
+
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { FiTag } from 'react-icons/fi';
-import PromotionCard from '../components/PromotionCard';
+// Giả sử 2 component này tồn tại
+import PromotionCard from '../components/PromotionCard'; 
 import VoucherModal from '../components/VoucherModal';
+import { useNavigate } from 'react-router-dom'; // (SỬA)
+import { useAuth } from '../context/AuthContext'; // (SỬA)
+import { CircleNotch, WarningCircle } from "@phosphor-icons/react"; // (SỬA)
 
-// Dữ liệu mẫu giữ nguyên
+// Dữ liệu mẫu (Giả định)
 const promotionsData = {
   events: [
     { id: 1, title: 'Đại Lễ 2/9', description: 'Vi vu không lo về giá, giảm đến 30% tour toàn quốc.', image: 'https://images.unsplash.com/photo-1597093278291-a205a1e7a36f?q=80&w=2070', tag: 'Lễ 2/9', timeLimit: 'Còn 3 ngày', voucherCode: 'LEQUOCKHANH', discountPercent: 30 },
@@ -12,7 +19,6 @@ const promotionsData = {
   ],
   regions: [
     { id: 3, title: 'Khám phá Miền Trung', description: 'Hành trình di sản Đà Nẵng - Huế - Hội An giảm ngay 25%.', image: 'https://images.unsplash.com/photo-1528127269322-539801943592?q=80&w=2070', tag: 'Miền Trung', timeLimit: 'Vô thời hạn', voucherCode: 'DISANMT', discountPercent: 25 },
-    { id: 4, title: 'Tây Bắc Mùa Lúa Chín', description: 'Săn mây Tà Xùa, khám phá Mù Cang Chải với giá siêu hấp dẫn.', image: 'https://images.unsplash.com/photo-1627993322198-281b6ac5a42b?q=80&w=2072', tag: 'Miền Bắc', timeLimit: 'Đến 30/10', voucherCode: 'MUAVANG', discountPercent: 15, quantityLimit: true },
   ],
   thematic: [
     { id: 5, title: 'Một vòng Việt Nam', description: 'Hành trình xuyên Việt 14 ngày, khám phá mọi miền Tổ quốc.', image: 'https://images.unsplash.com/photo-1543973156-3804b81a7351?q=80&w=2070', tag: 'Xuyên Việt', timeLimit: 'Ưu đãi tháng này', voucherCode: 'VIETNAMOI', discountPercent: 10 },
@@ -21,12 +27,48 @@ const promotionsData = {
 
 export default function PromotionPage() {
   const [selectedPromo, setSelectedPromo] = useState(null);
+  const { user, loading: authLoading } = useAuth(); // (SỬA)
+  const navigate = useNavigate(); // (SỬA)
 
   const handleClaimVoucher = (promo) => setSelectedPromo(promo);
   const handleCloseModal = () => setSelectedPromo(null);
 
   const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1 } } };
   const cardVariants = { hidden: { opacity: 0, y: 30 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } } };
+
+  // --- (SỬA) Thêm kiểm tra VIP ---
+  if (authLoading) {
+      return (
+          <div className="flex justify-center items-center h-screen bg-gray-50 dark:bg-neutral-900">
+              <CircleNotch size={48} className="animate-spin text-sky-500" />
+          </div>
+      );
+  }
+  
+  if (!user) {
+      // Chuyển hướng về login nếu chưa đăng nhập
+      toast.error("Vui lòng đăng nhập để xem ưu đãi.");
+      navigate('/login', { state: { from: '/promotions' } });
+      return null;
+  }
+  
+  if (user.role !== 'vip') {
+      return (
+          <div className="flex flex-col justify-center items-center h-screen text-center p-4 bg-gray-50 dark:bg-neutral-900">
+              <WarningCircle size={64} className="text-red-500" />
+              <h1 className="mt-4 text-3xl font-bold dark:text-white">Truy cập bị từ chối</h1>
+              <p className="mt-2 text-lg text-neutral-600 dark:text-neutral-400">
+                  Trang này chỉ dành cho thành viên VIP.
+              </p>
+              <button onClick={() => navigate('/')} className="mt-6 modal-button-primary">
+                  Quay về Trang chủ
+              </button>
+              {/* Thêm CSS cho nút bấm */}
+              <style>{`.modal-button-primary { @apply px-4 py-2 bg-sky-600 text-white rounded-md font-semibold hover:bg-sky-700 transition-colors duration-200 text-sm disabled:opacity-50; }`}</style>
+          </div>
+      );
+  }
+  // --- KẾT THÚC SỬA ---
 
   return (
     <div className="bg-gray-50 dark:bg-neutral-900 min-h-screen">

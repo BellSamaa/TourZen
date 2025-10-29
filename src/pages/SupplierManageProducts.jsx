@@ -1,53 +1,38 @@
 // src/pages/SupplierManageProducts.jsx
-// (NÂNG CẤP GIAO DIỆN: Dạng Card, thêm hình ảnh, icon và tóm tắt Slot)
+// (NÂNG CẤP: Thêm nút "Thêm Nhanh Tour Mẫu")
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { Link } from "react-router-dom"; // (SỬA) Import Link
 import { getSupabase } from "../lib/supabaseClient";
-import { useAuth } from "../context/AuthContext"; // (MỚI) Dùng AuthContext
+import { useAuth } from "../context/AuthContext"; 
+import toast from "react-hot-toast"; // Import toast
 import {
-  FaSpinner,
-  FaPlus,
-  FaEdit,
-  FaTrash,
-  FaUmbrellaBeach,
-  FaCheckCircle,
-  FaTimesCircle,
-  FaClock,
-  FaExclamationTriangle,
-  FaTicketAlt,
-  FaThList, // Icon xem dạng List
-  FaThLarge, // Icon xem dạng Grid
-  FaImage // Icon ảnh
+  FaSpinner, FaPlus, FaEdit, FaTrash, FaUmbrellaBeach, FaCheckCircle,
+  FaTimesCircle, FaClock, FaExclamationTriangle, FaTicketAlt,
+  FaThList, FaThLarge, FaImage
 } from "react-icons/fa";
-import ProductModal from "./ProductModal"; // <-- TÔI CẦN FILE NÀY ĐỂ SỬA MODAL
+import ProductModal from "./ProductModal"; 
 
 const supabase = getSupabase();
 
-// --- (MỚI) Component Trạng thái Phê duyệt (có icon) ---
+// --- Component Trạng thái Phê duyệt ---
 const ApprovalStatus = ({ status }) => {
   switch (status) {
     case "approved":
-      return (
-        <span className="badge-green"><FaCheckCircle /> Đã duyệt</span>
-      );
+      return <span className="badge-green"><FaCheckCircle /> Đã duyệt</span>;
     case "rejected":
-      return (
-        <span className="badge-red"><FaTimesCircle /> Bị từ chối</span>
-      );
+      return <span className="badge-red"><FaTimesCircle /> Bị từ chối</span>;
     default:
-      return (
-        <span className="badge-yellow"><FaClock /> Chờ duyệt</span>
-      );
+      return <span className="badge-yellow"><FaClock /> Chờ duyệt</span>;
   }
 };
 
-// --- (MỚI) Component Tóm tắt Slot (đọc từ Departures) ---
+// --- Component Tóm tắt Slot ---
 const SlotSummary = ({ departures }) => {
     const today = new Date().toISOString().split('T')[0];
     
-    // Chỉ tính các lịch khởi hành trong tương lai
     const upcomingDepartures = useMemo(() => 
-        departures.filter(d => d.departure_date >= today),
+        (departures || []).filter(d => d.departure_date >= today),
     [departures, today]);
 
     if (upcomingDepartures.length === 0) {
@@ -55,7 +40,7 @@ const SlotSummary = ({ departures }) => {
     }
 
     const totalRemaining = upcomingDepartures.reduce((sum, d) => {
-        return sum + (d.max_slots - d.booked_slots);
+        return sum + ((d.max_slots || 0) - (d.booked_slots || 0));
     }, 0);
 
     return (
@@ -67,18 +52,18 @@ const SlotSummary = ({ departures }) => {
 };
 
 export default function SupplierManageProducts() {
-  const { user } = useAuth(); // (MỚI)
+  const { user } = useAuth(); 
   const [products, setProducts] = useState([]);
-  const [suppliers, setSuppliers] = useState([]); // (Cần cho Modal)
+  const [suppliers, setSuppliers] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [productToEdit, setProductToEdit] = useState(null);
-  const [loggedInSupplierId, setLoggedInSupplierId] = useState(null); // (MỚI)
-  const [viewMode, setViewMode] = useState('grid'); // (MỚI) 'grid' or 'list'
+  const [loggedInSupplierId, setLoggedInSupplierId] = useState(null); 
+  const [viewMode, setViewMode] = useState('grid'); 
 
   const fetchData = useCallback(async () => {
-    if (!user) { // (MỚI) Nếu chưa đăng nhập, không làm gì cả
+    if (!user) {
         setLoading(false);
         setError("Vui lòng đăng nhập với tài khoản Nhà cung cấp.");
         return;
@@ -88,7 +73,6 @@ export default function SupplierManageProducts() {
     setError(null);
 
     try {
-      // (MỚI) Bước 1: Lấy supplier_id của user đang đăng nhập
       const { data: supplierData, error: supplierError } = await supabase
           .from('Suppliers')
           .select('id')
@@ -102,8 +86,6 @@ export default function SupplierManageProducts() {
       const supplierId = supplierData.id;
       setLoggedInSupplierId(supplierId);
 
-      // (MỚI) Bước 2: Lấy tour CHỈ CỦA nhà cung cấp này
-      // (MỚI) Lấy thêm bảng Departures
       const { data: productData, error: productError } = await supabase
         .from("Products")
         .select(`
@@ -111,12 +93,12 @@ export default function SupplierManageProducts() {
             Departures (id, departure_date, max_slots, booked_slots)
         `)
         .eq("product_type", "tour")
-        .eq("supplier_id", supplierId) // <-- (MỚI) Chỉ lấy tour của NCC này
+        .eq("supplier_id", supplierId) 
         .order("created_at", { ascending: false });
 
       if (productError) throw productError;
       
-      // (MỚI) Lấy danh sách NCC (vẫn cần cho Modal)
+      // Lấy danh sách NCC (vẫn cần cho Modal)
       const { data: suppliersData, error: suppliersError } = await supabase.from("Suppliers").select("id, name");
       if (suppliersError) throw suppliersError;
 
@@ -129,7 +111,7 @@ export default function SupplierManageProducts() {
     } finally {
       setLoading(false);
     }
-  }, [user]); // (MỚI) Phụ thuộc vào user
+  }, [user]); 
 
   useEffect(() => {
     fetchData();
@@ -141,7 +123,6 @@ export default function SupplierManageProducts() {
   };
 
   const handleEdit = (product) => {
-    // (MỚI) Không cần chuẩn hóa date nữa vì modal sẽ tự làm
     setProductToEdit(product);
     setShowModal(true);
   };
@@ -157,13 +138,12 @@ export default function SupplierManageProducts() {
     }
   };
 
-  // (MỚI) JSX cho Card tour
+  // --- JSX cho Card tour ---
   const TourCard = ({ product }) => (
     <div className="flex flex-col bg-white dark:bg-slate-800 shadow-lg rounded-lg overflow-hidden border dark:border-slate-700 transition-all duration-300 hover:shadow-xl">
-        {/* Hình ảnh */}
         <div className="relative h-48 w-full flex-shrink-0">
             {product.image_url ? (
-                <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" />
+                <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/600x400/cccccc/ffffff?text=Img'; }} />
             ) : (
                 <div className="h-full w-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
                     <FaImage className="text-4xl text-slate-400 dark:text-slate-500" />
@@ -174,7 +154,6 @@ export default function SupplierManageProducts() {
             </div>
         </div>
         
-        {/* Nội dung */}
         <div className="p-5 flex flex-col flex-grow">
             <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2 line-clamp-2" title={product.name}>
                 {product.name}
@@ -187,12 +166,10 @@ export default function SupplierManageProducts() {
                 {product.price ? product.price.toLocaleString("vi-VN") : 0} VNĐ
             </div>
             
-            {/* (MỚI) Tóm tắt Slot */}
             <div className="mb-4">
                 <SlotSummary departures={product.Departures || []} />
             </div>
 
-            {/* Actions */}
             <div className="mt-auto pt-4 border-t dark:border-slate-700 flex items-center justify-end gap-2">
                 <button
                     onClick={() => handleEdit(product)}
@@ -213,13 +190,13 @@ export default function SupplierManageProducts() {
     </div>
   );
   
-  // (MỚI) JSX cho List Item
+  // --- JSX cho List Item ---
   const TourListItem = ({ product }) => (
     <tr className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
         <td className="px-6 py-4 whitespace-nowrap">
             <div className="flex items-center gap-3">
                 {product.image_url ? (
-                    <img src={product.image_url} alt={product.name} className="h-12 w-16 object-cover rounded-md flex-shrink-0" />
+                    <img src={product.image_url} alt={product.name} className="h-12 w-16 object-cover rounded-md flex-shrink-0" onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/600x400/cccccc/ffffff?text=Img'; }}/>
                 ) : (
                     <div className="h-12 w-16 bg-slate-200 dark:bg-slate-700 flex items-center justify-center rounded-md flex-shrink-0">
                         <FaImage className="text-2xl text-slate-400 dark:text-slate-500" />
@@ -260,7 +237,6 @@ export default function SupplierManageProducts() {
   );
 
 
-  // (MỚI) JSX chính
   return (
     <>
     <div className="p-4 md:p-6 space-y-6">
@@ -269,8 +245,9 @@ export default function SupplierManageProducts() {
           <FaUmbrellaBeach size={24} className="text-sky-600" />
           <span>Quản lý Tour</span>
         </h1>
+        
+        {/* === (SỬA) Thêm Nút "Thêm Nhanh" === */}
         <div className="flex items-center gap-3">
-            {/* (MỚI) Nút đổi View */}
             <div className="flex items-center bg-slate-200 dark:bg-slate-700 rounded-lg p-1">
                 <button
                     onClick={() => setViewMode('grid')}
@@ -288,13 +265,22 @@ export default function SupplierManageProducts() {
                 </button>
             </div>
         
+            {/* (SỬA) Thêm Link "Thêm Nhanh" */}
+            <Link
+                to="/supplier/add-quick-tour"
+                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-lg shadow-md hover:bg-green-700 focus:ring-2 focus:ring-green-500"
+            >
+                <FaPlus /> Thêm Nhanh Tour Mẫu
+            </Link>
+        
             <button
                 onClick={handleAddNew}
                 className="flex items-center gap-2 bg-sky-600 text-white px-4 py-2.5 rounded-lg shadow-md hover:bg-sky-700 focus:ring-2 focus:ring-sky-500"
             >
-                <FaPlus /> Thêm Tour mới
+                <FaPlus /> Thêm Tour (Chi tiết)
             </button>
         </div>
+        {/* === KẾT THÚC SỬA === */}
       </div>
 
       {loading && (
@@ -313,11 +299,10 @@ export default function SupplierManageProducts() {
          <div className="text-center py-20 text-gray-500 italic">
             Không có tour nào được tìm thấy.
             <br/>
-            Nhấn "Thêm Tour mới" hoặc "Thêm nhanh Tour mẫu" để bắt đầu.
+            Nhấn "Thêm Tour (Chi tiết)" hoặc "Thêm Nhanh Tour Mẫu" để bắt đầu.
          </div>
       )}
 
-      {/* (MỚI) Hiển thị Grid hoặc List */}
       {!loading && !error && products.length > 0 && viewMode === 'grid' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {products.map((p) => <TourCard key={p.id} product={p} />)}
@@ -353,13 +338,11 @@ export default function SupplierManageProducts() {
           productToEdit={productToEdit}
           productType="tour"
           suppliers={suppliers}
-          // (MỚI) Truyền ID của NCC vào Modal
           forceSupplierId={loggedInSupplierId} 
         />
       )}
     </div>
     
-    {/* (MỚI) Thêm CSS cho các Badge và Nút */}
     <style jsx>{`
         .badge-base { @apply px-2.5 py-1 text-xs font-semibold rounded-full inline-flex items-center gap-1.5 whitespace-nowrap; }
         .badge-green { @apply badge-base bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300; }

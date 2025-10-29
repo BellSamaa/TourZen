@@ -1,11 +1,12 @@
 // src/pages/SupplierDashboard.jsx
+// (SỬA: Sửa lại route "hotels" thành "tours" cho đúng logic)
+
 import React from "react";
 import { Routes, Route, NavLink, useNavigate } from "react-router-dom";
 import {
-  Bed,
+  Package, // <-- THÊM (Icon cho Tour)
   CarSimple,
   AirplaneTilt,
-  // CurrencyDollar, // <- XÓA
   SignOut,
   House,
   PlusCircle,
@@ -16,13 +17,9 @@ import { useAuth } from "../context/AuthContext";
 import SupplierManageProducts from "./SupplierManageProducts";
 import ManageTransport from "./ManageTransport";
 import ManageFlights from "./ManageFlights";
-// import Payment from "./Payment"; // <- XÓA
-
-// --- SỬA Ở ĐÂY ---
-import SupplierHome from "./SupplierHome"; // Thay vì DashboardHome
-// --- KẾT THÚC SỬA ---
-
+import SupplierHome from "./SupplierHome"; 
 import SupplierAddQuickTour from "./SupplierAddQuickTour"; 
+import NotFound from "./NotFound"; // Giả sử có trang 404
 
 const SupplierSidebar = () => {
   const { user, logout } = useAuth();
@@ -31,10 +28,13 @@ const SupplierSidebar = () => {
   const navItems = [
     { path: "/supplier", label: "Tổng quan", icon: House },
     { type: "divider", label: "Dịch vụ cung cấp" },
-    { path: "/supplier/hotels", label: "Quản lý sản phẩm Tour", icon: Bed },
+    
+    // === (SỬA) Đổi "hotels" thành "tours" ===
+    { path: "/supplier/tours", label: "Quản lý Tour", icon: Package },
+    // === KẾT THÚC SỬA ===
+    
     { path: "/supplier/transport", label: "TourZenExpress (Xe)", icon: CarSimple },
     { path: "/supplier/flights", label: "Quản lý Chuyến bay", icon: AirplaneTilt },
-    // { path: "/supplier/payment", label: "Giá dịch vụ & Thanh toán", icon: CurrencyDollar }, // <- XÓA
     { type: "divider", label: "Tiện ích mở rộng" },
     { path: "/supplier/add-quick-tour", label: "Thêm Tour nhanh", icon: PlusCircle }, 
   ];
@@ -93,8 +93,8 @@ const SupplierSidebar = () => {
             className="text-sm font-medium text-white truncate mb-2 px-2"
             title={user.email}
           >
-            Xin chào, {user.full_name}!
-          </p> { /* <-- ĐÃ SỬA LỖI TỪ </div> THÀNH </p> */ }
+            Xin chào, {user.full_name || user.email}!
+          </p>
           <button
             onClick={handleLogout}
             className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-red-400 hover:bg-red-900/50 hover:text-red-300 transition-colors"
@@ -114,20 +114,17 @@ export default function SupplierDashboard() {
       <SupplierSidebar />
       <main className="flex-1 p-8 bg-slate-100 dark:bg-slate-950 overflow-y-auto">
         <Routes>
-          {/* --- SỬA Ở ĐÂY --- */}
           <Route path="/" element={<SupplierHome />} />
-          {/* --- KẾT THÚC SỬA --- */}
 
-          {/* Quản lý dịch vụ */}
-          <Route path="hotels" element={<SupplierManageProducts productType="hotel" />} />
+          {/* === (SỬA) Đổi path và prop === */}
+          <Route path="tours" element={<SupplierManageProducts productType="tour" />} />
+          {/* === KẾT THÚC SỬA === */}
+          
           <Route path="transport" element={<ManageTransport />} />
           <Route path="flights" element={<ManageFlights />} />
-
-          {/* Thanh toán & Giá */}
-          {/* <Route path="payment" element={<Payment />} /> */} {/* <- XÓA */}
-
-          {/* Route thêm mới - Thêm Tour nhanh */}
           <Route path="add-quick-tour" element={<SupplierAddQuickTour />} />
+          
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
     </div>
