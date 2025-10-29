@@ -1,17 +1,20 @@
 // ManageCustomersSupabase.jsx
-/* NÂNG CẤP LỚN v5: "Modal Form & Add Function"
-  1. (Font) Đảm bảo font 'Poppins' được áp dụng cho toàn bộ component.
-  2. (UX) Thay thế "Inline Editing" (chỉnh sửa tại chỗ) bằng "Modal Form" (form trong popup).
-  3. (Form) Form chỉnh sửa giờ đây hiển thị đầy đủ thông tin (bao gồm cả email - không cho sửa).
-  4. (Feature) Sửa lỗi nút "Thêm Khách Hàng". Giờ đây nút này sẽ mở một form modal để thêm khách hàng mới.
-  5. (Code) Tái cấu trúc, tạo component `CustomerForm` để dùng chung cho cả Thêm mới và Chỉnh sửa.
+/* NÂNG CẤP LỚN v6: "Font Fix & Dynamic Tiers"
+  1. (Font Fix) Sửa lỗi font triệt để, đảm bảo 'Poppins' được áp dụng cho H1 và toàn trang.
+  2. (Logic) Tự động phân loại khách hàng theo logic mới:
+     - VIP: Tổng chi tiêu > 20.000.000
+     - Mới: Số đơn hàng = 1 hoặc 2
+     - Thường xuyên: Số đơn hàng > 2 (và không phải VIP)
+     - Tiêu chuẩn: 0 đơn hàng
+  3. (UI) Loại bỏ ô chọn "Phân loại khách hàng" khỏi Form (vì đã tự động).
+  4. (Stats) Cập nhật các thẻ thống kê (StatCard) để đếm số VIP và Khách mới theo logic mới.
 */
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { FaSpinner, FaSearch, FaTrash } from "react-icons/fa";
 import {
   UserList, CaretLeft, CaretRight, CircleNotch, X, Plus, UsersThree, Crown, Sparkle, Wallet,
-  PencilSimple, Check, XCircle, List, Package, Bed, Airplane, Receipt, Cake, Info,
+  PencilSimple, List, Package, Bed, Airplane, Receipt, Info,
   User, Envelope, Phone, House, CalendarBlank
 } from "@phosphor-icons/react";
 import { getSupabase } from "../lib/supabaseClient";
@@ -55,15 +58,15 @@ const formatStatsNumber = (num) => {
   return num;
 };
 
+// (LOGIC v6) Định nghĩa Kiểu khách hàng
 const getCustomerTierStyle = (tier) => {
   switch (tier) {
     case "VIP": return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
     case "Thường xuyên": return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
     case "Mới": return "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300";
-    default: return "bg-gray-100 text-gray-800 dark:bg-gray-700/30 dark:text-gray-300";
+    default: return "bg-gray-100 text-gray-800 dark:bg-gray-700/30 dark:text-gray-300"; // Tiêu chuẩn
   }
 };
-const CUSTOMER_TIERS = ['Tiêu chuẩn', 'VIP', 'Thường xuyên', 'Mới'];
 
 // --- (NÂNG CẤP) Hiệu ứng Thẻ Stats ---
 const cardVariants = {
@@ -90,7 +93,7 @@ const StatCard = ({ title, value, icon, loading }) => (
   </motion.div>
 );
 
-// --- Component Lấy Dữ Liệu Thống Kê (Giữ nguyên) ---
+// --- (NÂNG CẤP v6) Component Lấy Dữ Liệu Thống Kê (Theo logic mới) ---
 const CustomerStats = () => {
   const [stats, setStats] = useState({ total: 0, vip: 0, new: 0, spend: 0 });
   const [loading, setLoading] = useState(true);
@@ -99,47 +102,60 @@ const CustomerStats = () => {
     const fetchStats = async () => {
       setLoading(true);
       try {
-        const { count: totalCount, error: totalErr } = await supabase
+        // 1. Lấy TẤT CẢ user và booking (cần thiết cho logic phân loại mới)
+        const { data: users, error: userErr } = await supabase
           .from("Users")
-          .select("id", { count: "exact", head: true })
+          .select("id")
           .eq("role", "user");
-        if (totalErr) throw totalErr;
+        if (userErr) throw userErr;
 
-        const { data: spendData, error: spendErr } = await supabase
-          .from("Bookings")
-          .select("total_price")
-          .eq("status", "confirmed");
-        if (spendErr) throw spendErr;
-        const totalSpend = spendData.reduce(
-          (sum, row) => sum + (row.total_price || 0),
-          0
-        );
-
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const { count: newCount, error: newErr } = await supabase
-          .from("Users")
-          .select("id", { count: "exact", head: true })
-          .eq("role", "user")
-          .gte("created_at", thirtyDaysAgo.toISOString());
-        if (newErr) console.warn("Lỗi fetch new users:", newErr.message);
-
-        const { count: vipCount, error: vipErr } = await supabase
-          .from("Users")
-          .select("id", { count: "exact", head: true })
-          .eq("role", "user")
-          .eq("customer_tier", "VIP"); 
-          
-        if (vipErr) {
-            console.error("Lỗi đếm VIP:", vipErr);
-            throw vipErr;
+        if (!users || users.length === 0) {
+          setLoading(false);
+          return;
         }
+
+        const { data: bookings, error: bookingErr } = await supabase
+          .from("Bookings")
+          .select("user_id, total_price")
+          .in("user_id", users.map(u => u.id))
+          .eq("status", "confirmed");
+        if (bookingErr) throw bookingErr;
+        
+        // 2. Tính toán tổng chi tiêu và số đơn cho mỗi user
+        let totalSystemSpend = 0;
+        const userStatsMap = users.reduce((acc, user) => {
+          acc[user.id] = { order_count: 0, total_spend: 0 };
+          return acc;
+        }, {});
+
+        for (const b of (bookings || [])) {
+          if (userStatsMap[b.user_id]) {
+            userStatsMap[b.user_id].order_count += 1;
+            userStatsMap[b.user_id].total_spend += (b.total_price || 0);
+          }
+          totalSystemSpend += (b.total_price || 0);
+        }
+
+        // 3. Đếm số VIP và Khách mới dựa trên logic mới
+        let vipCount = 0;
+        let newCount = 0;
+        
+        Object.values(userStatsMap).forEach(stat => {
+          // Logic VIP: > 20 triệu
+          if (stat.total_spend > 20000000) {
+            vipCount++;
+          } 
+          // Logic Mới: 1 hoặc 2 đơn (chỉ đếm nếu k phải VIP)
+          else if (stat.order_count >= 1 && stat.order_count <= 2) {
+            newCount++;
+          }
+        });
         
         setStats({
-          total: totalCount || 0,
-          vip: vipCount || 0,
-          new: newCount || 0,
-          spend: totalSpend,
+          total: users.length,
+          vip: vipCount,
+          new: newCount,
+          spend: totalSystemSpend,
         });
 
       } catch (error) { 
@@ -168,7 +184,7 @@ const CustomerStats = () => {
   );
 };
 
-// --- (NÂNG CẤP) Component Modal Xem Chi Tiết Đơn Hàng (Giữ nguyên) ---
+// --- Component Modal Xem Chi Tiết Đơn Hàng (Giữ nguyên) ---
 const CustomerBookingsModal = ({ customer, onClose }) => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -289,7 +305,7 @@ const CustomerBookingsModal = ({ customer, onClose }) => {
   );
 };
 
-// --- (MỚI v5) Component Form Tái Sử Dụng ---
+// --- (NÂNG CẤP v6) Component Form (Đã bỏ Phân loại) ---
 const CustomerForm = ({ initialData, onSubmit, isSaving, onCancel }) => {
   const [formData, setFormData] = useState({
     full_name: initialData?.full_name || '',
@@ -297,7 +313,7 @@ const CustomerForm = ({ initialData, onSubmit, isSaving, onCancel }) => {
     phone_number: initialData?.phone_number || '',
     address: initialData?.address || '',
     ngay_sinh: initialData?.ngay_sinh ? initialData.ngay_sinh.split('T')[0] : '',
-    customer_tier: initialData?.customer_tier || 'Tiêu chuẩn',
+    // (BỎ v6) customer_tier đã bị loại bỏ, vì giờ nó tự động
   });
   const isEditMode = !!initialData;
 
@@ -398,18 +414,7 @@ const CustomerForm = ({ initialData, onSubmit, isSaving, onCancel }) => {
         />
       </InputWrapper>
 
-      <InputWrapper label="Phân loại khách hàng" icon={<Crown size={18} className="mr-2" />}>
-        <select
-          name="customer_tier"
-          value={formData.customer_tier}
-          onChange={handleChange}
-          className="form-input-style"
-        >
-          {CUSTOMER_TIERS.map(tier => (
-            <option key={tier} value={tier}>{tier}</option>
-          ))}
-        </select>
-      </InputWrapper>
+      {/* (BỎ v6) Đã loại bỏ ô chọn Phân loại khách hàng */}
 
       {/* Nút bấm */}
       <div className="flex justify-end gap-4 pt-6 border-t dark:border-slate-700 mt-2">
@@ -437,7 +442,7 @@ const CustomerForm = ({ initialData, onSubmit, isSaving, onCancel }) => {
   );
 };
 
-// --- (MỚI v5) Component Modal Chung ---
+// --- Component Modal Chung (Giữ nguyên) ---
 const FormModal = ({ title, onClose, children }) => (
   <motion.div
     className="fixed inset-0 bg-black/70 backdrop-blur-md z-40 flex justify-center items-center p-4"
@@ -479,16 +484,15 @@ export default function ManageCustomersSupabase() {
   const [totalItems, setTotalItems] = useState(0);
   const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
 
-  // --- (THAY ĐỔI v5) State cho Modal Form ---
   const [isSaving, setIsSaving] = useState(false);
   const [isAddingCustomer, setIsAddingCustomer] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState(null); // Thay vì editingCustomerId
+  const [editingCustomer, setEditingCustomer] = useState(null); 
   
   const [viewingBookingsCustomer, setViewingBookingsCustomer] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
-  // --- Fetch customers (Logic giữ nguyên) ---
+  // --- (NÂNG CẤP v6) Fetch customers (Thêm logic phân loại động) ---
   const fetchCustomers = useCallback(async (isInitialLoad = false) => {
     if (!isInitialLoad) setIsFetchingPage(true);
     setError(null);
@@ -497,6 +501,7 @@ export default function ManageCustomersSupabase() {
       const to = from + ITEMS_PER_PAGE - 1;
       
       let countQuery = supabase.from("Users").select("id", { count: "exact", head: true }).eq("role", "user");
+      // Lấy cả cột 'customer_tier' cũ để phòng hờ, nhưng chúng ta sẽ ghi đè nó
       let dataQuery = supabase.from("Users").select("*, customer_tier, ngay_sinh").eq("role", "user");
 
       if (debouncedSearch.trim() !== "") {
@@ -519,6 +524,7 @@ export default function ManageCustomersSupabase() {
         return;
       }
 
+      // Lấy thông tin booking cho *chỉ* các user trên trang này
       const userIds = usersData.map((u) => u.id);
       const { data: bookingsData } = await supabase.from("Bookings").select("user_id, total_price").in("user_id", userIds).eq("status", "confirmed");
 
@@ -530,13 +536,28 @@ export default function ManageCustomersSupabase() {
         return acc;
       }, {});
 
-      const combinedData = usersData.map((user) => ({
-        ...user,
-        order_count: statsMap[user.id]?.order_count || 0,
-        total_spend: statsMap[user.id]?.total_spend || 0,
-        customer_tier: user.customer_tier || 'Tiêu chuẩn',
-        ngay_sinh: user.ngay_sinh ? user.ngay_sinh.split('T')[0] : '', 
-      }));
+      // (LOGIC v6) Áp dụng phân loại động
+      const combinedData = usersData.map((user) => {
+        const order_count = statsMap[user.id]?.order_count || 0;
+        const total_spend = statsMap[user.id]?.total_spend || 0;
+        
+        let dynamic_tier = 'Tiêu chuẩn'; // Mặc định
+        if (total_spend > 20000000) {
+            dynamic_tier = 'VIP';
+        } else if (order_count >= 1 && order_count <= 2) {
+            dynamic_tier = 'Mới';
+        } else if (order_count > 2) {
+            dynamic_tier = 'Thường xuyên';
+        }
+
+        return {
+          ...user,
+          order_count: order_count,
+          total_spend: total_spend,
+          customer_tier: dynamic_tier, // Ghi đè giá trị từ DB bằng giá trị động
+          ngay_sinh: user.ngay_sinh ? user.ngay_sinh.split('T')[0] : '', 
+        };
+      });
 
       setCustomers(combinedData);
       setTotalItems(count || 0);
@@ -560,7 +581,7 @@ export default function ManageCustomersSupabase() {
   }, [debouncedSearch]);
 
 
-  // --- (MỚI v5) Handlers cho Modal Form ---
+  // --- (NÂNG CẤP v6) Handlers cho Modal Form (Bỏ 'customer_tier') ---
   
   // Handler để LƯU KHÁCH HÀNG CẬP NHẬT
   const handleUpdateCustomer = async (formData) => {
@@ -571,8 +592,8 @@ export default function ManageCustomersSupabase() {
         full_name: formData.full_name,
         address: formData.address,
         phone_number: formData.phone_number,
-        customer_tier: formData.customer_tier,
         ngay_sinh: formData.ngay_sinh,
+        // (BỎ v6) 'customer_tier' không còn được cập nhật thủ công
     };
 
     try {
@@ -598,11 +619,10 @@ export default function ManageCustomersSupabase() {
     const insertData = {
       ...formData,
       role: 'user'
+      // (BỎ v6) 'customer_tier' không cần thêm, DB có thể tự gán 'Tiêu chuẩn'
     };
 
     try {
-      // Vì email là unique, Supabase Auth có thể từ chối nếu email đã tồn tại
-      // Đây chỉ là thêm profile, không phải tạo tài khoản auth
       const { error } = await supabase.from("Users").insert([insertData]); 
       if (error) {
         if (error.code === '23505') { // Lỗi unique violation
@@ -632,8 +652,6 @@ export default function ManageCustomersSupabase() {
   const handleDelete = async () => {
     if (!selectedCustomer) return;
     try {
-      // NOTE: This might fail if RLS (Row Level Security) is strict
-      // This only deletes the 'Users' profile, not the auth user
       const { error } = await supabase.from("Users").delete().eq("id", selectedCustomer.id);
       if (error) throw error;
       toast.success(`Đã xóa hồ sơ "${selectedCustomer.full_name || selectedCustomer.email}"!`);
@@ -648,10 +666,10 @@ export default function ManageCustomersSupabase() {
 
   const paginationWindow = useMemo(() => getPaginationWindow(currentPage, totalPages, 2), [currentPage, totalPages]);
 
-  // --- (NÂNG CẤP) Loading Screen ---
+  // --- (NÂNG CẤP) Loading Screen (Thêm class font) ---
   if (loading) {
     return (
-      <div className="flex flex-col justify-center items-center h-screen bg-gradient-to-b from-gray-50 to-white dark:from-slate-900 dark:to-slate-800 font-sans">
+      <div className="flex flex-col justify-center items-center h-screen bg-gradient-to-b from-gray-50 to-white dark:from-slate-900 dark:to-slate-800 font-poppins-main">
         <CircleNotch className="animate-spin text-sky-500" size={52} />
         <p className="text-slate-500 dark:text-slate-400 mt-5 font-semibold text-lg"> Đang tải dữ liệu... </p>
       </div>
@@ -660,16 +678,16 @@ export default function ManageCustomersSupabase() {
 
   return (
     <motion.div
-      className="max-w-8xl mx-auto p-6 sm:p-8 space-y-8 min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-slate-900 dark:to-slate-800 font-sans" // (FIX v5) Thêm 'font-sans'
+      className="max-w-8xl mx-auto p-6 sm:p-8 space-y-8 min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-slate-900 dark:to-slate-800 font-poppins-main" // (FIX v6) Dùng class 'font-poppins-main'
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
     >
-      {/* (NÂNG CẤP v5) Tiêu đề & Nút Thêm (đã sửa) */}
+      {/* Tiêu đề & Nút Thêm */}
       <div className="flex flex-wrap items-center justify-between gap-5">
         <div>
           <motion.h1 
-            className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-sky-500 to-purple-600 flex items-center gap-3"
+            className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-sky-500 to-purple-600 flex items-center gap-3 font-poppins-main" // (FIX v6) Thêm class font
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
@@ -682,7 +700,7 @@ export default function ManageCustomersSupabase() {
           </p>
         </div>
         <button
-          onClick={() => setIsAddingCustomer(true)} // (FIX v5) Mở modal thêm
+          onClick={() => setIsAddingCustomer(true)} 
           className="flex items-center gap-2.5 px-6 py-3 bg-gradient-to-r from-sky-500 to-sky-600 text-white rounded-xl shadow-lg shadow-sky-500/30 hover:shadow-xl hover:shadow-sky-500/40 hover:-translate-y-0.5 transition-all duration-300 font-semibold focus:outline-none focus:ring-4 focus:ring-sky-300"
         >
           <Plus size={20} weight="bold" />
@@ -690,7 +708,7 @@ export default function ManageCustomersSupabase() {
         </button>
       </div>
 
-      {/* Thống kê */}
+      {/* Thống kê (Giờ đã cập nhật logic v6) */}
       <CustomerStats />
 
       {/* Bảng dữ liệu */}
@@ -725,7 +743,7 @@ export default function ManageCustomersSupabase() {
                 <th className="th-style">Ngày sinh</th>
                 <th className="th-style text-center">Đơn</th>
                 <th className="th-style text-right">Tổng chi</th>
-                <th className="th-style text-center">Loại</th>
+                <th className="th-style text-center">Loại (Tự động)</th>
                 <th className="th-style text-center">Thao tác</th>
               </tr>
             </thead>
@@ -746,7 +764,8 @@ export default function ManageCustomersSupabase() {
               )}
               
               {!error && customers.map((c) => {
-                const tierStyle = getCustomerTierStyle(c.customer_tier);
+                // (LOGIC v6) style được lấy từ 'customer_tier' động
+                const tierStyle = getCustomerTierStyle(c.customer_tier); 
                 
                 return (
                   <motion.tr
@@ -788,14 +807,14 @@ export default function ManageCustomersSupabase() {
                       {formatCurrency(c.total_spend)}
                     </td>
                     
-                    {/* Loại (Customer Tier) */}
+                    {/* Loại (Customer Tier) (LOGIC v6) */}
                     <td className="td-style text-center">
                       <span className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold ${tierStyle}`}>
-                        {c.customer_tier || 'Tiêu chuẩn'}
+                        {c.customer_tier}
                       </span>
                     </td>
                     
-                    {/* (THAY ĐỔI v5) Thao tác (Actions) */}
+                    {/* Thao tác (Actions) */}
                     <td className="td-style text-center whitespace-nowrap space-x-2">
                         <>
                           <button onClick={() => setViewingBookingsCustomer(c)} disabled={isFetchingPage || !!editingCustomer || isAddingCustomer} className="action-button text-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/30" title="Xem các đơn hàng"><List size={20} weight="bold" /></button>
@@ -825,7 +844,7 @@ export default function ManageCustomersSupabase() {
         </div>
       )}
 
-      {/* --- Modals --- */}
+      {/* --- Modals (Giữ nguyên) --- */}
       <AnimatePresence>
         {viewingBookingsCustomer && (
           <CustomerBookingsModal
@@ -857,7 +876,7 @@ export default function ManageCustomersSupabase() {
         )}
       </AnimatePresence>
 
-      {/* (MỚI v5) Modal Thêm Khách Hàng */}
+      {/* Modal Thêm Khách Hàng (Dùng Form v6) */}
       <AnimatePresence>
         {isAddingCustomer && (
           <FormModal title="Thêm Khách Hàng Mới" onClose={() => setIsAddingCustomer(false)}>
@@ -870,7 +889,7 @@ export default function ManageCustomersSupabase() {
         )}
       </AnimatePresence>
       
-      {/* (MỚI v5) Modal Sửa Khách Hàng */}
+      {/* Modal Sửa Khách Hàng (Dùng Form v6) */}
       <AnimatePresence>
         {editingCustomer && (
           <FormModal title="Chỉnh Sửa Thông Tin Khách Hàng" onClose={() => setEditingCustomer(null)}>
@@ -885,18 +904,19 @@ export default function ManageCustomersSupabase() {
       </AnimatePresence>
       
       
-      {/* (MỚI) Thêm Google Font "Poppins" */}
+      {/* (FIX v6) Sửa lỗi Font */}
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap');
         :root {
           --font-poppins: 'Poppins', sans-serif;
         }
-        body, .font-sans {
+        /* Áp dụng font cho body và class tùy chỉnh */
+        body, .font-poppins-main {
           font-family: var(--font-poppins), sans-serif;
         }
       `}</style>
 
-      {/* --- CSS (NÂNG CẤP TOÀN DIỆN v5) --- */}
+      {/* --- CSS (Giữ nguyên) --- */}
       <style jsx>{`
         .th-style { 
           @apply px-6 py-5 text-left text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider; 
@@ -920,12 +940,10 @@ export default function ManageCustomersSupabase() {
           @apply px-2 py-1 text-gray-500 dark:text-gray-400; 
         }
         
-        /* (MỚI v5) CSS cho Form Input */
         .form-input-style {
           @apply p-3.5 border border-slate-300 dark:border-slate-600 rounded-lg w-full bg-white dark:bg-slate-700/50 focus:ring-2 focus:ring-sky-400 focus:border-sky-400 outline-none transition duration-200 text-base;
         }
 
-        /* (NÂNG CẤP) Modal buttons */
         .modal-button-secondary { 
           @apply px-6 py-3 bg-neutral-200 dark:bg-neutral-700 rounded-lg font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-600 text-sm transition-all duration-200 disabled:opacity-50; 
         }
@@ -936,7 +954,6 @@ export default function ManageCustomersSupabase() {
           @apply flex items-center justify-center px-6 py-3 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 text-sm transition-all duration-200 shadow-lg shadow-sky-500/30 disabled:opacity-50;
         }
 
-        /* (NÂNG CẤP) Scrollbar cho Modal */
         .simple-scrollbar::-webkit-scrollbar { width: 8px; }
         .simple-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .simple-scrollbar::-webkit-scrollbar-thumb {
@@ -950,4 +967,3 @@ export default function ManageCustomersSupabase() {
     </motion.div>
   );
 }
-
