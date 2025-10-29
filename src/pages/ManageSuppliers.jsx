@@ -1,5 +1,5 @@
 // src/pages/ManageSuppliers.jsx
-// (UPGRADED: Sửa Modal Edit, Sửa logic Thống kê, Sửa logic Icon)
+// (UPGRADED V4: Sửa logic Thống kê, Sửa Trạng thái click, Thêm Icons)
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -38,11 +38,10 @@ const StatCard = ({ title, value, icon }) => (
 );
 
 // ====================================================================
-// (FIX 3) Component Modal Chỉnh sửa Dịch vụ (Đã nâng cấp)
+// Component Modal Chỉnh sửa Dịch vụ (Đã nâng cấp)
 // ====================================================================
 const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
     const [loading, setLoading] = useState(false);
-    // (SỬA) State phức tạp hơn để chứa details và inventory
     const [formData, setFormData] = useState({
         name: '', price: 0, description: '', product_type: 'hotel', 
         supplier_id: supplierId, approval_status: 'pending', is_published: false,
@@ -69,7 +68,6 @@ const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
         }
     }, [product, supplierId]);
 
-    // (SỬA) HandleChange hỗ trợ nested 'details'
     const handleChange = (e) => {
         const { name, value, type } = e.target;
         
@@ -79,7 +77,6 @@ const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
                 [name]: type === 'number' ? parseFloat(value) || 0 : value
             }));
         } else {
-            // Giả định các trường còn lại thuộc 'details'
             setFormData(prev => ({
                 ...prev,
                 details: {
@@ -94,21 +91,18 @@ const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
         e.preventDefault();
         setLoading(true);
 
-        // (SỬA) Dùng formData đã được cập nhật
         const { id, created_at, ...dataToSubmit } = formData; 
         
         let error;
         if (isNew) {
-            // Thêm mới
             const { data, error: insertError } = await supabase
                 .from('Products')
-                .insert(dataToSubmit) // Gửi toàn bộ formData đã được chuẩn hóa
+                .insert(dataToSubmit) 
                 .select()
                 .single();
             error = insertError;
             if (!error) onSaved(data);
         } else {
-            // Cập nhật
             const { data, error: updateError } = await supabase
                 .from('Products')
                 .update(dataToSubmit)
@@ -129,7 +123,6 @@ const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
         }
     };
 
-    // (SỬA) Render form động dựa trên product_type
     const renderDynamicFields = () => {
         const type = formData.product_type;
         
@@ -171,7 +164,6 @@ const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
             );
         }
 
-        // Mặc định (hotel)
          return (
              <div>
                 <label htmlFor="description" className="label-style">Mô tả</label>
@@ -192,7 +184,6 @@ const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
                             <X size={20} />
                         </button>
                     </div>
-                    {/* (SỬA) Tăng chiều rộng modal và chia grid */}
                     <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4 overflow-y-auto">
                         <div>
                             <label htmlFor="edit-product-type" className="label-style">Loại Dịch vụ *</label>
@@ -215,7 +206,6 @@ const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
                             <input id="edit-product-inventory" type="number" name="inventory" value={formData.inventory} onChange={handleChange} required min="0" className="input-style" />
                         </div>
                         
-                        {/* Fields động */}
                         <div className="md:col-span-2 space-y-4 border-t dark:border-slate-700 pt-4 mt-2">
                              {renderDynamicFields()}
                         </div>
@@ -316,7 +306,6 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
         }
     };
     
-    // (FIX 2) Sửa logic Icon
     const ProductIcon = ({ type }) => {
         const iconSize = 18;
         if (type === 'hotel') return <Buildings size={iconSize} title="Hotel" />;
@@ -381,7 +370,6 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
                                     </button>
                                     
                                     <div className="flex items-center gap-0.5">
-                                        {/* (SỬA) Nút Sửa giờ đây mở modal đã nâng cấp */}
                                         <button onClick={() => setEditingProduct(p)} className="action-button text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa"><Pencil size={16}/></button>
                                         <button onClick={() => handleDelete(p.id)} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa"><Trash size={16}/></button>
 
@@ -495,12 +483,11 @@ const ServicesModal = ({ supplier, onClose }) => {
   };
   
 // ====================================================================
-// (FIX 1) Hàm lấy loại NCC (Sửa logic đếm)
+// Hàm lấy loại NCC
 // ====================================================================
 const getSupplierType = (name) => {
     const lowerName = name.toLowerCase();
     
-    // Ưu tiên 1: Tên chứa từ khóa cụ thể
     if (lowerName.includes('khách sạn') || lowerName.includes('resort') || lowerName.includes('hotel')) {
         return { type: 'Hotel', className: 'badge-green' };
     }
@@ -510,14 +497,10 @@ const getSupplierType = (name) => {
     if (lowerName.includes('vận chuyển') || lowerName.includes('transport') || lowerName.includes('sài gòn')) {
         return { type: 'Transport', className: 'badge-orange' };
     }
-    
-    // (SỬA) Ưu tiên 2: Tên chứa "TourZenSupplier"
-    // (Bạn có thể đổi 'Transport' thành 'Airline' nếu muốn)
     if (lowerName.includes('tourzensupplier')) {
          return { type: 'Transport', className: 'badge-orange' };
     }
     
-    // Mặc định
     return { type: 'Tour Operator', className: 'badge-blue' };
 };
 // ====================================================================
@@ -539,6 +522,9 @@ export default function ManageSuppliers() {
     const [searchTerm, setSearchTerm] = useState('');
     
     const [viewingServicesFor, setViewingServicesFor] = useState(null); 
+    
+    // (FIX 2) State MỚI cho thống kê DỊCH VỤ
+    const [productStats, setProductStats] = useState({ hotel: 0, flight: 0, transport: 0 });
 
     const fetchSuppliers = useCallback(async (isInitialLoad = false) => {
         if(!isInitialLoad) setIsFetchingPage(true); 
@@ -576,7 +562,31 @@ export default function ManageSuppliers() {
         }
     };
 
-    useEffect(() => { fetchSuppliers(true); fetchUsers(); }, [fetchSuppliers]);
+    // (FIX 2) Sửa useEffect để fetch cả Thống kê
+    useEffect(() => {
+        fetchSuppliers(true);
+        fetchUsers();
+
+        // Thêm logic fetch số lượng Products
+        async function fetchProductStats() {
+            const { data, error }_ = await supabase
+                .from('Products')
+                .select('product_type')
+                .neq('product_type', 'tour');
+            
+            if (data) {
+                let hotel = 0, flight = 0, transport = 0;
+                for (const prod of data) {
+                    if (prod.product_type === 'hotel') hotel++;
+                    else if (prod.product_type === 'flight') flight++;
+                    else if (prod.product_type === 'transport') transport++;
+                }
+                setProductStats({ hotel, flight, transport });
+            }
+        }
+        fetchProductStats();
+
+    }, [fetchSuppliers]); // fetchSuppliers đã có useCallback
 
     // --- Logic Modal NCC ---
     const handleOpenModal = (supplier = null) => {
@@ -654,38 +664,7 @@ export default function ManageSuppliers() {
         );
     }, [suppliers, searchTerm]);
 
-    const stats = useMemo(() => {
-        let hotel = 0;
-        let airline = 0;
-        let transport = 0;
-
-        suppliers.forEach(s => {
-            // (SỬA) Dùng hàm đã fix
-            const typeInfo = getSupplierType(s.name); 
-            switch (typeInfo.type) {
-                case 'Hotel':
-                    hotel++;
-                    break;
-                case 'Airline':
-                    airline++;
-                    break;
-                case 'Transport':
-                    transport++;
-                    break;
-                default:
-                    break;
-            }
-        });
-
-        return {
-            total: suppliers.length,
-            hotel,
-            airline,
-            transport
-        };
-    }, [suppliers]);
-
-    // (SỬA) Logic trạng thái
+    // Logic trạng thái
     const getStatus = (supplier) => {
         if (!supplier.user_id) {
              return { text: 'Ngừng', className: 'badge-status-inactive' };
@@ -728,25 +707,26 @@ export default function ManageSuppliers() {
                 </button>
             </div>
             
+            {/* (FIX 2) Sửa Thẻ Thống kê */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
                 <StatCard 
                     title="Tổng nhà cung cấp" 
-                    value={stats.total} 
+                    value={suppliers.length} 
                     icon={<Briefcase size={22} weight="duotone"/>}
                 />
                  <StatCard 
-                    title="Khách sạn" 
-                    value={stats.hotel} 
+                    title="Dịch vụ Khách sạn" 
+                    value={productStats.hotel} 
                     icon={<Buildings size={22} weight="duotone"/>}
                 />
                  <StatCard 
-                    title="Hàng không" 
-                    value={stats.airline} 
+                    title="Dịch vụ Hàng không" 
+                    value={productStats.flight} 
                     icon={<AirplaneTilt size={22} weight="duotone"/>}
                 />
                  <StatCard 
-                    title="Vận chuyển" 
-                    value={stats.transport} 
+                    title="Dịch vụ Vận chuyển" 
+                    value={productStats.transport} 
                     icon={<Car size={22} weight="duotone"/>}
                 />
             </div>
@@ -808,30 +788,56 @@ export default function ManageSuppliers() {
                                     <td className="td-style-new">
                                         <span className={`badge-base ${typeInfo.className}`}>{typeInfo.type}</span>
                                     </td>
+                                    
+                                    {/* (FIX 3) Thêm Icon Người liên hệ */}
                                     <td className="td-style-new">
                                         {supplier.managing_user ? (
-                                            <span title={supplier.managing_user.email}>{supplier.managing_user.full_name}</span>
+                                            <div className="flex items-center gap-2">
+                                                <UserCircle size={18} className="text-gray-400 flex-shrink-0" />
+                                                <span title={supplier.managing_user.email}>{supplier.managing_user.full_name}</span>
+                                            </div>
                                         ) : (
                                             <span className="text-gray-400 italic">N/A</span>
                                         )}
                                     </td>
-                                    <td className="td-style-new text-xs text-gray-600 dark:text-gray-400">
-                                        {supplier.phone && <div>{supplier.phone}</div>}
-                                        {supplier.email && <div className="truncate max-w-[150px]">{supplier.email}</div>}
+                                    
+                                    {/* (FIX 3) Thêm Icon Liên hệ */}
+                                    <td className="td-style-new text-xs text-gray-600 dark:text-gray-400 space-y-1.5">
+                                        {supplier.phone && (
+                                            <div className="flex items-center gap-2">
+                                                <Phone size={14} className="flex-shrink-0" />
+                                                <span>{supplier.phone}</span>
+                                            </div>
+                                        )}
+                                        {supplier.email && (
+                                            <div className="flex items-center gap-2 truncate max-w-[180px]">
+                                                <Envelope size={14} className="flex-shrink-0" />
+                                                <span className="truncate">{supplier.email}</span>
+                                            </div>
+                                        )}
                                     </td>
+                                    
                                     <td className="td-style-new">
                                         <div className="flex items-center gap-1">
                                             <Star size={15} weight="fill" className="text-yellow-400" />
                                             <span className="font-medium">{getRating(supplier.id)}</span>
                                         </div>
                                     </td>
+                                    
+                                    {/* (FIX 1) Sửa Trạng thái (Clickable) */}
                                     <td className="td-style-new">
-                                        <span className={`badge-base ${statusInfo.className}`}>{statusInfo.text}</span>
+                                        <button 
+                                            onClick={() => handleOpenModal(supplier)} 
+                                            title="Sửa trạng thái (liên kết tài khoản)"
+                                            className="cursor-pointer transition-transform hover:scale-105 focus:outline-none"
+                                        >
+                                            <span className={`badge-base ${statusInfo.className}`}>{statusInfo.text}</span>
+                                        </button>
                                     </td>
+                                    
                                     <td className="td-style-new text-right whitespace-nowrap">
                                         <div className="flex gap-1 justify-end">
                                             <button onClick={() => setViewingServicesFor(supplier)} className="action-button text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700/50" title="Quản lý Dịch vụ"><List size={16} /></button>
-                                            
                                             <button onClick={() => handleOpenModal(supplier)} className="action-button text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa NCC"><Pencil size={16} /></button>
                                             <button onClick={() => handleDelete(supplier.id, supplier.name)} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa NCC"><Trash size={16} /></button>
                                         </div>
@@ -863,9 +869,9 @@ export default function ManageSuppliers() {
                                     <input id="name" type="text" name="name" value={formData.name} onChange={handleChange} required className="input-style" />
                                 </div>
                                 <div>
-                                    <label htmlFor="user_id" className="label-style">Tài khoản quản lý (Nếu có)</label>
+                                    <label htmlFor="user_id" className="label-style">Tài khoản quản lý (Quyết định Trạng thái)</label>
                                     <select id="user_id" name="user_id" value={formData.user_id} onChange={handleChange} className="input-style">
-                                        <option value="">-- Không liên kết --</option>
+                                        <option value="">-- Không liên kết (Trạng thái: Ngừng) --</option>
                                         {users.map(user => (
                                             <option key={user.id} value={user.id}>
                                                 {user.full_name} ({user.email})
@@ -929,7 +935,7 @@ export default function ManageSuppliers() {
                 .badge-green { @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200; }
                 .badge-purple { @apply bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200; }
                 .badge-orange { @apply bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200; }
-                .badge-status-active { @apply bg-gray-700 text-white dark:bg-gray-200 dark:text-gray-800; }
+                .badge-status-active { @apply bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300; }
                 .badge-status-inactive { @apply bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-100; }
                 .badge-sm-base { @apply px-2.5 py-1 text-xs font-medium rounded-full inline-flex items-center gap-1.5; }
                 .badge-green-sm { @apply badge-sm-base bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300; }
