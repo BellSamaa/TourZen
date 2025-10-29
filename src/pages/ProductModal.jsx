@@ -339,15 +339,21 @@ export default function ProductModal({ show, onClose, onSuccess, productToEdit, 
                     booked_slots: dep.booked_slots || 0,
                 }));
 
+
                 if (departuresToUpsert.length > 0) {
-                     const { error: upsertError } = await supabase
-                         .from('Departures')
-                         .upsert(departuresToUpsert, { 
-                             onConflict: 'id',
-                             returning: 'minimal' // <-- SỬA LỖI: Thêm dòng này
-                         });
-                         
-                     if (upsertError) throw upsertError;
+                    for (const departure of departuresToUpsert) {
+                        const { error: upsertError } = await supabase
+                            .from('Departures')
+                            .upsert(departure, {
+                                onConflict: 'id',
+                                returning: 'minimal' 
+                            });
+
+                        // Nếu một mục bị lỗi, dừng lại và báo lỗi ngay
+                        if (upsertError) {
+                            throw upsertError;
+                        }
+                    }
                 }
             }
 
