@@ -5,6 +5,11 @@
   3. (Logic) Giữ nguyên logic phân loại khách hàng tự động từ v6.
 */
 
+/* CHỈNH SỬA v7.1 (Theo yêu cầu):
+  1. (CSS Bảng) Tăng cỡ chữ tiêu đề bảng (.th-style) từ text-sm -> text-base.
+  2. (CSS Bảng) Tăng cỡ chữ các ô dữ liệu phụ (Liên hệ, Địa chỉ, Ngày sinh) từ text-sm -> text-base cho dễ đọc.
+*/
+
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { FaSpinner, FaSearch, FaTrash } from "react-icons/fa";
 import {
@@ -736,15 +741,18 @@ export default function ManageCustomersSupabase() {
                     </td>
                     <td className="td-style whitespace-nowrap">
                       <div className="flex flex-col gap-0.5">
-                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{c.email}</span>
-                        <span className="text-sm text-gray-500 dark:text-gray-400">{c.phone_number || "..."}</span>
+                        {/* --- SỬA ĐỔI FONT --- */}
+                        <span className="text-base font-semibold text-gray-700 dark:text-gray-200">{c.email}</span>
+                        <span className="text-base text-gray-500 dark:text-gray-400">{c.phone_number || "..."}</span>
                       </div>
                     </td>
                     <td className="td-style max-w-sm">
-                      <span className="truncate block text-sm">{c.address || <span className="italic text-gray-400">...</span>}</span>
+                      {/* --- SỬA ĐỔI FONT --- */}
+                      <span className="truncate block text-base">{c.address || <span className="italic text-gray-400">...</span>}</span>
                     </td>
                     <td className="td-style">
-                      <span className="text-sm whitespace-nowrap">
+                      {/* --- SỬA ĐỔI FONT --- */}
+                      <span className="text-base whitespace-nowrap">
                         {c.ngay_sinh ? new Date(c.ngay_sinh).toLocaleDateString('vi-VN') : <span className="italic text-gray-400">...</span>}
                       </span>
                     </td>
@@ -855,10 +863,11 @@ export default function ManageCustomersSupabase() {
         }
       `}</style>
 
-      {/* --- CSS (Giữ nguyên) --- */}
+      {/* --- CSS (Chỉnh sửa .th-style) --- */}
       <style jsx>{`
         .th-style { 
-          @apply px-6 py-5 text-left text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider; 
+          /* --- SỬA ĐỔI FONT & PADDING --- */
+          @apply px-6 py-6 text-left text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider; 
         }
         .td-style { 
           @apply px-6 py-6 text-sm text-gray-600 dark:text-gray-300 align-middle;
