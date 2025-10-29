@@ -1,15 +1,16 @@
 // src/pages/PromotionPage.jsx
-// (SỬA: Thêm kiểm tra VIP)
+// (FIXED v2: Kiểm tra user.customer_tier === 'VIP')
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // (FIXED) Added useEffect for navigation
 import { motion } from 'framer-motion';
 import { FiTag } from 'react-icons/fi';
 // Giả sử 2 component này tồn tại
-import PromotionCard from '../components/PromotionCard'; 
+import PromotionCard from '../components/PromotionCard';
 import VoucherModal from '../components/VoucherModal';
-import { useNavigate } from 'react-router-dom'; // (SỬA)
-import { useAuth } from '../context/AuthContext'; // (SỬA)
-import { CircleNotch, WarningCircle } from "@phosphor-icons/react"; // (SỬA)
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { CircleNotch, WarningCircle } from "@phosphor-icons/react";
+import toast from 'react-hot-toast'; // (FIXED) Added toast import
 
 // Dữ liệu mẫu (Giả định)
 const promotionsData = {
@@ -27,8 +28,8 @@ const promotionsData = {
 
 export default function PromotionPage() {
   const [selectedPromo, setSelectedPromo] = useState(null);
-  const { user, loading: authLoading } = useAuth(); // (SỬA)
-  const navigate = useNavigate(); // (SỬA)
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
 
   const handleClaimVoucher = (promo) => setSelectedPromo(promo);
   const handleCloseModal = () => setSelectedPromo(null);
@@ -36,7 +37,9 @@ export default function PromotionPage() {
   const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1 } } };
   const cardVariants = { hidden: { opacity: 0, y: 30 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } } };
 
-  // --- (SỬA) Thêm kiểm tra VIP ---
+  // --- (FIXED v2) Thêm kiểm tra VIP ---
+  
+  // 1. Xử lý trạng thái loading
   if (authLoading) {
       return (
           <div className="flex justify-center items-center h-screen bg-gray-50 dark:bg-neutral-900">
@@ -45,20 +48,25 @@ export default function PromotionPage() {
       );
   }
   
+  // 2. Xử lý chưa đăng nhập
   if (!user) {
-      // Chuyển hướng về login nếu chưa đăng nhập
-      toast.error("Vui lòng đăng nhập để xem ưu đãi.");
-      navigate('/login', { state: { from: '/promotions' } });
-      return null;
+      // Dùng useEffect để đảm bảo navigate không chạy trong quá trình render ban đầu
+      useEffect(() => {
+          toast.error("Vui lòng đăng nhập để xem ưu đãi VIP.");
+          navigate('/login', { state: { from: '/promotions' } });
+      }, [navigate]);
+      return null; // Không render gì cả trong khi chờ redirect
   }
   
-  if (user.role !== 'vip') {
+  // 3. Xử lý đã đăng nhập nhưng không phải VIP
+  // Sử dụng 'customer_tier' thay vì 'role'
+  if (user.customer_tier !== 'VIP') {
       return (
           <div className="flex flex-col justify-center items-center h-screen text-center p-4 bg-gray-50 dark:bg-neutral-900">
               <WarningCircle size={64} className="text-red-500" />
               <h1 className="mt-4 text-3xl font-bold dark:text-white">Truy cập bị từ chối</h1>
               <p className="mt-2 text-lg text-neutral-600 dark:text-neutral-400">
-                  Trang này chỉ dành cho thành viên VIP.
+                  Trang này chỉ dành cho thành viên <span className="font-bold text-yellow-500">VIP</span>.
               </p>
               <button onClick={() => navigate('/')} className="mt-6 modal-button-primary">
                   Quay về Trang chủ
@@ -70,13 +78,16 @@ export default function PromotionPage() {
   }
   // --- KẾT THÚC SỬA ---
 
+  // 4. Nếu là VIP, hiển thị trang
   return (
     <div className="bg-gray-50 dark:bg-neutral-900 min-h-screen">
       <div className="container mx-auto px-4 sm:px-6 py-16">
         <motion.div className="text-center mb-16" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-sky-500 mb-3">Săn Ưu đãi, Vi vu khắp chốn</h1>
+          <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-sky-500 mb-3">
+            ✨ Ưu đãi Độc quyền VIP ✨
+          </h1>
           <p className="text-lg text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto">
-            Các chương trình khuyến mãi hấp dẫn nhất được cập nhật mỗi ngày đang chờ bạn!
+            Các chương trình khuyến mãi hấp dẫn nhất dành riêng cho thành viên VIP!
           </p>
         </motion.div>
 
@@ -87,7 +98,8 @@ export default function PromotionPage() {
                 <FiTag className="text-blue-500"/>
                 {sectionKey === "events" ? "Ưu đãi theo Dịp lễ" : sectionKey === "regions" ? "Ưu đãi theo Vùng miền" : "Ưu đãi Đặc biệt"}
               </h2>
-              <div className={`grid grid-cols-1 md:grid-cols-${sectionKey==="thematic"?1:2} gap-8`}>
+              {/* (FIXED) Sửa lại grid class cho thematic */}
+              <div className={`grid grid-cols-1 ${sectionKey==="thematic"? 'lg:grid-cols-1' : 'md:grid-cols-2'} gap-8`}>
                 {promotionsData[sectionKey].map(promo => (
                   <motion.div key={promo.id} variants={cardVariants}>
                     <PromotionCard promo={promo} onClaim={handleClaimVoucher} />
@@ -101,6 +113,13 @@ export default function PromotionPage() {
 
       {/* Modal với form Họ tên – SĐT – Email */}
       <VoucherModal promo={selectedPromo} onClose={handleCloseModal} />
+
+      {/* (FIXED) Thêm CSS cần thiết nếu chưa có global */}
+       <style jsx global>{`
+            .modal-button-primary { 
+                @apply px-4 py-2 bg-sky-600 text-white rounded-md font-semibold hover:bg-sky-700 transition-colors duration-200 text-sm disabled:opacity-50; 
+            }
+       `}</style>
     </div>
   );
 }
