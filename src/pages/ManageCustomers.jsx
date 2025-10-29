@@ -350,7 +350,7 @@ const CustomerForm = ({ initialData, onSubmit, isSaving, onCancel }) => {
   return (
     <form onSubmit={handleSubmit}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-        <InputWrapper label="Họ và Tên" icon={<User size={18} className="mr-2" />}>
+        <InputWrapper label="Họ và Tên" icon={<User size={16} className="mr-2" />}>
           <input
             type="text"
             name="full_name"

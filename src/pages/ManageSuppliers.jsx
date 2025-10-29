@@ -569,7 +569,8 @@ export default function ManageSuppliers() {
 
         // Thêm logic fetch số lượng Products
         async function fetchProductStats() {
-            const { data, error }_ = await supabase
+            // FIX: Removed the extra underscore after the closing brace of destructuring
+            const { data, error } = await supabase
                 .from('Products')
                 .select('product_type')
                 .neq('product_type', 'tour');
