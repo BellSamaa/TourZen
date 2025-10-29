@@ -1,5 +1,5 @@
 // src/App.jsx
-// (ĐÃ SỬA: Thêm wildcard /* cho các route dashboard)
+// (ĐÃ SỬA: Thêm wildcard /* cho route cha VÀ khôi phục route con admin)
 
 import React from "react";
 import { Routes, Route, Outlet, Link, Navigate } from "react-router-dom";
@@ -21,14 +21,14 @@ import Login from "./pages/Login.jsx";
 import About from "./pages/About.jsx";
 import Services from "./pages/Services.jsx";
 import MyBookings from "./pages/MyBookings.jsx";
-import PromotionPage from "./pages/PromotionPage.jsx"; // Bổ sung PromotionPage
-import NotFound from "./pages/NotFound.jsx"; // Bổ sung NotFound
+import PromotionPage from "./pages/PromotionPage.jsx";
+import NotFound from "./pages/NotFound.jsx";
 
 // === 2. IMPORT LAYOUT VÀ CÁC TRANG ADMIN ===
 import AdminDashboard from "./pages/AdminDashboard.jsx"; // Layout Admin
 import SupplierDashboard from "./pages/SupplierDashboard.jsx"; // Layout NCC
 
-// Các trang con của Admin (sẽ được render bên trong AdminDashboard)
+// Các trang con của Admin
 import DashboardHome from './pages/DashboardHome.jsx';
 import Reports from './pages/Reports.jsx';
 import AdminManageProducts from './pages/AdminManageProducts.jsx';
@@ -36,13 +36,6 @@ import ManageTour from './pages/ManageTour.jsx';
 import ManageCustomers from './pages/ManageCustomers.jsx';
 import ManageSuppliers from './pages/ManageSuppliers.jsx';
 import ManageAccounts from './pages/ManageAccounts.jsx';
-
-// (Thêm các trang con của Supplier nếu chưa import trong SupplierDashboard.jsx)
-// import SupplierHome from "./pages/SupplierHome.jsx";
-// import SupplierManageProducts from "./pages/SupplierManageProducts";
-// import ManageTransport from "./pages/ManageTransport";
-// import ManageFlights from "./pages/ManageFlights";
-// import SupplierAddQuickTour from "./pages/SupplierAddQuickTour";
 
 // Context Providers
 import { CartProvider } from "./context/CartContext.jsx";
@@ -67,10 +60,8 @@ const SiteLayout = () => {
     return (
         <div className="flex flex-col min-h-screen bg-white dark:bg-neutral-900">
             <Navbar />
-            <main className="flex-grow pt-[76px] relative"> {/* pt bằng chiều cao Navbar */}
+            <main className="flex-grow pt-[76px] relative">
                  <AnimatePresence mode="wait">
-                    {/* Sử dụng Outlet để render trang con */}
-                    {/* Key={location.pathname} đảm bảo animation chạy khi đổi trang */}
                     <motion.div
                         key={location.pathname}
                         initial="initial"
@@ -78,10 +69,9 @@ const SiteLayout = () => {
                         exit="out"
                         variants={pageVariants}
                         transition={pageTransition}
-                        // Style position absolute để animation chồng lên nhau mượt mà
                         style={{ position: 'absolute', width: '100%', top: 0, left: 0 }}
                     >
-                        <Outlet />
+                        <Outlet /> {/* Outlet render trang con */}
                     </motion.div>
                  </AnimatePresence>
             </main>
@@ -109,7 +99,7 @@ export default function App() {
                         <Route path="payment-success" element={<PaymentSuccess />} />
                         <Route path="services" element={<Services />} />
                         <Route path="my-bookings" element={<MyBookings />} />
-                        <Route path="promotions" element={<PromotionPage />} /> {/* Bổ sung promotions */}
+                        <Route path="promotions" element={<PromotionPage />} />
                         <Route path="login" element={<Login />} />
                         <Route path="register" element={<Login />} />
                         {/* Route 404 cho các trang public nằm trong SiteLayout */}
@@ -120,42 +110,77 @@ export default function App() {
                     {/* === Private Dashboards (Layout riêng + Route con) === */}
 
                     {/* 1. Admin Dashboard Routes */}
-                    {/* Thêm wildcard (*) để các route con bên trong AdminDashboard hoạt động */}
-                    <Route path="/admin/*" element={<AdminDashboard />}>
-                        {/* Trang mặc định khi vào /admin */}
-                        {/* <Route index element={<Navigate to="dashboard" replace />} /> */}
-
-                        {/* Các trang con đã được định nghĩa bên trong AdminDashboard.jsx qua <Outlet /> */}
-                        {/* Không cần định nghĩa lại ở đây nữa */}
-
-                        {/* Route bắt lỗi 404 bên trong Admin */}
-                        {/* <Route path="*" element={<AdminNotFound />} /> */}
+                    <Route path="/admin/*" element={<AdminDashboard />}> {/* Vẫn giữ /* */}
+                        {/* ====> KHÔI PHỤC CÁC ROUTE CON ADMIN Ở ĐÂY <==== */}
+                        <Route index element={<Navigate to="dashboard" replace />} />
+                        <Route path="dashboard" element={<DashboardHome />} />
+                        <Route path="reports" element={<Reports />} />
+                        <Route path="tours" element={<AdminManageProducts />} />
+                        <Route path="bookings" element={<ManageTour />} />
+                        <Route path="customers" element={<ManageCustomers />} />
+                        <Route path="suppliers" element={<ManageSuppliers />} />
+                        <Route path="accounts" element={<ManageAccounts />} />
+                        <Route path="*" element={<AdminNotFound />} />
+                         {/* ====> KẾT THÚC KHÔI PHỤC <==== */}
                     </Route>
 
-                    {/* ====> SỬA Ở ĐÂY <==== */}
                     {/* 2. Supplier Dashboard Routes */}
-                    {/* Thêm wildcard (*) để các route con bên trong SupplierDashboard hoạt động */}
-                    <Route path="/supplier/*" element={<SupplierDashboard />}>
-                         {/* Các trang con đã được định nghĩa bên trong SupplierDashboard.jsx qua <Outlet /> */}
-                         {/* Không cần định nghĩa lại ở đây nữa */}
-
-                         {/* Route bắt lỗi 404 bên trong Supplier */}
-                         {/* <Route path="*" element={<SupplierNotFound />} /> */}
+                    <Route path="/supplier/*" element={<SupplierDashboard />}> {/* Vẫn giữ /* */}
+                         {/* Các route con của supplier sẽ nằm trong SupplierDashboard.jsx (thông qua Outlet) */}
+                         {/* Nếu chưa định nghĩa trong SupplierDashboard.jsx, bạn cần thêm chúng ở đây */}
+                         {/* Ví dụ:
+                         <Route index element={<Navigate to="dashboard" replace />} />
+                         <Route path="dashboard" element={<SupplierHome />} />
+                         <Route path="tours" element={<SupplierManageProducts />} />
+                         <Route path="transport" element={<ManageTransport />} />
+                         <Route path="flights" element={<ManageFlights />} />
+                         <Route path="add-quick-tour" element={<SupplierAddQuickTour />} />
+                         <Route path="*" element={<SupplierNotFound />} /> // Tạo component SupplierNotFound nếu cần
+                         */}
                     </Route>
-                    {/* ====> KẾT THÚC SỬA <==== */}
 
+                    {/* Route 404 chung nếu không khớp các path trên */}
+                    {/* Đã được xử lý bên trong SiteLayout và các Dashboard */}
 
-                    {/* Route 404 chung (nếu không khớp public, admin, supplier) */}
-                    {/* Bỏ route này vì đã có 404 trong SiteLayout */}
-                    {/* <Route path="*" element={<NotFound />} /> */}
                 </Routes>
             </CartProvider>
         </AuthProvider>
     );
 }
 
-// --- Component NotFound (Chung - Bỏ đi vì đã import từ file riêng) ---
-// function NotFound() { ... }
-
-// --- Component NotFound (Admin - Bỏ đi vì nên đặt trong AdminDashboard hoặc file riêng) ---
-// function AdminNotFound() { ... }
+// --- Component NotFound (Admin) ---
+// (Bạn nên tạo file riêng cho component này, ví dụ: src/pages/AdminNotFound.jsx)
+function AdminNotFound() {
+  return (
+    <div className="flex items-center justify-center h-[calc(100vh-150px)] text-center px-4 bg-gray-50 dark:bg-slate-900 rounded-lg">
+      <div>
+        <motion.h2
+            className="text-5xl font-bold text-sky-500 mb-2"
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.5, type: 'spring' }}
+        >
+            404
+        </motion.h2>
+        <motion.p
+            className="text-neutral-500 dark:text-neutral-400 mt-2 text-lg"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+        >
+            Trang quản trị này không tồn tại.
+        </motion.p>
+         <motion.div
+             initial={{ y: 20, opacity: 0 }}
+             animate={{ y: 0, opacity: 1 }}
+             transition={{ duration: 0.5, delay: 0.4 }}
+             className="mt-6"
+         >
+             <Link to="/admin/dashboard" className="px-6 py-2 bg-sky-600 text-white rounded-md hover:bg-sky-700 transition-colors">
+                 Về Tổng quan
+             </Link>
+         </motion.div>
+      </div>
+    </div>
+  );
+}
