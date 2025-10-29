@@ -1,5 +1,5 @@
 // src/context/CartContext.jsx
-// (ĐÃ SỬA: Phân tách giỏ hàng theo user.id)
+// (ĐÃ SỬA: Hỗ trợ Người già (elders) + Thêm hàm updateCartItemDeparture)
 
 import React, { createContext, useContext, useEffect, useState, useMemo } from "react";
 // 👇 THÊM: Import useAuth (Giả định đường dẫn, hãy sửa nếu sai)
@@ -60,15 +60,18 @@ export function CartProvider({ children }) {
   // --- KẾT THÚC SỬA LỚN ---
 
 
-  // ✅ Thêm tour vào giỏ (Giữ nguyên)
+  // ✅ Thêm tour vào giỏ (Cập nhật)
   function addToCart({
     tour,
-    monthData = { month: "Chưa chọn", prices: { adult: tour?.price || 0, child: 0, infant: 0, singleSupplement: 0 } },
+    monthData = { month: "Chưa chọn", prices: { adult: tour?.price || 0, child: 0, infant: 0, elder: 0, singleSupplement: 0 } },
     adults = 1,
     children = 0,
     infants = 0,
+    elders = 0, // <-- THÊM
   }) {
     if (!tour) return;
+    // (SỬA) Key giờ phải bao gồm cả ID tour và ID lịch khởi hành (nếu có)
+    // Hoặc dựa trên logic cũ nếu dùng theo tháng (Tạm giữ logic tháng)
     const key = `${tour.id}_${monthData.month}`;
 
     setItems((prev) => {
@@ -76,7 +79,12 @@ export function CartProvider({ children }) {
       if (found) {
         return prev.map((p) =>
           p.key === key
-            ? { ...p, adults: Math.max(p.adults + adults, 0), children: Math.max(p.children + children, 0), infants: Math.max(p.infants + infants, 0), }
+            ? { ...p, 
+                adults: Math.max(p.adults + adults, 0), 
+                children: Math.max(p.children + children, 0), 
+                infants: Math.max(p.infants + infants, 0),
+                elders: Math.max(p.elders + elders, 0), // <-- THÊM
+              }
             : p
         );
       }
@@ -88,11 +96,25 @@ export function CartProvider({ children }) {
         {
           key, tourId: tour.id, title: tourName, month: monthData.month,
           departureDates: monthData.departureDates || [],
-          adults: Math.max(adults, 0), children: Math.max(children, 0), infants: Math.max(infants, 0),
-          priceAdult: monthData.prices?.adult || 0, priceChild: monthData.prices?.child || 0,
-          priceInfant: monthData.prices?.infant || 0, singleSupplement: monthData.prices?.singleSupplement || 0,
+          departure_id: null, // <-- THÊM: Sẽ được cập nhật sau
+          adults: Math.max(adults, 0), 
+          children: Math.max(children, 0), 
+          infants: Math.max(infants, 0),
+          elders: Math.max(elders, 0), // <-- THÊM
+          // (SỬA) Lấy giá bán (selling_price) thay vì giá NCC (price)
+          priceAdult: tour.selling_price_adult || 0, 
+          priceChild: tour.selling_price_child || 0,
+          priceInfant: 0, // Trẻ sơ sinh miễn phí
+          priceElder: tour.selling_price_elder || tour.selling_price_adult || 0, // <-- THÊM
+          // Lưu giá NCC để tham khảo nếu cần, nhưng không dùng để tính tổng
+          // supplierPriceAdult: monthData.prices?.adult || 0, 
+          singleSupplement: monthData.prices?.singleSupplement || 0,
           image: tour.image_url || tour.image || dynamicImage,
           location: tour.location || "",
+          // (SỬA) Thêm các giá bán
+          selling_price_adult: tour.selling_price_adult || 0,
+          selling_price_child: tour.selling_price_child || 0,
+          selling_price_elder: tour.selling_price_elder || 0,
         },
       ];
     });
@@ -103,16 +125,31 @@ export function CartProvider({ children }) {
     setItems((prev) => prev.filter((p) => p.key !== key));
   }
 
-  // ✅ Cập nhật số lượng (Giữ nguyên)
-  function updateQty(key, adults, children, infants) {
+  // ✅ Cập nhật số lượng (Cập nhật)
+  function updateQty(key, adults, children, infants, elders) { // <-- SỬA
     setItems((prev) =>
       prev.map((p) =>
         p.key === key
-          ? { ...p, adults: Math.max(adults || 0, 0), children: Math.max(children || 0, 0), infants: Math.max(infants || 0, 0), }
+          ? { ...p, 
+              adults: Math.max(adults || 0, 0), 
+              children: Math.max(children || 0, 0), 
+              infants: Math.max(infants || 0, 0),
+              elders: Math.max(elders || 0, 0), // <-- THÊM
+            }
           : p
       )
     );
   }
+
+  // --- (THÊM MỚI) Cập nhật lịch khởi hành đã chọn ---
+  function updateCartItemDeparture(key, departureId) {
+    setItems((prev) =>
+      prev.map((p) =>
+        p.key === key ? { ...p, departure_id: departureId } : p
+      )
+    );
+  }
+  // --- KẾT THÚC THÊM MỚI ---
 
   // ✅ Cập nhật toàn bộ item (Giữ nguyên)
   function updateCartItem(index, newItem) {
@@ -124,20 +161,22 @@ export function CartProvider({ children }) {
     setItems([]);
   }
 
-  // ✅ Tính tổng tiền (Giữ nguyên)
+  // ✅ Tính tổng tiền (Cập nhật)
   const total = items.reduce(
     (sum, i) =>
       sum +
-      i.adults * (i.priceAdult || 0) +
-      i.children * (i.priceChild || 0) +
+      (i.adults || 0) * (i.priceAdult || 0) +
+      (i.children || 0) * (i.priceChild || 0) +
+      (i.elders || 0) * (i.priceElder || i.priceAdult || 0) + // <-- THÊM
       (i.singleSupplement || 0),
     0
   );
 
-  // ✅ Trả giá trị (Giữ nguyên)
+  // ✅ Trả giá trị (Cập nhật)
   const value = {
     items, addToCart, removeFromCart,
     updateQty, updateCartItem, clearCart, total,
+    updateCartItemDeparture, // <-- THÊM
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

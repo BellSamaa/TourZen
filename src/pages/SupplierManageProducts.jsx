@@ -1,5 +1,5 @@
 // src/pages/SupplierManageProducts.jsx
-// (V4: Tập trung Quản lý Tour cho NCC)
+// (File này đã đúng logic, gọi ProductModal để sửa)
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
@@ -98,6 +98,7 @@ export default function SupplierManageProducts() {
         .from("Products")
         .select(`
             *,
+            supplier_price_adult:price, supplier_price_child:child_price, supplier_price_infant:infant_price,
             Departures (id, departure_date, max_slots, booked_slots, adult_price, child_price)
         `)
         .eq("product_type", "tour") // Đảm bảo chỉ lấy tour
@@ -184,7 +185,7 @@ export default function SupplierManageProducts() {
 
             {/* Giá NCC */}
             <div className="text-xl font-bold text-red-600 mb-4">
-                {/* Hiển thị giá cơ sở của NCC */}
+                {/* (ĐÚNG) Hiển thị giá NCC */}
                 {formatCurrency(product.supplier_price_adult || product.price || 0)} <span className="text-sm font-normal text-slate-500">(Giá NCC)</span>
             </div>
 
@@ -235,6 +236,7 @@ export default function SupplierManageProducts() {
         </td>
         {/* Giá NCC */}
         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-600">
+            {/* (ĐÚNG) Hiển thị giá NCC */}
             {formatCurrency(product.supplier_price_adult || product.price || 0)} <span className="text-xs font-normal text-slate-500">(Giá NCC)</span>
         </td>
         {/* Slots */}
