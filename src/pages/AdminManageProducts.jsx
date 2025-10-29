@@ -424,10 +424,76 @@ export default function AdminManageProducts() {
     // --- KẾT THÚC SỬA ---
 
     // --- JSX Card (Giữ nguyên) ---
-    const TourCard = ({ product }) => ( /* ... */ );
+    const TourCard = ({ product }) => (
+        <div className="flex flex-col bg-white dark:bg-slate-800 shadow-lg rounded-lg overflow-hidden border dark:border-slate-700 transition-all duration-300 hover:shadow-xl">
+            <div className="relative h-48 w-full flex-shrink-0">
+                {product.image_url ? (
+                    <img src={product.image_url} alt={product.name} className="h-full w-full object-cover"
+                         onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/600x400/cccccc/ffffff?text=Image+Error'; }} />
+                ) : (
+                    <div className="h-full w-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
+                        <FaImage className="text-4xl text-slate-400 dark:text-slate-500" />
+                    </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-90"></div>
+                <div className="absolute top-2 right-2 z-10"><ApprovalStatus status={product.approval_status} /></div>
+                <div className="absolute bottom-2 left-2 z-10"><SlotSummary departures={product.Departures} /></div>
+                {product.approval_status === 'approved' && (
+                    <div className="absolute top-2 left-2 z-10">
+                        {product.is_published ? <span className="badge-blue">Đã đăng</span> : <span className="badge-gray">Chưa đăng</span>}
+                    </div>
+                )}
+            </div>
+            <div className="p-4 flex flex-col flex-grow">
+                <h3 className="text-base font-bold text-slate-800 dark:text-white mb-2 line-clamp-2" title={product.name}>
+                    {product.name}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                    NCC: <Link to={`/admin/suppliers?search=${product.supplier?.name}`} className="font-medium hover:underline">{product.supplier?.name || 'N/A'}</Link>
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                    Mã: {product.tour_code || "N/A"}
+                </p>
+                <div className="mt-auto pt-3 border-t dark:border-slate-700">
+                    <ActionButtons product={product} />
+                </div>
+            </div>
+        </div>
+    );
     // --- JSX List Item (Giữ nguyên) ---
-    const TourListItem = ({ product }) => ( /* ... */ );
-
+    const TourListItem = ({ product }) => (
+        <tr className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
+            <td className="px-6 py-4">
+                <div className="flex items-center gap-3">
+                    {product.image_url ? (
+                        <img src={product.image_url} alt={product.name} className="h-12 w-16 object-cover rounded-md flex-shrink-0"
+                             onError={(e) => { e.target.onerror = null; e.target.style.display='none'; }}/>
+                    ) : (
+                        <div className="h-12 w-16 bg-slate-200 dark:bg-slate-700 flex items-center justify-center rounded-md flex-shrink-0">
+                            <FaImage className="text-2xl text-slate-400 dark:text-slate-500" />
+                        </div>
+                    )}
+                    <div>
+                        <div className="text-sm font-semibold text-slate-800 dark:text-white line-clamp-2">{product.name}</div>
+                        <div className="text-xs font-mono text-slate-500 dark:text-slate-400">{product.tour_code || "N/A"}</div>
+                    </div>
+                </div>
+            </td>
+            <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
+                 <Link to={`/admin/suppliers?search=${product.supplier?.name}`} className="link-style hover:text-sky-500" title={`Xem NCC ${product.supplier?.name}`}>
+                    {product.supplier?.name || "N/A"}
+                 </Link>
+            </td>
+            <td className="px-6 py-4 text-sm"><SlotSummary departures={product.Departures} /></td>
+            <td className="px-6 py-4 text-sm"><ApprovalStatus status={product.approval_status} /></td>
+            <td className="px-6 py-4 text-sm">
+                {product.is_published ? <span className="badge-blue">Đã đăng</span> : <span className="badge-gray">Chưa đăng</span>}
+            </td>
+            <td className="px-6 py-4 text-right text-sm">
+                <ActionButtons product={product} />
+            </td>
+        </tr>
+    );
     // --- JSX Chính (Giữ nguyên) ---
     return (
         <div className="p-4 md:p-6 space-y-6 min-h-screen dark:bg-slate-900 dark:text-white">
