@@ -376,12 +376,13 @@ export default function AdminManageProducts() {
             const from = (currentPage - 1) * ITEMS_PER_PAGE;
             const to = from + ITEMS_PER_PAGE - 1;
 
+//...
             let query = supabase
                 .from('Products')
                 .select(`
                     id, name, tour_code, image_url, location, duration,
-                    supplier_price_adult:price, supplier_price_child:child_price, supplier_price_infant:infant_price, /* (ĐÚNG) Lấy giá NCC (có thể dùng alias từ tên cột cũ) */
-                    selling_price_adult, selling_price_child, selling_price_elder, /* (ĐÚNG) Lấy giá bán Admin */
+                    supplier_price_adult:price, supplier_price_child:child_price, supplier_price_infant:infant_price,
+                    selling_price_adult, selling_price_child, selling_price_elder,
                     itinerary, approval_status, is_published, supplier_id,
                     supplier:supplier_id ( name ),
                     Departures ( id, departure_date, max_slots, booked_slots, adult_price, child_price )
