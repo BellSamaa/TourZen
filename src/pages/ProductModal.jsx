@@ -303,6 +303,6 @@ export default function ProductModal({ show, onClose, onSuccess, productToEdit, 
                 .dark .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(90, 90, 90, 0.6); }
                 .custom-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(150, 150, 150, 0.4) transparent; }
             `}</style>
-        </div>
+        </motion.div>
     );
 }
