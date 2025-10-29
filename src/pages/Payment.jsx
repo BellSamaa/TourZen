@@ -1,7 +1,5 @@
 // src/pages/Payment.jsx
-// (V9: Sửa lỗi 400 (Bad Request) khi insert vào Bookings)
-// (V10: Sửa lỗi logic hiển thị dịch vụ, thêm hiển thị inventory)
-// (V11: Xóa code bị lặp ở cuối file)
+// (V12: Sửa lỗi thiếu 'async' và THÊM LẠI logic trừ inventory dịch vụ)
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -14,7 +12,6 @@ import {
     FaUserTie // Icon Người già
 } from "react-icons/fa";
 import { IoIosMail, IoIosCall } from "react-icons/io";
-// (SỬA) Thêm WarningCircle
 import { Buildings, Ticket, CircleNotch, X, WarningCircle } from "@phosphor-icons/react"; 
 import { getSupabase } from "../lib/supabaseClient";
 import toast from 'react-hot-toast';
@@ -427,8 +424,8 @@ export default function Payment() {
         setIsCheckingVoucher(false);
     };
 
-// --- (CẬP NHẬT) HÀM CHECKOUT (ĐÃ SỬA: Thêm 'async' và logic trừ inventory Dịch vụ) ---
-    const handleCheckout = async (e) => {
+    // --- (CẬP NHẬT) HÀM CHECKOUT (ĐÃ SỬA: Thêm 'async' và logic trừ inventory Dịch vụ) ---
+    const handleCheckout = async (e) => { // <--- SỬA 1: THÊM 'async'
         e.preventDefault();
 
         // 1. Kiểm tra dữ liệu
@@ -452,7 +449,7 @@ export default function Payment() {
         let successfulBookingIds = [];
         const bookingPromises = []; // Khai báo mảng
 
-        // (THÊM MỚI) Tính tổng số khách cho dịch vụ (ví dụ: vé máy bay)
+        // SỬA 2: Tính tổng số khách cho dịch vụ (ví dụ: vé máy bay)
         const totalAllGuests = displayItems.reduce((sum, i) => sum + (i.adults || 0) + (i.children || 0) + (i.elders || 0) + (i.infants || 0), 0);
 
         // 2. Xử lý từng tour
@@ -476,7 +473,7 @@ export default function Payment() {
                 break; // Dừng nếu có lỗi
         	 }
 
-            // 2.2. (THÊM MỚI) Giữ chỗ DỊCH VỤ
+            // 2.2. (SỬA 3) Giữ chỗ DỊCH VỤ
             // Chỉ chạy một lần cho dịch vụ của cả đơn hàng (gắn vào tour đầu tiên)
             if (item === displayItems[0]) {
                 const servicePromises = [];
@@ -586,19 +583,19 @@ export default function Payment() {
                  toast.error("Lỗi khi lưu đơn hàng. Đang thử hoàn lại chỗ...");
                  bookingErrorOccurred = true;
                  
-                 // (THÊM MỚI) Rollback dịch vụ và tour nếu insert lỗi
-                 // TODO: Cần có cơ chế an toàn hơn, nhưng đây là giải pháp tạm thời
+                 // (SỬA 4) Rollback dịch vụ và tour nếu insert lỗi
                  console.warn("ĐANG THỬ ROLLBACK...");
                  for (const item of displayItems) {
                      const quantity = (item.adults || 0) + (item.children || 0) + (item.elders || 0) + (item.infants || 0);
-                     await supabase.rpc('book_tour_slot', { 
+                     // Bỏ 'await' nếu không cần thiết trong vòng lặp (cho phép chạy song song)
+                     supabase.rpc('book_tour_slot', { 
                         departure_id_input: item.departure_id,
                         guest_count_input: -quantity 
                      });
                  }
-                 if(selectedHotel) await supabase.rpc('book_service_slot', { product_id_input: selectedHotel, quantity_input: -1 });
-                 if(selectedTransport) await supabase.rpc('book_service_slot', { product_id_input: selectedTransport, quantity_input: -1 });
-                 if(selectedFlight) await supabase.rpc('book_service_slot', { product_id_input: selectedFlight, quantity_input: -totalAllGuests });
+                 if(selectedHotel) supabase.rpc('book_service_slot', { product_id_input: selectedHotel, quantity_input: -1 });
+                 if(selectedTransport) supabase.rpc('book_service_slot', { product_id_input: selectedTransport, quantity_input: -1 });
+                 if(selectedFlight) supabase.rpc('book_service_slot', { product_id_input: selectedFlight, quantity_input: -totalAllGuests });
             }
         }
 
@@ -667,10 +664,6 @@ export default function Payment() {
                                             <FaMapMarkerAlt size={12}/> {item.location}
                                         </p>
                                         
-                                        {/* *** DÒNG ĐÃ SỬA ***
-                                        Lỗi cú pháp: </Tóm tắt> -> </p>
-                                        Lỗi logic: formatCurrency(tourSubtotal) -> formatCurrency(calculateItemTotal(item))
-                                        */}
                                         <p className="text-2xl font-bold text-red-600 dark:text-red-500 mt-3">
                                             {formatCurrency(calculateItemTotal(item))}
                                         </p>
@@ -781,7 +774,6 @@ export default function Payment() {
                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5"><Buildings/> Khách sạn</label>
                                                <select value={selectedHotel} onChange={(e) => setSelectedHotel(e.target.value)} className="input-style w-full">
                                                     <option value="">Không chọn</option>
-                                                    {/* (SỬA) Hiển thị inventory và disable nếu hết hàng */}
                                                     {availableServices.hotels.map(s => 
                                                         <option key={s.id} value={s.id} disabled={s.inventory <= 0}>
                                                             {s.name} ({formatCurrency(s.price)})
@@ -797,7 +789,6 @@ export default function Payment() {
                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5"><FaCar/> Di chuyển</label>
                                                <select value={selectedTransport} onChange={(e) => setSelectedTransport(e.target.value)} className="input-style w-full">
                                                     <option value="">Không chọn</option>
-                                                    {/* (SỬA) Hiển thị inventory và disable nếu hết hàng */}
                                                     {availableServices.transport.map(s => 
                                                         <option key={s.id} value={s.id} disabled={s.inventory <= 0}>
                                                             {s.name} ({formatCurrency(s.price)})
@@ -813,7 +804,6 @@ export default function Payment() {
                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5"><FaPlane/> Vé máy bay</label>
                                                <select value={selectedFlight} onChange={(e) => setSelectedFlight(e.target.value)} className="input-style w-full">
                                                     <option value="">Không chọn</option>
-                                                    {/* (SỬA) Hiển thị inventory và disable nếu hết hàng */}
                                                     {availableServices.flights.map(s => 
                                                         <option key={s.id} value={s.id} disabled={s.inventory <= 0}>
                                                             {s.name} ({formatCurrency(s.price)})
