@@ -132,7 +132,7 @@ const DeparturesManager = ({ productId, initialDepartures = [], onDeparturesChan
                               </tr>
                           ))}
                            {departures.length === 0 && !loading && (
-                               <tr><td colSpan="6" className="p-4 text-center text-gray-500 italic">Chưa có lịch khởi hành.</td></tr>
+                                <tr><td colSpan="6" className="p-4 text-center text-gray-500 italic">Chưa có lịch khởi hành.</td></tr>
                            )}
                       </tbody>
                  </table>
@@ -181,6 +181,12 @@ export default function ProductModal({ show, onClose, onSuccess, productToEdit, 
     
     const [formData, setFormData] = useState(initialData);
     const [departures, setDepartures] = useState([]); // State lưu Lịch khởi hành
+
+    // SỬA LỖI: Dùng useCallback để ổn định hàm, tránh re-render vô hạn trong DeparturesManager
+    const handleDeparturesChange = useCallback((newDeps) => {
+        setDepartures(newDeps);
+    }, []); // Dependency rỗng vì setDepartures (từ useState) đã ổn định
+
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
 
@@ -250,10 +256,10 @@ export default function ProductModal({ show, onClose, onSuccess, productToEdit, 
             toast.error("Tên tour và Nhà cung cấp là bắt buộc."); return;
         }
         if (formData.supplier_price_adult <= 0) {
-              toast.error("Giá NCC (Người lớn) phải lớn hơn 0."); return;
+             toast.error("Giá NCC (Người lớn) phải lớn hơn 0."); return;
         }
         if (departures.length === 0) {
-              toast.error("Bạn phải thêm ít nhất 1 Lịch khởi hành (Slot)."); return;
+             toast.error("Bạn phải thêm ít nhất 1 Lịch khởi hành (Slot)."); return;
         }
 
         setLoading(true);
@@ -396,7 +402,7 @@ export default function ProductModal({ show, onClose, onSuccess, productToEdit, 
                             <div> <label className="label-style text-blue-700 dark:text-blue-400">Giá NCC Trẻ em</label> <input type="number" name="supplier_price_child" value={formData.supplier_price_child} onChange={handleChange} className="input-style border-blue-300 dark:border-blue-600 focus:ring-blue-500" min="0" /> </div>
                             <div> <label className="label-style text-blue-700 dark:text-blue-400">Giá NCC Sơ sinh</label> <input type="number" name="supplier_price_infant" value={formData.supplier_price_infant} onChange={handleChange} className="input-style border-blue-300 dark:border-blue-600 focus:ring-blue-500" min="0" /> </div>
                         </div>
-                          <p className="text-xs text-gray-500 mt-3 italic">* Đây là giá gốc bạn cung cấp. Admin sẽ duyệt và đặt giá bán sau.</p>
+                         <p className="text-xs text-gray-500 mt-3 italic">* Đây là giá gốc bạn cung cấp. Admin sẽ duyệt và đặt giá bán sau.</p>
                     </fieldset>
                     
                     {/* Ảnh */}
@@ -425,7 +431,7 @@ export default function ProductModal({ show, onClose, onSuccess, productToEdit, 
                         productId={productToEdit?.id}
                         // SỬA: Đảm bảo initialDepartures luôn là mảng rỗng nếu không có productToEdit hoặc Departures
                         initialDepartures={productToEdit?.Departures || []} 
-                        onDeparturesChange={(newDeps) => setDepartures(newDeps)}
+                        onDeparturesChange={handleDeparturesChange} // SỬA LỖI: Dùng hàm đã useCallback
                     />
 
                 </form>
