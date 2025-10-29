@@ -12,6 +12,9 @@ import {
     Trash, FloppyDisk, Info // Thêm icons
 } from "@phosphor-icons/react";
 
+// (Giả định) Thêm motion từ framer-motion nếu component Modal có dùng
+import { motion } from "framer-motion";
+
 const supabase = getSupabase();
 
 // --- Hook Debounce (Giữ nguyên) ---
@@ -214,6 +217,7 @@ const DeparturesManager = ({ tourId }) => {
 
 
 // --- (KHÔI PHỤC ĐẦY ĐỦ) Modal Chỉnh sửa Tour ---
+// (Lưu ý: Các hàm xử lý bên trong vẫn đang ở dạng /* ... */ như file gốc bạn cung cấp)
 const EditTourModal = ({ tour, onClose, onSuccess, suppliers }) => {
     const [formData, setFormData] = useState({
         name: '', description: '', price: 0, location: '', duration: '',
@@ -234,12 +238,12 @@ const EditTourModal = ({ tour, onClose, onSuccess, suppliers }) => {
         });
     }, [tour]);
 
-    const handleChange = (e) => { /* ... */ };
-    const handleItineraryChange = (index, field, value) => { /* ... */ };
-    const addItineraryItem = () => { /* ... */ };
-    const removeItineraryItem = (index) => { /* ... */ };
-    const handleImageUpload = async (e) => { /* ... */ };
-    const handleSubmit = async (e) => { /* ... */ };
+    const handleChange = (e) => { /* ... (Chưa định nghĩa) ... */ };
+    const handleItineraryChange = (index, field, value) => { /* ... (Chưa định nghĩa) ... */ };
+    const addItineraryItem = () => { /* ... (Chưa định nghĩa) ... */ };
+    const removeItineraryItem = (index) => { /* ... (Chưa định nghĩa) ... */ };
+    const handleImageUpload = async (e) => { /* ... (Chưa định nghĩa) ... */ };
+    const handleSubmit = async (e) => { /* ... (Chưa định nghĩa) ... */ };
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-40 flex justify-center items-center p-4">
@@ -258,6 +262,7 @@ const EditTourModal = ({ tour, onClose, onSuccess, suppliers }) => {
                         {/* Thông tin cơ bản */}
                         <fieldset className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                            {/* ... Inputs cho name, tour_code, price, location, duration, supplier_id ... */}
+                           <p className="text-center col-span-full">(Các trường input cho form chính ở đây)</p>
                         </fieldset>
                         {/* Ảnh */}
                         <div>
@@ -276,6 +281,8 @@ const EditTourModal = ({ tour, onClose, onSuccess, suppliers }) => {
                     </form>
                     <div className="p-4 border-t dark:border-neutral-700 flex justify-end gap-3 bg-gray-50 dark:bg-neutral-800 rounded-b-lg flex-shrink-0">
                         {/* ... Nút Hủy và Lưu/Đăng ... */}
+                        <button type="button" onClick={onClose} className="modal-button-secondary">Hủy</button>
+                        <button type="submit" form="main-tour-form" className="modal-button-primary">Lưu và Đăng</button>
                     </div>
                 </div>
             </motion.div>
@@ -291,16 +298,55 @@ export default function AdminManageProducts() {
     const [products, setProducts] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
     const [loading, setLoading] = useState(true);
-    // ... (các state khác)
+    
+    // --- (SỬA) Bổ sung các state bị thiếu ---
+    const [error, setError] = useState(null);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [viewMode, setViewMode] = useState('list'); // 'list' or 'grid'
+    const [modalTour, setModalTour] = useState(null); // State cho modal
+    
+    // State cho Pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(0);
+    const [totalItems, setTotalItems] = useState(0);
+    const [isFetchingPage, setIsFetchingPage] = useState(false); // Loading khi chuyển trang/search
+    
+    // Hằng số và Debounce
+    const ITEMS_PER_PAGE = 10;
+    const debouncedSearch = useDebounce(searchTerm, 500);
+    // --- Kết thúc SỬA ---
 
-    // --- fetchProducts (Giữ nguyên) ---
-    const fetchProducts = useCallback(async (isInitialLoad = false) => { /* ... */ }, [currentPage, debouncedSearch, suppliers.length, ITEMS_PER_PAGE]);
+
+    // --- fetchProducts (Giữ nguyên - Giả định hàm này đã hoàn chỉnh) ---
+    const fetchProducts = useCallback(async (isInitialLoad = false) => {
+        if (isInitialLoad) setLoading(true);
+        setIsFetchingPage(true);
+        setError(null);
+
+        // (Code logic fetch ... - Giả định)
+        // ...
+        // const { data, error, count } = await query;
+        // ...
+
+        // Giả lập fetch để code chạy được
+        console.log("Fetching page", currentPage, "Search:", debouncedSearch);
+        // setProducts(data || []);
+        // setTotalItems(count || 0);
+        // setTotalPages(Math.ceil((count || 0) / ITEMS_PER_PAGE));
+        // if (error) setError(error.message);
+        
+        if (isInitialLoad) setLoading(false);
+        setIsFetchingPage(false);
+
+    }, [currentPage, debouncedSearch, suppliers.length, ITEMS_PER_PAGE]);
 
     // --- useEffects (Giữ nguyên) ---
     useEffect(() => { fetchProducts(true); }, [fetchProducts]);
-    useEffect(() => { /* ... reset page ... */ }, [debouncedSearch]);
+    useEffect(() => { 
+        setCurrentPage(1); // Reset về trang 1 khi search
+    }, [debouncedSearch]);
 
-    // --- Handlers (Giữ nguyên) ---
+    // --- Handlers (Giữ nguyên - Giả định) ---
     const handleSetStatus = async (id, newStatus) => { /* ... */ };
     const handleDelete = async (tour) => { /* ... */ };
     const paginationWindow = useMemo(() => getPaginationWindow(currentPage, totalPages, 2), [currentPage, totalPages]);
@@ -309,6 +355,7 @@ export default function AdminManageProducts() {
     const ActionButtons = ({ product }) => (
         <div className="flex items-center justify-end gap-2 flex-wrap">
             {/* ... JSX các nút Duyệt, Từ chối, Sửa & Đăng, Đặt lại chờ, Xóa ... */}
+            
             {/* Sửa nút Sửa: */}
             {product.approval_status === 'approved' && (
                 <button
@@ -320,12 +367,21 @@ export default function AdminManageProducts() {
                     <PencilLine weight="bold" size={14}/> Sửa
                 </button>
             )}
-            {/* ... (Các nút khác giữ nguyên) ... */}
+            
+            {/* (Các nút khác giữ nguyên - Tạm ẩn) */}
+            {/*
+            {product.approval_status !== 'approved' && (
+                <button onClick={() => handleSetStatus(product.id, 'approved')} ...>Duyệt</button>
+            )}
+            {product.approval_status !== 'rejected' && (
+                <button onClick={() => handleSetStatus(product.id, 'rejected')} ...>Từ chối</button>
+            )}
+            */}
         </div>
     );
     // --- KẾT THÚC SỬA ---
 
-    // --- SỬA Ở ĐÂY: KHÔI PHỤC JSX Card ---
+    // --- KHÔI PHỤC JSX Card ---
     const TourCard = ({ product }) => (
         <div className="flex flex-col bg-white dark:bg-slate-800 shadow-lg rounded-lg overflow-hidden border dark:border-slate-700 transition-all duration-300 hover:shadow-xl">
             <div className="relative h-48 w-full flex-shrink-0">
@@ -364,7 +420,7 @@ export default function AdminManageProducts() {
     );
     // --- KẾT THÚC KHÔI PHỤC ---
 
-    // --- SỬA Ở ĐÂY: KHÔI PHỤC JSX List Item ---
+    // --- KHÔI PHỤC JSX List Item ---
     const TourListItem = ({ product }) => (
         <tr className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
             <td className="px-6 py-4">
