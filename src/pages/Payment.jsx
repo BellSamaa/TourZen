@@ -426,78 +426,184 @@ export default function Payment() {
         setIsCheckingVoucher(false);
     };
 
-    // --- (CẬP NHẬT) HÀM CHECKOUT ---
-    const handleCheckout = async (e) => {
-        e.preventDefault();
+// --- (CẬP NHẬT) HÀM CHECKOUT (ĐÃ SỬA: Thêm logic trừ inventory Dịch vụ) ---
+    const handleCheckout = async (e) => {
+        e.preventDefault();
 
-        // 1. Kiểm tra dữ liệu
-        if (!currentUser) { showNotification("Bạn cần đăng nhập..."); navigate('/login', { state: { from: location } }); return; }
-        if (!contactInfo.name || !contactInfo.phone || !contactInfo.email) { showNotification("Vui lòng điền đủ thông tin liên lạc."); return; }
-        if (displayItems.length === 0) { showNotification("Giỏ hàng trống."); return; }
-        if (!agreedToTerms) { showNotification("Bạn phải đồng ý điều khoản."); return; }
+        // 1. Kiểm tra dữ liệu
+        if (!currentUser) { showNotification("Bạn cần đăng nhập..."); navigate('/login', { state: { from: location } }); return; }
+        if (!contactInfo.name || !contactInfo.phone || !contactInfo.email) { showNotification("Vui lòng điền đủ thông tin liên lạc."); return; }
+        if (displayItems.length === 0) { showNotification("Giỏ hàng trống."); return; }
+        if (!agreedToTerms) { showNotification("Bạn phải đồng ý điều khoản."); return; }
 
-        let invalidItem = false;
-        displayItems.forEach(item => {
-            if (!item.departure_id) { showNotification(`Vui lòng chọn ngày khởi hành cho tour "${item.title}".`); invalidItem = true; }
-            const guests = (item.adults || 0) + (item.children || 0) + (item.elders || 0) + (item.infants || 0);
-            if (guests <= 0) { showNotification(`Vui lòng chọn số lượng khách cho tour "${item.title}".`); invalidItem = true; }
-            if ((item.adults || 0) + (item.elders || 0) === 0 && ((item.children || 0) > 0 || (item.infants || 0) > 0)) { showNotification(`"${item.title}" phải có người lớn hoặc người già đi kèm.`); invalidItem = true; }
-            if (item.max_slots !== undefined && guests > item.max_slots) { showNotification(`Số khách (${guests}) vượt quá số chỗ còn lại (${item.max_slots}) cho tour "${item.title}".`); invalidItem = true; }
-        });
-        if (invalidItem) return;
+        let invalidItem = false;
+        displayItems.forEach(item => {
+            if (!item.departure_id) { showNotification(`Vui lòng chọn ngày khởi hành cho tour "${item.title}".`); invalidItem = true; }
+            const guests = (item.adults || 0) + (item.children || 0) + (item.elders || 0) + (item.infants || 0);
+            if (guests <= 0) { showNotification(`Vui lòng chọn số lượng khách cho tour "${item.title}".`); invalidItem = true; }
+            if ((item.adults || 0) + (item.elders || 0) === 0 && ((item.children || 0) > 0 || (item.infants || 0) > 0)) { showNotification(`"${item.title}" phải có người lớn hoặc người già đi kèm.`); invalidItem = true; }
+            if (item.max_slots !== undefined && guests > item.max_slots) { showNotification(`Số khách (${guests}) vượt quá số chỗ còn lại (${item.max_slots}) cho tour "${item.title}".`); invalidItem = true; }
+        });
+        if (invalidItem) return;
 
-        setIsSubmitting(true);
-        let bookingErrorOccurred = false;
-        let successfulBookingIds = [];
-        const bookingPromises = []; // Khai báo mảng
+        setIsSubmitting(true);
+        let bookingErrorOccurred = false;
+        let successfulBookingIds = [];
+        const bookingPromises = []; // Khai báo mảng
 
-        // 2. Xử lý từng tour
-        for (const item of displayItems) {
-            const numAdults = item.adults || 0;
-            const numChildren = item.children || 0;
-            const numElders = item.elders || 0;
-            const numInfants = item.infants || 0;
-            const quantity = numAdults + numChildren + numElders + numInfants;
+        // (THÊM MỚI) Tính tổng số khách cho dịch vụ (ví dụ: vé máy bay)
+        const totalAllGuests = displayItems.reduce((sum, i) => sum + (i.adults || 0) + (i.children || 0) + (i.elders || 0) + (i.infants || 0), 0);
 
-            // Gọi RPC giữ chỗ
-            const { data: bookedSuccess, error: rpcError } = await supabase.rpc('book_tour_slot', {
-                departure_id_input: item.departure_id,
-                guest_count_input: quantity
-            });
+        // 2. Xử lý từng tour
+        for (const item of displayItems) {
+            const numAdults = item.adults || 0;
+            const numChildren = item.children || 0;
+            const numElders = item.elders || 0;
+            const numInfants = item.infants || 0;
+            const quantity = numAdults + numChildren + numElders + numInfants;
 
-            if (rpcError || !bookedSuccess) { 
-                console.error("Lỗi RPC book_tour_slot:", rpcError);
-                toast.error(`"${item.title}": Đã hết chỗ hoặc lỗi. ${rpcError?.message || ''}`);
-                bookingErrorOccurred = true;
-                break; // Dừng nếu có lỗi
-             }
+            // 2.1. Gọi RPC giữ chỗ TOUR
+            const { data: bookedSuccess, error: rpcError } = await supabase.rpc('book_tour_slot', {
+                departure_id_input: item.departure_id,
+                guest_count_input: quantity
+            });
 
-            // Tạo bản ghi Booking nếu RPC thành công
-            const itemTotalPrice = calculateItemTotal(item); // Dùng hàm helper
+            if (rpcError || !bookedSuccess) { 
+                console.error("Lỗi RPC book_tour_slot:", rpcError);
+                toast.error(`"${item.title}": Đã hết chỗ hoặc lỗi. ${rpcError?.message || ''}`);
+                bookingErrorOccurred = true;
+                break; // Dừng nếu có lỗi
+        	 }
 
-            const bookingPayload = {
-                user_id: currentUser.id, product_id: item.tourId,
-                departure_id: item.departure_id, 
-                departure_date: (departuresData[item.tourId] || []).find(d => d.id === item.departure_id)?.departure_date,
-                quantity: quantity,
-                num_adult: numAdults, num_child: numChildren, num_elder: numElders, num_infant: numInfants,
-                total_price: itemTotalPrice, // Giá tour của item này
-                status: 'pending', notes: notes,
-                // Gán dịch vụ & voucher cho booking đầu tiên
-                hotel_product_id: item === displayItems[0] ? selectedHotel || null : null,
-                transport_product_id: item === displayItems[0] ? selectedTransport || null : null,
-                flight_product_id: item === displayItems[0] ? selectedFlight || null : null,
-                voucher_code: item === displayItems[0] ? voucherCode || null : null,
-                voucher_discount: item === displayItems[0] ? voucherDiscount || 0 : 0,
-            };
+            // 2.2. (THÊM MỚI) Giữ chỗ DỊCH VỤ
+            // Chỉ chạy một lần cho dịch vụ của cả đơn hàng (gắn vào tour đầu tiên)
+            if (item === displayItems[0]) {
+                const servicePromises = [];
+                
+                // Trừ 1 inventory cho Khách sạn (giả định 1 đơn/1 phòng)
+                if (selectedHotel) {
+                    servicePromises.push(
+                        supabase.rpc('book_service_slot', { 
+                            product_id_input: selectedHotel, 
+                            quantity_input: 1 
+                        })
+                    );
+                }
+                
+                // Trừ 1 inventory cho Xe (giả định 1 đơn/1 xe)
+                if (selectedTransport) {
+                    servicePromises.push(
+                        supabase.rpc('book_service_slot', { 
+                            product_id_input: selectedTransport, 
+                            quantity_input: 1 
+                        })
+                    );
+                }
+                
+                // Trừ inventory cho Vé máy bay (giả định 1 vé / 1 khách)
+                if (selectedFlight) {
+                    servicePromises.push(
+                        supabase.rpc('book_service_slot', { 
+                            product_id_input: selectedFlight, 
+                            quantity_input: totalAllGuests // Dùng tổng số khách
+                        })
+                    );
+                }
 
-            // Thêm vào DB (sẽ chạy đồng loạt)
-            // SỬA LỖI 400: Bỏ .single() và chỉ .select('id').
-            // insert() trả về một mảng, nên chúng ta không dùng .single()
-            bookingPromises.push(
-                supabase.from('Bookings').insert(bookingPayload).select('id')
-            );
-        } // Hết vòng lặp
+                // Chạy tất cả các RPC dịch vụ
+                if (servicePromises.length > 0) {
+                    const serviceResults = await Promise.all(servicePromises);
+                    
+                    // Kiểm tra kết quả
+                    for (const result of serviceResults) {
+                        // Nếu 'data' trả về false (hết hàng) hoặc có lỗi
+                        if (result.error || !result.data) { 
+                            console.error("Lỗi RPC book_service_slot:", result.error);
+                            toast.error("Lỗi: Một dịch vụ (Xe/KS/Vé) đã hết hàng.");
+                            bookingErrorOccurred = true;
+                            
+                            // (Quan trọng) Rollback lại slot tour đã giữ
+                            await supabase.rpc('book_tour_slot', { 
+                                departure_id_input: item.departure_id,
+                                guest_count_input: -quantity // Trừ (âm) để trả lại slot
+                            });
+                            break; 
+                        }
+                    }
+                }
+            }
+            
+            // Nếu có lỗi (từ tour hoặc dịch vụ), dừng vòng lặp
+            if (bookingErrorOccurred) break;
+
+            // 2.3. Tạo bản ghi Booking nếu RPC thành công
+            const itemTotalPrice = calculateItemTotal(item); // Dùng hàm helper
+
+            const bookingPayload = {
+                user_id: currentUser.id, product_id: item.tourId,
+                departure_id: item.departure_id, 
+                departure_date: (departuresData[item.tourId] || []).find(d => d.id === item.departure_id)?.departure_date,
+                quantity: quantity,
+                num_adult: numAdults, num_child: numChildren, num_elder: numElders, num_infant: numInfants,
+                total_price: itemTotalPrice, // Giá tour của item này
+                status: 'pending', notes: notes,
+                // Gán dịch vụ & voucher cho booking đầu tiên
+                hotel_product_id: item === displayItems[0] ? selectedHotel || null : null,
+                transport_product_id: item === displayItems[0] ? selectedTransport || null : null,
+                flight_product_id: item === displayItems[0] ? selectedFlight || null : null,
+                voucher_code: item === displayItems[0] ? voucherCode || null : null,
+                voucher_discount: item === displayItems[0] ? voucherDiscount || 0 : 0,
+            };
+
+            // Thêm vào DB (sẽ chạy đồng loạt)
+            bookingPromises.push(
+                supabase.from('Bookings').insert(bookingPayload).select('id')
+            );
+        } // Hết vòng lặp
+
+        // 3. Xử lý kết quả insert (Như cũ)
+        if (!bookingErrorOccurred) {
+            try {
+                const results = await Promise.all(bookingPromises);
+                
+                successfulBookingIds = results.map(r => r.data?.[0]?.id).filter(Boolean);
+
+                if (!isBuyNow) clearCart(); 
+                toast.success("Đặt tour thành công! Kiểm tra email để xem chi tiết.");
+                
+                navigate('/booking-success', { 
+                    state: { 
+                        bookingIds: successfulBookingIds,
+                        method: paymentMethod,
+                        branch: selectedBranch,
+                        deadline: formattedDeadline
+                    } 
+                });
+
+            } catch (insertError) { 
+                 console.error("Lỗi insert Bookings:", insertError);
+                 toast.error("Lỗi khi lưu đơn hàng. Đang thử hoàn lại chỗ...");
+                 bookingErrorOccurred = true;
+                 
+                 // (THÊM MỚI) Rollback dịch vụ và tour nếu insert lỗi
+                 // TODO: Cần có cơ chế an toàn hơn, nhưng đây là giải pháp tạm thời
+                 console.warn("ĐANG THỬ ROLLBACK...");
+                 for (const item of displayItems) {
+                     const quantity = (item.adults || 0) + (item.children || 0) + (item.elders || 0) + (item.infants || 0);
+                     await supabase.rpc('book_tour_slot', { 
+                        departure_id_input: item.departure_id,
+                        guest_count_input: -quantity 
+                     });
+                 }
+                 if(selectedHotel) await supabase.rpc('book_service_slot', { product_id_input: selectedHotel, quantity_input: -1 });
+                 if(selectedTransport) await supabase.rpc('book_service_slot', { product_id_input: selectedTransport, quantity_input: -1 });
+                 if(selectedFlight) await supabase.rpc('book_service_slot', { product_id_input: selectedFlight, quantity_input: -totalAllGuests });
+            }
+        }
+
+        setIsSubmitting(false);
+    };
+    // --- KẾT THÚC CHECKOUT ---
 
         // 3. Xử lý kết quả insert
         if (!bookingErrorOccurred) {
