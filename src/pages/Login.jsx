@@ -40,8 +40,18 @@ export default function Login() {
                 const { data: { user }, error: signUpError } = await supabase.auth.signUp({ email: form.email, password: form.password, options: { data: { full_name: form.name, } } });
                 if (signUpError) throw signUpError;
                 if (user) {
-                    const { error: insertError } = await supabase.from('Users').insert({ id: user.id, full_name: form.name, email: form.email, address: form.address, phone_number: form.phone_number });
-                    if (insertError) { console.error("Insert profile error:", insertError); throw new Error(`Lỗi lưu hồ sơ: ${insertError.message}. Vui lòng thử lại.`); }
+                    
+                    // <<< SỬA LỖI 409 TẠI ĐÂY: Thay .insert() bằng .upsert() >>>
+                    // Lý do: Trigger trong DB đã tạo hàng, ta chỉ cần cập nhật (UPDATE) nó.
+                    const { error: insertError } = await supabase.from('Users').upsert({ 
+                        id: user.id, 
+                        full_name: form.name, 
+                        email: form.email, 
+                        address: form.address, 
+                        phone_number: form.phone_number 
+                    });
+                    
+                    if (insertError) { console.error("Upsert profile error:", insertError); throw new Error(`Lỗi lưu hồ sơ: ${insertError.message}. Vui lòng thử lại.`); }
                     setSuccess("Đăng ký thành công! 🎉 Vui lòng kiểm tra email để xác nhận.");
                     setForm(initialFormState);
                 } else throw new Error("Không thể tạo người dùng.");
@@ -52,7 +62,9 @@ export default function Login() {
                     const { data: userData, error: userError } = await supabase.from('Users').select('role, is_active').eq('id', user.id).single();
                     if (userError) {
                          if (userError.code === 'PGRST116') {
-                             const { error: insertError } = await supabase.from('Users').insert({ id: user.id, email: user.email });
+                             // Nếu hồ sơ không tồn tại (PGRST116), tạo một hồ sơ cơ bản
+                             // Dùng .upsert() ở đây cũng an toàn hơn
+                             const { error: insertError } = await supabase.from('Users').upsert({ id: user.id, email: user.email });
                              if (insertError) throw new Error("Lỗi tạo hồ sơ người dùng.");
                              navigate(location.state?.from?.pathname || "/", { replace: true });
                              return;
