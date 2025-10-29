@@ -1,5 +1,6 @@
 // src/pages/ManageTour.jsx
 // (V4: Giao diện giống ảnh Figma - Quản lý Nhà Cung Cấp, Logic Quản lý Đơn hàng)
+// (FIX: Đã xóa comment trong select)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -119,7 +120,7 @@ const BookingStats = () => {
                 let confirmedCount = 0;
                 let totalRevenue = 0;
 
-                data.forEach(b => {
+                (data || []).forEach(b => { // Thêm guard (data || [])
                     if (b.status === 'pending') pendingCount++;
                     if (b.status === 'confirmed') {
                         confirmedCount++;
@@ -337,12 +338,13 @@ export default function ManageTour() {
                     id, created_at, departure_date, status, total_price, quantity,
                     num_adult, num_child, num_elder, num_infant, departure_id,
                     user:user_id ( id, full_name, email ),
-                    product:product_id ( id, name, image_url ), // <-- ĐÃ XÓA HOÀN TOÀN COMMENT
+                    product:product_id ( id, name, image_url ),
                     hotel:hotel_product_id (id, name),
                     transport:transport_product_id (id, name),
                     flight:flight_product_id (id, name),
                     voucher_code, voucher_discount, notes, payment_method
-                `, { count: 'exact' });
+                `, { count: 'exact' }); // Lấy count để phân trang
+
             // Apply filter
             if (filterStatus !== 'all') {
                 query = query.eq('status', filterStatus);
@@ -350,11 +352,11 @@ export default function ManageTour() {
 
             // Apply search (Tìm theo Mã đơn, Tên khách, Email, Tên tour)
             if (debouncedSearch) {
-                 const searchTerm = `%${debouncedSearch}%`;
+                 const searchTermVal = `%${debouncedSearch}%`; // Sửa tên biến
                  // Tìm ID booking (cần ID đầy đủ, không phải slice)
-                 // Tìm tên/email user qua bảng Users (cần JOIN hoặc subquery phức tạp hơn, tạm thời bỏ qua)
+                 // Tìm tên/email user qua bảng Users
                  // Tìm tên tour qua bảng Products (đã JOIN)
-                 query = query.or(`product.name.ilike.${searchTerm},user.full_name.ilike.${searchTerm},user.email.ilike.${searchTerm},id::text.like.${searchTerm}`); // Tìm cả ID
+                 query = query.or(`product.name.ilike.${searchTermVal},user.full_name.ilike.${searchTermVal},user.email.ilike.${searchTermVal},id::text.like.${searchTermVal}`); // Tìm cả ID
             }
 
             query = query.order('created_at', { ascending: false }).range(from, to);
@@ -364,7 +366,7 @@ export default function ManageTour() {
             setBookings(data || []);
             setTotalItems(count || 0);
             // Tự động về trang 1 nếu trang hiện tại không còn dữ liệu (sau khi filter/search)
-            if (!isInitialLoad && currentPage > 1 && data.length === 0 && count > 0) {
+            if (!isInitialLoad && currentPage > 1 && (data || []).length === 0 && count > 0) { // Thêm guard (data || [])
                  setCurrentPage(1);
             }
 
@@ -382,19 +384,22 @@ export default function ManageTour() {
      useEffect(() => {
         // Fetch lần đầu hoặc khi dependencies thay đổi (trừ currentPage)
         fetchBookings(true);
-     }, [debouncedSearch, filterStatus]); // Bỏ currentPage
+     }, [debouncedSearch, filterStatus, fetchBookings]); // Thêm fetchBookings vào dependencies
 
      useEffect(() => {
         // Fetch khi chỉ currentPage thay đổi (không cần set loading chính)
-        fetchBookings(false);
-     }, [currentPage]); // Chỉ fetch khi currentPage đổi
+        if (!loading) { // Chỉ fetch khi không phải lần load đầu
+             fetchBookings(false);
+        }
+     }, [currentPage, loading, fetchBookings]); // Thêm loading và fetchBookings
 
      // Tự về trang 1 khi filter hoặc search thay đổi
      useEffect(() => {
         if (currentPage !== 1) {
             setCurrentPage(1);
         }
-     }, [debouncedSearch, filterStatus]);
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+     }, [debouncedSearch, filterStatus]); // Bỏ qua warning về dependency currentPage
 
 
     // --- Event Handlers (Cập nhật logic RPC) ---
@@ -435,7 +440,7 @@ export default function ManageTour() {
 
             toast.success(`Đã cập nhật trạng thái đơn #${booking.id.slice(-8).toUpperCase()} thành "${newStatus}"`);
             setModalBooking(null); // Đóng modal
-            fetchBookings(); // Tải lại danh sách
+            fetchBookings(false); // Tải lại danh sách (không cần initial load)
 
         } catch (err) {
             console.error("Lỗi cập nhật trạng thái:", err);
@@ -481,9 +486,9 @@ export default function ManageTour() {
 
             // Tải lại dữ liệu - Kiểm tra nếu xóa hết trang cuối thì lùi trang
             if (bookings.length === 1 && currentPage > 1) {
-                setCurrentPage(currentPage - 1);
+                setCurrentPage(currentPage - 1); // Lùi về trang trước đó
             } else {
-                fetchBookings();
+                fetchBookings(false); // Tải lại trang hiện tại
             }
 
         } catch (err) {
