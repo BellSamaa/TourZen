@@ -1,14 +1,12 @@
 // src/pages/Home.jsx
-// (Phiên bản cuối cùng, sửa lỗi 400, Swiper, JSX, và lỗi import 'Star')
+// (Phiên bản cuối cùng, đã thêm lại các section Điểm Đến, Blog, Features)
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { getSupabase } from "../lib/supabaseClient"; // Import Supabase
-// (SỬA) Import FaStar từ react-icons/fa (Vì file gốc dùng FaStar)
 import { FaMapMarkerAlt, FaStar, FaAward, FaHeadset, FaTags } from "react-icons/fa";
-// (SỬA) Bỏ Star khỏi import này nếu không dùng
-import { MapPin, Clock, Fire, Sun, CircleNotch, Ticket, ArrowRight, Star } from "@phosphor-icons/react"; // <--- THÊM Star vào đây
+import { MapPin, Clock, Fire, Sun, CircleNotch, Ticket, ArrowRight, Star } from "@phosphor-icons/react"; // Import Star từ phosphor
 
 // Swiper
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -22,13 +20,26 @@ const supabase = getSupabase();
 // ===================================
 // === CÁC HÀM HELPER ===
 // ===================================
+
+/**
+ * Chuyển đổi văn bản thành dạng "slug" (URL-friendly).
+ */
 function slugify(text) {
   if (!text) return '';
   return text.toString().toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd')
-    .replace(/\s+/g, '-').replace(/[^\w-]+/g, '').replace(/--+/g, '-')
-    .replace(/^-+/, '').replace(/-+$/, '');
+    .normalize('NFD') // Chuẩn hóa Unicode (tách dấu)
+    .replace(/[\u0300-\u036f]/g, '') // Bỏ dấu
+    .replace(/đ/g, 'd') // Xử lý chữ 'đ'
+    .replace(/\s+/g, '-') // Thay khoảng trắng bằng gạch nối
+    .replace(/[^\w-]+/g, '') // Bỏ ký tự không phải chữ/số/gạch nối
+    .replace(/--+/g, '-') // Bỏ gạch nối thừa
+    .replace(/^-+/, '') // Bỏ gạch nối đầu
+    .replace(/-+$/, ''); // Bỏ gạch nối cuối
 }
+
+/**
+ * Định dạng số thành tiền tệ Việt Nam (VND).
+ */
 const formatCurrency = (num) => {
     if (typeof num !== 'number' || isNaN(num)) return "0 ₫";
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(num);
@@ -37,15 +48,56 @@ const formatCurrency = (num) => {
 // === KẾT THÚC HELPER ===
 // ===================================
 
-// Dữ liệu tĩnh (Giữ nguyên)
-const destinationsData = { /* ... */ };
-const tabs = [ /* ... */ ];
-const blogs = [ /* ... */ ];
-const features = [ /* ... */ ];
+
+// Dữ liệu cho các điểm đến (Giữ nguyên từ file gốc)
+const destinationsData = {
+  mienBac: [
+    { name: 'Quảng Ninh', image: '/images/destinations/quangninh.jpg', gridClass: 'md:col-span-2 md:row-span-2' },
+    { name: 'Hà Giang', image: '/images/destinations/hagiang.jpg', gridClass: 'md:col-span-2' },
+    { name: 'Lào Cai', image: '/images/destinations/laocai.jpg', gridClass: '' },
+    { name: 'Ninh Bình', image: '/images/destinations/ninhbinh.jpg', gridClass: '' },
+    { name: 'Yên Bái', image: '/images/destinations/yenbai.jpg', gridClass: '' },
+    { name: 'Sơn La', image: '/images/destinations/sonla.jpg', gridClass: 'md:col-span-2' },
+    { name: 'Cao Bằng', image: '/images/destinations/caobang.jpg', gridClass: '' },
+    { name: 'Hải Phòng', image: '/images/destinations/haiphong.jpg', gridClass: '' },
+    { name: 'Hà Nội', image: '/images/destinations/hanoi.jpg', gridClass: '' },
+  ],
+  mienTrung: [
+    { name: 'Đà Nẵng', image: '/images/destinations/danang.jpg', gridClass: 'md:col-span-2 md:row-span-2' },
+    { name: 'Hội An', image: '/images/destinations/hoian.jpg', gridClass: 'md:col-span-2' },
+    { name: 'Huế', image: '/images/destinations/hue.jpg', gridClass: '' },
+    { name: 'Quy Nhơn', image: '/images/destinations/quynhon.jpg', gridClass: '' },
+    { name: 'Nha Trang', image: '/images/destinations/nhatrang_dest.jpg', gridClass: '' },
+    { name: 'Phan Thiết', image: '/images/destinations/phanthiet.jpg', gridClass: 'md:col-span-2' },
+  ],
+  mienDongNamBo: [], // Giả sử chưa có dữ liệu
+  mienTayNamBo: [], // Giả sử chưa có dữ liệu
+};
+
+const tabs = [
+  { key: 'mienBac', label: 'Miền Bắc' },
+  { key: 'mienTrung', label: 'Miền Trung' },
+  { key: 'mienDongNamBo', label: 'Miền Đông Nam Bộ' },
+  { key: 'mienTayNamBo', label: 'Miền Tây Nam Bộ' },
+];
+
+// Blog mẫu (Giữ nguyên)
+const blogs = [
+    { id: 1, title: "Top 5 bãi biển đẹp nhất Việt Nam", excerpt: "Cùng khám phá 5 bãi biển tuyệt đẹp trải dài từ Bắc chí Nam...", image: "/images/blog_beach.jpg" },
+    { id: 2, title: "Kinh nghiệm du lịch Đà Lạt 3N2Đ", excerpt: "Thành phố ngàn hoa luôn là điểm đến mơ ước của giới trẻ...", image: "/images/blog_dalat.jpg" },
+    { id: 3, title: "Ẩm thực đường phố Nha Trang", excerpt: "Không chỉ có hải sản, Nha Trang còn là thiên đường ăn vặt...", image: "/images/blog_nhatrang.jpg" },
+];
+
+// Features (Giữ nguyên)
+const features = [
+    { icon: <FaAward />, title: "Chất Lượng Hàng Đầu", description: "Chúng tôi cam kết mang đến những trải nghiệm vượt trội và dịch vụ đẳng cấp." },
+    { icon: <FaHeadset />, title: "Hỗ Trợ 24/7", description: "Đội ngũ chuyên viên luôn sẵn sàng hỗ trợ bạn mọi lúc, mọi nơi." },
+    { icon: <FaTags />, title: "Giá Cả Tối Ưu", description: "Luôn có những ưu đãi tốt nhất và mức giá cạnh tranh trên thị trường." },
+];
 
 /**
  * Component Thẻ Tour (Tái sử dụng)
- * (SỬA: Dùng FaStar từ react-icons/fa cho nhất quán với file gốc)
+ * Dùng FaStar và cột 'price'
  */
 const TourCard = ({ tour, isFeatured = false }) => (
     <Link
@@ -59,7 +111,7 @@ const TourCard = ({ tour, isFeatured = false }) => (
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                 onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/600x400/eee/ccc?text=No+Image'; }}
             />
-             {isFeatured && (
+            {isFeatured && (
                  <div className="absolute top-4 left-4 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg">
                     <Fire size={14} weight="bold" /> Nổi Bật
                 </div>
@@ -75,7 +127,6 @@ const TourCard = ({ tour, isFeatured = false }) => (
             <div className="flex justify-between items-center text-sm text-neutral-600 dark:text-neutral-400">
                  <span className="flex items-center gap-1.5"> <Clock size={16} className="text-sky-500" /> {tour.duration || 'N/A ngày'} </span>
                  <span className="flex items-center gap-1.5">
-                     {/* (SỬA) Dùng FaStar thay vì Star */}
                      <FaStar size={16} className="text-yellow-500" /> {tour.rating?.toFixed(1) || '4.5'}
                  </span>
             </div>
@@ -157,6 +208,7 @@ export default function Home() {
 
   return (
     <div className="bg-slate-50 dark:bg-neutral-900 text-slate-800 dark:text-neutral-200 overflow-x-hidden">
+      {/* <FlyingPlane /> */} {/* (Tùy chọn) */}
 
       {/* SLIDE GIỚI THIỆU */}
       <section className="relative w-full h-[90vh] -mt-[76px] text-white">
@@ -222,12 +274,12 @@ export default function Home() {
         </div>
       </section>
       
-      {/* ĐIỂM ĐẾN YÊU THÍCH */}
+      {/* === (THÊM LẠI) ĐIỂM ĐẾN YÊU THÍCH === */}
       <section className="py-20 bg-white dark:bg-neutral-800">
         <div className="max-w-7xl mx-auto px-6">
             <div className="text-center mb-12">
                 <h2 className="text-3xl font-bold mb-4 dark:text-white">🏖️ Điểm Đến Yêu Thích</h2>
-                <p className="text-slate-500 dark:text-neutral-400 max-w-2xl mx-auto">Khám phá vẻ đẹp bất tận của Việt Nam...</p>
+                <p className="text-slate-500 dark:text-neutral-400 max-w-2xl mx-auto">Khám phá vẻ đẹp bất tận của Việt Nam qua những điểm đến không thể bỏ lỡ.</p>
             </div>
             <div className="flex justify-center flex-wrap gap-x-6 gap-y-2 mb-8 border-b dark:border-neutral-700">
                 {tabs.map((tab) => (
@@ -256,12 +308,12 @@ export default function Home() {
         </div>
       </section>
 
-      {/* BLOG DU LỊCH */}
+      {/* === (THÊM LẠI) BLOG DU LỊCH === */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-6">
              <div className="text-center mb-12">
                 <h2 className="text-3xl font-bold mb-4 dark:text-white">📰 Cẩm Nang Du Lịch</h2>
-                <p className="text-slate-500 dark:text-neutral-400 max-w-2xl mx-auto">Những bài viết chia sẻ kinh nghiệm...</p>
+                <p className="text-slate-500 dark:text-neutral-400 max-w-2xl mx-auto">Những bài viết chia sẻ kinh nghiệm, mẹo hay và cảm hứng cho chuyến đi sắp tới của bạn.</p>
             </div>
             <div className="grid md:grid-cols-3 gap-8">
                 {blogs.map((post) => (
@@ -272,6 +324,7 @@ export default function Home() {
                         <div className="p-6">
                             <h3 className="font-semibold text-lg mb-2 h-14 dark:text-white">{post.title}</h3>
                             <p className="text-slate-500 dark:text-neutral-400 text-sm mb-4 line-clamp-2">{post.excerpt}</p>
+                            {/* Giả sử link blog chưa có, tạm để button */}
                             <button className="font-semibold text-sky-600 hover:text-sky-700">Đọc thêm →</button>
                         </div>
                     </motion.div>
@@ -280,11 +333,11 @@ export default function Home() {
         </div>
       </section>
       
-      {/* TẠI SAO CHỌN CHÚNG TÔI */}
+      {/* === (THÊM LẠI) TẠI SAO CHỌN CHÚNG TÔI === */}
       <section className="py-20 bg-white dark:bg-neutral-800">
         <div className="max-w-7xl mx-auto px-6 text-center">
             <h2 className="text-3xl font-bold mb-4 dark:text-white">💖 Tại Sao Chọn TourZen?</h2>
-            <p className="text-slate-500 dark:text-neutral-400 max-w-2xl mx-auto mb-12">Chúng tôi không chỉ bán tour...</p>
+            <p className="text-slate-500 dark:text-neutral-400 max-w-2xl mx-auto mb-12">Chúng tôi không chỉ bán tour, chúng tôi mang đến những hành trình và kỷ niệm trọn đời.</p>
             <div className="grid md:grid-cols-3 gap-10">
                 {features.map((feature, index) => (
                     <motion.div key={index} initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.5 }} transition={{ duration: 0.5, delay: index * 0.1 }} className="flex flex-col items-center">
