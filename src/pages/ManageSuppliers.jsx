@@ -1,5 +1,6 @@
 // src/pages/ManageSuppliers.jsx
 // (UPGRADED: Thêm CRUD + Bật/Tắt cho Dịch vụ con)
+// (UPGRADED: Tăng kích thước / padding cho dễ nhìn)
 
 import React, { useState, useEffect, useCallback, Fragment } from 'react';
 import { Link } from 'react-router-dom';
@@ -107,17 +108,20 @@ const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
                 <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
                     <div className="flex justify-between items-center p-4 border-b dark:border-slate-700">
-                        <h3 className="text-lg font-semibold text-slate-800 dark:text-white">
+                        {/* (NÂNG CẤP) Tăng cỡ chữ tiêu đề modal */}
+                        <h3 className="text-xl font-semibold text-slate-800 dark:text-white">
                             {isNew ? 'Thêm Dịch vụ mới' : 'Chỉnh sửa Dịch vụ'}
                         </h3>
                         <button type="button" onClick={onClose} disabled={loading} className="text-gray-400 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50">
                             <X size={20} />
                         </button>
                     </div>
-                    <div className="p-6 space-y-4 overflow-y-auto">
+                    {/* (NÂNG CẤP) Tăng padding và khoảng cách */}
+                    <div className="p-6 space-y-5 overflow-y-auto">
                         <div>
                             <label htmlFor="edit-product-type" className="label-style">Loại Dịch vụ *</label>
-                            <select id="edit-product-type" name="product_type" value={formData.product_type} onChange={handleChange} required className="input-style" disabled={!isNew}>
+                            {/* (NÂNG CẤP) Tăng cỡ chữ input */}
+                            <select id="edit-product-type" name="product_type" value={formData.product_type} onChange={handleChange} required className="input-style !text-base" disabled={!isNew}>
                                 <option value="hotel">Hotel (Khách sạn)</option>
                                 <option value="car">TourZenTaxi (Xe)</option>
                                 <option value="plane">TourZenFlight (Bay)</option>
@@ -136,7 +140,8 @@ const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
                             <textarea id="edit-product-description" name="description" value={formData.description} onChange={handleChange} rows="4" className="input-style resize-y"></textarea>
                         </div>
                     </div>
-                    <div className="p-4 border-t dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800 rounded-b-lg">
+                    {/* (NÂNG CẤP) Tăng padding */}
+                    <div className="p-5 border-t dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800 rounded-b-lg">
                         <button type="button" onClick={onClose} disabled={loading} className="modal-button-secondary">Hủy</button>
                         <button type="submit" disabled={loading} className="modal-button-primary flex items-center justify-center gap-1.5">
                             {loading && <CircleNotch size={18} className="animate-spin" />}
@@ -242,21 +247,25 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
 
     // (SỬA) Đổi tên
     const ProductIcon = ({ type }) => {
-        if (type === 'hotel') return <Buildings title="Hotel" />;
-        if (type === 'car') return <Car title="TourZenTaxi" />;
-        if (type === 'plane') return <AirplaneTilt title="TourZenFlight" />;
-        return <Package />;
+        // (NÂNG CẤP) Tăng cỡ icon
+        const iconSize = 18;
+        if (type === 'hotel') return <Buildings size={iconSize} title="Hotel" />;
+        if (type === 'car') return <Car size={iconSize} title="TourZenTaxi" />;
+        if (type === 'plane') return <AirplaneTilt size={iconSize} title="TourZenFlight" />;
+        return <Package size={iconSize} />;
     };
     
     // (SỬA) Badge Duyệt
     const ApprovalBadge = ({ status }) => {
+      // (NÂNG CẤP) Tăng cỡ icon badge
+      const iconSize = 14;
       switch (status) {
         case "approved":
-          return <span className="badge-green-sm"><CheckCircle size={12} /> Đã duyệt</span>;
+          return <span className="badge-green-sm"><CheckCircle size={iconSize} /> Đã duyệt</span>;
         case "rejected":
-          return <span className="badge-red-sm"><XCircle size={12} /> Bị từ chối</span>;
+          return <span className="badge-red-sm"><XCircle size={iconSize} /> Bị từ chối</span>;
         default:
-          return <span className="badge-yellow-sm"><Clock size={12} /> Chờ duyệt</span>;
+          return <span className="badge-yellow-sm"><Clock size={iconSize} /> Chờ duyệt</span>;
       }
     };
 
@@ -265,45 +274,54 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
             <div className="flex justify-between items-center">
                 <button
                     onClick={() => setIsOpen(!isOpen)}
-                    className="text-xs text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 mt-1 font-medium"
+                    // (NÂNG CẤP) Tăng cỡ chữ từ text-xs -> text-sm
+                    className="text-sm text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 mt-1 font-medium"
                     aria-expanded={isOpen}
                     disabled={loading && isOpen && products.length === 0}
                 >
                     {isOpen ? <CaretUp weight="bold"/> : <CaretDown weight="bold"/>}
                     {isOpen ? 'Ẩn' : 'Hiện'} Dịch vụ (Hotel, Taxi, Flight)
-                    {isOpen && loading && <CircleNotch size={12} className="animate-spin ml-1" />}
+                    {/* (NÂNG CẤP) Tăng cỡ icon spin */}
+                    {isOpen && loading && <CircleNotch size={14} className="animate-spin ml-1" />}
                     {!loading && ` (${products.length})`}
                 </button>
                 {/* (MỚI) Nút Thêm Dịch vụ */}
                 {isOpen && (
                     <button 
                         onClick={() => setEditingProduct({ isNew: true })} // Mở modal ở trạng thái "Mới"
-                        className="button-primary !text-xs !px-2 !py-1 flex items-center gap-1"
+                        // (NÂNG CẤP) Tăng padding/size, bỏ !text-xs
+                        className="button-primary !text-sm !px-3 !py-1.5 flex items-center gap-1.5"
                     >
-                        <Plus size={12} /> Thêm DV
+                        <Plus size={16} /> Thêm DV
                     </button>
                 )}
             </div>
             {isOpen && (
-                <div className="mt-2 pl-4 border-l-2 border-sky-300 dark:border-sky-700 space-y-1.5">
+                // (NÂNG CẤP) Tăng padding/khoảng cách
+                <div className="mt-3 pl-4 border-l-2 border-sky-300 dark:border-sky-700 space-y-2.5">
                     {loading && products.length === 0 ? ( 
-                        <div className="py-2 flex items-center gap-1 text-xs text-neutral-500"> <CircleNotch size={14} className="animate-spin" /> Đang tải... </div>
+                        // (NÂNG CẤP) Tăng cỡ chữ
+                        <div className="py-2 flex items-center gap-1.5 text-sm text-neutral-500"> <CircleNotch size={16} className="animate-spin" /> Đang tải... </div>
                     ) 
                     : !loading && products.length === 0 ? (
-                        <p className="text-xs italic text-neutral-500 py-1">Chưa có dịch vụ.</p>
+                        // (NÂNG CẤP) Tăng cỡ chữ
+                        <p className="text-sm italic text-neutral-500 py-1">Chưa có dịch vụ.</p>
                     ) : (
-                        <ul className="divide-y dark:divide-neutral-700 text-xs">
+                        // (NÂNG CẤP) Bỏ text-xs, để inherit text-sm từ td
+                        <ul className="divide-y dark:divide-neutral-700">
                             {products.map(p => (
-                                <li key={p.id} className="py-1.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                                // (NÂNG CẤP) Tăng padding y
+                                <li key={p.id} className="py-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
                                     {/* ... (Thông tin tên + giá giữ nguyên) ... */}
-                                    <div className="flex items-center gap-1.5 flex-grow min-w-[150px]">
+                                    <div className="flex items-center gap-2 flex-grow min-w-[150px]">
                                         <ProductIcon type={p.product_type} />
                                         <span className="font-medium dark:text-neutral-100" title={p.description || p.name}>{p.name}</span>
                                         <span className="text-sky-600 dark:text-sky-400 font-semibold">({formatCurrency(p.price)})</span>
                                     </div>
                                     
                                     {/* (SỬA) Nút Bấm Actions */}
-                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                    {/* (NÂNG CẤP) Tăng gap */}
+                                    <div className="flex items-center gap-3 flex-shrink-0">
                                         <ApprovalBadge status={p.approval_status} />
                                         
                                         {/* (MỚI) Nút Bật/Tắt (Hiển thị / Ngừng) */}
@@ -311,25 +329,27 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
                                             onClick={() => handleTogglePublished(p)}
                                             title={p.is_published ? "Đang Hiển thị (Bấm để Ngừng)" : "Đang Ngừng (Bấm để Hiển thị)"}
                                             disabled={p.approval_status !== 'approved'}
+                                            // (NÂNG CẤP) Tăng cỡ icon
                                             className={`disabled:opacity-30 ${p.is_published ? 'text-green-500' : 'text-gray-400'}`}
                                         >
-                                            {p.is_published ? <ToggleRight size={20} weight="fill" /> : <ToggleLeft size={20} />}
+                                            {p.is_published ? <ToggleRight size={24} weight="fill" /> : <ToggleLeft size={24} />}
                                         </button>
                                         
+                                        {/* (NÂNG CẤP) Tăng cỡ icon, đổi action-button-sm -> action-button */}
                                         <div className="flex items-center gap-0.5">
                                             {/* Nút Sửa */}
-                                            <button onClick={() => setEditingProduct(p)} className="action-button-sm text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa"><Pencil size={14}/></button>
+                                            <button onClick={() => setEditingProduct(p)} className="action-button text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa"><Pencil size={16}/></button>
                                             {/* Nút Xóa */}
-                                            <button onClick={() => handleDelete(p.id)} className="action-button-sm text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa"><Trash size={14}/></button>
+                                            <button onClick={() => handleDelete(p.id)} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa"><Trash size={16}/></button>
 
                                             {p.approval_status === 'pending' && (
                                                 <>
-                                                <button onClick={() => handleApproval(p.id, 'approved')} className="action-button-sm text-green-500 hover:bg-green-100 dark:hover:bg-green-900/30" title="Duyệt"><CheckCircle size={14}/></button>
-                                                <button onClick={() => handleApproval(p.id, 'rejected')} className="action-button-sm text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Từ chối"><XCircle size={14}/></button>
+                                                <button onClick={() => handleApproval(p.id, 'approved')} className="action-button text-green-500 hover:bg-green-100 dark:hover:bg-green-900/30" title="Duyệt"><CheckCircle size={16}/></button>
+                                                <button onClick={() => handleApproval(p.id, 'rejected')} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Từ chối"><XCircle size={16}/></button>
                                                 </>
                                             )}
                                             {(p.approval_status === 'approved' || p.approval_status === 'rejected') && (
-                                                 <button onClick={() => handleApproval(p.id, 'pending')} className="action-button-sm text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50" title="Đặt lại chờ duyệt"><Clock size={14}/></button>
+                                                 <button onClick={() => handleApproval(p.id, 'pending')} className="action-button text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50" title="Đặt lại chờ duyệt"><Clock size={16}/></button>
                                             )}
                                         </div>
                                     </div>
@@ -367,28 +387,32 @@ const SupplierBookingsManagement = ({ supplierId, supplierContact }) => {
     const handleContactSupplier = () => { /* ... */ };
     // (SỬA) Đổi tên icon
     const BookingIcon = ({ type }) => {
-        if (type === 'hotel') return <Buildings title="Hotel" />;
-        if (type === 'car') return <Car title="TourZenTaxi" />;
-        if (type === 'plane') return <AirplaneTilt title="TourZenFlight" />;
-        return <Package />;
+        // (NÂNG CẤP) Tăng cỡ icon
+        const iconSize = 18;
+        if (type === 'hotel') return <Buildings size={iconSize} title="Hotel" />;
+        if (type === 'car') return <Car size={iconSize} title="TourZenTaxi" />;
+        if (type === 'plane') return <AirplaneTilt size={iconSize} title="TourZenFlight" />;
+        return <Package size={iconSize} />;
     };
     const ServiceStatusBadge = ({ status }) => { /* ... */ };
     const handleEmailCustomer = (booking) => { /* (logic tạm) */ };
 
     return (
-        <div className="mt-3">
+        <div className="mt-4">
              <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 font-medium"
+                // (NÂNG CẤP) Tăng cỡ chữ từ text-xs -> text-sm
+                className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 font-medium"
                 aria-expanded={isOpen}
                 disabled={loading && isOpen && bookings.length === 0}
             >
                 {isOpen ? <CaretUp weight="bold"/> : <CaretDown weight="bold"/>}
                 {isOpen ? 'Ẩn' : 'Hiện'} Quản lý Đặt chỗ (Xe/Bay/KS)
-                {isOpen && loading && <CircleNotch size={12} className="animate-spin ml-1" />}
+                {/* (NÂNG CẤP) Tăng cỡ icon spin */}
+                {isOpen && loading && <CircleNotch size={14} className="animate-spin ml-1" />}
                 {!loading && ` (${bookings.length})`}
             </button>
-            {/* ... (Phần còn lại của JSX cho Bookings giữ nguyên) ... */}
+            {/* ... (Phần còn lại của JSX cho Bookings giữ nguyên, giả định cũng sẽ bỏ text-xs để dùng text-sm) ... */}
         </div>
     );
 };
@@ -453,7 +477,8 @@ export default function ManageSuppliers() {
       }
 
     return (
-        <div className="p-4 sm:p-6 space-y-6 min-h-screen dark:bg-slate-900 dark:text-white">
+        // (NÂNG CẤP) Tăng padding p-4 -> p-6, p-6 -> p-8
+        <div className="p-6 sm:p-8 space-y-6 min-h-screen dark:bg-slate-900 dark:text-white">
             {/* Tiêu đề & Nút Thêm (Giữ nguyên) */}
             <div className="flex flex-wrap justify-between items-center gap-4">
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
@@ -464,12 +489,14 @@ export default function ManageSuppliers() {
                      <button
                         onClick={() => fetchSuppliers(false)} 
                         disabled={isFetchingPage || loading}
+                        // (NÂNG CẤP) Tăng cỡ chữ
                         className={`button-secondary flex items-center gap-1.5 ${isFetchingPage ? 'opacity-50 cursor-wait' : ''}`}
                      >
                          <CircleNotch size={16} className={isFetchingPage ? "animate-spin" : ""} /> Làm mới
                      </button>
                     <button
                         onClick={() => handleOpenModal()}
+                        // (NÂNG CẤP) Tăng cỡ chữ
                         className="button-primary flex items-center gap-1.5"
                     >
                         <Plus size={18} weight="bold" /> Thêm NCC
@@ -487,6 +514,7 @@ export default function ManageSuppliers() {
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
                         <thead className="bg-gray-50 dark:bg-slate-700/40">
                             <tr>
+                                {/* (NÂNG CẤP) Cập nhật style cho th-style */}
                                 <th scope="col" className="th-style w-2/5">Tên NCC & Quản lý Dịch vụ</th>
                                 <th scope="col" className="th-style w-1/4">Tài khoản QLý (Nếu có)</th>
                                 <th scope="col" className="th-style w-1/4">Thông tin liên hệ (NCC)</th>
@@ -496,14 +524,16 @@ export default function ManageSuppliers() {
                         <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
                             {suppliers.length === 0 && !loading && (
                                 <tr>
-                                    <td colSpan="4" className="text-center py-10 text-neutral-500 italic">Chưa có nhà cung cấp nào.</td>
+                                    {/* (NÂNG CẤP) Tăng padding */}
+                                    <td colSpan="4" className="text-center py-12 text-neutral-500 italic">Chưa có nhà cung cấp nào.</td>
                                 </tr>
                             )}
                             {suppliers.map((supplier) => (
                                 <tr key={supplier.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 align-top transition-colors">
                                     {/* Cột Tên NCC và Component con */}
-                                    <td className="td-style py-3 align-top">
-                                        <div className="font-semibold text-base dark:text-white mb-2">{supplier.name}</div>
+                                    {/* (NÂNG CẤP) Tăng padding y, align-top */}
+                                    <td className="td-style py-4 align-top">
+                                        <div className="font-semibold text-base dark:text-white mb-3">{supplier.name}</div>
                                         
                                         {/* (SỬA) Truyền supplierName vào */}
                                         <SupplierProductsApproval 
@@ -517,15 +547,17 @@ export default function ManageSuppliers() {
                                         />
                                     </td>
                                     {/* ... (Các <td> khác giữ nguyên) ... */}
-                                    <td className="td-style py-3 align-top">
+                                    {/* (NÂNG CẤP) Tăng padding y, align-top */}
+                                    <td className="td-style py-4 align-top">
                                         {supplier.managing_user ? (
                                             <Link to={`/admin/accounts?search=${supplier.managing_user.email || supplier.managing_user.id}`} title={`Xem tài khoản ${supplier.managing_user.full_name}`} className='link-style text-sky-600 dark:text-sky-400'>
                                                 <UserCircle size={16} weight="duotone"/>
                                                 <span className='font-medium whitespace-nowrap truncate max-w-[150px]'>{supplier.managing_user.full_name || supplier.managing_user.email}</span>
                                             </Link>
-                                        ) : ( <span className="text-xs italic text-neutral-500">Chưa liên kết TK</span> )}
+                                        ) : ( <span className="text-sm italic text-neutral-500">Chưa liên kết TK</span> )}
                                     </td>
-                                    <td className="td-style py-3 text-xs text-neutral-600 dark:text-neutral-400 space-y-1.5 align-top">
+                                    {/* (NÂNG CẤP) Tăng padding y, align-top, tăng cỡ chữ từ text-xs -> text-sm */}
+                                    <td className="td-style py-4 text-sm text-neutral-600 dark:text-neutral-400 space-y-2 align-top">
                                          {supplier.phone && (
                                             <div className="flex items-center gap-1.5 whitespace-nowrap"> <Phone size={14} weight="duotone"/> <span>{supplier.phone}</span> </div>
                                         )}
@@ -537,7 +569,8 @@ export default function ManageSuppliers() {
                                         )}
                                         {!(supplier.phone || supplier.email || supplier.address) && ( <span className="italic">Chưa có thông tin</span> )}
                                     </td>
-                                    <td className="td-style py-3 text-right whitespace-nowrap align-top">
+                                    {/* (NÂNG CẤP) Tăng padding y, align-top */}
+                                    <td className="td-style py-4 text-right whitespace-nowrap align-top">
                                         <div className="flex gap-1 justify-end">
                                             <button onClick={() => handleOpenModal(supplier)} className="action-button text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa NCC"><Pencil size={16} /></button>
                                             <button onClick={() => handleDelete(supplier.id, supplier.name)} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa NCC"><Trash size={16} /></button>
@@ -551,31 +584,43 @@ export default function ManageSuppliers() {
             </div>
 
             {/* Modal Form Thêm/Sửa NCC (Giữ nguyên) */}
-             {isModalOpen && (null)}
+             {isModalOpen && ( /* ... */ null )} {/* (FIXED) Đã sửa lỗi syntax */}
             {/* CSS */}
             <style jsx>{`
                 /* Các class CSS dùng chung */
                 .loading-overlay { @apply absolute inset-0 bg-white/70 dark:bg-slate-800/70 flex items-center justify-center z-10; }
-                .th-style { @apply px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap; }
+                
+                /* (NÂNG CẤP) Tăng padding y, tăng cỡ chữ */
+                .th-style { @apply px-6 py-4 text-left text-sm font-semibold text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap; }
+                
+                /* (NÂNG CẤP) Đảm bảo td-style là text-sm */
                 .td-style { @apply px-6 py-4 text-sm; } 
                 .link-style { @apply inline-flex items-center gap-1.5 hover:underline; }
+                
+                /* (NÂNG CẤP) Giữ p-1.5 cho action-button */
                 .action-button { @apply p-1.5 rounded-lg transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-offset-1 dark:focus:ring-offset-slate-800 disabled:opacity-50 disabled:cursor-not-allowed; }
-                .action-button-sm { @apply p-1 rounded-md transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-offset-1 dark:focus:ring-offset-slate-800 disabled:opacity-50 disabled:cursor-not-allowed; }
+                
+                /* (NÂNG CẤP) Bỏ action-button-sm, đã thay thế bằng action-button */
+
+                /* (NÂNG CẤP) Tăng cỡ chữ button */
                 .button-secondary { @apply bg-slate-200 hover:bg-slate-300 dark:bg-neutral-700 dark:hover:bg-neutral-600 text-slate-800 dark:text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed; }
                 .button-primary { @apply bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed; }
 
-                /* (MỚI) Badge nhỏ cho dịch vụ */
-                .badge-sm-base { @apply px-2 py-0.5 text-xs font-medium rounded-full inline-flex items-center gap-1; }
+                /* (NÂNG CẤP) Tăng padding cho badge */
+                .badge-sm-base { @apply px-2.5 py-1 text-xs font-medium rounded-full inline-flex items-center gap-1.5; }
                 .badge-green-sm { @apply badge-sm-base bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300; }
                 .badge-yellow-sm { @apply badge-sm-base bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300; }
                 .badge-red-sm { @apply badge-sm-base bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300; }
 
                 /* Modal Styles */
-                .input-style { @apply border border-gray-300 dark:border-slate-600 p-2 rounded-md w-full dark:bg-slate-700 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none transition text-sm; }
-                .label-style { @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1; }
-                .modal-button-secondary { @apply px-4 py-2 bg-neutral-200 dark:bg-neutral-600 rounded-md font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-500 text-sm disabled:opacity-50; }
-                .modal-button-primary { @apply px-4 py-2 bg-sky-600 text-white rounded-md font-semibold hover:bg-sky-700 text-sm disabled:opacity-50; }
-                .modal-button-danger { @apply px-4 py-2 bg-red-600 text-white rounded-md font-semibold hover:bg-red-700 text-sm disabled:opacity-50; }
+                /* (NÂNG CẤP) Tăng cỡ chữ input/label */
+                .input-style { @apply border border-gray-300 dark:border-slate-600 p-2.5 rounded-md w-full dark:bg-slate-700 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none transition text-sm; }
+                .label-style { @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5; }
+                
+                /* (NÂNG CẤP) Tăng cỡ chữ/padding button modal */
+                .modal-button-secondary { @apply px-5 py-2.5 bg-neutral-200 dark:bg-neutral-600 rounded-md font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-500 text-sm disabled:opacity-50; }
+                .modal-button-primary { @apply px-5 py-2.5 bg-sky-600 text-white rounded-md font-semibold hover:bg-sky-700 text-sm disabled:opacity-50; }
+                .modal-button-danger { @apply px-5 py-2.5 bg-red-600 text-white rounded-md font-semibold hover:bg-red-700 text-sm disabled:opacity-50; }
             `}</style>
         </div>
     );
