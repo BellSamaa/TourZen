@@ -1,5 +1,5 @@
 // src/pages/ManageTour.jsx
-// (V5: Thêm chức năng Thêm mới & Chỉnh sửa chi tiết Đơn hàng)
+// (V6: Cho phép Admin sửa chi tiết đơn hàng (các trường an toàn))
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -9,13 +9,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
     Package, CaretLeft, CaretRight, CircleNotch, X, MagnifyingGlass, Funnel, List, ArrowClockwise,
     User, CalendarBlank, UsersThree, Tag, Wallet, CheckCircle, XCircle, Clock, Info, PencilSimple, Trash, Plus, WarningCircle, Envelope,
-    Buildings, AirplaneTilt, Car, Ticket as VoucherIcon, Bank, Image as ImageIcon, FloppyDisk // Thêm icon Save
+    Buildings, AirplaneTilt, Car, Ticket as VoucherIcon, Bank, Image as ImageIcon, FloppyDisk
 } from "@phosphor-icons/react";
 
 const supabase = getSupabase();
 
 // --- Hook Debounce (Giữ nguyên) ---
 const useDebounce = (value, delay) => {
+  // ... (code giữ nguyên)
   const [debouncedValue, setDebouncedValue] = useState(value);
   useEffect(() => {
     const handler = setTimeout(() => { setDebouncedValue(value); }, delay);
@@ -26,6 +27,7 @@ const useDebounce = (value, delay) => {
 
 // --- Helper Pagination Window (Giữ nguyên) ---
 const getPaginationWindow = (currentPage, totalPages, width = 2) => {
+    // ... (code giữ nguyên)
     if (totalPages <= 1) return [];
     if (totalPages <= 5 + width * 2) { return Array.from({ length: totalPages }, (_, i) => i + 1); }
     const pages = new Set([1]);
@@ -39,39 +41,43 @@ const getPaginationWindow = (currentPage, totalPages, width = 2) => {
 
 // --- Helpers Format (Giữ nguyên) ---
 const formatCurrency = (number) => {
+    // ... (code giữ nguyên)
     if (typeof number !== 'number' || isNaN(number)) return "0 ₫";
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(number);
 };
 const formatDate = (dateString) => {
+    // ... (code giữ nguyên)
     if (!dateString) return 'N/A';
     try {
         return new Date(dateString).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: '2-digit', minute: '2-digit' });
     } catch (e) { return 'Invalid Date'; }
 };
 const formatShortDate = (dateString) => {
+    // ... (code giữ nguyên)
     if (!dateString) return 'N/A';
     try {
         return new Date(dateString).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
     } catch (e) { return 'Invalid Date'; }
 };
 const formatQuantity = (booking) => {
+    // ... (code giữ nguyên)
     let parts = [];
     if (booking.num_adult > 0) parts.push(`${booking.num_adult}NL`);
-    if (booking.num_elder > 0) parts.push(`${booking.num_elder}NG`); // Người Già
+    if (booking.num_elder > 0) parts.push(`${booking.num_elder}NG`);
     if (booking.num_child > 0) parts.push(`${booking.num_child}TE`);
-    if (booking.num_infant > 0) parts.push(`${booking.num_infant}EB`); // Em Bé
+    if (booking.num_infant > 0) parts.push(`${booking.num_infant}EB`);
     return parts.join(', ') || '0';
 };
 
 // --- Component Badge Trạng thái (Giữ nguyên) ---
 const StatusBadge = ({ status }) => {
+  // ... (code giữ nguyên)
   const baseStyle = "px-3 py-1 text-[11px] font-bold rounded-md inline-flex items-center gap-1 leading-tight whitespace-nowrap";
   switch (status) {
     case 'confirmed':
       return <span className={`${baseStyle} bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900`}><CheckCircle weight="bold" /> Đã xác nhận</span>;
     case 'cancelled':
       return <span className={`${baseStyle} bg-red-600 text-white dark:bg-red-500`}><XCircle weight="bold" /> Đã hủy</span>;
-    case 'pending':
     default:
       return <span className={`${baseStyle} bg-gray-300 text-gray-700 dark:bg-gray-600 dark:text-gray-100`}><Clock weight="bold" /> Chờ xử lý</span>;
   }
@@ -79,7 +85,7 @@ const StatusBadge = ({ status }) => {
 
 // --- Component Thẻ Thống Kê (Giữ nguyên) ---
 const StatCard = ({ title, value, icon, loading }) => {
-    // ... (Giữ nguyên code StatCard) ...
+    // ... (code giữ nguyên)
     return (
         <motion.div
             className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-md border border-gray-100 dark:border-slate-700 transition-all duration-300 hover:shadow-lg"
@@ -95,9 +101,9 @@ const StatCard = ({ title, value, icon, loading }) => {
 
 // --- Component Fetch và Hiển thị Thống Kê (Giữ nguyên) ---
 const BookingStats = () => {
+    // ... (code giữ nguyên)
     const [stats, setStats] = useState({ total: 0, pending: 0, confirmed: 0, revenue: 0 });
     const [loading, setLoading] = useState(true);
-
     useEffect(() => {
         const fetchStats = async () => {
             setLoading(true);
@@ -105,7 +111,6 @@ const BookingStats = () => {
                 const { data, error, count } = await supabase
                     .from('Bookings')
                     .select('status, total_price', { count: 'exact' });
-
                 if (error) throw error;
                 let pendingCount = 0; let confirmedCount = 0; let totalRevenue = 0;
                 (data || []).forEach(b => {
@@ -122,7 +127,6 @@ const BookingStats = () => {
         };
         fetchStats();
     }, []);
-
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <StatCard title="Tổng đơn hàng" value={stats.total} loading={loading} />
@@ -135,11 +139,27 @@ const BookingStats = () => {
 
 
 // --- (CẬP NHẬT) Component Modal Chi tiết/Sửa Đơn hàng ---
-const EditBookingModal = ({ booking, onClose, onStatusChange, onSaveDetails }) => {
+const EditBookingModal = ({ 
+    booking, 
+    onClose, 
+    onStatusChange, 
+    onSaveDetails,
+    // --- (MỚI) Props cho dropdowns ---
+    allUsers,
+    allTours,
+    allServices // { hotels: [], transport: [], flights: [] }
+}) => {
     if (!booking) return null;
     
-    // --- (MỚI) State để chỉnh sửa ---
+    // --- (CẬP NHẬT) State để chỉnh sửa (thêm nhiều trường) ---
     const [formData, setFormData] = useState({
+        user_id: booking.user?.id || '',
+        product_id: booking.product?.id || '',
+        hotel_product_id: booking.hotel?.id || '',
+        transport_product_id: booking.transport?.id || '',
+        flight_product_id: booking.flight?.id || '',
+        voucher_code: booking.voucher_code || '',
+        // Các trường đã có từ V5
         total_price: booking.total_price || 0,
         notes: booking.notes || ''
     });
@@ -148,6 +168,12 @@ const EditBookingModal = ({ booking, onClose, onStatusChange, onSaveDetails }) =
     useEffect(() => {
         // Cập nhật state nếu booking prop thay đổi
         setFormData({
+            user_id: booking.user?.id || '',
+            product_id: booking.product?.id || '',
+            hotel_product_id: booking.hotel?.id || '',
+            transport_product_id: booking.transport?.id || '',
+            flight_product_id: booking.flight?.id || '',
+            voucher_code: booking.voucher_code || '',
             total_price: booking.total_price || 0,
             notes: booking.notes || ''
         });
@@ -159,14 +185,26 @@ const EditBookingModal = ({ booking, onClose, onStatusChange, onSaveDetails }) =
             ...prev,
             [name]: type === 'number' ? parseFloat(value || 0) : value
         }));
+        
+        // --- (MỚI) Logic: Nếu đổi Tour, reset Ngày đi ---
+        // (Vì modal này không cho sửa Ngày đi, ta chỉ cảnh báo)
+        if (name === 'product_id' && value !== booking.product?.id) {
+            toast.error("Bạn đã đổi Tour. Ngày đi có thể không còn hợp lệ. Vui lòng Hủy và Tạo đơn mới nếu cần đổi ngày.");
+        }
     };
     
     const handleSave = async () => {
         setIsSaving(true);
-        await onSaveDetails(booking.id, formData); // Gọi hàm prop
+        // Chỉ gửi các trường đã thay đổi + ID
+        const finalData = {
+            ...formData,
+            // (Nâng cao) Tính lại voucher discount nếu voucher_code thay đổi
+            // Tạm thời chỉ lưu code
+        };
+        await onSaveDetails(booking.id, finalData); // Gọi hàm prop
         setIsSaving(false);
     };
-    // --- (Kết thúc Mới) ---
+    // --- (Kết thúc Cập nhật) ---
 
     const handleLocalStatusChange = (newStatus) => {
          if (booking.status === newStatus) return;
@@ -185,7 +223,7 @@ const EditBookingModal = ({ booking, onClose, onStatusChange, onSaveDetails }) =
              <motion.div
                 initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
                 transition={{ type: 'spring', damping: 18, stiffness: 250 }}
-                className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col"
+                className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col" // Tăng max-w
                 onClick={(e) => e.stopPropagation()}
              >
                 {/* Header */}
@@ -197,78 +235,126 @@ const EditBookingModal = ({ booking, onClose, onStatusChange, onSaveDetails }) =
                 </div>
                 {/* Body */}
                 <div className="p-6 space-y-5 overflow-y-auto flex-1 text-sm simple-scrollbar">
-                    {/* ... (Các thông tin chỉ đọc giữ nguyên) ... */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
-                        <div><strong className="label-modal">Khách hàng:</strong> <span className="value-modal">{booking.user?.full_name || booking.user?.email || 'N/A'}</span></div>
-                        <div><strong className="label-modal">Email:</strong> <span className="value-modal">{booking.user?.email || 'N/A'}</span></div>
-                        <div><strong className="label-modal">Ngày đặt:</strong> <span className="value-modal">{formatDate(booking.created_at)}</span></div>
-                    </div>
-                    <div className="border-t pt-4 dark:border-slate-700 space-y-2">
-                        <div><strong className="label-modal">Tour:</strong> <span className="font-semibold text-lg text-sky-700 dark:text-sky-400">{booking.product?.name || 'Tour đã bị xóa'}</span></div>
-                        <div><strong className="label-modal">Ngày đi:</strong> <span className="font-semibold value-modal text-base">{formatShortDate(booking.departure_date)}</span></div>
-                        <div><strong className="label-modal">Số lượng:</strong> <span className="value-modal">{formatQuantity(booking)} ({booking.quantity} người)</span></div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 pt-4 border-t dark:border-slate-700">
-                        {/* ... (Các dịch vụ kèm theo giữ nguyên) ... */}
-                        <div><strong className="label-modal flex items-center gap-1.5"><Buildings size={18}/> Khách sạn:</strong> <span className="value-modal">{booking.hotel?.name || 'Không chọn'}</span></div>
-                        <div><strong className="label-modal flex items-center gap-1.5"><Car size={18}/> Vận chuyển:</strong> <span className="value-modal">{booking.transport?.name || 'Không chọn'}</span></div>
-                        <div><strong className="label-modal flex items-center gap-1.5"><AirplaneTilt size={18}/> Chuyến bay:</strong> <span className="value-modal">{booking.flight?.name || 'Không chọn'}</span></div>
-                        <div><strong className="label-modal flex items-center gap-1.5"><VoucherIcon size={18}/> Voucher:</strong> <span className="value-modal">{booking.voucher_code || 'Không có'} {booking.voucher_discount > 0 ? `(-${formatCurrency(booking.voucher_discount)})` : ''}</span></div>
+                    
+                    {/* --- (CẬP NHẬT) Thông tin Khách hàng (Thành select) --- */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                        <div>
+                            <label className="label-modal font-semibold" htmlFor="user_id_edit">Khách hàng:</label>
+                            <select id="user_id_edit" name="user_id" value={formData.user_id} onChange={handleChange} className="input-style w-full mt-1">
+                                <option value="">-- Chọn User --</option>
+                                {allUsers.map(u => <option key={u.id} value={u.id}>{u.full_name || u.email}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <strong className="label-modal">Email (từ user):</strong> 
+                            <span className="value-modal block mt-1 p-2 border border-dashed dark:border-slate-600 rounded">
+                                {allUsers.find(u => u.id === formData.user_id)?.email || 'N/A'}
+                            </span>
+                        </div>
+                        <div>
+                            <strong className="label-modal">Ngày đặt:</strong> 
+                            <span className="value-modal block mt-1">{formatDate(booking.created_at)}</span>
+                        </div>
                     </div>
                     
-                    {/* --- (CẬP NHẬT) Ghi chú (Thành textarea) --- */}
-                    <div className="pt-4 border-t dark:border-slate-700">
-                         <label className="label-modal font-semibold" htmlFor="notes_edit">Ghi chú của khách (có thể sửa):</label>
-                         <textarea
-                            id="notes_edit"
-                            name="notes"
-                            value={formData.notes}
-                            onChange={handleChange}
-                            rows={3}
-                            className="input-style w-full mt-1.5 !text-base"
-                            placeholder="Không có ghi chú"
-                         />
+                    {/* --- (CẬP NHẬT) Thông tin Tour (Thành select) --- */}
+                    <div className="border-t pt-4 dark:border-slate-700 space-y-4">
+                        <div>
+                            <label className="label-modal font-semibold" htmlFor="product_id_edit">Tour:</label>
+                            <select id="product_id_edit" name="product_id" value={formData.product_id} onChange={handleChange} className="input-style w-full mt-1 !text-lg !font-semibold !text-sky-700 dark:!text-sky-400">
+                                <option value="">-- Chọn Tour --</option>
+                                {allTours.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            </select>
+                        </div>
+                        
+                        {/* --- (GIỮ CHỈ ĐỌC) Ngày đi & Số lượng --- */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <strong className="label-modal">Ngày đi (Chỉ đọc):</strong> 
+                                <span className="value-modal block mt-1 p-2 border border-dashed dark:border-slate-600 rounded bg-slate-50 dark:bg-slate-700/50">
+                                    {formatShortDate(booking.departure_date)}
+                                </span>
+                            </div>
+                            <div>
+                                <strong className="label-modal">Số lượng (Chỉ đọc):</strong> 
+                                <span className="value-modal block mt-1 p-2 border border-dashed dark:border-slate-600 rounded bg-slate-50 dark:bg-slate-700/50">
+                                    {formatQuantity(booking)} ({booking.quantity} người)
+                                </span>
+                            </div>
+                        </div>
+                        <p className="text-xs text-orange-600 dark:text-orange-400 italic text-center">
+                            * Để thay đổi <span className="font-semibold">Ngày đi</span> hoặc <span className="font-semibold">Số lượng</span>, vui lòng <span className="font-semibold">Hủy</span> đơn này (để hoàn slot) và <span className="font-semibold">Tạo Đơn Hàng Mới</span>.
+                        </p>
                     </div>
 
-                     {/* --- (CẬP NHẬT) Tổng tiền (Thành input) --- */}
+                    {/* --- (CẬP NHẬT) Dịch vụ kèm theo & Voucher (Thành select/input) --- */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-4 border-t dark:border-slate-700">
+                        <div>
+                            <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="hotel_product_id_edit"><Buildings size={18}/> Khách sạn:</label>
+                            <select id="hotel_product_id_edit" name="hotel_product_id" value={formData.hotel_product_id} onChange={handleChange} className="input-style w-full mt-1">
+                                <option value="">Không chọn</option>
+                                {allServices.hotels.map(s => <option key={s.id} value={s.id}>{s.name} ({formatCurrency(s.price)})</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="transport_product_id_edit"><Car size={18}/> Vận chuyển:</label>
+                            <select id="transport_product_id_edit" name="transport_product_id" value={formData.transport_product_id} onChange={handleChange} className="input-style w-full mt-1">
+                                <option value="">Không chọn</option>
+                                {allServices.transport.map(s => <option key={s.id} value={s.id}>{s.name} ({formatCurrency(s.price)})</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="flight_product_id_edit"><AirplaneTilt size={18}/> Chuyến bay:</label>
+                            <select id="flight_product_id_edit" name="flight_product_id" value={formData.flight_product_id} onChange={handleChange} className="input-style w-full mt-1">
+                                <option value="">Không chọn</option>
+                                {allServices.flights.map(s => <option key={s.id} value={s.id}>{s.name} ({formatCurrency(s.price)})</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="voucher_code_edit"><VoucherIcon size={18}/> Voucher:</label>
+                            <input id="voucher_code_edit" name="voucher_code" value={formData.voucher_code} onChange={handleChange} className="input-style w-full mt-1" placeholder="Không có"/>
+                            {/* (Note: Thay đổi voucher ở đây không tự động tính lại discount, chỉ lưu code) */}
+                        </div>
+                    </div>
+                    
+                    {/* Ghi chú (Editable - Giữ nguyên) */}
+                    <div className="pt-4 border-t dark:border-slate-700">
+                         <label className="label-modal font-semibold" htmlFor="notes_edit">Ghi chú (có thể sửa):</label>
+                         <textarea id="notes_edit" name="notes" value={formData.notes} onChange={handleChange} rows={3} className="input-style w-full mt-1.5 !text-base" placeholder="Không có ghi chú" />
+                    </div>
+
+                     {/* Tổng tiền (Editable - Giữ nguyên) */}
                      <div className="pt-4 border-t dark:border-slate-700 flex justify-end items-center gap-3">
                         <label className="text-lg font-semibold value-modal" htmlFor="total_price_edit">Tổng tiền:</label>
-                        <input
-                            id="total_price_edit"
-                            name="total_price"
-                            type="number"
-                            value={formData.total_price}
-                            onChange={handleChange}
-                            className="input-style w-48 !text-2xl font-bold !text-red-600 dark:!text-red-400 text-right"
-                        />
+                        <input id="total_price_edit" name="total_price" type="number" value={formData.total_price} onChange={handleChange} className="input-style w-48 !text-2xl font-bold !text-red-600 dark:!text-red-400 text-right" />
                      </div>
 
                      {/* Thay đổi trạng thái (Giữ nguyên) */}
                      <div className="pt-5 border-t dark:border-slate-700">
                         <label className="label-modal text-base font-semibold mb-2">Cập nhật trạng thái (Hành động riêng):</label>
                         <div className="flex flex-wrap gap-3 mt-1">
-                             <button onClick={() => handleLocalStatusChange('confirmed')} disabled={booking.status === 'confirmed'} className="button-status bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"> <CheckCircle weight="bold"/> Xác nhận </button>
-                             <button onClick={() => handleLocalStatusChange('cancelled')} disabled={booking.status === 'cancelled'} className="button-status bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"> <XCircle weight="bold"/> Hủy đơn </button>
-                             <button onClick={() => handleLocalStatusChange('pending')} disabled={booking.status === 'pending'} className="button-status bg-gray-500 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"> <Clock weight="bold"/> Đặt lại Chờ xử lý </button>
+                             <button onClick={() => handleLocalStatusChange('confirmed')} disabled={booking.status === 'confirmed'} className="button-status bg-green-600 hover:bg-green-700 ..."> <CheckCircle weight="bold"/> Xác nhận </button>
+                             <button onClick={() => handleLocalStatusChange('cancelled')} disabled={booking.status === 'cancelled'} className="button-status bg-red-600 hover:bg-red-700 ..."> <XCircle weight="bold"/> Hủy đơn </button>
+                             <button onClick={() => handleLocalStatusChange('pending')} disabled={booking.status === 'pending'} className="button-status bg-gray-500 hover:bg-gray-600 ..."> <Clock weight="bold"/> Đặt lại Chờ xử lý </button>
                         </div>
                         {booking.status === 'confirmed' && booking.user?.email && (
                             <button onClick={() => sendConfirmationEmail(booking.user.email)} className="button-secondary text-sm mt-4 flex items-center gap-1.5"> <Envelope/> Gửi lại email xác nhận </button>
                         )}
                      </div>
                 </div>
-                {/* --- (CẬP NHẬT) Footer: Thêm nút Save --- */}
+                {/* Footer (Giữ nguyên) */}
                 <div className="p-4 border-t dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-b-lg">
                     <button type="button" onClick={onClose} disabled={isSaving} className="modal-button-secondary">Đóng</button>
                     <button type="button" onClick={handleSave} disabled={isSaving} className="modal-button-primary flex items-center gap-1.5">
                         {isSaving ? <CircleNotch className="animate-spin" size={18} /> : <FloppyDisk size={18} />}
-                        Lưu thay đổi (Tiền & Ghi chú)
+                        Lưu thay đổi chi tiết
                     </button>
                 </div>
             </motion.div>
             <style jsx>{`
                  .label-modal { @apply font-medium text-gray-500 dark:text-gray-400 block text-xs uppercase tracking-wider mb-0.5; }
                  .value-modal { @apply text-gray-800 dark:text-white text-base; }
-                 .button-status { @apply flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white rounded-md transition-all duration-200 transform hover:-translate-y-0.5; }
+                 .button-status { @apply flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white rounded-md transition-all duration-200 transform hover:-translate-y-0.5 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed; }
                  .simple-scrollbar::-webkit-scrollbar { width: 6px; }
                  .simple-scrollbar::-webkit-scrollbar-track { background: transparent; }
                  .simple-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -276,6 +362,7 @@ const EditBookingModal = ({ booking, onClose, onStatusChange, onSaveDetails }) =
                  .input-style { @apply border border-gray-300 p-2 rounded-md w-full dark:bg-neutral-700 dark:border-neutral-600 dark:text-white focus:ring-sky-500 focus:border-sky-500 transition-colors duration-200 text-sm; }
                  .modal-button-secondary { @apply px-5 py-2 bg-neutral-200 dark:bg-neutral-600 rounded-md font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-500 text-sm disabled:opacity-50 transition-colors; }
                  .modal-button-primary { @apply px-5 py-2 bg-sky-600 text-white rounded-md font-semibold hover:bg-sky-700 text-sm disabled:opacity-50 transition-colors; }
+                 .button-secondary { @apply bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-neutral-600 dark:hover:bg-neutral-500 dark:text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm disabled:opacity-50; }
             `}</style>
         </motion.div>
     );
@@ -283,7 +370,7 @@ const EditBookingModal = ({ booking, onClose, onStatusChange, onSaveDetails }) =
 
 // --- Component Modal Xác nhận Xóa (Giữ nguyên) ---
 const DeleteConfirmationModal = ({ booking, onClose, onConfirm }) => {
-    // ... (Giữ nguyên code DeleteConfirmationModal) ...
+    // ... (code giữ nguyên)
     const [isDeleting, setIsDeleting] = useState(false);
     const handleConfirm = async () => {
         setIsDeleting(true);
@@ -327,143 +414,67 @@ const DeleteConfirmationModal = ({ booking, onClose, onConfirm }) => {
 };
 
 
-// --- (MỚI) Component Modal Thêm Đơn Hàng ---
+// --- Component Modal Thêm Đơn Hàng (Giữ nguyên) ---
 const AddBookingModal = ({ users, tours, onClose, onSuccess }) => {
-    const [formData, setFormData] = useState({
-        user_id: '',
-        product_id: '',
-        departure_id: '',
-        num_adult: 1,
-        num_child: 0,
-        num_elder: 0,
-        num_infant: 0,
-        total_price: 0,
-        status: 'pending',
-        notes: '',
-    });
+    // ... (code giữ nguyên từ V5)
+    const [formData, setFormData] = useState({ user_id: '', product_id: '', departure_id: '', num_adult: 1, num_child: 0, num_elder: 0, num_infant: 0, total_price: 0, status: 'pending', notes: '', });
     const [departures, setDepartures] = useState([]);
     const [loadingDepartures, setLoadingDepartures] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
-
-    // Fetch lịch khởi hành khi chọn tour
     useEffect(() => {
-        if (!formData.product_id) {
-            setDepartures([]);
-            setFormData(prev => ({ ...prev, departure_id: '' }));
-            return;
-        }
-        
+        if (!formData.product_id) { setDepartures([]); setFormData(prev => ({ ...prev, departure_id: '' })); return; }
         const fetchDepartures = async () => {
             setLoadingDepartures(true);
             const today = new Date().toISOString().split('T')[0];
-            const { data, error } = await supabase
-                .from("Departures")
-                .select("*")
-                .eq("product_id", formData.product_id)
-                .gte("departure_date", today)
-                .order("departure_date", { ascending: true });
-            
-            if (error) { toast.error("Lỗi tải lịch khởi hành."); }
-            else { setDepartures(data || []); }
+            const { data, error } = await supabase.from("Departures").select("*").eq("product_id", formData.product_id).gte("departure_date", today).order("departure_date", { ascending: true });
+            if (error) { toast.error("Lỗi tải lịch khởi hành."); } else { setDepartures(data || []); }
             setLoadingDepartures(false);
         };
         fetchDepartures();
     }, [formData.product_id]);
-
     const handleChange = (e) => {
         const { name, value, type } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: type === 'number' ? parseInt(value, 10) || 0 : value
-        }));
+        setFormData(prev => ({ ...prev, [name]: type === 'number' ? parseInt(value, 10) || 0 : value }));
     };
-
-    const selectedDeparture = useMemo(() => {
-        return departures.find(d => d.id == formData.departure_id); // Dùng == vì value từ select có thể là string
-    }, [formData.departure_id, departures]);
-
+    const selectedDeparture = useMemo(() => { return departures.find(d => d.id == formData.departure_id); }, [formData.departure_id, departures]);
     const currentGuests = formData.num_adult + formData.num_child + formData.num_elder + formData.num_infant;
     const remainingSlots = selectedDeparture ? (selectedDeparture.max_slots || 0) - (selectedDeparture.booked_slots || 0) : 0;
-
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
-        // Validation
         if (!formData.user_id) { toast.error("Vui lòng chọn khách hàng."); return; }
         if (!formData.product_id) { toast.error("Vui lòng chọn tour."); return; }
         if (!formData.departure_id) { toast.error("Vui lòng chọn ngày khởi hành."); return; }
         if (currentGuests <= 0) { toast.error("Số lượng khách phải lớn hơn 0."); return; }
         if (currentGuests > remainingSlots) { toast.error(`Số khách (${currentGuests}) vượt quá số chỗ còn lại (${remainingSlots}).`); return; }
         if (formData.total_price <= 0) { toast.error("Tổng tiền phải lớn hơn 0 (Admin tự nhập)."); return; }
-        
         setIsSubmitting(true);
-        
         try {
-            // Bước 1: Giữ chỗ nếu đơn là 'confirmed'
             if (formData.status === 'confirmed') {
-                const { error: rpcError } = await supabase.rpc('book_tour_slot', {
-                    departure_id_input: formData.departure_id,
-                    guest_count_input: currentGuests
-                });
+                const { error: rpcError } = await supabase.rpc('book_tour_slot', { departure_id_input: formData.departure_id, guest_count_input: currentGuests });
                 if (rpcError) throw new Error(`Lỗi giữ chỗ: ${rpcError.message}`);
             }
-
-            // Bước 2: Tạo payload
-            const bookingPayload = {
-                user_id: formData.user_id,
-                product_id: formData.product_id,
-                departure_id: formData.departure_id,
-                departure_date: selectedDeparture.departure_date,
-                quantity: currentGuests,
-                num_adult: formData.num_adult,
-                num_child: formData.num_child,
-                num_elder: formData.num_elder,
-                num_infant: formData.num_infant,
-                total_price: formData.total_price,
-                status: formData.status,
-                notes: formData.notes,
-                // Admin thêm đơn hàng, không có các dịch vụ/voucher kèm theo
-            };
-
-            // Bước 3: Insert
-            const { error: insertError } = await supabase
-                .from('Bookings')
-                .insert(bookingPayload);
-
+            const bookingPayload = { user_id: formData.user_id, product_id: formData.product_id, departure_id: formData.departure_id, departure_date: selectedDeparture.departure_date, quantity: currentGuests, num_adult: formData.num_adult, num_child: formData.num_child, num_elder: formData.num_elder, num_infant: formData.num_infant, total_price: formData.total_price, status: formData.status, notes: formData.notes, };
+            const { error: insertError } = await supabase.from('Bookings').insert(bookingPayload);
             if (insertError) throw insertError;
-            
             toast.success("Tạo đơn hàng thành công!");
-            onSuccess(); // Tải lại danh sách
-            onClose(); // Đóng modal
-
+            onSuccess();
+            onClose();
         } catch (err) {
             console.error("Lỗi tạo đơn hàng:", err);
             toast.error(`Lỗi: ${err.message}`);
-            // (Nâng cao) Cần rollback RPC nếu insert thất bại
         } finally {
             setIsSubmitting(false);
         }
     };
-
     return (
-        <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4"
-            onClick={onClose}
-        >
-             <motion.div
-                initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-                transition={{ type: 'spring', damping: 18, stiffness: 250 }}
-                className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col"
-                onClick={(e) => e.stopPropagation()}
-             >
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4" onClick={onClose} >
+             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} transition={{ type: 'spring', damping: 18, stiffness: 250 }} className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()} >
                 <div className="flex justify-between items-center p-5 border-b dark:border-slate-700">
                     <h3 className="text-xl font-semibold text-slate-800 dark:text-white">Tạo Đơn Hàng Mới (Admin)</h3>
                     <button onClick={onClose} className="text-gray-400 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"> <X size={22} weight="bold" /> </button>
                 </div>
-                
-                <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 simple-scrollbar">
-                    {/* Chọn Khách hàng & Tour */}
+                <form id="add-booking-form" onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 simple-scrollbar">
+                    {/* ... (JSX của AddBookingModal giữ nguyên) ... */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="label-modal font-semibold" htmlFor="user_id">Khách hàng *</label>
@@ -480,21 +491,17 @@ const AddBookingModal = ({ users, tours, onClose, onSuccess }) => {
                             </select>
                         </div>
                     </div>
-                    {/* Chọn Lịch khởi hành (dependent) */}
                     <div>
                         <label className="label-modal font-semibold" htmlFor="departure_id">Ngày khởi hành *</label>
                         <select id="departure_id" name="departure_id" value={formData.departure_id} onChange={handleChange} className="input-style w-full mt-1" required disabled={loadingDepartures || departures.length === 0}>
                             <option value="" disabled>-- {loadingDepartures ? "Đang tải lịch..." : (formData.product_id ? "Chọn ngày đi" : "Vui lòng chọn tour trước")} --</option>
                             {departures.map(d => {
                                 const remaining = (d.max_slots || 0) - (d.booked_slots || 0);
-                                return <option key={d.id} value={d.id} disabled={remaining <= 0}>
-                                    {d.departure_date} (Còn {remaining} chỗ)
-                                </option>
+                                return <option key={d.id} value={d.id} disabled={remaining <= 0}> {d.departure_date} (Còn {remaining} chỗ) </option>
                             })}
                         </select>
                          {selectedDeparture && currentGuests > remainingSlots && <p className="text-xs text-red-500 mt-1">Số lượng khách ({currentGuests}) vượt quá số chỗ còn lại ({remainingSlots})!</p>}
                     </div>
-                    {/* Nhập số lượng */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t dark:border-slate-700">
                         <div>
                             <label className="label-modal font-semibold" htmlFor="num_adult">Người lớn *</label>
@@ -513,7 +520,6 @@ const AddBookingModal = ({ users, tours, onClose, onSuccess }) => {
                             <input type="number" id="num_infant" name="num_infant" value={formData.num_infant} onChange={handleChange} min={0} className="input-style w-full mt-1"/>
                         </div>
                     </div>
-                     {/* Giá & Trạng thái */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t dark:border-slate-700">
                         <div>
                             <label className="label-modal font-semibold" htmlFor="total_price">Tổng tiền (Admin tự nhập) *</label>
@@ -527,13 +533,11 @@ const AddBookingModal = ({ users, tours, onClose, onSuccess }) => {
                             </select>
                         </div>
                     </div>
-                     {/* Ghi chú */}
                     <div>
                          <label className="label-modal font-semibold" htmlFor="notes_add">Ghi chú (Admin):</label>
                          <textarea id="notes_add" name="notes" value={formData.notes} onChange={handleChange} rows={2} className="input-style w-full mt-1" placeholder="Ghi chú nội bộ..."/>
                     </div>
                 </form>
-                
                 <div className="p-4 border-t dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-b-lg">
                     <button type="button" onClick={onClose} disabled={isSubmitting} className="modal-button-secondary">Hủy</button>
                     <button type="submit" form="add-booking-form" disabled={isSubmitting || loadingDepartures} className="modal-button-primary flex items-center gap-1.5">
@@ -574,21 +578,22 @@ export default function ManageTour() {
     const [bookingToDelete, setBookingToDelete] = useState(null);
     const [filterStatus, setFilterStatus] = useState('all');
 
-    // --- (MỚI) State cho modal Thêm ---
     const [showAddModal, setShowAddModal] = useState(false);
     const [allUsers, setAllUsers] = useState([]);
     const [allTours, setAllTours] = useState([]);
+    // --- (MỚI) State cho Dịch vụ ---
+    const [allServices, setAllServices] = useState({ hotels: [], transport: [], flights: [] });
     const [loadingAddData, setLoadingAddData] = useState(false);
     
-    // --- (CẬP NHẬT) Fetch Bookings (Giữ nguyên) ---
+    // Fetch Bookings (Giữ nguyên)
     const fetchBookings = useCallback(async (isInitialLoad = false) => {
+        // ... (code fetchBookings giữ nguyên)
         if (!isInitialLoad) setIsFetchingPage(true);
         else setLoading(true); 
         setError(null);
         try {
             const from = (currentPage - 1) * ITEMS_PER_PAGE;
             const to = from + ITEMS_PER_PAGE - 1;
-
             let query = supabase
                 .from('Bookings')
                 .select(`
@@ -597,27 +602,23 @@ export default function ManageTour() {
                     user:user_id ( id, full_name, email ),
                     product:product_id ( id, name, image_url ),
                     hotel:hotel_product_id (id, name),
-                    transport:Products!Bookings_transport_product_id_fkey (id, name),
-                    flight:flight_product_id (id, name),
+                    transport:Products!Bookings_transport_product_id_fkey (id, name, price, product_type, details),
+                    flight:flight_product_id (id, name, price, product_type, details),
                     voucher_code, voucher_discount, notes, payment_method
-                `, { count: 'exact' });
-
+                `, { count: 'exact' }); // (CẬP NHẬT) Sửa join 'transport' để lấy đúng
             if (filterStatus !== 'all') { query = query.eq('status', filterStatus); }
             if (debouncedSearch) {
                  const searchTermVal = `%${debouncedSearch}%`;
                  query = query.or(`product.name.ilike.${searchTermVal},user.full_name.ilike.${searchTermVal},user.email.ilike.${searchTermVal},id::text.like.${searchTermVal}`);
             }
-
             query = query.order('created_at', { ascending: false }).range(from, to);
             const { data, error: queryError, count } = await query;
-
             if (queryError) throw queryError;
             setBookings(data || []);
             setTotalItems(count || 0);
             if (!isInitialLoad && currentPage > 1 && (data || []).length === 0 && count > 0) {
                  setCurrentPage(1);
             }
-
         } catch (err) {
              console.error("Lỗi tải danh sách đơn hàng:", err);
              setError(err.message || "Không thể tải dữ liệu.");
@@ -628,38 +629,52 @@ export default function ManageTour() {
         }
     }, [currentPage, debouncedSearch, filterStatus]);
 
-    // --- (MỚI) useEffect để fetch Users & Tours cho modal 'Add' ---
+    // --- (CẬP NHẬT) useEffect để fetch Users, Tours & Services ---
     useEffect(() => {
         const fetchAddModalData = async () => {
             setLoadingAddData(true);
             try {
                 // Fetch Users
                 const { data: usersData, error: usersError } = await supabase
-                    .from('Users') // Giả sử bạn có bảng 'Users' public
+                    .from('Users')
                     .select('id, full_name, email')
                     .order('full_name', { ascending: true });
                 if (usersError) throw usersError;
                 setAllUsers(usersData || []);
                 
-                // Fetch Tours
+                // Fetch Tours (approved)
                 const { data: toursData, error: toursError } = await supabase
                     .from('Products')
                     .select('id, name')
                     .eq('product_type', 'tour')
-                    .eq('approval_status', 'approved') // Chỉ cho phép thêm đơn cho tour đã duyệt
+                    .eq('approval_status', 'approved')
                     .order('name', { ascending: true });
                 if (toursError) throw toursError;
                 setAllTours(toursData || []);
                 
+                // --- (MỚI) Fetch Services (approved) ---
+                const { data: servicesData, error: servicesError } = await supabase
+                    .from('Products')
+                    .select('id, name, price, product_type, details')
+                    .in('product_type', ['hotel', 'car', 'plane']) // Giả sử type là 'car', 'plane'
+                    .eq('approval_status', 'approved')
+                    .eq('is_published', true);
+                if (servicesError) throw servicesError;
+                setAllServices({
+                    hotels: servicesData.filter(s => s.product_type === 'hotel'),
+                    transport: servicesData.filter(s => s.product_type === 'car'),
+                    flights: servicesData.filter(s => s.product_type === 'plane')
+                });
+                
             } catch (err) {
-                console.error("Lỗi fetch data cho modal Add:", err);
-                toast.error("Lỗi tải danh sách Users/Tours.");
+                console.error("Lỗi fetch data cho modal:", err);
+                toast.error("Lỗi tải danh sách Users/Tours/Services.");
             }
             setLoadingAddData(false);
         };
         fetchAddModalData();
     }, []);
-    // --- (HẾT MỚI) ---
+    // --- (HẾT CẬP NHẬT) ---
 
 
      useEffect(() => {
@@ -672,13 +687,13 @@ export default function ManageTour() {
 
      useEffect(() => {
         if (currentPage !== 1) { setCurrentPage(1); }
-     // eslint-disable-next-line react-hooks/exhaustive-deps
      }, [debouncedSearch, filterStatus]);
 
 
-    // --- (CẬP NHẬT) Event Handlers ---
+    // Event Handlers
     // (onStatusChange và confirmDeleteBooking giữ nguyên logic RPC)
     const handleStatusChange = async (booking, newStatus) => {
+        // ... (code giữ nguyên)
         setIsFetchingPage(true); 
         let needsSlotUpdate = false;
         let slotChange = 0;
@@ -702,6 +717,7 @@ export default function ManageTour() {
         }
     };
     const confirmDeleteBooking = async (booking) => {
+        // ... (code giữ nguyên)
         setIsFetchingPage(true);
         let needsSlotUpdate = booking.status === 'confirmed'; 
         let slotChange = booking.quantity;
@@ -724,16 +740,25 @@ export default function ManageTour() {
         }
     };
     
-    // --- (MỚI) Handler để lưu chỉnh sửa chi tiết ---
+    // --- (CẬP NHẬT) Handler để lưu chỉnh sửa chi tiết (Thêm các trường mới) ---
     const handleSaveDetails = async (bookingId, updatedData) => {
-        setIsFetchingPage(true); // Dùng loading overlay
+        setIsFetchingPage(true);
         try {
+             // Dữ liệu update chỉ chứa các trường an toàn
+             const dataToUpdate = {
+                user_id: updatedData.user_id,
+                product_id: updatedData.product_id,
+                hotel_product_id: updatedData.hotel_product_id || null, // Đảm bảo gửi null nếu rỗng
+                transport_product_id: updatedData.transport_product_id || null,
+                flight_product_id: updatedData.flight_product_id || null,
+                voucher_code: updatedData.voucher_code || null,
+                total_price: updatedData.total_price,
+                notes: updatedData.notes
+             };
+
              const { error } = await supabase
                 .from('Bookings')
-                .update({
-                    total_price: updatedData.total_price,
-                    notes: updatedData.notes
-                })
+                .update(dataToUpdate)
                 .eq('id', bookingId);
              
              if (error) throw error;
@@ -752,12 +777,8 @@ export default function ManageTour() {
 
     const handleViewDetails = (booking) => { setModalBooking(booking); };
     const handleDeleteClick = (booking) => { setBookingToDelete(booking); };
-    // --- (MỚI) Handler mở modal Add ---
     const handleAddBooking = () => {
-        if (loadingAddData) {
-            toast.loading("Đang tải dữ liệu Users/Tours...");
-            return;
-        }
+        if (loadingAddData) { toast.loading("Đang tải dữ liệu Users/Tours..."); return; }
         if (allUsers.length === 0 || allTours.length === 0) {
             toast.error("Lỗi: Không có đủ dữ liệu Users hoặc Tours để tạo đơn.");
             return;
@@ -778,17 +799,13 @@ export default function ManageTour() {
 
     return (
         <div className="p-4 sm:p-6 space-y-6 min-h-screen bg-gray-50 dark:bg-slate-900 dark:text-white">
-            {/* --- (CẬP NHẬT) Header & Nút Tạo --- */}
+            {/* Header & Nút Tạo (Giữ nguyên) */}
             <div className="flex flex-wrap justify-between items-center gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-800 dark:text-white">Quản Lý Đơn Đặt Tour</h1>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Quản lý và duyệt đơn đặt tour của khách hàng.</p>
                 </div>
-                 <button 
-                    onClick={handleAddBooking} // <-- (CẬP NHẬT)
-                    disabled={loadingAddData}
-                    className="flex items-center gap-1.5 px-5 py-2.5 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-lg shadow hover:shadow-md transition-all font-semibold text-sm disabled:opacity-60"
-                 >
+                 <button onClick={handleAddBooking} disabled={loadingAddData} className="flex items-center gap-1.5 px-5 py-2.5 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-lg shadow hover:shadow-md transition-all font-semibold text-sm disabled:opacity-60" >
                      {loadingAddData ? <CircleNotch className="animate-spin" size={18} /> : <Plus size={18} weight="bold" />}
                      Thêm Đơn Hàng
                  </button>
@@ -799,15 +816,10 @@ export default function ManageTour() {
 
             {/* Filter & Search + Danh sách (Giữ nguyên) */}
             <div className="bg-white dark:bg-slate-800 shadow-xl rounded-lg border border-gray-100 dark:border-slate-700">
-                {/* Filter & Search Bar */}
+                {/* Filter & Search Bar (Giữ nguyên) */}
                 <div className="p-4 border-b border-gray-100 dark:border-slate-700 flex flex-col md:flex-row items-center gap-3">
                     <div className="flex items-center gap-2 w-full md:w-auto flex-shrink-0">
-                        <select
-                            value={filterStatus}
-                            onChange={(e) => setFilterStatus(e.target.value)}
-                            className="filter-select-figma"
-                            disabled={isFetchingPage}
-                        >
+                        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="filter-select-figma" disabled={isFetchingPage} >
                             <option value="all">Tất cả</option> 
                             <option value="pending">Chờ xử lý</option>
                             <option value="confirmed">Đã xác nhận</option>
@@ -816,14 +828,7 @@ export default function ManageTour() {
                     </div>
                     <div className="relative flex-grow w-full">
                         <MagnifyingGlass size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                        <input
-                            type="text"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Tìm kiếm đơn hàng..."
-                            className="search-input-figma"
-                            disabled={isFetchingPage}
-                        />
+                        <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Tìm kiếm đơn hàng..." className="search-input-figma" disabled={isFetchingPage} />
                     </div>
                     <button onClick={() => fetchBookings(true)} disabled={loading || isFetchingPage} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors flex-shrink-0">
                         <ArrowClockwise size={18} className={isFetchingPage ? "animate-spin" : ""} />
@@ -835,6 +840,7 @@ export default function ManageTour() {
                     {isFetchingPage && <div className="loading-overlay"><CircleNotch size={32} className="animate-spin text-sky-500" /></div>}
                     <table className="min-w-full divide-y divide-gray-100 dark:divide-slate-700">
                         <thead className="bg-gray-50 dark:bg-slate-700/40">
+                            {/* ... (Header bảng giữ nguyên) ... */}
                             <tr>
                                 <th className="th-style-figma">Mã đơn</th>
                                 <th className="th-style-figma">Khách hàng</th>
@@ -858,25 +864,14 @@ export default function ManageTour() {
                             {!error && bookings.map((booking) => {
                                 const paidAmount = booking.status === 'confirmed' ? booking.total_price : 0; 
                                 return (
-                                <motion.tr
-                                    key={booking.id}
-                                    className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors group"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    transition={{ duration: 0.3 }}
-                                >
+                                <motion.tr key={booking.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors group" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }} >
                                     <td className="td-style-figma font-mono text-xs text-gray-500 dark:text-gray-400">#{booking.id.slice(-8).toUpperCase()}</td>
                                     <td className="td-style-figma max-w-xs">
                                         <div className="font-semibold text-gray-800 dark:text-white truncate" title={booking.user?.email}>{booking.user?.full_name || booking.user?.email || 'N/A'}</div>
                                     </td>
                                     <td className="td-style-figma max-w-xs">
                                         <div className="flex items-center gap-3">
-                                            <img
-                                                src={booking.product?.image_url || 'https://placehold.co/80x50/eee/ccc?text=Tour'} 
-                                                alt={booking.product?.name || 'Tour'}
-                                                className="w-20 h-12 object-cover rounded flex-shrink-0 border dark:border-slate-600"
-                                                onError={(e) => {e.target.src='https://placehold.co/80x50/eee/ccc?text=Error'}}
-                                            />
+                                            <img src={booking.product?.image_url || 'https://placehold.co/80x50/eee/ccc?text=Tour'} alt={booking.product?.name || 'Tour'} className="w-20 h-12 object-cover rounded flex-shrink-0 border dark:border-slate-600" onError={(e) => {e.target.src='https://placehold.co/80x50/eee/ccc?text=Error'}} />
                                             <span className="text-gray-700 dark:text-gray-200 truncate group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors font-medium" title={booking.product?.name}>
                                                 {booking.product?.name || 'N/A'}
                                             </span>
@@ -922,51 +917,43 @@ export default function ManageTour() {
                         booking={modalBooking} 
                         onClose={() => setModalBooking(null)} 
                         onStatusChange={handleStatusChange} 
-                        onSaveDetails={handleSaveDetails} // <-- (MỚI) Pass hàm save
+                        onSaveDetails={handleSaveDetails} // <-- (CẬP NHẬT) Tên hàm
+                        // --- (MỚI) Truyền props data ---
+                        allUsers={allUsers}
+                        allTours={allTours}
+                        allServices={allServices}
                     />
                 )}
                 {bookingToDelete && <DeleteConfirmationModal booking={bookingToDelete} onClose={() => setBookingToDelete(null)} onConfirm={confirmDeleteBooking} />}
                 
-                {/* --- (MỚI) Render modal Add --- */}
                 {showAddModal && (
                     <AddBookingModal
                         users={allUsers}
                         tours={allTours}
                         onClose={() => setShowAddModal(false)}
-                        onSuccess={() => fetchBookings(false)} // Tải lại danh sách
+                        onSuccess={() => fetchBookings(false)} 
                     />
                 )}
             </AnimatePresence>
 
-            {/* CSS (Thêm style mới) */}
+            {/* CSS (Giữ nguyên) */}
             <style jsx>{`
                 /* ... (Tất cả CSS styles từ file gốc giữ nguyên) ... */
-                /* Nút Thêm (Style Figma) */
-                .button-add-figma { @apply flex items-center gap-1.5 px-5 py-2.5 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-lg shadow hover:shadow-md transition-all font-semibold text-sm; }
-                /* Filter/Search (Style Figma) */
                 .filter-select-figma { @apply appearance-none block w-full md:w-auto px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:opacity-50 cursor-pointer; }
                 .search-input-figma { @apply w-full pl-10 pr-4 py-2 text-sm text-gray-900 dark:text-white bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:opacity-50; }
                 .loading-overlay { @apply absolute inset-0 bg-white/70 dark:bg-slate-800/70 flex items-center justify-center z-10 rounded-lg; }
-                /* Table Header (Style Figma) */
                 .th-style-figma { @apply px-5 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap; }
-                /* Table Data Cell (Style Figma) */
                 .td-style-figma { @apply px-5 py-4 text-sm align-middle; }
                 .td-center { @apply px-6 py-8 text-center; }
-                 /* Nút Thao tác (Style Figma - Icon only) */
                 .action-button-figma { @apply p-2 rounded-md transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-slate-800 focus:ring-sky-500 disabled:opacity-50 disabled:cursor-not-allowed; }
-                /* Modal Styles */
                 .modal-button-secondary { @apply px-5 py-2 bg-neutral-200 dark:bg-neutral-600 rounded-md font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-500 text-sm disabled:opacity-50 transition-colors; }
                 .modal-button-danger { @apply px-5 py-2 bg-red-600 text-white rounded-md font-semibold hover:bg-red-700 text-sm disabled:opacity-50 transition-colors shadow-sm hover:shadow-md; }
-                /* (MỚI) Thêm style cho modal-button-primary */
                 .modal-button-primary { @apply px-5 py-2 bg-sky-600 text-white rounded-md font-semibold hover:bg-sky-700 text-sm disabled:opacity-50 transition-colors; }
-                /* (MỚI) Thêm style cho input-style (dùng trong modal) */
                 .input-style { @apply border border-gray-300 p-2 rounded-md w-full dark:bg-neutral-700 dark:border-neutral-600 dark:text-white focus:ring-sky-500 focus:border-sky-500 transition-colors duration-200 text-sm; }
-                /* Pagination */
                 .pagination-arrow { @apply p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors; }
                 .pagination-number { @apply w-8 h-8 rounded-md font-semibold transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed; }
                 .pagination-active { @apply bg-sky-600 text-white hover:bg-sky-600 dark:hover:bg-sky-600; }
                 .pagination-dots { @apply px-2 py-1 text-gray-500 dark:text-gray-400; }
-                /* (MỚI) Thêm style cho scrollbar modal */
                  .simple-scrollbar::-webkit-scrollbar { width: 6px; }
                  .simple-scrollbar::-webkit-scrollbar-track { background: transparent; }
                  .simple-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
