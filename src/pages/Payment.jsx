@@ -501,11 +501,20 @@ export default function Payment() {
                 // Nếu tất cả thành công
                 // TODO: Gửi email xác nhận
                 
-                if (!isBuyNow) clearCart(); // Xóa giỏ hàng nếu không phải Buy Now
+if (!isBuyNow) clearCart(); // Xóa giỏ hàng nếu không phải Buy Now
                 toast.success("Đặt tour thành công! Kiểm tra email để xem chi tiết.");
-                navigate('/booking-success', { state: { bookingIds: successfulBookingIds } });
+                
+                // SỬA LỖI: Gửi đầy đủ thông tin mà trang Success cần
+                navigate('/booking-success', { 
+                    state: { 
+                        bookingIds: successfulBookingIds, // Vẫn gửi ID
+                        method: paymentMethod,             // Gửi phương thức thanh toán
+                        branch: selectedBranch,            // Gửi chi nhánh (nếu có)
+                        deadline: formattedDeadline        // Gửi hạn thanh toán (nếu có)
+                    } 
+                });
 
-            } catch (insertError) { 
+            } catch (insertError) {
                  console.error("Lỗi insert Bookings:", insertError);
                  toast.error("Lỗi khi lưu đơn hàng. Đang thử hoàn lại chỗ...");
                  bookingErrorOccurred = true;
