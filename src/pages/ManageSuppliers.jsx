@@ -1,5 +1,6 @@
 // src/pages/ManageSuppliers.jsx
 // (UPGRADED: Giao diện Dashboard + Giữ logic con trong Modal)
+// (FIXED: Tính toán số liệu thống kê động)
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -28,15 +29,12 @@ const formatCurrency = (number) => {
 
 // ====================================================================
 // (MỚI) Component Thống kê
+// (SỬA) Bỏ icon màu bên trái để giống 100% ảnh
 // ====================================================================
-const StatCard = ({ title, value, icon, colorClass }) => (
+const StatCard = ({ title, value, icon }) => (
     <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-lg border border-gray-100 dark:border-slate-700 flex items-center gap-4">
-        {/*
-        // Bỏ icon màu bên trái cho giống ảnh
-        <div className={`p-3 rounded-full ${colorClass}`}>
-            {icon}
-        </div>
-        */}
+        {/* (MỚI) Thêm icon vào (theo yêu cầu "thêm icon") nhưng để bên trong */}
+        {icon && <div className="text-sky-600 dark:text-sky-400">{icon}</div>}
         <div>
             <div className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</div>
             <div className="text-3xl font-bold text-gray-800 dark:text-white">{value}</div>
@@ -171,11 +169,11 @@ const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
 
 // ====================================================================
 // Component con hiển thị Sản phẩm cần duyệt
-// (REFACTORED: Bỏ nút "Hiện/Ẩn", sẽ render trực tiếp trong Modal)
+// (Giữ nguyên từ code "dung hòa")
 // ====================================================================
 const SupplierProductsApproval = ({ supplierId, supplierName }) => {
     const [products, setProducts] = useState([]);
-    const [loading, setLoading] = useState(true); // (SỬA) true để fetch ngay
+    const [loading, setLoading] = useState(true); 
     const [editingProduct, setEditingProduct] = useState(null); 
 
     const fetchProductsForSupplier = useCallback(async () => {
@@ -184,7 +182,7 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
             .from('Products')
             .select('*')
             .eq('supplier_id', supplierId)
-            .neq('product_type', 'tour'); // Lấy Hotel, Car, Plane
+            .neq('product_type', 'tour'); 
             
         if (error) { toast.error("Lỗi tải dịch vụ: " + error.message); }
         else { setProducts(data || []); }
@@ -347,13 +345,12 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
 };
 // ====================================================================
 // Component con Quản lý Đặt chỗ (Bookings)
-// (REFACTORED: Bỏ nút "Hiện/Ẩn")
+// (Giữ nguyên từ code "dung hòa")
 // ====================================================================
 const SupplierBookingsManagement = ({ supplierId, supplierContact }) => {
     const [bookings, setBookings] = useState([]);
-    const [loading, setLoading] = useState(true); // (SỬA) true để fetch ngay
+    const [loading, setLoading] = useState(true); 
     
-    // ... (Giữ nguyên logic stub, bỏ state/props liên quan đến isOpen) ...
     const fetchBookingsForSupplier = useCallback(async () => { 
         setLoading(true);
         // ... logic fetch thật của bạn sẽ ở đây ...
@@ -388,7 +385,7 @@ const SupplierBookingsManagement = ({ supplierId, supplierContact }) => {
 };
 
 // ====================================================================
-// (MỚI) Modal để chứa 2 component con
+// (MỚI) Modal để chứa 2 component con (Giữ nguyên)
 // ====================================================================
 const ServicesModal = ({ supplier, onClose }) => {
     return (
@@ -430,6 +427,23 @@ const ServicesModal = ({ supplier, onClose }) => {
       </div>
     );
   };
+  
+// ====================================================================
+// (FIXED) Hàm lấy loại NCC (Dùng cho cả Bảng và Thống kê)
+// ====================================================================
+const getSupplierType = (name) => {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes('khách sạn') || lowerName.includes('resort') || lowerName.includes('hotel')) {
+        return { type: 'Hotel', className: 'badge-green' };
+    }
+    if (lowerName.includes('hàng không') || lowerName.includes('airline') || lowerName.includes('vietjet')) {
+        return { type: 'Airline', className: 'badge-purple' };
+    }
+    if (lowerName.includes('vận chuyển') || lowerName.includes('transport') || lowerName.includes('sài gòn')) {
+        return { type: 'Transport', className: 'badge-orange' };
+    }
+    return { type: 'Tour Operator', className: 'badge-blue' };
+};
 
 // ====================================================================
 // Component chính: ManageSuppliers (Áp dụng UI Dashboard)
@@ -565,26 +579,37 @@ export default function ManageSuppliers() {
         );
     }, [suppliers, searchTerm]);
 
-    const stats = {
-        total: suppliers.length,
-        hotel: 18, // Giả lập
-        airline: 8, // Giả lập
-        transport: 12 // Giả lập
-    };
+    // (FIXED) Tính toán thống kê động
+    const stats = useMemo(() => {
+        let hotel = 0;
+        let airline = 0;
+        let transport = 0;
 
-    const getSupplierType = (name) => {
-        const lowerName = name.toLowerCase();
-        if (lowerName.includes('khách sạn') || lowerName.includes('resort') || lowerName.includes('hotel')) {
-            return { type: 'Hotel', className: 'badge-green' };
-        }
-        if (lowerName.includes('hàng không') || lowerName.includes('airline') || lowerName.includes('vietjet')) {
-            return { type: 'Airline', className: 'badge-purple' };
-        }
-        if (lowerName.includes('vận chuyển') || lowerName.includes('transport') || lowerName.includes('sài gòn')) {
-            return { type: 'Transport', className: 'badge-orange' };
-        }
-        return { type: 'Tour Operator', className: 'badge-blue' };
-    };
+        suppliers.forEach(s => {
+            const typeInfo = getSupplierType(s.name);
+            switch (typeInfo.type) {
+                case 'Hotel':
+                    hotel++;
+                    break;
+                case 'Airline':
+                    airline++;
+                    break;
+                case 'Transport':
+                    transport++;
+                    break;
+                default:
+                    break;
+            }
+        });
+
+        return {
+            total: suppliers.length,
+            hotel,
+            airline,
+            transport
+        };
+    }, [suppliers]);
+
 
     const getStatus = (supplier) => {
         // Giả lập, bạn có thể thay bằng logic thật
@@ -633,23 +658,27 @@ export default function ManageSuppliers() {
                 </button>
             </div>
             
-            {/* (MỚI) Thẻ Thống kê */}
+            {/* (MỚI) Thẻ Thống kê (Đã sửa để dùng SỐ LIỆU ĐỘNG) */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
                 <StatCard 
                     title="Tổng nhà cung cấp" 
-                    value={stats.total}
+                    value={stats.total} // Dữ liệu động
+                    icon={<Briefcase size={22} weight="duotone"/>} // Thêm icon
                 />
                  <StatCard 
                     title="Khách sạn" 
-                    value={stats.hotel}
+                    value={stats.hotel} // Dữ liệu động
+                    icon={<Buildings size={22} weight="duotone"/>} // Thêm icon
                 />
                  <StatCard 
                     title="Hàng không" 
-                    value={stats.airline}
+                    value={stats.airline} // Dữ liệu động
+                    icon={<AirplaneTilt size={22} weight="duotone"/>} // Thêm icon
                 />
                  <StatCard 
                     title="Vận chuyển" 
-                    value={stats.transport}
+                    value={stats.transport} // Dữ liệu động
+                    icon={<Car size={22} weight="duotone"/>} // Thêm icon
                 />
             </div>
             
@@ -706,6 +735,7 @@ export default function ManageSuppliers() {
                                     <td className="td-style-new font-mono">NCC-{supplier.id.slice(-4).toUpperCase()}</td>
                                     <td className="td-style-new max-w-xs">
                                         <div className="flex items-center gap-2">
+                                            {/* (MỚI) Thêm icon Briefcase vào bảng */}
                                             <Briefcase size={18} weight="duotone" className="text-gray-500 flex-shrink-0" />
                                             <span className="font-semibold text-gray-800 dark:text-white truncate">{supplier.name}</span>
                                         </div>
@@ -822,10 +852,10 @@ export default function ManageSuppliers() {
                     @apply bg-gray-800 hover:bg-gray-900 dark:bg-sky-600 dark:hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed shadow-md; 
                 }
                 .button-filter-active {
-                    @apply bg-sky-100 dark:bg-sky-800 text-sky-700 dark:text-sky-200 font-semibold px-3 py-1.5 rounded-lg text-sm;
+                    @apply bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-semibold px-3 py-1.5 rounded-lg text-sm;
                 }
                 .search-input-style {
-                    @apply border border-gray-300 dark:border-slate-600 p-2 pl-9 rounded-lg w-full sm:w-64 dark:bg-slate-700 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none transition text-sm;
+                    @apply border border-gray-300 dark:border-slate-600 p-2 pl-9 rounded-lg w-full sm:w-64 bg-white dark:bg-slate-700 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none transition text-sm;
                 }
 
                 /* (MỚI) CSS Bảng */
