@@ -1,14 +1,11 @@
 // ManageAccounts.jsx
-/* *** (STYLE UPGRADE) Nâng cấp giao diện v10 ***
-  (Giữ nguyên)
+/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v12 (Admin Reset Password) ***
+  1. (UI) Thêm trường "Mật khẩu mới" (tùy chọn) vào Modal Chỉnh sửa.
+  2. (Logic) Sửa `handleSubmit` để gọi một Edge Function mới ('admin-update-user')
+     thay vì cập nhật trực tiếp từ client, nhằm xử lý việc
+     đổi mật khẩu một cách an toàn.
 */
-/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v11 (Thêm Mã KH / TK) ***
-  1. (SQL) Thêm cột `customer_code` và `account_code` (xem SQL riêng).
-  2. (Fetch) Cập nhật `fetchAccounts` để lấy cả 2 mã.
-  3. (UI) Thêm cột "Mã ID" vào bảng.
-  4. (Logic) Hiển thị `customer_code` (nếu role='user') hoặc `account_code` (nếu role khác).
-  5. (Search) Cho phép tìm kiếm theo cả 2 mã.
-*/
+/* *** (Nâng cấp v11 - Giữ nguyên) *** */
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { getSupabase } from "../lib/supabaseClient";
@@ -17,7 +14,7 @@ import {
     UsersThree, CaretLeft, CaretRight, CircleNotch, X, MagnifyingGlass,
     PencilLine, ArrowsClockwise, WarningCircle, UserPlus, UserCircleMinus, UserCircleCheck,
     Eye, EyeSlash, CheckCircle, XCircle, User, At, ShieldCheck, CalendarBlank, Hourglass,
-    Archive // <<< FIX LẦN 3: Sửa từ ArchiveBox thành Archive
+    Archive, Key // <<< THÊM v12: Icon Key
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -69,8 +66,7 @@ const fieldVariant = {
     visible: { opacity: 1, y: 0 }
 };
 
-// --- (STYLE UPGRADE) Modal Thêm/Sửa Tài Khoản ---
-// (SỬA v11) - Không cần thay đổi Form, vì mã được tạo tự động bởi DB Trigger.
+// --- (SỬA v12) Modal Thêm/Sửa Tài Khoản (Thêm Mật khẩu mới) ---
 const AccountModal = ({ account, onClose, onSuccess }) => {
     const isEdit = !!account;
     
@@ -84,7 +80,8 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
 
     const [formData, setFormData] = useState({
         email: isEdit ? account.email : '',
-        password: '',
+        password: '', // (SỬA v12) Dùng cho cả Thêm mới và Sửa (Reset)
+        confirm_password: '', // (SỬA v12) Thêm confirm
         username: isEdit ? (account.username || '') : '',
         full_name: isEdit ? account.full_name : '',
         role: isEdit ? account.role : 'staff',
@@ -92,8 +89,8 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
     });
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false); // (SỬA v12)
 
-    // ... (Logic handleChange, handleSubmit giữ nguyên) ...
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
         setFormData(prev => ({
@@ -102,24 +99,46 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
         }));
     };
 
+    // --- (SỬA v12) Cập nhật logic handleSubmit ---
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
 
         try {
+            // Kiểm tra mật khẩu (cho cả Thêm mới và Reset)
+            if (formData.password) {
+                 if (formData.password.length < 6) {
+                    throw new Error("Mật khẩu mới phải có ít nhất 6 ký tự.");
+                 }
+                 if (formData.password !== formData.confirm_password) {
+                    throw new Error("Mật khẩu xác nhận không khớp.");
+                 }
+            } else if (!isEdit) {
+                 // Bắt buộc mật khẩu khi Thêm mới
+                 throw new Error("Mật khẩu là bắt buộc khi thêm tài khoản mới.");
+            }
+
             if (isEdit) {
-                const { error: updateError } = await supabase
-                    .from('Users')
-                    .update({
+                // --- (SỬA v12) CHỈNH SỬA: Gọi Edge Function ---
+                // Chỉ admin mới có thể cập nhật tài khoản (đặc biệt là mật khẩu)
+                const { data, error: functionError } = await supabase.functions.invoke('admin-update-user', {
+                    body: {
+                        user_id: account.id,
                         username: formData.username,
                         full_name: formData.full_name,
                         role: formData.role,
                         is_active: formData.is_active,
-                    })
-                    .eq('id', account.id);
-                if (updateError) throw updateError;
+                        password: formData.password || null // Gửi null nếu không đổi
+                    }
+                });
+                
+                if (functionError) throw functionError;
+                if (data && data.error) throw new Error(data.error);
+
                 toast.success('Cập nhật tài khoản thành công!');
+
             } else {
+                // --- THÊM MỚI (Giữ nguyên logic cũ) ---
                 const { data: authData, error: authError } = await supabase.auth.signUp({
                     email: formData.email,
                     password: formData.password,
@@ -145,8 +164,8 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
             onClose();
         } catch (error) {
             console.error("Lỗi Thêm/Sửa tài khoản:", error);
-            const errorMessage = error.message.includes("Password") 
-                ? "Mật khẩu quá yếu (cần ít nhất 6 ký tự)."
+            const errorMessage = error.message.includes("Edge Function") 
+                ? "Lỗi server: " + error.message
                 : (error.message || 'Đã xảy ra lỗi không xác định.');
             toast.error(errorMessage);
         } finally {
@@ -199,26 +218,55 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                             />
                         </motion.div>
 
-                        {/* Password */}
-                        {!isEdit && (
+                        {/* --- (SỬA v12) Thêm trường Mật khẩu mới cho Edit --- */}
+                        <motion.div variants={fieldVariant}>
+                            <label className="label-style" htmlFor="password">
+                                {isEdit ? 'Mật khẩu mới (Bỏ trống nếu không đổi)' : 'Mật khẩu *'}
+                            </label>
+                            <div className="relative">
+                                <input 
+                                    id="password"
+                                    type={showPassword ? "text" : "password"}
+                                    name="password" value={formData.password} onChange={handleChange} 
+                                    required={!isEdit} // Chỉ bắt buộc khi Thêm mới
+                                    minLength="6"
+                                    className="input-style-pro pr-10"
+                                    placeholder="Tối thiểu 6 ký tự"
+                                />
+                                <button 
+                                    type="button" 
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="password-toggle-btn"
+                                    title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                                >
+                                    {showPassword ? <EyeSlash size={20} /> : <Eye size={20} />}
+                                </button>
+                            </div>
+                        </motion.div>
+
+                        {/* --- (SỬA v12) Thêm trường Xác nhận Mật khẩu --- */}
+                        {/* Chỉ hiển thị nếu đang gõ mật khẩu mới */}
+                        {(formData.password || !isEdit) && (
                             <motion.div variants={fieldVariant}>
-                                <label className="label-style" htmlFor="password">Mật khẩu *</label>
+                                <label className="label-style" htmlFor="confirm_password">
+                                    Xác nhận Mật khẩu {isEdit ? '' : '*'}
+                                </label>
                                 <div className="relative">
                                     <input 
-                                        id="password"
-                                        type={showPassword ? "text" : "password"}
-                                        name="password" value={formData.password} onChange={handleChange} 
-                                        required minLength="6"
+                                        id="confirm_password"
+                                        type={showConfirmPassword ? "text" : "password"}
+                                        name="confirm_password" value={formData.confirm_password} onChange={handleChange} 
+                                        required={!isEdit || !!formData.password} // Bắt buộc nếu gõ mật khẩu
                                         className="input-style-pro pr-10"
-                                        placeholder="Tối thiểu 6 ký tự"
+                                        placeholder="Nhập lại mật khẩu"
                                     />
                                     <button 
                                         type="button" 
-                                        onClick={() => setShowPassword(!showPassword)}
+                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                                         className="password-toggle-btn"
-                                        title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                                        title={showConfirmPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                                     >
-                                        {showPassword ? <EyeSlash size={20} /> : <Eye size={20} />}
+                                        {showConfirmPassword ? <EyeSlash size={20} /> : <Eye size={20} />}
                                     </button>
                                 </div>
                             </motion.div>
@@ -311,6 +359,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
 };
 
 
+// --- (Giữ nguyên phần còn lại của file) ---
 // --- Variants cho Stagger (Giữ nguyên) ---
 const pageVariants = {
     hidden: { opacity: 0 },
@@ -342,7 +391,7 @@ export default function AdminManageAccounts() {
     const [totalItems, setTotalItems] = useState(0);
     const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
 
-    // --- Fetch data (SỬA v11) ---
+    // --- Fetch data (SỬA v11 - Giữ nguyên) ---
     const fetchAccounts = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         setError(null);
@@ -388,7 +437,7 @@ export default function AdminManageAccounts() {
         }
     }, [debouncedSearch]);
     
-    // --- Event Handlers (Giữ nguyên)
+    // --- (SỬA v12) Sửa logic handleSuspend để gọi Edge Function ---
     const handleSuspend = (account) => {
         toast((t) => (
             <div className="flex flex-col items-center p-1">
@@ -403,10 +452,23 @@ export default function AdminManageAccounts() {
                     onClick={async () => {
                         toast.dismiss(t.id);
                         setIsFetchingPage(true);
-                        const { error: updateError } = await supabase.from("Users").update({ is_active: false }).eq("id", account.id);
+                        
+                        // --- (SỬA v12) Gọi Edge Function để ngừng ---
+                        const { data, error: functionError } = await supabase.functions.invoke('admin-update-user', {
+                            body: {
+                                user_id: account.id,
+                                is_active: false, // Chỉ cập nhật trạng thái
+                                // Gửi các giá trị còn lại là 'undefined' để function bỏ qua
+                                username: undefined,
+                                full_name: undefined,
+                                role: undefined,
+                                password: null
+                            }
+                        });
+                        
                         setIsFetchingPage(false);
-                        if (updateError) {
-                            toast.error("Lỗi: " + updateError.message);
+                        if (functionError || (data && data.error)) {
+                            toast.error("Lỗi: " + (functionError?.message || data?.error));
                         } else {
                             toast.success("Đã ngừng tài khoản.");
                             fetchAccounts(false);
@@ -457,7 +519,7 @@ export default function AdminManageAccounts() {
         );
     }
 
-    // --- JSX ---
+    // --- JSX (Giữ nguyên) ---
     return (
         <motion.div
             className="p-4 md:p-8 min-h-screen bg-slate-50 dark:bg-slate-900 font-inter"
