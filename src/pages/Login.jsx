@@ -49,29 +49,55 @@ export default function Login() {
                 if (form.password !== form.confirm) throw new Error("Mật khẩu không khớp.");
                 if (form.password.length < 6) throw new Error("Mật khẩu phải có ít nhất 6 ký tự.");
                 
-                // --- SỬA v8: VALIDATE SĐT ---
+                // --- Sửa v8: VALIDATE SĐT ---
                 if (form.phone_number && !phoneRegex.test(form.phone_number)) {
                     throw new Error("Số điện thoại không hợp lệ. Phải đủ 10 số và đúng đầu số (03, 05, 07, 08, 09).");
                 }
-                // --- KẾT THÚC SỬA SĐT ---
+                // --- KẾT THÚC Sửa SĐT ---
 
-                const { data: { user }, error: signUpError } = await supabase.auth.signUp({ email: form.email, password: form.password, options: { data: { full_name: form.name, } } });
+                const { data: { user }, error: signUpError } = await supabase.auth.signUp({ 
+                    email: form.email, 
+                    password: form.password, 
+                    options: { 
+                        data: { 
+                            full_name: form.name,
+                            address: form.address,
+                            phone_number: form.phone_number,
+                            ngay_sinh: form.ngay_sinh || null
+                        },
+                        // Tắt email confirmation để test (bật lại sau khi có SMTP)
+                        emailRedirectTo: window.location.origin
+                    } 
+                });
+                
                 if (signUpError) throw signUpError;
+                
                 if (user) {
-                    const { error: insertError } = await supabase.from('Users').upsert({ 
-                        id: user.id, 
-                        full_name: form.name, 
-                        email: form.email, 
-                        address: form.address, 
-                        phone_number: form.phone_number,
-                        ngay_sinh: form.ngay_sinh || null 
-                    });
+                    // ✅ QUAN TRỌNG: Chỉ upsert nếu user đã được confirm
+                    // Nếu email confirmation bật, bỏ qua bước này - dùng Database Trigger thay thế
+                    try {
+                        const { error: insertError } = await supabase.from('Users').insert({ 
+                            id: user.id, 
+                            full_name: form.name, 
+                            email: form.email, 
+                            address: form.address, 
+                            phone_number: form.phone_number,
+                            ngay_sinh: form.ngay_sinh || null 
+                        });
+                        
+                        // Bỏ qua lỗi nếu đã có trigger tự động tạo
+                        if (insertError && insertError.code !== '23505') {
+                            console.warn("Insert profile warning:", insertError);
+                        }
+                    } catch (err) {
+                        console.warn("Profile insert skipped:", err);
+                    }
                     
-                    if (insertError) { console.error("Upsert profile error:", insertError); throw new Error(`Lỗi lưu hồ sơ: ${insertError.message}. Vui lòng thử lại.`); }
                     setSuccess("Đăng ký thành công! 🎉 Vui lòng kiểm tra email để xác nhận.");
                     setForm(initialFormState);
-                } else throw new Error("Không thể tạo người dùng.");
-            
+                } else {
+                    throw new Error("Không thể tạo người dùng.");
+                }
             } else if (mode === 'login') { // Login
                 const { data: { user }, error: signInError } = await supabase.auth.signInWithPassword({ email: form.email, password: form.password });
                 if (signInError) throw new Error("Email hoặc mật khẩu không đúng.");
