@@ -1,5 +1,5 @@
 // src/pages/ManageTour.jsx
-// (V8: Thêm cột Payment Method và Nút xem Hóa đơn)
+// (V9: Thêm cột Payment Method, Nút xem Hóa đơn, VÀ cột xem Đánh giá/Rating)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -10,17 +10,18 @@ import {
     Package, CaretLeft, CaretRight, CircleNotch, X, MagnifyingGlass, Funnel, List, ArrowClockwise,
     User, CalendarBlank, UsersThree, Tag, Wallet, CheckCircle, XCircle, Clock, Info, PencilSimple, Trash, Plus, WarningCircle, Envelope,
     Buildings, AirplaneTilt, Car, Ticket as VoucherIcon, Bank, Image as ImageIcon, FloppyDisk,
-    Receipt // (MỚI) Icon Hóa đơn
+    Receipt, // (V8) Icon Hóa đơn
+    Star, // (MỚI v9) Icon Sao
+    ChatCircleDots // (MỚI v9) Icon Bình luận
 } from "@phosphor-icons/react";
 
-// (MỚI) Import Modal Hóa đơn
+// (V8) Import Modal Hóa đơn
 import ViewInvoiceModal from "../components/ViewInvoiceModal.jsx"; // Đảm bảo đường dẫn đúng
 
 const supabase = getSupabase();
 
 // --- Hook Debounce (Giữ nguyên) ---
 const useDebounce = (value, delay) => {
-  // ... (code giữ nguyên)
   const [debouncedValue, setDebouncedValue] = useState(value);
   useEffect(() => {
     const handler = setTimeout(() => { setDebouncedValue(value); }, delay);
@@ -31,7 +32,6 @@ const useDebounce = (value, delay) => {
 
 // --- Helper Pagination Window (Giữ nguyên) ---
 const getPaginationWindow = (currentPage, totalPages, width = 2) => {
-    // ... (code giữ nguyên)
     if (totalPages <= 1) return [];
     if (totalPages <= 5 + width * 2) { return Array.from({ length: totalPages }, (_, i) => i + 1); }
     const pages = new Set([1]);
@@ -43,28 +43,24 @@ const getPaginationWindow = (currentPage, totalPages, width = 2) => {
     return finalPages;
 };
 
-// --- Helpers Format (CẬP NHẬT) ---
+// --- Helpers Format (Giữ nguyên v8) ---
 const formatCurrency = (number) => {
-    // ... (code giữ nguyên)
     if (typeof number !== 'number' || isNaN(number)) return "0 ₫";
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(number);
 };
 const formatDate = (dateString) => {
-    // ... (code giữ nguyên)
     if (!dateString) return 'N/A';
     try {
         return new Date(dateString).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: '2-digit', minute: '2-digit' });
     } catch (e) { return 'Invalid Date'; }
 };
 const formatShortDate = (dateString) => {
-    // ... (code giữ nguyên)
     if (!dateString) return 'N/A';
     try {
         return new Date(dateString).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
     } catch (e) { return 'Invalid Date'; }
 };
 const formatQuantity = (booking) => {
-    // ... (code giữ nguyên)
     let parts = [];
     if (booking.num_adult > 0) parts.push(`${booking.num_adult}NL`);
     if (booking.num_elder > 0) parts.push(`${booking.num_elder}NG`);
@@ -72,7 +68,6 @@ const formatQuantity = (booking) => {
     if (booking.num_infant > 0) parts.push(`${booking.num_infant}EB`);
     return parts.join(', ') || '0';
 };
-// (MỚI) Format PTTT
 const formatPaymentMethod = (method) => {
     switch (method) {
         case 'direct': return 'Trực tiếp';
@@ -84,7 +79,6 @@ const formatPaymentMethod = (method) => {
 
 // --- Component Badge Trạng thái (Giữ nguyên) ---
 const StatusBadge = ({ status }) => {
-  // ... (code giữ nguyên)
   const baseStyle = "px-3 py-1 text-[11px] font-bold rounded-md inline-flex items-center gap-1 leading-tight whitespace-nowrap";
   switch (status) {
     case 'confirmed':
@@ -96,9 +90,20 @@ const StatusBadge = ({ status }) => {
   }
 };
 
+// --- (MỚI v9) Component hiển thị sao Rating ---
+const RatingDisplay = ({ rating }) => {
+    const totalStars = 5;
+    return (
+        <div className="flex justify-center text-yellow-500" title={`${rating}/${totalStars} sao`}>
+            {[...Array(totalStars)].map((_, i) => (
+                <Star key={i} weight={i < rating ? "fill" : "regular"} size={16} />
+            ))}
+        </div>
+    );
+};
+
 // --- Component Thẻ Thống Kê (Giữ nguyên) ---
 const StatCard = ({ title, value, icon, loading }) => {
-    // ... (code giữ nguyên)
     return (
         <motion.div
             className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-md border border-gray-100 dark:border-slate-700 transition-all duration-300 hover:shadow-lg"
@@ -114,7 +119,6 @@ const StatCard = ({ title, value, icon, loading }) => {
 
 // --- Component Fetch và Hiển thị Thống Kê (Giữ nguyên) ---
 const BookingStats = () => {
-    // ... (code giữ nguyên)
     const [stats, setStats] = useState({ total: 0, pending: 0, confirmed: 0, revenue: 0 });
     const [loading, setLoading] = useState(true);
     useEffect(() => {
@@ -151,7 +155,7 @@ const BookingStats = () => {
 };
 
 
-// --- (GIỮ NGUYÊN V7) Component Modal Chi tiết/Sửa Đơn hàng ---
+// --- (GIỮ NGUYÊN V8) Component Modal Chi tiết/Sửa Đơn hàng ---
 const EditBookingModal = ({ 
     booking, 
     onClose, 
@@ -422,7 +426,6 @@ const EditBookingModal = ({
 
 // --- Component Modal Xác nhận Xóa (Giữ nguyên) ---
 const DeleteConfirmationModal = ({ booking, onClose, onConfirm }) => {
-    // ... (code giữ nguyên)
     const [isDeleting, setIsDeleting] = useState(false);
     const handleConfirm = async () => {
         setIsDeleting(true);
@@ -466,9 +469,8 @@ const DeleteConfirmationModal = ({ booking, onClose, onConfirm }) => {
 };
 
 
-// --- Component Modal Thêm Đơn Hàng (Giữ nguyên) ---
+// --- Component Modal Thêm Đơn Hàng (Giữ nguyên v8) ---
 const AddBookingModal = ({ users, tours, onClose, onSuccess }) => {
-    // ... (code giữ nguyên từ V7)
     const [formData, setFormData] = useState({ user_id: '', product_id: '', departure_id: '', num_adult: 1, num_child: 0, num_elder: 0, num_infant: 0, total_price: 0, status: 'pending', notes: '', });
     const [departures, setDepartures] = useState([]);
     const [loadingDepartures, setLoadingDepartures] = useState(false);
@@ -505,7 +507,6 @@ const AddBookingModal = ({ users, tours, onClose, onSuccess }) => {
                 const { error: rpcError } = await supabase.rpc('book_tour_slot', { departure_id_input: formData.departure_id, guest_count_input: currentGuests });
                 if (rpcError) throw new Error(`Lỗi giữ chỗ: ${rpcError.message}`);
             }
-            // (SỬA) Thêm PTTT là 'direct' (mặc định cho admin tạo)
             const bookingPayload = { 
                 user_id: formData.user_id, 
                 product_id: formData.product_id, 
@@ -541,7 +542,6 @@ const AddBookingModal = ({ users, tours, onClose, onSuccess }) => {
                     <button onClick={onClose} className="text-gray-400 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"> <X size={22} weight="bold" /> </button>
                 </div>
                 <form id="add-booking-form" onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 simple-scrollbar">
-                    {/* ... (JSX của AddBookingModal giữ nguyên) ... */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="label-modal font-semibold" htmlFor="user_id">Khách hàng *</label>
@@ -651,10 +651,10 @@ export default function ManageTour() {
     const [allServices, setAllServices] = useState({ hotels: [], transport: [], flights: [] });
     const [loadingAddData, setLoadingAddData] = useState(false);
     
-    // (MỚI) State cho Modal Hóa đơn
+    // (V8) State cho Modal Hóa đơn
     const [viewingInvoiceId, setViewingInvoiceId] = useState(null); // Lưu booking_id
     
-    // (CẬP NHẬT) Fetch Bookings (thêm payment_method và join Invoices)
+    // (CẬP NHẬT v9) Fetch Bookings (thêm join Invoices và Reviews)
     const fetchBookings = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         else setLoading(true); 
@@ -674,8 +674,10 @@ export default function ManageTour() {
                     flight:flight_product_id (id, name, price, product_type, details),
                     voucher_code, voucher_discount, notes, 
                     payment_method,
-                    Invoices ( id ) 
-                `, { count: 'exact' });
+                    Invoices ( id ),
+                    Reviews ( id, rating, comment ) 
+                `, { count: 'exact' }); // <-- ĐÃ THÊM REVIEWS
+                
             if (filterStatus !== 'all') { query = query.eq('status', filterStatus); }
             if (debouncedSearch) {
                  const searchTermVal = `%${debouncedSearch}%`;
@@ -685,10 +687,11 @@ export default function ManageTour() {
             const { data, error: queryError, count } = await query;
             if (queryError) throw queryError;
             
-             // (SỬA) Xử lý join Invoices (trả về mảng)
+             // (SỬA v9) Xử lý join Invoices (trả về mảng) và Reviews
              const formattedData = (data || []).map(b => ({
                  ...b,
-                 has_invoice: b.Invoices && b.Invoices.length > 0
+                 has_invoice: b.Invoices && b.Invoices.length > 0,
+                 review_data: b.Reviews && b.Reviews.length > 0 ? b.Reviews[0] : null // Lấy review (nếu có)
              }));
 
             setBookings(formattedData || []);
@@ -706,7 +709,7 @@ export default function ManageTour() {
         }
     }, [currentPage, debouncedSearch, filterStatus]);
 
-    // (GIỮ NGUYÊN V7) useEffect để fetch Users, Tours & Services
+    // (GIỮ NGUYÊN V8) useEffect để fetch Users, Tours & Services
     useEffect(() => {
         const fetchAddModalData = async () => {
             setLoadingAddData(true);
@@ -766,9 +769,8 @@ export default function ManageTour() {
      }, [debouncedSearch, filterStatus]);
 
 
-    // (GIỮ NGUYÊN V7) Event Handlers
+    // (GIỮ NGUYÊN V8) Event Handlers
     const handleStatusChange = async (booking, newStatus) => {
-        // ... (code giữ nguyên)
         setIsFetchingPage(true); 
         let needsSlotUpdate = false;
         let slotChange = 0;
@@ -792,13 +794,24 @@ export default function ManageTour() {
         }
     };
     
-    // (CẬP NHẬT) Xóa: Xóa hóa đơn liên kết trước khi xóa booking
+    // (CẬP NHẬT v9) Xóa: Xóa hóa đơn/review liên kết trước khi xóa booking
     const confirmDeleteBooking = async (booking) => {
         setIsFetchingPage(true);
         let needsSlotUpdate = booking.status === 'confirmed'; 
         let slotChange = booking.quantity;
         try {
-            // (MỚI) Xóa Hóa đơn trước (nếu có)
+            // (MỚI v9) Xóa Reviews trước (nếu có)
+             if (booking.review_data) {
+                 const { error: reviewError } = await supabase
+                     .from('Reviews')
+                     .delete()
+                     .eq('booking_id', booking.id); // Xóa theo booking_id
+                 if (reviewError) {
+                      console.warn(`Lỗi xóa review liên kết: ${reviewError.message}`);
+                 }
+             }
+
+            // (V8) Xóa Hóa đơn trước (nếu có)
              if (booking.has_invoice) {
                  const { error: invoiceError } = await supabase
                      .from('Invoices')
@@ -832,7 +845,7 @@ export default function ManageTour() {
         }
     };
     
-    // (GIỮ NGUYÊN V7) Handler để lưu chỉnh sửa chi tiết
+    // (GIỮ NGUYÊN V8) Handler để lưu chỉnh sửa chi tiết
     const handleSaveDetails = async (bookingId, updatedData) => {
         setIsFetchingPage(true);
         try {
@@ -868,7 +881,7 @@ export default function ManageTour() {
 
     const handleViewDetails = (booking) => { setModalBooking(booking); };
     const handleDeleteClick = (booking) => { setBookingToDelete(booking); };
-    // (MỚI) Mở modal hóa đơn
+    // (V8) Mở modal hóa đơn
     const handleViewInvoice = (bookingId) => { setViewingInvoiceId(bookingId); };
     
     const handleAddBooking = () => {
@@ -929,7 +942,7 @@ export default function ManageTour() {
                     </button>
                 </div>
 
-                {/* (CẬP NHẬT) Bảng Dữ liệu (Thêm cột PTTT) */}
+                {/* (CẬP NHẬT v9) Bảng Dữ liệu (Thêm cột Đánh giá) */}
                 <div className="overflow-x-auto relative">
                     {isFetchingPage && <div className="loading-overlay"><CircleNotch size={32} className="animate-spin text-sky-500" /></div>}
                     <table className="min-w-full divide-y divide-gray-100 dark:divide-slate-700">
@@ -942,19 +955,20 @@ export default function ManageTour() {
                                 <th className="th-style-figma">Ngày đi</th>
                                 <th className="th-style-figma">Số người</th>
                                 <th className="th-style-figma text-right">Tổng tiền</th>
-                                <th className="th-style-figma text-center">P.Thức TT</th> {/* MỚI */}
+                                <th className="th-style-figma text-center">P.Thức TT</th>
+                                <th className="th-style-figma text-center">Đánh giá</th> {/* MỚI v9 */}
                                 <th className="th-style-figma text-center">Trạng thái</th>
                                 <th className="th-style-figma text-center">Thao tác</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
                             {!loading && !error && bookings.length === 0 && !isFetchingPage && (
-                                <tr><td colSpan="10" className="td-center text-gray-500 italic py-10">
+                                // (SỬA v9) Colspan 11
+                                <tr><td colSpan="11" className="td-center text-gray-500 italic py-10">
                                     {searchTerm || filterStatus !== 'all' ? 'Không tìm thấy đơn hàng phù hợp.' : 'Chưa có đơn hàng nào.'}
                                 </td></tr>
                             )}
                             {!error && bookings.map((booking) => {
-                                // const paidAmount = booking.status === 'confirmed' ? booking.total_price : 0; // Bỏ cột Đã cọc
                                 return (
                                 <motion.tr key={booking.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors group" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }} >
                                     <td className="td-style-figma font-mono text-xs text-gray-500 dark:text-gray-400">#{booking.id.slice(-8).toUpperCase()}</td>
@@ -973,15 +987,35 @@ export default function ManageTour() {
                                     <td className="td-style-figma text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatShortDate(booking.departure_date)}</td>
                                     <td className="td-style-figma text-xs text-center text-gray-600 dark:text-gray-300">{formatQuantity(booking)}</td>
                                     <td className="td-style-figma text-right font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">{formatCurrency(booking.total_price)}</td>
-                                    {/* (MỚI) Cột PTTT */}
+                                    {/* (V8) Cột PTTT */}
                                     <td className="td-style-figma text-center text-xs text-gray-600 dark:text-gray-300 font-medium">
                                         {formatPaymentMethod(booking.payment_method)}
                                     </td>
+                                    
+                                    {/* (MỚI v9) Cột Đánh giá */}
+                                    <td className="td-style-figma text-center">
+                                        {booking.review_data ? (
+                                            <div className="flex flex-col items-center gap-0.5">
+                                                <RatingDisplay rating={booking.review_data.rating} />
+                                                {booking.review_data.comment && (
+                                                    <span 
+                                                        className="cursor-help" 
+                                                        title={`Comment: ${booking.review_data.comment}`}
+                                                    >
+                                                        <ChatCircleDots size={16} className="text-gray-500" />
+                                                    </span>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-gray-400 italic">Chưa có</span>
+                                        )}
+                                    </td>
+
                                     <td className="td-style-figma text-center"><StatusBadge status={booking.status} /></td>
-                                    {/* (CẬP NHẬT) Thao tác (Thêm nút Hóa đơn) */}
+                                    {/* (V8) Thao tác (Thêm nút Hóa đơn) */}
                                     <td className="td-style-figma text-center whitespace-nowrap">
                                         <div className="flex gap-2 justify-center">
-                                            {/* (MỚI) Nút Hóa đơn */}
+                                            {/* (V8) Nút Hóa đơn */}
                                             {booking.has_invoice && (
                                                 <button onClick={() => handleViewInvoice(booking.id)} className="action-button-figma text-gray-600 dark:text-gray-300 hover:text-green-600 dark:hover:text-green-400" title="Xem Hóa đơn">
                                                     <Receipt size={18} weight="bold" />
@@ -1012,7 +1046,7 @@ export default function ManageTour() {
                   </div>
             )}
 
-            {/* (CẬP NHẬT) Modals (Thêm Modal Hóa đơn) */}
+            {/* (V8) Modals (Thêm Modal Hóa đơn) */}
             <AnimatePresence>
                 {modalBooking && (
                     <EditBookingModal 
@@ -1036,7 +1070,7 @@ export default function ManageTour() {
                     />
                 )}
                 
-                {/* (MỚI) Modal Hóa đơn */}
+                {/* (V8) Modal Hóa đơn */}
                 {viewingInvoiceId && (
                      <ViewInvoiceModal
                          bookingId={viewingInvoiceId}
@@ -1047,7 +1081,6 @@ export default function ManageTour() {
 
             {/* CSS (Giữ nguyên) */}
             <style jsx>{`
-                /* ... (Tất cả CSS styles từ file gốc giữ nguyên) ... */
                 .filter-select-figma { @apply appearance-none block w-full md:w-auto px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:opacity-50 cursor-pointer; }
                 .search-input-figma { @apply w-full pl-10 pr-4 py-2 text-sm text-gray-900 dark:text-white bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:opacity-50; }
                 .loading-overlay { @apply absolute inset-0 bg-white/70 dark:bg-slate-800/70 flex items-center justify-center z-10 rounded-lg; }
