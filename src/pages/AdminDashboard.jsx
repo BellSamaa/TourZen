@@ -1,5 +1,5 @@
 // src/pages/AdminDashboard.jsx
-// (NÂNG CẤP HIỆU ỨNG: Thêm Framer Motion vào Sidebar)
+// (NÂNG CẤP HIỆU ỨNG: Thêm Framer Motion vào Sidebar, Cải thiện bố cục với gradient, shadow, và hiệu ứng chuyên nghiệp hơn)
 
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
@@ -13,36 +13,44 @@ import {
     Buildings,
     UserCircleGear,
     List,
-    UserCircle
+    UserCircle,
+    SignOut,
+    Gear
 } from '@phosphor-icons/react';
 
 // --- (NÂNG CẤP) Component Link của Sidebar ---
 function SidebarLink({ to, icon, children }) {
-    const baseClass = "flex items-center gap-3 py-3 px-6 rounded-lg transition-colors duration-200";
-    const textClass = "text-sm font-medium";
+    const baseClass = "flex items-center gap-3 py-3 px-6 rounded-xl transition-all duration-300 relative";
+    const textClass = "text-base font-semibold";
 
     // (MỚI) Định nghĩa animation cho từng link
     const linkVariants = {
-        hidden: { opacity: 0, x: -20 },
+        hidden: { opacity: 0, x: -30 },
         visible: { opacity: 1, x: 0 },
     };
 
     return (
-        <motion.div variants={linkVariants} whileHover={{ x: 3 }}>
+        <motion.div 
+            variants={linkVariants} 
+            whileHover={{ scale: 1.05 }} 
+            whileTap={{ scale: 0.95 }}
+        >
             <NavLink
                 to={to}
                 end
                 className={({ isActive }) =>
-                    `${baseClass} w-full ` + // Thêm w-full
+                    `${baseClass} w-full group ` + // Thêm w-full và group cho hover
                     (isActive
-                        ? 'bg-white/10 text-white'
-                        : 'text-blue-100 hover:bg-white/5')
+                        ? 'bg-white/20 text-white shadow-lg'
+                        : 'text-blue-100 hover:bg-white/10 hover:shadow-md')
                 }
             >
-                <div className="flex-shrink-0">{icon}</div>
+                <div className="flex-shrink-0 text-xl">{icon}</div>
                 <span className={textClass}>
                     {children}
                 </span>
+                {/* (MỚI) Indicator cho active link */}
+                <span className="absolute left-0 top-0 bottom-0 w-1 bg-white rounded-r-md scale-y-0 group-[.active]:scale-y-100 transition-transform duration-300"></span>
             </NavLink>
         </motion.div>
     );
@@ -56,91 +64,108 @@ function Sidebar() {
         visible: {
             opacity: 1,
             transition: {
-                staggerChildren: 0.08, // Mỗi link cách nhau 0.08s
+                staggerChildren: 0.1, // Mỗi link cách nhau 0.1s để mượt hơn
+                delayChildren: 0.2,
             },
         },
     };
 
     return (
-        <div className="flex flex-col w-64 h-screen bg-blue-600 text-white">
+        <motion.div 
+            className="flex flex-col w-72 h-screen bg-gradient-to-b from-blue-700 to-blue-900 text-white shadow-2xl"
+            initial={{ x: -300 }}
+            animate={{ x: 0 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+        >
             
-            {/* Logo Area */}
+            {/* Logo Area - Nâng cấp với gradient và shadow */}
             <motion.div 
-                className="flex items-center justify-between h-16 px-6 border-b border-blue-500/50"
-                initial={{ opacity: 0, y: -20 }}
+                className="flex items-center justify-between h-20 px-6 border-b border-blue-600/30 bg-blue-800/50 backdrop-blur-md shadow-md"
+                initial={{ opacity: 0, y: -30 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
+                transition={{ duration: 0.6 }}
             >
-                <span className="font-bold text-2xl text-white">
+                <span className="font-extrabold text-3xl text-white tracking-wide">
                     TourZen
                 </span>
-                <button className="text-blue-200 hover:text-white">
-                    <List size={24} />
+                <button className="text-blue-200 hover:text-white transition-colors">
+                    <List size={28} />
                 </button>
             </motion.div>
 
-            {/* (NÂNG CẤP) Navigation */}
+            {/* (NÂNG CẤP) Navigation - Thêm space-y-2 cho khoảng cách */}
             <motion.nav 
-                className="flex-1 p-4 space-y-1 overflow-y-auto"
+                className="flex-1 p-6 space-y-2 overflow-y-auto"
                 variants={navContainerVariants}
                 initial="hidden"
                 animate="visible"
             >
-                <SidebarLink to="/admin/dashboard" icon={<Layout size={20} />}>
+                <SidebarLink to="/admin/dashboard" icon={<Layout size={24} />}>
                     Tổng Quan
                 </SidebarLink>
-                <SidebarLink to="/admin/tours" icon={<AirplaneTilt size={20} />}>
+                <SidebarLink to="/admin/tours" icon={<AirplaneTilt size={24} />}>
                     Quản lý Sản phẩm Tour
                 </SidebarLink>
-                <SidebarLink to="/admin/bookings" icon={<Package size={20} />}>
+                <SidebarLink to="/admin/bookings" icon={<Package size={24} />}>
                     Quản lý Đặt Tour
                 </SidebarLink>
-                <SidebarLink to="/admin/customers" icon={<Users size={20} />}>
+                <SidebarLink to="/admin/customers" icon={<Users size={24} />}>
                     Quản lý Khách Hàng
                 </SidebarLink>
-                <SidebarLink to="/admin/suppliers" icon={<Buildings size={20} />}>
+                <SidebarLink to="/admin/suppliers" icon={<Buildings size={24} />}>
                     Quản lý Nhà Cung Cấp
                 </SidebarLink>
-                <SidebarLink to="/admin/accounts" icon={<UserCircleGear size={20} />}>
+                <SidebarLink to="/admin/accounts" icon={<UserCircleGear size={24} />}>
                     Quản lý Tài Khoản
                 </SidebarLink>
             </motion.nav>
 
-            {/* (NÂNG CẤP) User Profile */}
+            {/* (NÂNG CẤP) User Profile - Thêm hover effect và options */}
             <motion.div 
-                className="p-4 border-t border-blue-500/50"
-                initial={{ opacity: 0, y: 20 }}
+                className="p-6 border-t border-blue-600/30 bg-blue-800/50 backdrop-blur-md shadow-md"
+                initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.5 }} // Delay để chờ link load xong
+                transition={{ duration: 0.6, delay: 0.6 }} // Delay để chờ link load xong
             >
-                <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer">
-                    <UserCircle size={36} weight="light" className="flex-shrink-0" />
+                <div className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 cursor-pointer transition-all duration-300 group">
+                    <UserCircle size={48} weight="light" className="flex-shrink-0 text-blue-200 group-hover:text-white" />
                     <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold truncate">Nguyễn Văn An</p>
-                        <p className="text-xs text-blue-200 truncate">Admin</p>
+                        <p className="text-base font-bold truncate text-white">Nguyễn Văn An</p>
+                        <p className="text-sm text-blue-200 truncate">Admin</p>
                     </div>
+                    <Gear size={24} className="text-blue-200 group-hover:rotate-90 transition-transform duration-300" />
                 </div>
+                {/* (MỚI) Thêm nút Logout */}
+                <button className="flex items-center gap-3 py-3 px-6 w-full text-left text-blue-100 hover:bg-white/10 rounded-xl transition-colors duration-300 mt-2">
+                    <SignOut size={24} />
+                    <span className="text-base font-semibold">Đăng xuất</span>
+                </button>
             </motion.div>
-        </div>
+        </motion.div>
     );
 }
 
 
-// --- Component Layout chính (Giữ nguyên) ---
+// --- Component Layout chính (Nâng cấp với animation cho main content) ---
 export default function AdminDashboard() {
     return (
-        <div className="flex h-screen bg-gray-50 dark:bg-slate-900">
+        <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800">
             <Sidebar />
             <div className="flex-1 flex flex-col overflow-hidden">
-                <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 dark:bg-slate-900 p-6">
+                <motion.main 
+                    className="flex-1 overflow-x-hidden overflow-y-auto bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 p-8 shadow-inner"
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                >
                     <Outlet />
-                </main>
+                </motion.main>
             </div>
             <Toaster
                 position="top-right"
                 reverseOrder={false}
                 toastOptions={{
-                    className: 'dark:bg-slate-700 dark:text-white',
+                    className: 'dark:bg-slate-800 dark:text-white shadow-lg rounded-xl',
                 }}
             />
         </div>
