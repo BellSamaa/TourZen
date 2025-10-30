@@ -10,13 +10,12 @@
   2. (CSS Bảng) Giảm cỡ chữ "Đơn" và "Tổng chi" từ text-base -> text-sm cho đồng bộ.
 */
 
-/* *** SỬA LỖI v7.6 (Fix Lỗi Mất Focus Input) ***
-  1. (useCallback) Bọc tất cả các hàm xử lý (handleUpdateCustomer, handleAddNewCustomer, v.v.)
-     trong `useCallback` để ổn định props truyền vào các Modal và Form.
-  2. (Stable Handlers) Tạo các hàm đóng modal (handleCloseAddModal, handleCloseEditModal)
-     để thay thế các hàm inline (ẩn danh) `() => ...` trong props `onClose` và `onCancel`.
-  3. (Nguyên nhân) Lỗi này xảy ra do component cha render lại, tạo hàm mới, 
-     khiến component con (Form) cũng render lại và làm mất focus của input.
+/* *** SỬA LỖI v7.7 (Fix Lỗi Mất Focus Input) ***
+  1. (Di chuyển) Di chuyển component `InputWrapper` từ BÊN TRONG ra BÊN NGOÀI `CustomerForm`.
+  2. (Nguyên nhân) Khi `InputWrapper` ở bên trong, mỗi lần `CustomerForm` render lại
+     (khi gõ phím), nó tạo ra một `InputWrapper` "mới", khiến React hủy
+     component cũ và làm mất focus của input.
+  3. (useCallback) Giữ lại các `useCallback` từ v7.6 để đảm bảo component cha ổn định.
 */
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
@@ -307,8 +306,23 @@ const CustomerBookingsModal = ({ customer, onClose }) => {
   );
 };
 
+// --- (*** FIX v7.7 ***) Component InputWrapper (Đã di chuyển ra ngoài) ---
+// Component này được di chuyển ra ngoài CustomerForm để tránh bị tạo lại khi render
+const InputWrapper = ({ label, icon, children }) => (
+  <div className="mb-5">
+    <label className="flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+      {icon}
+      {label}
+    </label>
+    <div className="relative">
+      {children}
+    </div>
+  </div>
+);
+
+
 // --- Component Form (Logic v6) ---
-// (Component này giữ nguyên, không cần thay đổi)
+// (InputWrapper đã được chuyển ra ngoài)
 const CustomerForm = ({ initialData, onSubmit, isSaving, onCancel }) => {
   const [formData, setFormData] = useState({
     full_name: initialData?.full_name || '',
@@ -343,18 +357,8 @@ const CustomerForm = ({ initialData, onSubmit, isSaving, onCancel }) => {
     onSubmit(dataToSubmit);
   };
 
-  const InputWrapper = ({ label, icon, children }) => (
-    <div className="mb-5">
-      <label className="flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-        {icon}
-        {label}
-      </label>
-      <div className="relative">
-        {children}
-      </div>
-    </div>
-  );
-
+  // (*** FIX v7.7 ***) InputWrapper đã được XÓA khỏi đây
+  
   return (
     <form onSubmit={handleSubmit}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
@@ -575,7 +579,7 @@ export default function ManageCustomersSupabase() {
   }, [debouncedSearch]);
 
 
-  // --- (*** FIX v7.6 ***) Handlers cho Modal Form (Bọc useCallback) ---
+  // --- Handlers cho Modal Form (Bọc useCallback) ---
   const handleUpdateCustomer = useCallback(async (formData) => {
     if (!editingCustomer || isSaving) return;
     setIsSaving(true);
@@ -610,7 +614,7 @@ export default function ManageCustomersSupabase() {
         throw error;
       }
       toast.success("Thêm khách hàng mới thành công!");
-      setIsAddingCustomer(false); // Sửa: setIsAddingCustomer(null) -> setIsAddingCustomer(false)
+      setIsAddingCustomer(false);
       fetchCustomers();
     } catch (err) {
       console.error("Lỗi thêm mới:", err);
@@ -620,7 +624,7 @@ export default function ManageCustomersSupabase() {
     }
   }, [isSaving, fetchCustomers]); // Thêm dependencies
 
-  // --- (*** FIX v7.6 ***) Handlers ổn định để đóng/mở Modals ---
+  // --- Handlers ổn định để đóng/mở Modals ---
   const handleOpenAddModal = useCallback(() => {
     setIsAddingCustomer(true);
   }, []);
@@ -637,16 +641,16 @@ export default function ManageCustomersSupabase() {
     setViewingBookingsCustomer(null);
   }, []);
 
-  // --- (*** FIX v7.6 ***) Delete Handlers (Bọc useCallback) ---
+  // --- Delete Handlers (Bọc useCallback) ---
   const openDeleteConfirm = useCallback((c) => {
     setSelectedCustomer(c); 
     setShowDeleteConfirm(true);
-  }, []); // Dependency rỗng vì chỉ set state
+  }, []);
   
   const closeDeleteConfirm = useCallback(() => {
     setSelectedCustomer(null); 
     setShowDeleteConfirm(false);
-  }, []); // Dependency rỗng vì chỉ set state
+  }, []);
 
   const handleDelete = useCallback(async () => {
     if (!selectedCustomer) return;
@@ -664,7 +668,7 @@ export default function ManageCustomersSupabase() {
       console.error("Lỗi xóa:", err);
       toast.error(`Xóa thất bại: ${err.message}.`);
     }
-  }, [selectedCustomer, customers.length, currentPage, fetchCustomers, closeDeleteConfirm]); // Thêm dependencies
+  }, [selectedCustomer, customers.length, currentPage, fetchCustomers, closeDeleteConfirm]);
 
   const paginationWindow = useMemo(() => getPaginationWindow(currentPage, totalPages, 2), [currentPage, totalPages]);
 
@@ -680,16 +684,15 @@ export default function ManageCustomersSupabase() {
 
   return (
     <motion.div
-      className="max-w-8xl mx-auto p-6 sm:p-8 space-y-8 min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-slate-900 dark:to-slate-800 font-vietnam-main" // (FIX v7) Đổi class
+      className="max-w-8xl mx-auto p-6 sm:p-8 space-y-8 min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-slate-900 dark:to-slate-800 font-vietnam-main"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
     >
-      {/* --- SỬA ĐỔI MÀU TIÊU ĐỀ (v7.2) --- */}
       <div className="flex flex-wrap items-center justify-between gap-5">
         <div>
           <motion.h1 
-            className="text-4xl font-extrabold text-gray-900 dark:text-white flex items-center gap-3 font-vietnam-main" // Đổi màu (bỏ gradient)
+            className="text-4xl font-extrabold text-gray-900 dark:text-white flex items-center gap-3 font-vietnam-main"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
@@ -702,7 +705,7 @@ export default function ManageCustomersSupabase() {
           </p>
         </div>
         <button
-          onClick={handleOpenAddModal} // (*** FIX v7.6 ***)
+          onClick={handleOpenAddModal}
           className="flex items-center gap-2.5 px-6 py-3 bg-gradient-to-r from-sky-500 to-sky-600 text-white rounded-xl shadow-lg shadow-sky-500/30 hover:shadow-xl hover:shadow-sky-500/40 hover:-translate-y-0.5 transition-all duration-300 font-semibold focus:outline-none focus:ring-4 focus:ring-sky-300"
         >
           <Plus size={20} weight="bold" />
@@ -735,7 +738,6 @@ export default function ManageCustomersSupabase() {
           <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
             <thead className="bg-gray-50 dark:bg-slate-700/40">
               <tr>
-                {/* --- SỬA ĐỔI FONT (.th-style) (v7.2) --- */}
                 <th className="th-style">Họ và tên</th>
                 <th className="th-style">Liên hệ</th>
                 <th className="th-style">Địa chỉ</th>
@@ -772,29 +774,23 @@ export default function ManageCustomersSupabase() {
                     whileHover={{ y: -2 }}
                   >
                     <td className="td-style">
-                      {/* --- SỬA ĐỔI FONT (về text-sm) --- */}
                       <span className="font-bold text-sm text-slate-900 dark:text-white">{c.full_name || <span className="italic text-gray-400">...</span>}</span>
                     </td>
                     <td className="td-style whitespace-nowrap">
                       <div className="flex flex-col gap-0.5">
-                        {/* --- SỬA ĐỔI FONT (về text-sm) (v7.2) --- */}
                         <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{c.email}</span>
                         <span className="text-sm text-gray-500 dark:text-gray-400">{c.phone_number || "..."}</span>
                       </div>
                     </td>
                     <td className="td-style max-w-sm">
-                      {/* --- SỬA ĐỔI FONT (về text-sm) (v7.2) --- */}
                       <span className="truncate block text-sm">{c.address || <span className="italic text-gray-400">...</span>}</span>
                     </td>
                     <td className="td-style">
-                      {/* --- SỬA ĐỔI FONT (về text-sm) (v7.2) --- */}
                       <span className="text-sm whitespace-nowrap">
                         {c.ngay_sinh ? new Date(c.ngay_sinh).toLocaleDateString('vi-VN') : <span className="italic text-gray-400">...</span>}
                       </span>
                     </td>
-                    {/* --- SỬA ĐỔI FONT (về text-sm) --- */}
                     <td className="td-style text-center font-bold text-sm text-sky-600 dark:text-sky-400">{c.order_count}</td>
-                    {/* --- SỬA ĐỔI FONT (về text-sm) --- */}
                     <td className="td-style text-right font-bold text-sm text-gray-800 dark:text-gray-200 whitespace-nowrap">
                       {formatCurrency(c.total_spend)}
                     </td>
@@ -805,10 +801,9 @@ export default function ManageCustomersSupabase() {
                     </td>
                     <td className="td-style text-center whitespace-nowrap space-x-2">
                         <>
-                          {/* (*** FIX v7.6 ***) Thay thế hàm inline bằng cách gọi hàm đã định nghĩa */}
                           <button onClick={() => setViewingBookingsCustomer(c)} disabled={isFetchingPage || !!editingCustomer || isAddingCustomer} className="action-button text-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/30" title="Xem các đơn hàng"><List size={20} weight="bold" /></button>
                           <button onClick={() => setEditingCustomer(c)} disabled={isFetchingPage || !!editingCustomer || isAddingCustomer} className="action-button text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa thông tin"><PencilSimple size={20} weight="bold" /></button>
-                          <button onClick={() => openDeleteConfirm(c)} disabled={isFetchingPage || !!editingCustomer || isAddingCustomer} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa hồ sơ"><FaTrash size={18} /></button>
+                          <button onClick={() => openDeleteConfirm(c)} disabled={isFetchingPage || !!editingCustomer || isAddingCustomer} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/3D" title="Xóa hồ sơ"><FaTrash size={18} /></button>
                         </>
                     </td>
                   </motion.tr>
@@ -832,12 +827,12 @@ export default function ManageCustomersSupabase() {
         </div>
       )}
 
-      {/* --- (*** FIX v7.6 ***) Modals (Sử dụng handlers ổn định) --- */}
+      {/* --- Modals (Sử dụng handlers ổn định) --- */}
       <AnimatePresence>
         {viewingBookingsCustomer && (
           <CustomerBookingsModal
             customer={viewingBookingsCustomer}
-            onClose={handleCloseBookingsModal} // (*** FIX v7.6 ***)
+            onClose={handleCloseBookingsModal}
           />
         )}
       </AnimatePresence>
@@ -866,11 +861,11 @@ export default function ManageCustomersSupabase() {
 
       <AnimatePresence>
         {isAddingCustomer && (
-          <FormModal title="Thêm Khách Hàng Mới" onClose={handleCloseAddModal}> {/* (*** FIX v7.6 ***) */}
+          <FormModal title="Thêm Khách Hàng Mới" onClose={handleCloseAddModal}>
             <CustomerForm
               isSaving={isSaving}
-              onSubmit={handleAddNewCustomer} // (*** FIX v7.6 ***)
-              onCancel={handleCloseAddModal} // (*** FIX v7.6 ***)
+              onSubmit={handleAddNewCustomer}
+              onCancel={handleCloseAddModal}
             />
           </FormModal>
         )}
@@ -878,12 +873,12 @@ export default function ManageCustomersSupabase() {
       
       <AnimatePresence>
         {editingCustomer && (
-          <FormModal title="Chỉnh Sửa Thông Tin Khách Hàng" onClose={handleCloseEditModal}> {/* (*** FIX v7.6 ***) */}
+          <FormModal title="Chỉnh Sửa Thông Tin Khách Hàng" onClose={handleCloseEditModal}>
             <CustomerForm
               initialData={editingCustomer}
               isSaving={isSaving}
-              onSubmit={handleUpdateCustomer} // (*** FIX v7.6 ***)
-              onCancel={handleCloseEditModal} // (*** FIX v7.6 ***)
+              onSubmit={handleUpdateCustomer}
+              onCancel={handleCloseEditModal}
             />
           </FormModal>
         )}
