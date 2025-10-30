@@ -1,6 +1,7 @@
 // src/pages/ManageSuppliers.jsx
 // (UPGRADED V4: Sửa logic Thống kê, Sửa Trạng thái click, Thêm Icons)
 // (Nâng cấp giao diện: Tăng kích thước font, padding; Thêm nhiều icon; Nút bấm màu sắc đa dạng hơn với gradient, hover effects; Cải thiện layout cho dễ nhìn)
+// (Nâng cấp VIP: Thêm gradient cao cấp, shadow sâu, hiệu ứng pop-up xịn, nút bấm với màu sắc sống động và animation)
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -175,10 +176,16 @@ const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
     };
 
     return (
-        <div className="fixed inset-0 bg-black/70 z-50 flex justify-center items-center p-6">
-            <div className="bg-gradient-to-br from-white to-gray-50 dark:from-slate-800 dark:to-slate-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] flex flex-col border border-sky-200 dark:border-sky-700">
+        <motion.div className="fixed inset-0 bg-black/80 z-50 flex justify-center items-center p-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div 
+                className="bg-gradient-to-br from-white to-gray-100 dark:from-slate-800 dark:to-slate-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] flex flex-col border border-sky-200 dark:border-sky-700"
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                transition={{ duration: 0.3, type: "spring" }}
+            >
                 <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-                    <div className="flex justify-between items-center p-6 border-b dark:border-slate-700">
+                    <div className="flex justify-between items-center p-6 border-b dark:border-slate-700 bg-gradient-to-r from-sky-50 to-sky-100 dark:from-slate-900 dark:to-slate-800">
                         <h3 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
                             <ShieldCheck size={28} className="text-sky-600" />
                             {isNew ? 'Thêm Dịch vụ mới' : 'Chỉnh sửa Dịch vụ'}
@@ -214,15 +221,15 @@ const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
                         </div>
                     </div>
                     <div className="p-6 border-t dark:border-slate-700 flex justify-end gap-4 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-slate-800 dark:to-slate-900 rounded-b-2xl">
-                        <button type="button" onClick={onClose} disabled={loading} className="modal-button-secondary text-lg px-6 py-3">Hủy</button>
-                        <button type="submit" disabled={loading} className="modal-button-primary flex items-center justify-center gap-2 text-lg px-6 py-3">
+                        <button type="button" onClick={onClose} disabled={loading} className="modal-button-secondary text-lg px-6 py-3 bg-gradient-to-r from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500 dark:from-gray-600 dark:to-gray-700 dark:hover:from-gray-700 dark:hover:to-gray-800 rounded-xl shadow-lg">Hủy</button>
+                        <button type="submit" disabled={loading} className="modal-button-primary flex items-center justify-center gap-2 text-lg px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-xl shadow-lg">
                             {loading && <CircleNotch size={24} className="animate-spin" />}
                             <FloppyDisk size={24} /> Lưu
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
+            </motion.div>
+        </motion.div>
     );
 };
 // ====================================================================
@@ -450,9 +457,15 @@ const SupplierBookingsManagement = ({ supplierId, supplierContact }) => {
 // ====================================================================
 const ServicesModal = ({ supplier, onClose }) => {
     return (
-      <div className="fixed inset-0 bg-black/70 z-50 flex justify-center items-center p-6">
-        <div className="bg-gradient-to-br from-white to-gray-50 dark:from-slate-800 dark:to-slate-900 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] flex flex-col border border-indigo-200 dark:border-indigo-700">
-          <div className="flex justify-between items-center p-6 border-b dark:border-slate-700">
+      <motion.div className="fixed inset-0 bg-black/80 z-50 flex justify-center items-center p-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <motion.div 
+            className="bg-gradient-to-br from-white to-gray-100 dark:from-slate-800 dark:to-slate-900 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] flex flex-col border border-indigo-200 dark:border-indigo-700"
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            transition={{ duration: 0.3, type: "spring" }}
+        >
+          <div className="flex justify-between items-center p-6 border-b dark:border-slate-700 bg-gradient-to-r from-indigo-50 to-indigo-100 dark:from-indigo-900 dark:to-indigo-800">
               <h3 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
                   <UsersThree size={28} className="text-indigo-600" /> Quản lý Dịch vụ & Đặt chỗ
               </h3>
@@ -478,10 +491,10 @@ const ServicesModal = ({ supplier, onClose }) => {
             />
           </div>
           <div className="p-6 border-t dark:border-slate-700 flex justify-end gap-4 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-slate-800 dark:to-slate-900 rounded-b-2xl">
-              <button type="button" onClick={onClose} className="modal-button-secondary text-lg px-6 py-3">Đóng</button>
+              <button type="button" onClick={onClose} className="modal-button-secondary text-lg px-6 py-3 bg-gradient-to-r from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500 dark:from-gray-600 dark:to-gray-700 dark:hover:from-gray-700 dark:hover:to-gray-800 rounded-xl shadow-lg">Đóng</button>
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     );
   };
   
@@ -783,7 +796,7 @@ export default function ManageSuppliers() {
                                 const statusInfo = getStatus(supplier);
 
                                 return (
-                                <tr key={supplier.id} className="hover:bg-gray-100 dark:hover:bg-slate-700/40 align-top transition-colors duration-300">
+                                <motion.tr key={supplier.id} className="hover:bg-gray-100 dark:hover:bg-slate-700/40 align-top transition-colors duration-300" whileHover={{ scale: 1.01 }}>
                                     <td className="td-style-new font-mono text-lg">NCC-{supplier.id.slice(-4).toUpperCase()}</td>
                                     <td className="td-style-new max-w-md">
                                         <div className="flex items-center gap-3">
@@ -848,7 +861,7 @@ export default function ManageSuppliers() {
                                             <button onClick={() => handleDelete(supplier.id, supplier.name)} className="action-button text-red-600 hover:bg-red-200 dark:hover:bg-red-900/40 p-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg" title="Xóa NCC"><Trash size={20} /></button>
                                         </div>
                                     </td>
-                                </tr>
+                                </motion.tr>
                             )})}
                         </tbody>
                     </table>
@@ -857,10 +870,16 @@ export default function ManageSuppliers() {
 
             {/* Modal Thêm/Sửa NCC chính */}
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/70 z-50 flex justify-center items-center p-6">
-                    <div className="bg-gradient-to-br from-white to-gray-50 dark:from-slate-800 dark:to-slate-900 rounded-2xl shadow-2xl w-full max-w-xl max-h-[95vh] flex flex-col border border-sky-200 dark:border-sky-700">
+                <motion.div className="fixed inset-0 bg-black/80 z-50 flex justify-center items-center p-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <motion.div 
+                        className="bg-gradient-to-br from-white to-gray-100 dark:from-slate-800 dark:to-slate-900 rounded-2xl shadow-2xl w-full max-w-xl max-h-[95vh] flex flex-col border border-sky-200 dark:border-sky-700"
+                        initial={{ scale: 0.95, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.95, opacity: 0 }}
+                        transition={{ duration: 0.3, type: "spring" }}
+                    >
                         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-                            <div className="flex justify-between items-center p-6 border-b dark:border-slate-700">
+                            <div className="flex justify-between items-center p-6 border-b dark:border-slate-700 bg-gradient-to-r from-sky-50 to-sky-100 dark:from-slate-900 dark:to-slate-800">
                                 <h3 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
                                     <CurrencyCircleDollar size={28} className="text-sky-600" />
                                     {editingId ? 'Chỉnh sửa Nhà cung cấp' : 'Thêm Nhà cung cấp mới'}
@@ -903,15 +922,15 @@ export default function ManageSuppliers() {
                             </div>
                             
                             <div className="p-6 border-t dark:border-slate-700 flex justify-end gap-4 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-slate-800 dark:to-slate-900 rounded-b-2xl">
-                                <button type="button" onClick={handleCloseModal} disabled={isSubmitting} className="modal-button-secondary text-lg px-6 py-3">Hủy</button>
-                                <button type="submit" disabled={isSubmitting} className="modal-button-primary flex items-center justify-center gap-2 text-lg px-6 py-3">
+                                <button type="button" onClick={handleCloseModal} disabled={isSubmitting} className="modal-button-secondary text-lg px-6 py-3 bg-gradient-to-r from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500 dark:from-gray-600 dark:to-gray-700 dark:hover:from-gray-700 dark:hover:to-gray-800 rounded-xl shadow-lg">Hủy</button>
+                                <button type="submit" disabled={isSubmitting} className="modal-button-primary flex items-center justify-center gap-2 text-lg px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-xl shadow-lg">
                                     {isSubmitting && <CircleNotch size={24} className="animate-spin" />}
                                     Lưu Nhà cung cấp
                                 </button>
                             </div>
                         </form>
-                    </div>
-                </div>
+                    </motion.div>
+                </motion.div>
              )}
 
             {/* Modal Dịch vụ con */}

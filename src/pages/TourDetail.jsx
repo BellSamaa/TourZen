@@ -1,7 +1,7 @@
 // src/pages/TourDetail.jsx
 // (V5: FIX LỖI WHITE SCREEN - Tách useEffect cuộn trang khi ID thay đổi)
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useLayoutEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getSupabase } from "../lib/supabaseClient";
 import toast, { Toaster } from "react-hot-toast";
@@ -192,11 +192,11 @@ const TourDetail = () => {
     const { ref: bannerRef, scrollYProgress } = useScroll();
     const bannerTextY = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
 
-    // --- (FIX V5) useEffect cuộn trang khi ID thay đổi ---
-    // Đảm bảo trang luôn cuộn lên đầu ngay khi ID thay đổi, tránh lỗi hiển thị trắng
-    useEffect(() => {
-        if(id) {
-            window.scrollTo(0, 0);
+    // --- (FIX V5) useLayoutEffect cuộn trang khi ID thay đổi ---
+    // Đảm bảo trang luôn cuộn lên đầu ngay khi ID thay đổi, trước khi render, tránh lỗi hiển thị trắng
+    useLayoutEffect(() => {
+        if (id) {
+            window.scrollTo({ top: 0, behavior: 'instant' });
         }
     }, [id]);
 
@@ -206,7 +206,7 @@ const TourDetail = () => {
         setLoading(true);
         setError(null);
         setTour(null);
-        // window.scrollTo(0, 0); // Đã chuyển lên useEffect độc lập (FIX V5)
+        // window.scrollTo(0, 0); // Đã chuyển lên useLayoutEffect (FIX V5)
 
         // --- 2. HÀM FETCH DATA ---
         async function fetchTour() {
@@ -284,7 +284,7 @@ const TourDetail = () => {
         <motion.div
             key={id} // (SỬA MỚI) Thêm key={id} để force remount component khi ID thay đổi, tránh lỗi white screen khi navigate client-side
             className="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-200 overflow-x-hidden"
-            initial="hidden" animate="visible" exit={{ opacity: 0 }}
+            initial="hidden" animate="visible" // Xóa exit để tránh vấn đề animation khi không có AnimatePresence
             variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { duration: 0.4 } } }} 
         >
             <Toaster position="top-center" reverseOrder={false} />
