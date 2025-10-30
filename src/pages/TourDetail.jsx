@@ -1,5 +1,5 @@
 // src/pages/TourDetail.jsx
-// (V5: FIX LỖI WHITE SCREEN - Thêm useEffect cuộn trang khi ID thay đổi)
+// (V5: FIX LỖI WHITE SCREEN - Tách useEffect cuộn trang khi ID thay đổi)
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -76,7 +76,7 @@ const StarRating = ({ rating, size = "text-lg" }) => {
     );
 };
 
-// --- (MỚI) Component Mục Đánh giá (SỬA v2: Bỏ join user) ---
+// --- (MỚI) Component Mục Đánh giá (Giữ nguyên) ---
 const ReviewsSection = ({ tourId, initialRating }) => {
     const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -206,7 +206,7 @@ const TourDetail = () => {
         setLoading(true);
         setError(null);
         setTour(null);
-        // window.scrollTo(0, 0); // Đã chuyển lên useEffect độc lập
+        // window.scrollTo(0, 0); // Đã chuyển lên useEffect độc lập (FIX V5)
 
         // --- 2. HÀM FETCH DATA ---
         async function fetchTour() {
@@ -347,7 +347,7 @@ const TourDetail = () => {
                     </div>
                 </motion.div>
 
-                {/* --- Cột Đặt vé (ĐÃ SỬA) --- */}
+                {/* --- Cột Đặt vé (Giữ nguyên) --- */}
                 <motion.div className="lg:col-span-1 bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border dark:border-slate-700 lg:sticky lg:top-24 self-start" variants={itemVariants}>
                     <p className="text-slate-500 dark:text-slate-400 text-sm mb-1 font-medium">Giá chỉ từ</p>
                     <p className="text-4xl md:text-5xl font-bold text-red-600 mb-6 pb-6 border-b dark:border-slate-600">
@@ -363,8 +363,6 @@ const TourDetail = () => {
                      <p className="text-xs text-slate-500 mt-4 text-center"> Nhân viên sẽ liên hệ xác nhận sau khi bạn đặt. </p>
                 </motion.div>
             </motion.section>
-
-            {/* --- (XÓA) Đã xóa phần Lịch khởi hành --- */}
 
             {/* === Lịch trình (Giữ nguyên) === */}
             {tour.itinerary && tour.itinerary.length > 0 && (
