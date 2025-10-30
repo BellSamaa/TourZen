@@ -1,5 +1,5 @@
 // src/pages/ManageTour.jsx
-// (V10: Thêm Modal "ViewReviewModal" để xem chi tiết bình luận khi bấm vào)
+// (V11: Fix lỗi query Reviews, thêm Modal xem Review khi click)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -10,10 +10,10 @@ import {
     Package, CaretLeft, CaretRight, CircleNotch, X, MagnifyingGlass, Funnel, List, ArrowClockwise,
     User, CalendarBlank, UsersThree, Tag, Wallet, CheckCircle, XCircle, Clock, Info, PencilSimple, Trash, Plus, WarningCircle, Envelope,
     Buildings, AirplaneTilt, Car, Ticket as VoucherIcon, Bank, Image as ImageIcon, FloppyDisk,
-    Receipt, // (V8) Icon Hóa đơn
-    Star, // (V9) Icon Sao
-    ChatCircleDots, // (V9) Icon Bình luận
-    UserCircle // (MỚI v10) Icon user
+    Receipt, // Icon Hóa đơn
+    Star, // Icon Sao
+    ChatCircleDots, // Icon Bình luận
+    UserCircle // Icon user
 } from "@phosphor-icons/react";
 
 // (V8) Import Modal Hóa đơn
@@ -469,10 +469,12 @@ const DeleteConfirmationModal = ({ booking, onClose, onConfirm }) => {
     );
 };
 
+
 // --- (MỚI v10) Component Modal xem Review ---
 const ViewReviewModal = ({ review, onClose }) => {
     if (!review) return null;
 
+    // Lấy tên người dùng (từ cột join Reviews(user) )
     const userName = review.user?.full_name || review.user?.email || "Khách ẩn danh";
 
     return (
@@ -722,7 +724,7 @@ export default function ManageTour() {
     const [viewingReview, setViewingReview] = useState(null); // Lưu object review
 
     
-    // (CẬP NHẬT v10) Fetch Bookings (thêm join User vào Review)
+    // (CẬP NHẬT v11) Fetch Bookings (Fix lỗi Query Reviews)
     const fetchBookings = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         else setLoading(true); 
@@ -743,8 +745,9 @@ export default function ManageTour() {
                     voucher_code, voucher_discount, notes, 
                     payment_method,
                     Invoices ( id ),
+                    -- SỬA LỖI QUERY: Phải dùng user:user_id để join bảng Users
                     Reviews ( id, rating, comment, user:user_id ( full_name, email ) ) 
-                `, { count: 'exact' }); // <-- ĐÃ THÊM user VÀO REVIEW
+                `, { count: 'exact' }); 
                 
             if (filterStatus !== 'all') { query = query.eq('status', filterStatus); }
             if (debouncedSearch) {
@@ -755,7 +758,7 @@ export default function ManageTour() {
             const { data, error: queryError, count } = await query;
             if (queryError) throw queryError;
             
-             // (SỬA v9) Xử lý join Invoices (trả về mảng) và Reviews
+             // Xử lý join Invoices (trả về mảng) và Reviews
              const formattedData = (data || []).map(b => ({
                  ...b,
                  has_invoice: b.Invoices && b.Invoices.length > 0,
@@ -1151,12 +1154,15 @@ export default function ManageTour() {
                 )}
                 
                 {/* (MỚI v10) Modal Xem Review */}
-                {viewingReview && (
-                    <ViewReviewModal
-                        review={viewingReview}
-                        onClose={() => setViewingReview(null)}
-                    />
-                )}
+                <AnimatePresence>
+                    {viewingReview && (
+                        <ViewReviewModal
+                            review={viewingReview}
+                            onClose={() => setViewingReview(null)}
+                        />
+                    )}
+                </AnimatePresence>
+
             </AnimatePresence>
 
             {/* CSS (Giữ nguyên) */}
