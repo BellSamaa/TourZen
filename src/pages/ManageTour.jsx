@@ -734,9 +734,8 @@ export default function ManageTour() {
             const from = (currentPage - 1) * ITEMS_PER_PAGE;
             const to = from + ITEMS_PER_PAGE - 1;
             
-            // SỬA V17: Viết lại chuỗi select 1 dòng và loại bỏ comment (Fix parsing và relation)
-            const selectQuery = `
-                id,created_at,departure_date,status,total_price,quantity,
+            // SỬA V18: Dùng Template Literal SẠCH và không comment
+            const selectQuery = `id,created_at,departure_date,status,total_price,quantity,
                 num_adult,num_child,num_elder,num_infant,departure_id,
                 user:user_id(id,full_name,email),
                 product:product_id(id,name,image_url),
@@ -745,7 +744,7 @@ export default function ManageTour() {
                 flight:flight_product_id(id,name,price,product_type,details),
                 voucher_code,voucher_discount,notes,payment_method,
                 Invoices(id),
-                Reviews(id,rating,comment,reviewer:Users!Reviews_user_id_fkey(full_name,email)) 
+                Reviews(id,rating,comment,reviewer:user_id(full_name,email)) 
             `.replace(/\s+/g, ''); // Loại bỏ tất cả khoảng trắng, tab, newline
             
             let query = supabase
