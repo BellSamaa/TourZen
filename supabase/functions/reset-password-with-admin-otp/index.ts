@@ -22,10 +22,10 @@ Deno.serve(async (req) => {
     // 1. Tạo Supabase Admin Client (dùng service_role)
     // Biến này phải được set trong Supabase project secrets:
     // SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+const supabaseAdmin = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SERVICE_KEY') ?? '' 
+);
 
     // 2. Lấy dữ liệu
     const { email, otp, newPassword } = await req.json();
