@@ -2,6 +2,7 @@
 // (Nâng cấp giao diện "Hoa lá cành" + Hiệu ứng - Đã sửa lỗi khai báo kép)
 // (ĐÃ SỬA: Thêm trường Ngày Sinh)
 // (*** NÂNG CẤP v8: Thêm Validate SĐT + Chức năng Quên Mật Khẩu ***)
+// (*** SỬA LỖI v9: Chuyển luồng Quên Mật Khẩu sang sử dụng Mã Xác Nhận/Mật khẩu mới trực tiếp ***)
 
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -9,7 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
     FaLock, FaEye, FaEyeSlash, FaUser, FaEnvelope, FaSignInAlt,
     FaMapMarkerAlt, FaPhone, FaInfoCircle, FaCheckCircle,
-    FaCalendarAlt, FaQuestionCircle // SỬA v8: Thêm icon
+    FaCalendarAlt, FaQuestionCircle, FaPaperPlane, FaKey // SỬA v9: Thêm icon
 } from "react-icons/fa";
 import { getSupabase } from "../lib/supabaseClient";
 
@@ -25,13 +26,16 @@ export default function Login() {
     const navigate = useNavigate();
     const location = useLocation();
     const [mode, setMode] = useState('login'); // 'login', 'register', 'forgot'
-    const initialFormState = { name: "", email: "", password: "", confirm: "", address: "", phone_number: "", ngay_sinh: "" };
+    const initialFormState = { name: "", email: "", password: "", confirm: "", address: "", phone_number: "", ngay_sinh: "", otp: "" }; // SỬA v9: Thêm otp
     const [form, setForm] = useState(initialFormState);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
+    
+    // SỬA v9: Trạng thái mới cho luồng Quên Mật Khẩu
+    const [isOtpSent, setIsOtpSent] = useState(false); 
 
     // --- Hàm handleSubmit (Đã sửa điều hướng + Thêm mode 'forgot') ---
      const handleSubmit = async (e) => {
@@ -90,19 +94,60 @@ export default function Login() {
                         throw new Error("Không tìm thấy hồ sơ người dùng.");
                     }
                 }
-            } else if (mode === 'forgot') { // SỬA v8: Thêm mode 'forgot'
+            } else if (mode === 'forgot') { // SỬA v9: Luồng Quên Mật Khẩu mới
                 if (!form.email) throw new Error("Vui lòng nhập email của bạn.");
                 
-                // Gửi yêu cầu lên Supabase (Cần tạo bảng 'password_reset_requests' và set Policy)
-                const { error: requestError } = await supabase
-                    .from('password_reset_requests')
-                    .insert({ email: form.email, is_resolved: false });
-                
-                if (requestError) throw new Error(`Lỗi gửi yêu cầu: ${requestError.message}`);
-                
-                setSuccess("Yêu cầu đã được gửi! Vui lòng liên hệ Admin qua SĐT: 0987.654.321 (hoặc Zalo) và chờ phê duyệt.");
-                setForm(initialFormState);
-                setMode('login'); // Quay lại mode login sau khi thành công
+                if (!isOtpSent) {
+                    // --- BƯỚC 1: YÊU CẦU GỬI MÃ OTP QUA EMAIL ---
+                    // SỬA v9: Thay đổi luồng sang gửi yêu cầu reset mật khẩu trực tiếp.
+                    // Supabase sẽ gửi một email chứa mã OTP hoặc link ma thuật (Magic Link). 
+                    // Để đáp ứng yêu cầu 'gõ mã', ta dùng `sendOtp` với type 'recovery'.
+                    // LƯU Ý: Admin phải cung cấp mã OTP cho khách qua kênh khác 
+                    // nếu bạn không muốn dùng email của Supabase.
+                    
+                    const { error: otpError } = await supabase.auth.signInWithOtp({ 
+                        email: form.email, 
+                        options: { emailRedirectTo: window.location.origin, shouldCreateUser: false } // 'recovery' type is default for existing users in this flow
+                    });
+
+                    if (otpError) {
+                        // Nếu tài khoản chưa xác nhận email, Supabase có thể báo lỗi
+                        if (otpError.message.includes("Email rate limit exceeded")) throw new Error("Vượt quá giới hạn yêu cầu. Vui lòng thử lại sau.");
+                        if (otpError.message.includes("User not found")) throw new Error("Email không tồn tại trong hệ thống.");
+                        throw new Error(`Lỗi gửi yêu cầu: ${otpError.message}.`);
+                    }
+                    
+                    setSuccess("Mã xác nhận đã được gửi đến Email của bạn. Vui lòng kiểm tra hộp thư!");
+                    setIsOtpSent(true); // Chuyển sang bước nhập mã
+                } else {
+                    // --- BƯỚC 2: NHẬP MÃ OTP VÀ MẬT KHẨU MỚI ---
+                    if (!form.otp || !form.password || form.password.length < 6) {
+                        throw new Error("Vui lòng nhập Mã xác nhận và Mật khẩu mới (tối thiểu 6 ký tự).");
+                    }
+                    if (form.password !== form.confirm) throw new Error("Mật khẩu không khớp.");
+                    
+                    // Supabase `updateUser` (Đã xác thực) hoặc `verifyOtp` (chưa xác thực)
+                    // Vì luồng này phức tạp hơn (cần dùng mã), ta dùng `verifyOtp` với type 'recovery'
+                    // và sau đó update mật khẩu.
+                    
+                    // Xác thực mã OTP
+                    const { data: { session }, error: verifyError } = await supabase.auth.verifyOtp({
+                        email: form.email,
+                        token: form.otp,
+                        type: 'recovery'
+                    });
+                    
+                    if (verifyError) throw new Error(`Mã xác nhận không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.`);
+
+                    // Đổi mật khẩu
+                    const { error: updateError } = await supabase.auth.updateUser({ password: form.password });
+                    if (updateError) throw new Error(`Lỗi đổi mật khẩu: ${updateError.message}.`);
+                    
+                    setSuccess("Đổi mật khẩu thành công! 🎉 Vui lòng đăng nhập lại.");
+                    setForm(initialFormState);
+                    setIsOtpSent(false);
+                    setMode('login'); // Quay lại mode login sau khi thành công
+                }
             }
         } catch (err) { setError(err.message || "Đã có lỗi xảy ra."); }
         finally { setLoading(false); }
@@ -113,6 +158,16 @@ export default function Login() {
         setError('');
         setSuccess('');
         setForm(initialFormState);
+        setIsOtpSent(false); // SỬA v9: Reset trạng thái OTP
+    }
+    
+    // SỬA v9: Thêm hàm xử lý khi quay lại Đăng nhập từ Quên Mật Khẩu
+    const handleForgotBackToLogin = () => {
+        setError("");
+        setSuccess("");
+        setForm(initialFormState);
+        setIsOtpSent(false);
+        setMode('login');
     }
 
     // --- Animation Variants ---
@@ -147,7 +202,7 @@ export default function Login() {
 
             {/* Form Container */}
             <motion.div
-                key={mode}
+                key={mode + (isOtpSent ? '-otp' : '')} // SỬA v9: Key theo isOtpSent
                 className="w-full max-w-md p-8 sm:p-10 relative z-10 bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl text-white"
                 variants={formContainerVariants}
                 initial="hidden"
@@ -157,8 +212,8 @@ export default function Login() {
                 <motion.div className="text-center mb-8" variants={inputGroupVariants}>
                      <h2 className="text-4xl font-bold text-white tracking-tight drop-shadow-lg">TourZen</h2>
                      <p className="text-sm text-sky-300 mt-1">
-                        {/* SỬA v8: Thay đổi tiêu đề con khi 'forgot' */}
-                        {mode === 'forgot' ? 'Đặt lại mật khẩu' : 'Khám phá thế giới trong tầm tay'}
+                        {/* SỬA v9: Thay đổi tiêu đề con khi 'forgot' */}
+                        {mode === 'forgot' ? (isOtpSent ? 'Nhập Mã & Mật Khẩu Mới' : 'Yêu cầu Đặt lại Mật khẩu') : 'Khám phá thế giới trong tầm tay'}
                      </p>
                 </motion.div>
 
@@ -204,10 +259,10 @@ export default function Login() {
                             </motion.div>
                         )}
 
-                        {/* (SỬA v8) Email (Hiển thị cho cả 3 mode) */}
+                        {/* (SỬA v9) Email (Hiển thị cho cả 3 mode - Disable khi đã gửi OTP) */}
                         <motion.div className="relative" variants={inputGroupVariants} layout>
                             <FaEnvelope className="input-icon" />
-                            <input type="email" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input-field" required />
+                            <input type="email" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={`input-field ${mode === 'forgot' && isOtpSent ? 'bg-white/5 cursor-not-allowed' : ''}`} required disabled={mode === 'forgot' && isOtpSent} />
                         </motion.div>
 
                         {mode === 'register' && (
@@ -235,12 +290,27 @@ export default function Login() {
                             </>
                         )}
 
-                        {/* (SỬA v8) Ẩn Password khi 'forgot' */}
-                        {mode !== 'forgot' && (
+                        {/* (SỬA v9) Trường Mã Xác Nhận - Chỉ hiển thị khi mode='forgot' VÀ isOtpSent=true */}
+                        {mode === 'forgot' && isOtpSent && (
+                             <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
+                                <FaKey className="input-icon" />
+                                <input type="text" placeholder="Mã xác nhận (OTP)" value={form.otp} onChange={(e) => setForm({ ...form, otp: e.target.value })} className="input-field" required />
+                            </motion.div>
+                        )}
+
+                        {/* (SỬA v9) Mật khẩu: Ẩn khi 'forgot' và chưa gửi OTP */}
+                        {mode !== 'forgot' || isOtpSent ? (
                             <>
                                 <motion.div className="relative" variants={inputGroupVariants} layout>
                                     <FaLock className="input-icon" />
-                                    <input type={showPassword ? "text" : "password"} placeholder="Mật khẩu" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="input-field pr-10" required />
+                                    <input 
+                                        type={showPassword ? "text" : "password"} 
+                                        placeholder={mode === 'forgot' ? "Mật khẩu mới (Tối thiểu 6 ký tự)" : "Mật khẩu"} 
+                                        value={form.password} 
+                                        onChange={(e) => setForm({ ...form, password: e.target.value })} 
+                                        className="input-field pr-10" 
+                                        required 
+                                    />
                                     <span className="absolute top-1/2 transform -translate-y-1/2 right-3 cursor-pointer text-gray-400 hover:text-white transition-colors" onClick={() => setShowPassword(!showPassword)}>
                                         {showPassword ? <FaEyeSlash /> : <FaEye />}
                                     </span>
@@ -252,7 +322,7 @@ export default function Login() {
                                     </motion.div>
                                 )}
 
-                                {mode === 'register' && (
+                                {(mode === 'register' || mode === 'forgot') && ( // SỬA v9: Confirm cho cả register và forgot (khi đã gửi OTP)
                                     <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
                                         <FaLock className="input-icon" />
                                         <input type={showConfirm ? "text" : "password"} placeholder="Nhập lại mật khẩu" value={form.confirm} onChange={(e) => setForm({ ...form, confirm: e.target.value })} className="input-field pr-10" required />
@@ -262,20 +332,20 @@ export default function Login() {
                                     </motion.div>
                                 )}
                             </>
-                        )}
+                        ) : null}
                     </AnimatePresence>
                      
-                    {/* (SỬA v8) Ghi chú cho mode 'forgot' */}
+                    {/* (SỬA v9) Ghi chú cho mode 'forgot' */}
                     {mode === 'forgot' && (
                        <motion.p 
                            className="text-sm text-center text-gray-200"
                            variants={inputGroupVariants}
                        >
-                           Nhập email của bạn. Một yêu cầu sẽ được gửi đến Admin.
-                           <br/>
-                           <b className="text-white">SĐT Admin: 0987.654.321</b>.
-                           <br/>
-                           Vui lòng liên hệ và chờ phê duyệt.
+                           {!isOtpSent ? (
+                                "Nhập email của bạn để nhận mã xác nhận đổi mật khẩu."
+                           ) : (
+                                "Vui lòng kiểm tra email và nhập Mã xác nhận (OTP) cùng với Mật khẩu mới."
+                           )}
                        </motion.p>
                     )}
 
@@ -283,12 +353,12 @@ export default function Login() {
                     <motion.button
                         type="submit"
                         disabled={loading}
-                        /* (SỬA v8) Thêm màu cho 'forgot' */
+                        /* (SỬA v9) Thay đổi màu/icon/text cho luồng 'forgot' */
                         className={`w-full bg-gradient-to-r ${
                             mode === 'login' ? 'from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700' 
                             : mode === 'register' ? 'from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700' 
-                            : 'from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700'
-                        } text-white py-3.5 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center space-x-2 mt-8 transform active:scale-[0.97]`}
+                            : isOtpSent ? 'from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700' : 'from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700'
+                        } text-white py-3.5 rounded-xl font-bold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center space-x-2 mt-8 transform active:scale-[0.97]`}
                         whileHover={{ scale: 1.03, y: -3, transition: { type: 'spring', stiffness: 300 } }}
                         variants={inputGroupVariants}
                     >
@@ -301,23 +371,18 @@ export default function Login() {
                             </>
                         ) : (
                             <>
-                               {/* (SỬA v8) Thêm icon cho 'forgot' */}
-                               {mode === 'login' ? <FaSignInAlt /> : mode === 'register' ? <FaUser /> : <FaQuestionCircle />}
-                               <span>{mode === 'login' ? 'Đăng nhập' : mode === 'register' ? 'Tạo tài khoản' : 'Gửi yêu cầu'}</span>
+                               {/* (SỬA v9) Thêm icon cho 'forgot' */}
+                               {mode === 'login' ? <FaSignInAlt /> : mode === 'register' ? <FaUser /> : (isOtpSent ? <FaLock/> : <FaPaperPlane/>)}
+                               <span>{mode === 'login' ? 'Đăng nhập' : mode === 'register' ? 'Tạo tài khoản' : (isOtpSent ? 'Đổi mật khẩu' : 'Gửi yêu cầu')}</span>
                             </>
                         )}
                     </motion.button>
                     
-                    {/* (SỬA v8) Nút 'Quên mật khẩu' / 'Quay lại Đăng nhập' */}
+                    {/* (SỬA v9) Nút 'Quên mật khẩu' / 'Quay lại Đăng nhập' */}
                     <motion.div className="text-center pt-2" variants={inputGroupVariants}>
                         <button
                             type="button"
-                            onClick={() => {
-                                setError("");
-                                setSuccess("");
-                                setForm(initialFormState); // Reset form khi chuyển
-                                setMode(mode === 'forgot' ? 'login' : 'forgot');
-                            }}
+                            onClick={() => handleForgotBackToLogin()} // SỬA v9: Luôn gọi hàm mới để reset trạng thái OTP
                             className="text-sm text-sky-300 hover:text-white transition-colors"
                         >
                             {mode === 'forgot' ? 'Quay lại trang Đăng nhập' : (mode === 'login' ? 'Quên mật khẩu?' : '')}

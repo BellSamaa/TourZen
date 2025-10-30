@@ -5,16 +5,18 @@
 /* *** SỬA LỖI v7.7 (Fix Lỗi Mất Focus Input) ***
   (Giữ nguyên)
 */
-/* *** NÂNG CẤP v8 (Thêm Yêu Cầu Reset Mật Khẩu) ***
-  1. (Thêm Component) Thêm `PasswordResetRequests` để fetch và hiển thị 
-     dữ liệu từ bảng `password_reset_requests` (nơi `is_resolved` = false).
-  2. (Chèn Component) Chèn component này vào dưới `CustomerStats`.
-  3. (Hành động) Admin có thể nhấn "Đã giải quyết" để update
-     bản ghi, ẩn nó đi.
+/* *** NÂNG CẤP v9 (Thay đổi Luồng Reset Mật Khẩu) ***
+  1. (Sửa Component) Thay đổi `PasswordResetRequests` để Admin có thể
+     kích hoạt Gửi Email/Link Reset Mật Khẩu.
+  2. (Giữ lại logic cũ) Giữ lại logic cũ (dùng bảng password_reset_requests) 
+     nhưng đổi tên nút hành động để Admin thực hiện.
+  LƯU Ý: Luồng mới trên Login.jsx sử dụng Supabase Auth Recovery OTP.
+     Component này sẽ mô phỏng việc Admin hỗ trợ khách hàng bằng cách 
+     thực hiện hành động reset thủ công.
 */
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { FaSpinner, FaSearch, FaTrash, FaBell } from "react-icons/fa"; // SỬA v8: Thêm FaBell
+import { FaSpinner, FaSearch, FaTrash, FaBell, FaPaperPlane } from "react-icons/fa"; // SỬA v9: Thêm FaPaperPlane
 import {
   UserList, CaretLeft, CaretRight, CircleNotch, X, Plus, UsersThree, Crown, Sparkle, Wallet,
   PencilSimple, List, Package, Bed, Airplane, Receipt, Info,
@@ -165,8 +167,8 @@ const CustomerStats = () => {
   );
 };
 
-// --- (*** SỬA v8: THÊM COMPONENT MỚI ***) ---
-// --- Component Hiển Thị Yêu Cầu Reset Mật Khẩu ---
+// --- (*** SỬA v9: THAY ĐỔI COMPONENT YÊU CẦU RESET MẬT KHẨU ***) ---
+// --- Component Hiển Thị Yêu Cầu Reset Mật Khẩu (Vẫn dựa trên bảng `password_reset_requests` cũ) ---
 const PasswordResetRequests = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -198,22 +200,33 @@ const PasswordResetRequests = () => {
     return () => clearInterval(interval);
   }, [fetchRequests]);
 
-  // Hàm xử lý khi Admin nhấn "Đã giải quyết"
-  const handleResolve = async (id) => {
+  // SỬA v9: Hàm xử lý Gửi Email Reset Mật Khẩu
+  const handleSendResetEmail = async (email, id) => {
     try {
-      // Cập nhật cột is_resolved = true
-      const { error } = await supabase
+      // 1. Gửi email reset mật khẩu từ Supabase (sẽ gửi link hoặc mã OTP)
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password` // Nếu dùng link
+        // Nếu dùng OTP: Khách hàng chỉ cần làm lại luồng 'forgot' trên Login.jsx
+        // Vì Supabase không có API để Admin gửi OTP thay mặt user,
+        // ta mô phỏng bằng cách dùng `resetPasswordForEmail` (gửi link).
+      });
+      if (resetError) throw resetError;
+
+      // 2. Cập nhật cột is_resolved = true (giả định là Admin đã hỗ trợ)
+      const { error: updateError } = await supabase
         .from("password_reset_requests")
         .update({ is_resolved: true })
         .eq("id", id);
-      if (error) throw error;
-      toast.success("Đã đánh dấu là đã giải quyết!");
+      if (updateError) throw updateError;
+      
+      toast.success("Đã gửi email/link reset mật khẩu cho khách hàng!");
       fetchRequests(); // Tải lại danh sách
     } catch (err) {
-      console.error("Lỗi cập nhật:", err);
-      toast.error("Lỗi cập nhật: " + err.message);
+      console.error("Lỗi xử lý yêu cầu:", err);
+      toast.error("Lỗi xử lý yêu cầu: " + err.message);
     }
   };
+
 
   if (loading && requests.length === 0) {
     return (
@@ -236,7 +249,7 @@ const PasswordResetRequests = () => {
     >
       <h3 className="text-2xl font-bold mb-4 flex items-center gap-3">
         <FaBell className="animate-pulse" />
-        Yêu Cầu Đổi Mật Khẩu ({requests.length})
+        Yêu Cầu Hỗ Trợ Đổi Mật Khẩu ({requests.length})
       </h3>
       <div className="space-y-3 max-h-60 overflow-y-auto simple-scrollbar pr-2">
         {requests.map((req) => (
@@ -253,10 +266,10 @@ const PasswordResetRequests = () => {
               </span>
             </div>
             <button
-              onClick={() => handleResolve(req.id)}
-              className="px-4 py-2 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors shadow-md"
+              onClick={() => handleSendResetEmail(req.email, req.id)} // SỬA v9: Gửi link/mã
+              className="px-4 py-2 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors shadow-md flex items-center gap-2"
             >
-              Đánh dấu Đã giải quyết
+              <FaPaperPlane/> Gửi Link/OTP Reset
             </button>
           </motion.div>
         ))}
@@ -264,11 +277,12 @@ const PasswordResetRequests = () => {
     </motion.div>
   );
 };
-// --- (*** KẾT THÚC COMPONENT MỚI v8 ***) ---
+// --- (*** KẾT THÚC SỬA COMPONENT MỚI v9 ***) ---
 
 
 // --- Component Modal Xem Chi Tiết Đơn Hàng (Giữ nguyên) ---
 const CustomerBookingsModal = ({ customer, onClose }) => {
+// ... (Giữ nguyên nội dung của CustomerBookingsModal)
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -384,7 +398,7 @@ const InputWrapper = ({ label, icon, children }) => (
     </div>
   </div>
 );
-
+// ... (Giữ nguyên nội dung còn lại của ManageCustomersSupabase)
 // --- Component Form (Logic v6) ---
 const CustomerForm = ({ initialData, onSubmit, isSaving, onCancel }) => {
   const [formData, setFormData] = useState({
@@ -674,9 +688,9 @@ export default function ManageCustomersSupabase() {
 
       <CustomerStats />
 
-      {/* --- (*** SỬA v8: THÊM COMPONENT YÊU CẦU ***) --- */}
+      {/* --- (*** SỬA v9: COMPONENT YÊU CẦU RESET MẬT KHẨU ***) --- */}
       <PasswordResetRequests />
-      {/* --- (*** KẾT THÚC SỬA v8 ***) --- */}
+      {/* --- (*** KẾT THÚC SỬA v9 ***) --- */}
 
       <div className="bg-white dark:bg-slate-800 shadow-2xl shadow-gray-200/50 dark:shadow-black/30 rounded-2xl overflow-hidden border border-gray-200 dark:border-slate-700">
         <div className="p-5 border-b border-gray-200 dark:border-slate-700">
