@@ -1,6 +1,6 @@
 // src/pages/TourDetail.jsx
 // (NÂNG CẤP: Thêm mục hiển thị Đánh giá của Khách hàng)
-// (SỬA v2: Sửa lỗi query RLS khi tải Reviews)
+// (SỬA v3: Sửa lỗi 'price_adult' không tồn tại, đổi về 'price')
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -65,7 +65,7 @@ const ErrorComponent = ({ message }) => (
 const StarRating = ({ rating, size = "text-lg" }) => {
     const totalStars = 5;
     // Làm tròn rating lên 0.5 gần nhất
-    const displayRating = Math.round(rating * 2) / 2;
+    const displayRating = Math.round((rating || 0) * 2) / 2;
 
     return (
         <div className={`flex items-center gap-0.5 text-amber-400 ${size}`}>
@@ -77,7 +77,7 @@ const StarRating = ({ rating, size = "text-lg" }) => {
     );
 };
 
-// --- (MỚI) Component Mục Đánh giá ---
+// --- (MỚI) Component Mục Đánh giá (SỬA v2: Bỏ join user) ---
 const ReviewsSection = ({ tourId, initialRating }) => {
     const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -91,7 +91,6 @@ const ReviewsSection = ({ tourId, initialRating }) => {
             setLoading(true);
             try {
                 // (SỬA v2) GỠ BỎ JOIN VỚI BẢNG 'Users' ĐỂ TRÁNH LỖI RLS
-                // Lấy review và KHÔNG join với bảng Users
                 const { data, error: fetchError, count } = await supabase
                     .from("Reviews")
                     .select(`
@@ -163,7 +162,7 @@ const ReviewsSection = ({ tourId, initialRating }) => {
                             <div className="flex items-center gap-2">
                                 <FaUserCircle className="text-2xl text-slate-400" />
                                 <span className="font-semibold text-slate-800 dark:text-white">
-                                    {/* (SỬA v2) Luôn hiển thị "Khách ẩn danh" vì đã gỡ bỏ join */}
+                                    {/* (SỬA v2) Luôn hiển thị "Khách ẩn danh" */}
                                     {"Khách ẩn danh"}
                                 </span>
                             </div>
@@ -188,7 +187,6 @@ const TourDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const [tour, setTour] = useState(null);
-    // (ĐÃ XÓA state: departures, departuresLoading, selectedDepartureId)
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -209,11 +207,12 @@ const TourDetail = () => {
             window.scrollTo(0, 0);
 
             try {
-                // Fetch 1: Lấy thông tin Tour
-                // (SỬA) Lấy thêm cột 'rating'
+                // (SỬA v3) Lấy 'price' thay vì 'price_adult' (mặc dù có vẻ
+                // trong file Home bạn lại muốn dùng 'price_adult'. 
+                // Tôi sẽ dùng 'price' ở đây cho nhất quán với lỗi)
                 const { data: tourData, error: tourError } = await supabase
                     .from("Products")
-                    .select("*, rating, supplier_name:Suppliers(name)") // Lấy cột rating
+                    .select("*, rating, price, supplier_name:Suppliers(name)") // Lấy cột rating và price
                     .eq("id", id)
                     .eq("is_published", true)
                     .eq("approval_status", "approved")
@@ -236,9 +235,8 @@ const TourDetail = () => {
         fetchTour();
     }, [id]);
 
-    // --- (SỬA) Giá "Từ" (Giữ nguyên, dùng giá gốc của tour) ---
-    // (SỬA v2) Dùng price_adult
-    const displayPrice = tour?.price_adult || 0;
+    // --- (SỬA v3) Dùng 'price' ---
+    const displayPrice = tour?.price || 0;
 
     // --- (SỬA) Logic "Đặt Ngay" (Không cần chọn slot nữa) ---
     const handleBookNow = () => {
@@ -246,7 +244,6 @@ const TourDetail = () => {
         navigate('/payment', {
             state: {
                 item: tour, // Gửi toàn bộ thông tin tour
-                // (KHÔNG gửi selectedDeparture nữa)
             }
         });
     };
@@ -346,7 +343,7 @@ const TourDetail = () => {
                 <motion.div className="lg:col-span-1 bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border dark:border-slate-700 lg:sticky lg:top-24 self-start" variants={itemVariants}>
                     <p className="text-slate-500 dark:text-slate-400 text-sm mb-1 font-medium">Giá chỉ từ</p>
                     <p className="text-4xl md:text-5xl font-bold text-red-600 mb-6 pb-6 border-b dark:border-slate-600">
-                        {/* (SỬA v2) Dùng displayPrice (tức price_adult) */}
+                        {/* (SỬA v3) Dùng displayPrice (tức price) */}
                         {displayPrice > 0 ? formatCurrency(displayPrice) : "Liên hệ"}
                     </p>
                     <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">

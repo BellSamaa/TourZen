@@ -1,6 +1,6 @@
 // src/pages/Home.jsx
 // (Phiên bản cuối cùng, đã thêm lại các section Điểm Đến, Blog, Features)
-// (SỬA v2: Thêm component "Tour Yêu Thích Nhất")
+// (SỬA v3: Sửa lỗi 'price_adult' không tồn tại, đổi về 'price')
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
@@ -78,11 +78,10 @@ const MostLovedTour = () => {
         const fetchTopTour = async () => {
             setLoading(true);
             
-            // Lấy tour có rating cao nhất từ bảng Products
-            // (Đảm bảo cột 'rating' đã được trigger SQL cập nhật)
+            // (SỬA v3) Đổi 'price_adult' thành 'price'
             const { data, error } = await supabase
                 .from('Products')
-                .select('id, name, image_url, price_adult, rating, location')
+                .select('id, name, image_url, price, rating, location') // SỬA Ở ĐÂY
                 .eq('product_type', 'tour') // Chỉ lấy tour
                 .eq('is_published', true)
                 .order('rating', { ascending: false, nulls: 'last' }) // Sắp xếp theo rating
@@ -140,7 +139,8 @@ const MostLovedTour = () => {
                         <div>
                             <span className="text-sm text-gray-500 dark:text-gray-400">Giá chỉ từ</span>
                             <p className="text-3xl font-bold text-red-600 dark:text-red-500">
-                                {formatCurrency(tour.price_adult)}
+                                {/* (SỬA v3) Đổi 'tour.price_adult' thành 'tour.price' */}
+                                {formatCurrency(tour.price)}
                             </p>
                         </div>
                         <Link 
@@ -275,9 +275,8 @@ export default function Home() {
             setLoading(true);
             setError(null);
             try {
-                // Dùng cột 'price'
-                // (SỬA v2) Dùng price_adult thay vì price
-                const queryColumns = 'id, name, location, duration, image_url, price_adult, rating';
+                // (SỬA v3) Đổi 'price_adult' thành 'price'
+                const queryColumns = 'id, name, location, duration, image_url, price, rating';
 
                 const [featuredPromise, newestPromise] = await Promise.all([
                     supabase.rpc('get_most_booked_tours', { limit_count: 4 }),
@@ -294,7 +293,7 @@ export default function Home() {
                 // Xử lý Tour Mới Nhất
                 if (newestPromise.error) {
                     console.error("Lỗi Query Tour Mới Nhất:", newestPromise.error);
-                    throw new Error(`Lỗi query Products: ${newestPromise.error.message}. Cột '${newestPromise.error.details?.split('"')[1]}' không tồn tại?`);
+                    throw new Error(`Lỗi query Products: ${newestPromise.error.message}.`);
                 }
                 const allNewTours = newestPromise.data || [];
                 setNewestTours(allNewTours);
@@ -303,12 +302,12 @@ export default function Home() {
                 // Xử lý Tour Nổi Bật
                 if (featuredPromise.error) {
                     console.error("Lỗi RPC (get_most_booked_tours):", featuredPromise.error);
-                    throw new Error(`Lỗi RPC get_most_booked_tours: ${featuredPromise.error.message}. Hàm SQL có vấn đề hoặc cột trả về không đúng?`);
+                    throw new Error(`Lỗi RPC get_most_booked_tours: ${featuredPromise.error.message}.`);
                 } else {
-                    // (SỬA v2) Chuyển price thành price_adult cho đồng bộ
+                    // (SỬA v3) Ánh xạ price_adult (từ RPC) sang price (cho TourCard)
                     const featuredData = (featuredPromise.data || []).map(tour => ({
                         ...tour,
-                        price: tour.price_adult // Đảm bảo TourCard nhận đúng 'price'
+                        price: tour.price_adult // Giả định RPC trả về price_adult
                     }));
                     setFeaturedTours(featuredData);
                 }
