@@ -1,5 +1,5 @@
 // src/pages/ManageTour.jsx
-// (V14: FIX LỖI PARSING QUERY - Chuyển sang cú pháp Array Select an toàn)
+// (V15: FIX LỖI QUERY REVIEWS - Sử dụng tên cột để join Users)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -725,7 +725,7 @@ export default function ManageTour() {
     const [viewingReview, setViewingReview] = useState(null); // Lưu object review
 
     
-    // (CẬP NHẬT v13) Fetch Bookings (Fix lỗi Query Reviews)
+    // (CẬP NHẬT v15) Fetch Bookings (Fix lỗi Query Reviews)
     const fetchBookings = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         else setLoading(true); 
@@ -746,7 +746,8 @@ export default function ManageTour() {
                     voucher_code, voucher_discount, notes, 
                     payment_method,
                     Invoices ( id ),
-                    Reviews ( id, rating, comment, reviewer:Users!Reviews_user_id_fkey ( full_name, email ) )
+                    -- SỬA CUỐI CÙNG: Dùng alias cho cột user_id
+                    Reviews ( id, rating, comment, reviewer:user_id ( full_name, email ) ) 
                 `, { count: 'exact' }); 
                 
             if (filterStatus !== 'all') { query = query.eq('status', filterStatus); }
