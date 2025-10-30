@@ -1,5 +1,5 @@
 // supabase/functions/reset-password-with-admin-otp/index.ts
-// (SỬA v2: Thêm console.error để log lỗi)
+// (SỬA v3: Sửa tên hàm 'getUserByEmail' thành 'lookupUserByEmail')
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
     const { email, otp, newPassword } = await req.json();
     if (!email || !otp || !newPassword) {
       const errorMsg = 'Thiếu email, OTP, hoặc mật khẩu mới';
-      console.error(errorMsg); // <-- (SỬA) Log lỗi
+      console.error(errorMsg); 
       return new Response(JSON.stringify({ error: errorMsg }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
 
     if (findError || !requests || requests.length === 0) {
       const errorMsg = 'Mã OTP không hợp lệ hoặc không tìm thấy yêu cầu';
-      console.error(errorMsg, findError); // <-- (SỬA) Log lỗi
+      console.error(errorMsg, findError); 
       return new Response(JSON.stringify({ error: errorMsg }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
     // 4. Kiểm tra thời gian hết hạn (từ file ManageCustomers là 10 phút)
     if (new Date(request.expires_at) < new Date()) {
       const errorMsg = 'Mã OTP đã hết hạn. Vui lòng yêu cầu lại.';
-      console.error(errorMsg); // <-- (SỬA) Log lỗi
+      console.error(errorMsg); 
       return new Response(JSON.stringify({ error: errorMsg }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
@@ -58,11 +58,12 @@ Deno.serve(async (req) => {
     }
 
     // 5. Lấy User ID từ email (dùng service_role)
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.admin.getUserByEmail(email);
+    // --- (*** SỬA LỖI v3 TẠI ĐÂY ***) ---
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.admin.lookupUserByEmail(email);
     
     if (userError || !user) {
          const errorMsg = 'Không tìm thấy người dùng (admin)';
-         console.error(errorMsg, userError); // <-- (SỬA) Log lỗi
+         console.error(errorMsg, userError); 
          return new Response(JSON.stringify({ error: errorMsg }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 404,
@@ -77,7 +78,7 @@ Deno.serve(async (req) => {
 
     if (updateError) {
       const errorMsg = `Lỗi cập nhật mật khẩu: ${updateError.message}`;
-      console.error('Lỗi Admin Update Mật Khẩu:', updateError); // (Giữ nguyên)
+      console.error('Lỗi Admin Update Mật Khẩu:', updateError); 
       return new Response(JSON.stringify({ error: errorMsg }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
@@ -91,14 +92,13 @@ Deno.serve(async (req) => {
       .eq('id', request.id);
 
     // 8. Trả về thành công
-    console.log(`Đổi mật khẩu thành công cho: ${email}`); // (SỬA) Log thành công
+    console.log(`Đổi mật khẩu thành công cho: ${email}`); 
     return new Response(JSON.stringify({ success: true, message: 'Đổi mật khẩu thành công' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
 
   } catch (err) {
-    // (*** SỬA: BẮT LỖI TỔNG ***)
     console.error('LỖI FUNCTION CRASH:', err.message);
 
     return new Response(JSON.stringify({ error: err.message }), {
