@@ -1,5 +1,5 @@
 // supabase/functions/reset-password-with-admin-otp/index.ts
-// (SỬA v4: Sửa tên hàm thành 'listUsers' - Đây là hàm đúng)
+// (SỬA v5: Lọc chính xác tài khoản 'email', bỏ qua tài khoản SSO)
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
 
     const request = requests[0];
 
-    // 4. Kiểm tra thời gian hết hạn (từ file ManageCustomers là 10 phút)
+    // 4. Kiểm tra thời gian hết hạn
     if (new Date(request.expires_at) < new Date()) {
       const errorMsg = 'Mã OTP đã hết hạn. Vui lòng yêu cầu lại.';
       console.error(errorMsg); 
@@ -57,9 +57,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // --- (*** SỬA LỖI v4 TẠI ĐÂY ***) ---
+    // --- (*** SỬA LỖI v5 TẠI ĐÂY ***) ---
     // 5. Lấy User ID từ email (dùng service_role)
-    // Dùng listUsers và lọc bằng email
     const { data: listData, error: listError } = await supabaseAdmin.auth.admin.listUsers({
       email: email,
     });
@@ -73,18 +72,20 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (!listData.users || listData.users.length === 0) {
-      const errorMsg = 'Không tìm thấy người dùng (admin)';
-      console.error(errorMsg, 'No user found for email:', email);
+    // Lọc để CHỈ tìm user có danh tính 'email' (không phải Google, Facebook, v.v.)
+    const user = listData.users.find(u => 
+      u.identities && u.identities.some(identity => identity.provider === 'email')
+    );
+
+    if (!user) {
+      const errorMsg = 'Không tìm thấy tài khoản (email/password) khớp. (Có thể là tài khoản Google/SSO?)';
+      console.error(errorMsg, 'No email provider found for:', email);
       return new Response(JSON.stringify({ error: errorMsg }), {
          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
          status: 404,
       });
     }
-    
-    // Lấy user đầu tiên tìm thấy
-    const user = listData.users[0];
-    // --- (*** KẾT THÚC SỬA LỖI v4 ***) ---
+    // --- (*** KẾT THÚC SỬA LỖI v5 ***) ---
 
 
     // 6. CẬP NHẬT MẬT KHẨU (dùng service_role)
@@ -109,7 +110,7 @@ Deno.serve(async (req) => {
       .eq('id', request.id);
 
     // 8. Trả về thành công
-    console.log(`Đổi mật khẩu thành công cho: ${email}`); 
+    console.log(`Đổi mật khẩu thành công cho (Email Provider): ${email}`); 
     return new Response(JSON.stringify({ success: true, message: 'Đổi mật khẩu thành công' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
