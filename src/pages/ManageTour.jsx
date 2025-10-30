@@ -1,5 +1,5 @@
 // src/pages/ManageTour.jsx
-// (V18: FIX LỖI PARSING BẰNG CÁCH DÙNG TEMPLATE LITERAL SẠCH)
+// (V18: FIX LỖI PARSING & SCHEMA CACHE - Truy vấn Reviews an toàn)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -725,7 +725,7 @@ export default function ManageTour() {
     const [viewingReview, setViewingReview] = useState(null); // Lưu object review
 
     
-    // (CẬP NHẬT v17) Fetch Bookings (Fix lỗi Parsing Reviews)
+    // (CẬP NHẬT v18) Fetch Bookings (Fix lỗi Parsing Reviews)
     const fetchBookings = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         else setLoading(true); 
@@ -734,8 +734,9 @@ export default function ManageTour() {
             const from = (currentPage - 1) * ITEMS_PER_PAGE;
             const to = from + ITEMS_PER_PAGE - 1;
             
-            // SỬA V18: Dùng Template Literal SẠCH và không comment
-            const selectQuery = `id,created_at,departure_date,status,total_price,quantity,
+            // SỬA V18: Cú pháp select 1 dòng, loại bỏ ký tự thừa và dùng alias an toàn
+            const selectQuery = `
+                id,created_at,departure_date,status,total_price,quantity,
                 num_adult,num_child,num_elder,num_infant,departure_id,
                 user:user_id(id,full_name,email),
                 product:product_id(id,name,image_url),
