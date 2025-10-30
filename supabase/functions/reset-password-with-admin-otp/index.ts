@@ -1,5 +1,5 @@
 // supabase/functions/reset-password-with-admin-otp/index.ts
-// (SỬA v3: Sửa tên hàm 'getUserByEmail' thành 'lookupUserByEmail')
+// (SỬA v4: Sửa tên hàm thành 'listUsers' - Đây là hàm đúng)
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
@@ -14,7 +14,7 @@ Deno.serve(async (req) => {
     // 1. Tạo Supabase Admin Client (dùng service_role)
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SERVICE_KEY') ?? '' // Đọc tên biến đã sửa
+      Deno.env.get('SERVICE_KEY') ?? ''
     );
 
     // 2. Lấy dữ liệu
@@ -57,18 +57,35 @@ Deno.serve(async (req) => {
       });
     }
 
+    // --- (*** SỬA LỖI v4 TẠI ĐÂY ***) ---
     // 5. Lấy User ID từ email (dùng service_role)
-    // --- (*** SỬA LỖI v3 TẠI ĐÂY ***) ---
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.admin.lookupUserByEmail(email);
-    
-    if (userError || !user) {
-         const errorMsg = 'Không tìm thấy người dùng (admin)';
-         console.error(errorMsg, userError); 
-         return new Response(JSON.stringify({ error: errorMsg }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 404,
-         });
+    // Dùng listUsers và lọc bằng email
+    const { data: listData, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+      email: email,
+    });
+
+    if (listError) {
+      const errorMsg = 'Lỗi khi tìm người dùng (admin)';
+      console.error(errorMsg, listError);
+      return new Response(JSON.stringify({ error: errorMsg }), {
+         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+         status: 500,
+      });
     }
+
+    if (!listData.users || listData.users.length === 0) {
+      const errorMsg = 'Không tìm thấy người dùng (admin)';
+      console.error(errorMsg, 'No user found for email:', email);
+      return new Response(JSON.stringify({ error: errorMsg }), {
+         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+         status: 404,
+      });
+    }
+    
+    // Lấy user đầu tiên tìm thấy
+    const user = listData.users[0];
+    // --- (*** KẾT THÚC SỬA LỖI v4 ***) ---
+
 
     // 6. CẬP NHẬT MẬT KHẨU (dùng service_role)
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(

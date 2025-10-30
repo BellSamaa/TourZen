@@ -5,18 +5,15 @@
 /* *** SỬA LỖI v7.7 (Fix Lỗi Mất Focus Input) ***
   (Giữ nguyên)
 */
-/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v10 (Admin Tạo Mã OTP 6 Số) ***
-  1. (Sửa Component) Thay đổi `PasswordResetRequests` để Admin
-     kích hoạt tạo mã OTP 6 số.
-  2. (Sửa Logic) Mã này được lưu vào cột `token` và `expires_at`
-     của bảng `password_reset_requests`.
-  3. (Hiển thị) Hiển thị mã OTP cho Admin để Admin có thể
-     gửi thủ công cho khách hàng.
+/* *** NÂNG CẤP v10 & v10.1 (Logic OTP & Giải Quyết Yêu Cầu) ***
+  (Giữ nguyên)
 */
-/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v10.1 (Thêm nút Giải Quyết Yêu Cầu) ***
-  1. (Thêm Logic) Thêm hàm `handleResolveRequest` để cập nhật
-     `is_resolved = true` cho một yêu cầu.
-  2. (Thêm UI) Thêm nút 'X' để kích hoạt hàm `handleResolveRequest`.
+/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v11 (Thêm Mã KH) ***
+  1. (SQL) Thêm cột `customer_code` vào bảng Users (xem SQL riêng).
+  2. (Fetch) Cập nhật `fetchCustomers` để lấy `customer_code`.
+  3. (UI) Hiển thị `customer_code` trong bảng.
+  4. (Search) Cho phép tìm kiếm theo `customer_code`.
+  5. (UI) Cập nhật các Modal (Xem đơn hàng, Xóa) để hiển thị `customer_code`.
 */
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
@@ -172,8 +169,7 @@ const CustomerStats = () => {
   );
 };
 
-// --- (*** SỬA v10 & v10.1: THAY ĐỔI COMPONENT YÊU CẦU RESET MẬT KHẨU ***) ---
-// --- Component Hiển Thị Yêu Cầu Reset Mật Khẩu (Dựa trên bảng `password_reset_requests`) ---
+// --- (*** SỬA v10 & v10.1: COMPONENT YÊU CẦU RESET MẬT KHẨU ***) ---
 const PasswordResetRequests = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -339,9 +335,9 @@ const PasswordResetRequests = () => {
 // --- (*** KẾT THÚC SỬA COMPONENT MỚI v10.1 ***) ---
 
 
-// --- Component Modal Xem Chi Tiết Đơn Hàng (Giữ nguyên) ---
+// --- Component Modal Xem Chi Tiết Đơn Hàng ---
 const CustomerBookingsModal = ({ customer, onClose }) => {
-// ... (Giữ nguyên nội dung của CustomerBookingsModal)
+// ... (Giữ nguyên logic)
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -396,7 +392,12 @@ const CustomerBookingsModal = ({ customer, onClose }) => {
         <div className="flex justify-between items-center mb-6 pb-6 border-b dark:border-slate-700">
           <h3 className="text-2xl font-bold flex items-center gap-3">
             <Receipt size={30} className="text-sky-600 dark:text-sky-400" />
-            <span>Đơn hàng của: <span className="text-sky-600 dark:text-sky-400">{customer.full_name || customer.email}</span></span>
+            {/* (SỬA v11) Thêm customer_code vào tiêu đề Modal */}
+            <span>Đơn hàng của: <span className="text-sky-600 dark:text-sky-400">{customer.full_name || customer.email}</span>
+              {customer.customer_code && (
+                <span className="text-base font-medium text-gray-500 dark:text-gray-400 ml-2">({customer.customer_code})</span>
+              )}
+            </span>
           </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
             <X size={24} weight="bold" />
@@ -459,6 +460,7 @@ const InputWrapper = ({ label, icon, children }) => (
 );
 // ... (Giữ nguyên nội dung còn lại của ManageCustomersSupabase)
 // --- Component Form (Logic v6) ---
+// (SỬA v11) - Không cần thay đổi Form, vì customer_code được tạo tự động bởi DB Trigger.
 const CustomerForm = ({ initialData, onSubmit, isSaving, onCancel }) => {
   const [formData, setFormData] = useState({
     full_name: initialData?.full_name || '',
@@ -563,7 +565,7 @@ export default function ManageCustomersSupabase() {
   const [totalItems, setTotalItems] = useState(0);
   const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
 
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSaving, setIsSaving] =useState(false);
   const [isAddingCustomer, setIsAddingCustomer] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null); 
   
@@ -571,7 +573,7 @@ export default function ManageCustomersSupabase() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
-  // --- Fetch customers (Logic v6) ---
+  // --- Fetch customers (SỬA v11) ---
   const fetchCustomers = useCallback(async (isInitialLoad = false) => {
     if (!isInitialLoad) setIsFetchingPage(true);
     setError(null);
@@ -579,13 +581,17 @@ export default function ManageCustomersSupabase() {
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
       let countQuery = supabase.from("Users").select("id", { count: "exact", head: true }).eq("role", "user");
-      let dataQuery = supabase.from("Users").select("*, customer_tier, ngay_sinh").eq("role", "user");
+      // (SỬA v11) Thêm customer_code vào select
+      let dataQuery = supabase.from("Users").select("*, customer_tier, ngay_sinh, customer_code").eq("role", "user");
+      
       if (debouncedSearch.trim() !== "") {
         const searchTerm = `%${debouncedSearch.trim()}%`;
-        const searchQuery = `full_name.ilike.${searchTerm},email.ilike.${searchTerm},address.ilike.${searchTerm},phone_number.ilike.${searchTerm}`;
+        // (SỬA v11) Thêm customer_code vào tìm kiếm
+        const searchQuery = `customer_code.ilike.${searchTerm},full_name.ilike.${searchTerm},email.ilike.${searchTerm},address.ilike.${searchTerm},phone_number.ilike.${searchTerm}`;
         countQuery = countQuery.or(searchQuery);
         dataQuery = dataQuery.or(searchQuery);
       }
+      
       dataQuery = dataQuery.order("full_name", { ascending: true }).range(from, to);
       const { count, error: countError } = await countQuery;
       if (countError) throw countError;
@@ -657,6 +663,7 @@ export default function ManageCustomersSupabase() {
     }
   }, [editingCustomer, isSaving, fetchCustomers]); 
 
+  // (SỬA v11) - Không cần thay đổi logic AddNew, Trigger của DB sẽ tự thêm code
   const handleAddNewCustomer = useCallback(async (formData) => {
     if (isSaving) return;
     setIsSaving(true);
@@ -757,7 +764,7 @@ export default function ManageCustomersSupabase() {
             <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Tìm kiếm khách hàng (tên, email, SĐT...)"
+              placeholder="Tìm kiếm khách hàng (Mã KH, tên, email, SĐT...)"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-12 pr-5 py-3.5 text-base rounded-xl border border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-sky-400 focus:bg-white dark:focus:bg-slate-700 outline-none transition-all duration-300"
@@ -774,6 +781,8 @@ export default function ManageCustomersSupabase() {
           <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
             <thead className="bg-gray-50 dark:bg-slate-700/40">
               <tr>
+                {/* (SỬA v11) Thêm cột Mã KH */}
+                <th className="th-style">Mã KH</th>
                 <th className="th-style">Họ và tên</th>
                 <th className="th-style">Liên hệ</th>
                 <th className="th-style">Địa chỉ</th>
@@ -790,10 +799,12 @@ export default function ManageCustomersSupabase() {
               animate="visible"
               variants={{ visible: { transition: { staggerChildren: 0.05 } } }}
             >
-              {error && !isFetchingPage && ( <tr><td colSpan="8" className="p-10 text-center text-red-500">{error}</td></tr> )}
+              {/* (SỬA v11) Sửa colSpan="9" */}
+              {error && !isFetchingPage && ( <tr><td colSpan="9" className="p-10 text-center text-red-500">{error}</td></tr> )}
               {!error && !loading && !isFetchingPage && customers.length === 0 && ( 
                 <tr>
-                  <td colSpan="8" className="p-16 text-center text-gray-500">
+                  {/* (SỬA v11) Sửa colSpan="9" */}
+                  <td colSpan="9" className="p-16 text-center text-gray-500">
                     <UserList size={48} className="mx-auto text-gray-400" />
                     <span className="mt-4 text-lg font-medium">{debouncedSearch ? "Không tìm thấy khách hàng." : "Chưa có dữ liệu."}</span>
                   </td>
@@ -809,6 +820,10 @@ export default function ManageCustomersSupabase() {
                     variants={cardVariants}
                     whileHover={{ y: -2 }}
                   >
+                    {/* (SỬA v11) Thêm ô Mã KH */}
+                    <td className="td-style">
+                      <span className="font-bold text-sm text-sky-600 dark:text-sky-400">{c.customer_code || <span className="italic text-gray-400">N/A</span>}</span>
+                    </td>
                     <td className="td-style">
                       <span className="font-bold text-sm text-slate-900 dark:text-white">{c.full_name || <span className="italic text-gray-400">...</span>}</span>
                     </td>
@@ -881,7 +896,9 @@ export default function ManageCustomersSupabase() {
             >
               <h4 className="text-xl font-bold text-red-600 dark:text-red-500 mb-4"> Xác nhận xóa hồ sơ </h4>
               <p className="mb-8 text-base text-gray-700 dark:text-gray-300">
-                Bạn có chắc muốn xóa hồ sơ của{" "} <b className="text-gray-900 dark:text-white">{selectedCustomer.full_name || selectedCustomer.email}</b>?
+                Bạn có chắc muốn xóa hồ sơ của{" "} 
+                {/* (SỬA v11) Thêm customer_code vào xác nhận xóa */}
+                <b className="text-gray-900 dark:text-white">{selectedCustomer.full_name || selectedCustomer.email} ({selectedCustomer.customer_code})</b>?
                 <br/>
                 <span className="text-sm font-medium text-orange-600 dark:text-orange-400">(Hành động này không xóa tài khoản đăng nhập.)</span>
               </p>

@@ -1,3 +1,15 @@
+// ManageAccounts.jsx
+/* *** (STYLE UPGRADE) Nâng cấp giao diện v10 ***
+  (Giữ nguyên)
+*/
+/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v11 (Thêm Mã KH / TK) ***
+  1. (SQL) Thêm cột `customer_code` và `account_code` (xem SQL riêng).
+  2. (Fetch) Cập nhật `fetchAccounts` để lấy cả 2 mã.
+  3. (UI) Thêm cột "Mã ID" vào bảng.
+  4. (Logic) Hiển thị `customer_code` (nếu role='user') hoặc `account_code` (nếu role khác).
+  5. (Search) Cho phép tìm kiếm theo cả 2 mã.
+*/
+
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { getSupabase } from "../lib/supabaseClient";
 import toast from "react-hot-toast";
@@ -58,6 +70,7 @@ const fieldVariant = {
 };
 
 // --- (STYLE UPGRADE) Modal Thêm/Sửa Tài Khoản ---
+// (SỬA v11) - Không cần thay đổi Form, vì mã được tạo tự động bởi DB Trigger.
 const AccountModal = ({ account, onClose, onSuccess }) => {
     const isEdit = !!account;
     
@@ -329,20 +342,23 @@ export default function AdminManageAccounts() {
     const [totalItems, setTotalItems] = useState(0);
     const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
 
-    // --- Fetch data (Giữ nguyên logic) ---
+    // --- Fetch data (SỬA v11) ---
     const fetchAccounts = useCallback(async (isInitialLoad = false) => {
-        // ... (Logic giữ nguyên) ...
         if (!isInitialLoad) setIsFetchingPage(true);
         setError(null);
         try {
             const from = (currentPage - 1) * ITEMS_PER_PAGE;
             const to = from + ITEMS_PER_PAGE - 1;
-            const selectQuery = `id, username, full_name, email, role, is_active, created_at`;
+            // (SỬA v11) Thêm customer_code, account_code vào select
+            const selectQuery = `id, username, full_name, email, role, is_active, created_at, customer_code, account_code`;
             let query = supabase.from("Users").select(selectQuery, { count: 'exact' });
+            
             if (debouncedSearch.trim() !== "") {
                 const searchStr = `%${debouncedSearch.trim()}%`;
-                query = query.or(`full_name.ilike.${searchStr},email.ilike.${searchStr},username.ilike.${searchStr}`);
+                // (SỬA v11) Thêm customer_code, account_code vào tìm kiếm
+                query = query.or(`customer_code.ilike.${searchStr},account_code.ilike.${searchStr},full_name.ilike.${searchStr},email.ilike.${searchStr},username.ilike.${searchStr}`);
             }
+            
             query = query.order("created_at", { ascending: false }).range(from, to);
             const { data, count, error: fetchError } = await query;
             if (fetchError) throw fetchError;
@@ -490,7 +506,7 @@ export default function AdminManageAccounts() {
                                     type="text" 
                                     value={searchTerm} 
                                     onChange={(e) => setSearchTerm(e.target.value)} 
-                                    placeholder="Tìm Tên, Email, Username..." 
+                                    placeholder="Tìm Mã, Tên, Email, Username..." 
                                     className="search-input-pro"
                                 />
                             </div>
@@ -510,9 +526,10 @@ export default function AdminManageAccounts() {
                         <table className="min-w-full">
                             <thead className="border-b-2 border-slate-100 dark:border-slate-700">
                                 <tr>
-                                    {/* === THAY ĐỔI TẠI ĐÂY: Tiêu đề cột và Độ rộng === */}
-                                    <th className="th-style-pro w-[30%]"><div className="flex items-center gap-1.5"><User size={14}/>Họ và Tên</div></th>
-                                    <th className="th-style-pro w-[25%]"><div className="flex items-center gap-1.5"><At size={14}/>Email</div></th>
+                                    {/* === (SỬA v11) Thêm cột Mã ID, điều chỉnh độ rộng === */}
+                                    <th className="th-style-pro w-[10%]"><div className="flex items-center gap-1.5"><Archive size={14}/>Mã ID</div></th>
+                                    <th className="th-style-pro w-[25%]"><div className="flex items-center gap-1.5"><User size={14}/>Họ và Tên</div></th>
+                                    <th className="th-style-pro w-[20%]"><div className="flex items-center gap-1.5"><At size={14}/>Email</div></th>
                                     <th className="th-style-pro w-[15%]"><div className="flex items-center gap-1.5"><ShieldCheck size={14}/>Vai trò</div></th>
                                     <th className="th-style-pro w-[10%]"><div className="flex items-center gap-1.5"><Hourglass size={14}/>Trạng thái</div></th>
                                     <th className="th-style-pro w-[10%]"><div className="flex items-center gap-1.5"><CalendarBlank size={14}/>Ngày tạo</div></th>
@@ -521,12 +538,14 @@ export default function AdminManageAccounts() {
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
                                 <AnimatePresence>
+                                    {/* (SỬA v11) Sửa colSpan="7" */}
                                     {error && !isFetchingPage && ( 
-                                        <tr><td colSpan="6" className="td-center py-20 text-red-500">{`Lỗi: ${error.message}`}</td></tr> 
+                                        <tr><td colSpan="7" className="td-center py-20 text-red-500">{`Lỗi: ${error.message}`}</td></tr> 
                                     )}
                                     
                                     {!error && !loading && !isFetchingPage && accounts.length === 0 && ( 
-                                        <tr><td colSpan="6" className="td-center py-20 text-slate-500">
+                                        /* (SỬA v11) Sửa colSpan="7" */
+                                        <tr><td colSpan="7" className="td-center py-20 text-slate-500">
                                             <div className="flex flex-col items-center">
                                                 {/* <<< FIX: Sửa từ ArchiveBox thành Archive */}
                                                 <Archive size={48} className="text-slate-400 mb-4" weight="light" />
@@ -538,6 +557,9 @@ export default function AdminManageAccounts() {
                                     
                                     {!error && accounts.map((account) => {
                                         const roleInfo = getRoleInfo(account.role);
+                                        // (SỬA v11) Logic chọn mã để hiển thị
+                                        const displayCode = account.role === 'user' ? account.customer_code : account.account_code;
+                                        
                                         return (
                                         <motion.tr
                                             key={account.id}
@@ -547,6 +569,13 @@ export default function AdminManageAccounts() {
                                             exit={{ opacity: 0, x: -50, transition: { duration: 0.2 } }}
                                             className="hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
                                         >
+                                            {/* === (SỬA v11) Thêm ô Mã ID === */}
+                                            <td className="td-style-pro">
+                                                <span className="font-sora font-semibold text-sm text-indigo-600 dark:text-indigo-400">
+                                                    {displayCode || <span className="italic text-slate-400">N/A</span>}
+                                                </span>
+                                            </td>
+
                                             {/* === THAY ĐỔI TẠI ĐÂY: Hoán đổi full_name và username === */}
                                             <td className="td-style-pro">
                                                 <div className="font-sora font-semibold text-slate-800 dark:text-slate-100">{account.full_name}</div>
