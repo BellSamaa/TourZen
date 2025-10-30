@@ -3,7 +3,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
   ShoppingCart,
   Plane,
-  Hotel,
+  Users, // Đã thay đổi từ Hotel
   Percent,
   User,
   LogOut,
@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
-// import { useCart } from "../context/CartContext"; 
+// import { useCart } from "../context/CartContext";
 
 // 🌙 Theme Toggle
 const ThemeToggle = () => {
@@ -145,7 +145,7 @@ export default function Navbar() {
 
   const navLinks = [
     { name: "Du lịch", path: "/tours", icon: <Plane size={18} /> },
-    { name: "Khách sạn", path: "/hotels", icon: <Hotel size={18} /> },
+    { name: "Về Chúng Tôi", path: "/about", icon: <Users size={18} /> }, // Đã thay đổi
     { name: "Khuyến mãi", path: "/promotions", icon: <Percent size={18} /> },
   ];
 

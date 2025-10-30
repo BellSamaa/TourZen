@@ -95,7 +95,7 @@ export default function App() {
                     {/* === Public Routes (Sử dụng SiteLayout) === */}
                     <Route path="/" element={<SiteLayout />}>
                         <Route index element={<Home />} />
-                        <Route path="about-tourzen" element={<About />} />
+<                        Route path="about" element={<About />} />
                         <Route path="tours" element={<TourList />} />
                         <Route path="tour/:id" element={<TourDetail />} />
                         <Route path="cart" element={<Cart />} />
