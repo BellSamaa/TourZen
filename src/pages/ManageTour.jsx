@@ -1,5 +1,5 @@
 // src/pages/ManageTour.jsx
-// (V15: FIX LỖI QUERY REVIEWS - Sử dụng tên cột để join Users)
+// (V16: FIX LỖI PARSING CUỐI CÙNG - Truy vấn Reviews an toàn)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -725,7 +725,7 @@ export default function ManageTour() {
     const [viewingReview, setViewingReview] = useState(null); // Lưu object review
 
     
-    // (CẬP NHẬT v15) Fetch Bookings (Fix lỗi Query Reviews)
+    // (CẬP NHẬT v16) Fetch Bookings (Fix lỗi Parsing Reviews)
     const fetchBookings = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         else setLoading(true); 
@@ -733,22 +733,24 @@ export default function ManageTour() {
         try {
             const from = (currentPage - 1) * ITEMS_PER_PAGE;
             const to = from + ITEMS_PER_PAGE - 1;
+            
+            // SỬA V16: Xóa tất cả các comment và đưa về 1 chuỗi an toàn
+            const selectQuery = `
+                id, created_at, departure_date, status, total_price, quantity,
+                num_adult, num_child, num_elder, num_infant, departure_id,
+                user:user_id ( id, full_name, email ),
+                product:product_id ( id, name, image_url ),
+                hotel:hotel_product_id (id, name),
+                transport:Products!Bookings_transport_product_id_fkey (id, name, price, product_type, details),
+                flight:flight_product_id (id, name, price, product_type, details),
+                voucher_code, voucher_discount, notes, payment_method,
+                Invoices ( id ),
+                Reviews ( id, rating, comment, reviewer:user_id ( full_name, email ) )
+            `.replace(/\s+/g, ''); // Loại bỏ tất cả khoảng trắng, tab, newline
+            
             let query = supabase
                 .from('Bookings')
-                .select(`
-                    id, created_at, departure_date, status, total_price, quantity,
-                    num_adult, num_child, num_elder, num_infant, departure_id,
-                    user:user_id ( id, full_name, email ),
-                    product:product_id ( id, name, image_url ),
-                    hotel:hotel_product_id (id, name),
-                    transport:Products!Bookings_transport_product_id_fkey (id, name, price, product_type, details),
-                    flight:flight_product_id (id, name, price, product_type, details),
-                    voucher_code, voucher_discount, notes, 
-                    payment_method,
-                    Invoices ( id ),
-                    -- SỬA CUỐI CÙNG: Dùng alias cho cột user_id
-                    Reviews ( id, rating, comment, reviewer:user_id ( full_name, email ) ) 
-                `, { count: 'exact' }); 
+                .select(selectQuery, { count: 'exact' }); 
                 
             if (filterStatus !== 'all') { query = query.eq('status', filterStatus); }
             if (debouncedSearch) {
