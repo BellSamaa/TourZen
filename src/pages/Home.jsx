@@ -1,12 +1,14 @@
 // src/pages/Home.jsx
 // (Phiên bản cuối cùng, đã thêm lại các section Điểm Đến, Blog, Features)
+// (SỬA v2: Thêm component "Tour Yêu Thích Nhất")
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { getSupabase } from "../lib/supabaseClient"; // Import Supabase
 import { FaMapMarkerAlt, FaStar, FaAward, FaHeadset, FaTags } from "react-icons/fa";
-import { MapPin, Clock, Fire, Sun, CircleNotch, Ticket, ArrowRight, Star } from "@phosphor-icons/react"; // Import Star từ phosphor
+// (SỬA v2) Thêm Gift (Quà)
+import { MapPin, Clock, Fire, Sun, CircleNotch, Ticket, ArrowRight, Star as PhosphorStar, Gift } from "@phosphor-icons/react";
 
 // Swiper
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -44,6 +46,117 @@ const formatCurrency = (num) => {
     if (typeof num !== 'number' || isNaN(num)) return "0 ₫";
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(num);
 };
+
+// ===================================
+// === (MỚI v2) COMPONENT PHỤ ===
+// ===================================
+
+/**
+ * (MỚI v2) Component hiển thị sao Rating (dùng PhosphorStar)
+ */
+const RatingDisplay = ({ rating, size = 18 }) => {
+    const totalStars = 5;
+    const ratingValue = rating || 0;
+    return (
+        <div className="flex text-yellow-500" title={`${ratingValue.toFixed(1)}/${totalStars} sao`}>
+            {[...Array(totalStars)].map((_, i) => (
+                <PhosphorStar key={i} weight={i < ratingValue ? "fill" : "regular"} size={size} />
+            ))}
+            <span className="ml-2 text-sm font-semibold text-gray-600 dark:text-gray-300">({ratingValue.toFixed(1)})</span>
+        </div>
+    );
+};
+
+/**
+ * (MỚI v2) Component Tour được yêu thích nhất
+ */
+const MostLovedTour = () => {
+    const [tour, setTour] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchTopTour = async () => {
+            setLoading(true);
+            
+            // Lấy tour có rating cao nhất từ bảng Products
+            // (Đảm bảo cột 'rating' đã được trigger SQL cập nhật)
+            const { data, error } = await supabase
+                .from('Products')
+                .select('id, name, image_url, price_adult, rating, location')
+                .eq('product_type', 'tour') // Chỉ lấy tour
+                .eq('is_published', true)
+                .order('rating', { ascending: false, nulls: 'last' }) // Sắp xếp theo rating
+                .limit(1) // Lấy 1
+                .single(); // Lấy 1 đối tượng duy nhất
+
+            if (data && !error) {
+                setTour(data);
+            } else {
+                console.error("Lỗi tải top tour:", error);
+            }
+            setLoading(false);
+        };
+        fetchTopTour();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="flex justify-center items-center h-60 bg-gray-100 dark:bg-neutral-800 rounded-lg">
+                <CircleNotch size={32} className="animate-spin text-sky-500" />
+            </div>
+        );
+    }
+    if (!tour) { return null; /* Ẩn đi nếu không có tour nào */ }
+
+    return (
+        <motion.div 
+            className="bg-gradient-to-r from-sky-50 to-blue-50 dark:from-neutral-900 dark:to-slate-900 p-8 rounded-xl shadow-lg border dark:border-neutral-700"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+        >
+            <h2 className="text-3xl font-bold text-center mb-6 text-sky-700 dark:text-sky-400 flex items-center justify-center gap-3">
+                <Gift size={32} /> Tour được yêu thích nhất
+            </h2>
+            <motion.div 
+                className="flex flex-col md:flex-row bg-white dark:bg-neutral-800 rounded-lg shadow-xl overflow-hidden"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+            >
+                <img 
+                    src={tour.image_url} 
+                    alt={tour.name} 
+                    className="w-full md:w-1/2 h-64 md:h-auto object-cover"
+                />
+                <div className="p-6 flex flex-col justify-between flex-1">
+                    <div>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">{tour.location}</span>
+                        <h3 className="text-2xl font-bold text-gray-800 dark:text-white my-2">
+                            {tour.name}
+                        </h3>
+                        {tour.rating > 0 && <RatingDisplay rating={tour.rating} />}
+                    </div>
+                    <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <span className="text-sm text-gray-500 dark:text-gray-400">Giá chỉ từ</span>
+                            <p className="text-3xl font-bold text-red-600 dark:text-red-500">
+                                {formatCurrency(tour.price_adult)}
+                            </p>
+                        </div>
+                        <Link 
+                            to={`/tour/${tour.id}`} 
+                            className="mt-4 sm:mt-0 px-6 py-3 bg-sky-600 text-white font-semibold rounded-lg text-center hover:bg-sky-700 transition-colors shadow-md"
+                        >
+                            Xem Chi Tiết
+                        </Link>
+                    </div>
+                </div>
+            </motion.div>
+        </motion.div>
+    );
+};
+
+
 // ===================================
 // === KẾT THÚC HELPER ===
 // ===================================
@@ -163,7 +276,8 @@ export default function Home() {
             setError(null);
             try {
                 // Dùng cột 'price'
-                const queryColumns = 'id, name, location, duration, image_url, price, rating';
+                // (SỬA v2) Dùng price_adult thay vì price
+                const queryColumns = 'id, name, location, duration, image_url, price_adult, rating';
 
                 const [featuredPromise, newestPromise] = await Promise.all([
                     supabase.rpc('get_most_booked_tours', { limit_count: 4 }),
@@ -191,7 +305,12 @@ export default function Home() {
                     console.error("Lỗi RPC (get_most_booked_tours):", featuredPromise.error);
                     throw new Error(`Lỗi RPC get_most_booked_tours: ${featuredPromise.error.message}. Hàm SQL có vấn đề hoặc cột trả về không đúng?`);
                 } else {
-                    setFeaturedTours(featuredPromise.data || []);
+                    // (SỬA v2) Chuyển price thành price_adult cho đồng bộ
+                    const featuredData = (featuredPromise.data || []).map(tour => ({
+                        ...tour,
+                        price: tour.price_adult // Đảm bảo TourCard nhận đúng 'price'
+                    }));
+                    setFeaturedTours(featuredData);
                 }
 
             } catch (err) {
@@ -273,6 +392,13 @@ export default function Home() {
              )}
         </div>
       </section>
+      
+      {/* === (MỚI v2) TOUR YÊU THÍCH NHẤT === */}
+      <section className="py-20 bg-white dark:bg-neutral-800">
+          <div className="max-w-7xl mx-auto px-6">
+              <MostLovedTour />
+          </div>
+      </section>
       
       {/* === (THÊM LẠI) ĐIỂM ĐẾN YÊU THÍCH === */}
       <section className="py-20 bg-white dark:bg-neutral-800">

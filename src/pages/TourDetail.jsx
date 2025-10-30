@@ -1,5 +1,6 @@
 // src/pages/TourDetail.jsx
 // (NÂNG CẤP: Thêm mục hiển thị Đánh giá của Khách hàng)
+// (SỬA v2: Sửa lỗi query RLS khi tải Reviews)
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -63,18 +64,14 @@ const ErrorComponent = ({ message }) => (
 // --- (MỚI) Component Hiển thị Sao ---
 const StarRating = ({ rating, size = "text-lg" }) => {
     const totalStars = 5;
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating - fullStars >= 0.5; // Không dùng nửa sao ở đây, làm tròn
-    
     // Làm tròn rating lên 0.5 gần nhất
     const displayRating = Math.round(rating * 2) / 2;
 
     return (
         <div className={`flex items-center gap-0.5 text-amber-400 ${size}`}>
             {[...Array(totalStars)].map((_, i) => (
-                <FaStar key={i} />
-                // (Logic nửa sao nếu cần)
-                // i + 1 <= displayRating ? <FaStar key={i} /> : (i < displayRating ? <FaStarHalfAlt key={i} /> : <FaRegStar key={i} />)
+                // Hiển thị sao đầy
+                i + 1 <= displayRating ? <FaStar key={i} /> : <FaRegStar key={i} />
             ))}
         </div>
     );
@@ -85,6 +82,7 @@ const ReviewsSection = ({ tourId, initialRating }) => {
     const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [totalReviews, setTotalReviews] = useState(0);
 
     useEffect(() => {
         if (!tourId) return;
@@ -92,22 +90,23 @@ const ReviewsSection = ({ tourId, initialRating }) => {
         async function fetchReviews() {
             setLoading(true);
             try {
-                // Lấy review và join với bảng Users để lấy tên
-                const { data, error: fetchError } = await supabase
+                // (SỬA v2) GỠ BỎ JOIN VỚI BẢNG 'Users' ĐỂ TRÁNH LỖI RLS
+                // Lấy review và KHÔNG join với bảng Users
+                const { data, error: fetchError, count } = await supabase
                     .from("Reviews")
                     .select(`
                         id,
                         created_at,
                         rating,
-                        comment,
-                        user:user_id ( full_name, email ) 
-                    `)
+                        comment
+                    `, { count: 'exact' }) // Thêm 'count'
                     .eq("product_id", tourId)
                     .order("created_at", { ascending: false })
                     .limit(10); // Chỉ lấy 10 review mới nhất
 
                 if (fetchError) throw fetchError;
                 setReviews(data || []);
+                setTotalReviews(count || 0); // Lưu tổng số
             } catch (err) {
                 console.error("Lỗi tải reviews:", err);
                 setError("Không thể tải đánh giá.");
@@ -139,7 +138,7 @@ const ReviewsSection = ({ tourId, initialRating }) => {
                 </span>
                 <StarRating rating={averageRating} size="text-3xl" />
                 <span className="text-sm text-slate-500 dark:text-slate-400 mt-2">
-                    Dựa trên {reviews.length} đánh giá
+                    Dựa trên {totalReviews} đánh giá {/* (SỬA v2) Dùng totalReviews */}
                 </span>
             </div>
 
@@ -164,7 +163,8 @@ const ReviewsSection = ({ tourId, initialRating }) => {
                             <div className="flex items-center gap-2">
                                 <FaUserCircle className="text-2xl text-slate-400" />
                                 <span className="font-semibold text-slate-800 dark:text-white">
-                                    {review.user?.full_name || review.user?.email || "Khách ẩn danh"}
+                                    {/* (SỬA v2) Luôn hiển thị "Khách ẩn danh" vì đã gỡ bỏ join */}
+                                    {"Khách ẩn danh"}
                                 </span>
                             </div>
                             <StarRating rating={review.rating} size="text-base" />
@@ -237,7 +237,8 @@ const TourDetail = () => {
     }, [id]);
 
     // --- (SỬA) Giá "Từ" (Giữ nguyên, dùng giá gốc của tour) ---
-    const displayPrice = tour?.price || 0;
+    // (SỬA v2) Dùng price_adult
+    const displayPrice = tour?.price_adult || 0;
 
     // --- (SỬA) Logic "Đặt Ngay" (Không cần chọn slot nữa) ---
     const handleBookNow = () => {
@@ -254,7 +255,7 @@ const TourDetail = () => {
     if (loading) { return <LoadingComponent />; }
     if (!tour) { return <ErrorComponent message={error || "Tour không tồn tại."} />; }
 
-    // --- Xử lý Ảnh (Giỳ_nguyên) ---
+    // --- Xử lý Ảnh (Giữ nguyên) ---
     const mainImageUrl = getTourImage(tour);
     const galleryImages = tour?.galleryImages && tour.galleryImages.length > 0
         ? tour.galleryImages
@@ -345,7 +346,7 @@ const TourDetail = () => {
                 <motion.div className="lg:col-span-1 bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border dark:border-slate-700 lg:sticky lg:top-24 self-start" variants={itemVariants}>
                     <p className="text-slate-500 dark:text-slate-400 text-sm mb-1 font-medium">Giá chỉ từ</p>
                     <p className="text-4xl md:text-5xl font-bold text-red-600 mb-6 pb-6 border-b dark:border-slate-600">
-                        {/* (SỬA) Dùng giá gốc */}
+                        {/* (SỬA v2) Dùng displayPrice (tức price_adult) */}
                         {displayPrice > 0 ? formatCurrency(displayPrice) : "Liên hệ"}
                     </p>
                     <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
@@ -382,6 +383,7 @@ const TourDetail = () => {
             )}
 
             {/* === (MỚI) Mục Đánh giá === */}
+            {/* Truyền tour.id (UUID) và tour.rating (số) vào */}
             <ReviewsSection tourId={tour.id} initialRating={tour.rating} />
 
             {/* === Bản đồ (Giữ nguyên) === */}
