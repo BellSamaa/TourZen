@@ -2,7 +2,7 @@
 // (NÂNG CẤP HIỆU ỨNG: Thêm Framer Motion vào Sidebar, Cải thiện bố cục với gradient, shadow, và hiệu ứng chuyên nghiệp hơn)
 
 import React from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { motion } from 'framer-motion'; // <-- IMPORT MOTION
 import {
@@ -17,6 +17,7 @@ import {
     SignOut,
     Gear
 } from '@phosphor-icons/react';
+import { useAuth } from "../context/AuthContext"; // Thêm import useAuth để xử lý logout
 
 // --- (NÂNG CẤP) Component Link của Sidebar ---
 function SidebarLink({ to, icon, children }) {
@@ -58,6 +59,9 @@ function SidebarLink({ to, icon, children }) {
 
 // --- (NÂNG CẤP) Component Sidebar ---
 function Sidebar() {
+    const { user, logout } = useAuth(); // Thêm useAuth để lấy user và logout
+    const navigate = useNavigate();
+
     // (MỚI) Định nghĩa animation cho container chứa các link
     const navContainerVariants = {
         hidden: { opacity: 0 },
@@ -68,6 +72,11 @@ function Sidebar() {
                 delayChildren: 0.2,
             },
         },
+    };
+
+    const handleLogout = async () => {
+        await logout();
+        navigate("/");
     };
 
     return (
@@ -130,16 +139,20 @@ function Sidebar() {
                 <div className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 cursor-pointer transition-all duration-300 group">
                     <UserCircle size={48} weight="light" className="flex-shrink-0 text-blue-200 group-hover:text-white" />
                     <div className="flex-1 min-w-0">
-                        <p className="text-base font-bold truncate text-white">Nguyễn Văn An</p>
-                        <p className="text-sm text-blue-200 truncate">Admin</p>
+                        <p className="text-base font-bold truncate text-white">Admin</p>
                     </div>
                     <Gear size={24} className="text-blue-200 group-hover:rotate-90 transition-transform duration-300" />
                 </div>
                 {/* (MỚI) Thêm nút Logout */}
-                <button className="flex items-center gap-3 py-3 px-6 w-full text-left text-blue-100 hover:bg-white/10 rounded-xl transition-colors duration-300 mt-2">
+                <motion.button 
+                    className="flex items-center gap-3 py-3 px-6 w-full text-left text-blue-100 hover:bg-white/10 rounded-xl transition-colors duration-300 mt-2"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleLogout}
+                >
                     <SignOut size={24} />
                     <span className="text-base font-semibold">Đăng xuất</span>
-                </button>
+                </motion.button>
             </motion.div>
         </motion.div>
     );
