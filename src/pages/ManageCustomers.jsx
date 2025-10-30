@@ -1,25 +1,20 @@
 // ManageCustomersSupabase.jsx
 /* NÂNG CẤP LỚN v7: "Change Font to Be Vietnam Pro"
-  1. (Font Change) Thay thế font 'Poppins' bằng 'Be Vietnam Pro' theo yêu cầu.
-  2. (CSS) Cập nhật class CSS từ 'font-poppins-main' thành 'font-vietnam-main'.
-  3. (Logic) Giữ nguyên logic phân loại khách hàng tự động từ v6.
+  (Giữ nguyên các v7.x)
 */
-
-/* CHỈNH SỬA v7.5 (Theo yêu cầu):
-  1. (CSS Bảng) Giảm cỡ chữ "Họ và tên" từ text-base -> text-sm.
-  2. (CSS Bảng) Giảm cỡ chữ "Đơn" và "Tổng chi" từ text-base -> text-sm cho đồng bộ.
-*/
-
 /* *** SỬA LỖI v7.7 (Fix Lỗi Mất Focus Input) ***
-  1. (Di chuyển) Di chuyển component `InputWrapper` từ BÊN TRONG ra BÊN NGOÀI `CustomerForm`.
-  2. (Nguyên nhân) Khi `InputWrapper` ở bên trong, mỗi lần `CustomerForm` render lại
-     (khi gõ phím), nó tạo ra một `InputWrapper` "mới", khiến React hủy
-     component cũ và làm mất focus của input.
-  3. (useCallback) Giữ lại các `useCallback` từ v7.6 để đảm bảo component cha ổn định.
+  (Giữ nguyên)
+*/
+/* *** NÂNG CẤP v8 (Thêm Yêu Cầu Reset Mật Khẩu) ***
+  1. (Thêm Component) Thêm `PasswordResetRequests` để fetch và hiển thị 
+     dữ liệu từ bảng `password_reset_requests` (nơi `is_resolved` = false).
+  2. (Chèn Component) Chèn component này vào dưới `CustomerStats`.
+  3. (Hành động) Admin có thể nhấn "Đã giải quyết" để update
+     bản ghi, ẩn nó đi.
 */
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { FaSpinner, FaSearch, FaTrash } from "react-icons/fa";
+import { FaSpinner, FaSearch, FaTrash, FaBell } from "react-icons/fa"; // SỬA v8: Thêm FaBell
 import {
   UserList, CaretLeft, CaretRight, CircleNotch, X, Plus, UsersThree, Crown, Sparkle, Wallet,
   PencilSimple, List, Package, Bed, Airplane, Receipt, Info,
@@ -41,7 +36,6 @@ const useDebounce = (value, delay) => {
   }, [value, delay]);
   return debouncedValue;
 };
-
 const getPaginationWindow = (currentPage, totalPages, width = 2) => {
   if (totalPages <= 1) return [];
   if (totalPages <= 5 + width * 2) { return Array.from({ length: totalPages }, (_, i) => i + 1); }
@@ -53,19 +47,16 @@ const getPaginationWindow = (currentPage, totalPages, width = 2) => {
   for (const page of sortedPages) { if (lastPage !== 0 && page - lastPage > 1) { finalPages.push("..."); } finalPages.push(page); lastPage = page; }
   return finalPages;
 };
-
 const formatCurrency = (amount) => {
   if (typeof amount !== "number") return "0 ₫";
   return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount);
 };
-
 const formatStatsNumber = (num) => {
   if (num >= 1_000_000_000) { return (num / 1_000_000_000).toFixed(1) + " tỷ"; }
   if (num >= 1_000_000) { return (num / 1_000_000).toFixed(1) + " triệu"; }
   if (num >= 1_000) { return (num / 1_000).toFixed(1) + " k"; }
   return num;
 };
-
 const getCustomerTierStyle = (tier) => {
   switch (tier) {
     case "VIP": return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
@@ -74,12 +65,10 @@ const getCustomerTierStyle = (tier) => {
     default: return "bg-gray-100 text-gray-800 dark:bg-gray-700/30 dark:text-gray-300"; // Tiêu chuẩn
   }
 };
-
 const cardVariants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } }
 };
-
 const StatCard = ({ title, value, icon, loading }) => (
   <motion.div
     className="bg-gradient-to-br from-white to-gray-50 dark:from-slate-800 dark:to-slate-700 p-6 rounded-2xl shadow-xl shadow-gray-200/50 dark:shadow-black/30 border border-gray-100 dark:border-slate-700/50 flex items-center gap-5 transition-all duration-300 hover:shadow-2xl dark:hover:shadow-black/40 hover:-translate-y-1.5"
@@ -98,7 +87,6 @@ const StatCard = ({ title, value, icon, loading }) => (
     </div>
   </motion.div>
 );
-
 // --- Component Lấy Dữ Liệu Thống Kê (Logic v6) ---
 const CustomerStats = () => {
   const [stats, setStats] = useState({ total: 0, vip: 0, new: 0, spend: 0 });
@@ -113,25 +101,21 @@ const CustomerStats = () => {
           .select("id")
           .eq("role", "user");
         if (userErr) throw userErr;
-
         if (!users || users.length === 0) {
           setLoading(false);
           return;
         }
-
         const { data: bookings, error: bookingErr } = await supabase
           .from("Bookings")
           .select("user_id, total_price")
           .in("user_id", users.map(u => u.id))
           .eq("status", "confirmed");
         if (bookingErr) throw bookingErr;
-        
         let totalSystemSpend = 0;
         const userStatsMap = users.reduce((acc, user) => {
           acc[user.id] = { order_count: 0, total_spend: 0 };
           return acc;
         }, {});
-
         for (const b of (bookings || [])) {
           if (userStatsMap[b.user_id]) {
             userStatsMap[b.user_id].order_count += 1;
@@ -139,10 +123,8 @@ const CustomerStats = () => {
           }
           totalSystemSpend += (b.total_price || 0);
         }
-
         let vipCount = 0;
         let newCount = 0;
-        
         Object.values(userStatsMap).forEach(stat => {
           if (stat.total_spend > 20000000) {
             vipCount++;
@@ -151,14 +133,12 @@ const CustomerStats = () => {
             newCount++;
           }
         });
-        
         setStats({
           total: users.length,
           vip: vipCount,
           new: newCount,
           spend: totalSystemSpend,
         });
-
       } catch (error) { 
         console.error("Lỗi fetch stats:", error);
         toast.error("Không thể tải dữ liệu thống kê.");
@@ -184,6 +164,108 @@ const CustomerStats = () => {
     </motion.div>
   );
 };
+
+// --- (*** SỬA v8: THÊM COMPONENT MỚI ***) ---
+// --- Component Hiển Thị Yêu Cầu Reset Mật Khẩu ---
+const PasswordResetRequests = () => {
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Hàm fetch data
+  const fetchRequests = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("password_reset_requests")
+        .select("id, email, requested_at")
+        .eq("is_resolved", false) // Chỉ lấy các yêu cầu CHƯA giải quyết
+        .order("requested_at", { ascending: true });
+      if (error) throw error;
+      setRequests(data || []);
+    } catch (err) {
+      console.error("Lỗi tải yêu cầu reset pass:", err);
+      toast.error("Lỗi tải yêu cầu reset pass: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch data khi component mount
+  useEffect(() => {
+    fetchRequests();
+    // Thiết lập polling để cập nhật tự động (tùy chọn)
+    const interval = setInterval(fetchRequests, 60000); // Tải lại mỗi 60 giây
+    return () => clearInterval(interval);
+  }, [fetchRequests]);
+
+  // Hàm xử lý khi Admin nhấn "Đã giải quyết"
+  const handleResolve = async (id) => {
+    try {
+      // Cập nhật cột is_resolved = true
+      const { error } = await supabase
+        .from("password_reset_requests")
+        .update({ is_resolved: true })
+        .eq("id", id);
+      if (error) throw error;
+      toast.success("Đã đánh dấu là đã giải quyết!");
+      fetchRequests(); // Tải lại danh sách
+    } catch (err) {
+      console.error("Lỗi cập nhật:", err);
+      toast.error("Lỗi cập nhật: " + err.message);
+    }
+  };
+
+  if (loading && requests.length === 0) {
+    return (
+      <div className="p-4 bg-yellow-50 dark:bg-slate-700/50 rounded-lg text-center text-gray-600 dark:text-gray-300 font-medium">
+        <CircleNotch size={18} className="animate-spin inline-block mr-2" /> Đang kiểm tra yêu cầu...
+      </div>
+    );
+  }
+
+  // Nếu không có yêu cầu nào thì không hiển thị gì
+  if (!loading && requests.length === 0) {
+    return null;
+  }
+
+  return (
+    <motion.div 
+      className="bg-gradient-to-r from-orange-500 to-red-600 p-6 rounded-2xl shadow-xl text-white"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+    >
+      <h3 className="text-2xl font-bold mb-4 flex items-center gap-3">
+        <FaBell className="animate-pulse" />
+        Yêu Cầu Đổi Mật Khẩu ({requests.length})
+      </h3>
+      <div className="space-y-3 max-h-60 overflow-y-auto simple-scrollbar pr-2">
+        {requests.map((req) => (
+          <motion.div 
+            key={req.id} 
+            className="flex flex-wrap justify-between items-center bg-white/20 p-4 rounded-lg gap-3"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+          >
+            <div>
+              <span className="font-bold text-lg">{req.email}</span>
+              <span className="block text-sm opacity-90">
+                Yêu cầu lúc: {new Date(req.requested_at).toLocaleString('vi-VN')}
+              </span>
+            </div>
+            <button
+              onClick={() => handleResolve(req.id)}
+              className="px-4 py-2 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors shadow-md"
+            >
+              Đánh dấu Đã giải quyết
+            </button>
+          </motion.div>
+        ))}
+      </div>
+    </motion.div>
+  );
+};
+// --- (*** KẾT THÚC COMPONENT MỚI v8 ***) ---
+
 
 // --- Component Modal Xem Chi Tiết Đơn Hàng (Giữ nguyên) ---
 const CustomerBookingsModal = ({ customer, onClose }) => {
@@ -249,15 +331,9 @@ const CustomerBookingsModal = ({ customer, onClose }) => {
         </div>
         
         <div className="overflow-y-auto pr-2 -mr-4 simple-scrollbar">
-          {loading && (
-            <div className="flex justify-center items-center p-20"> <CircleNotch size={40} className="animate-spin text-sky-500" /> </div>
-          )}
+          {loading && ( <div className="flex justify-center items-center p-20"> <CircleNotch size={40} className="animate-spin text-sky-500" /> </div> )}
           {error && <p className="text-center text-red-500 p-20">{error}</p>}
-          
-          {!loading && !error && bookings.length === 0 && (
-            <p className="text-center text-gray-500 p-20 italic text-lg">Khách hàng này chưa có đơn hàng nào.</p>
-          )}
-
+          {!loading && !error && bookings.length === 0 && ( <p className="text-center text-gray-500 p-20 italic text-lg">Khách hàng này chưa có đơn hàng nào.</p> )}
           {!loading && !error && bookings.length > 0 && (
             <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
               <thead className="bg-gray-50 dark:bg-slate-700/40 sticky top-0">
@@ -275,25 +351,15 @@ const CustomerBookingsModal = ({ customer, onClose }) => {
                       <div className="flex items-center gap-4">
                         {getProductIcon(b.Products?.product_type)}
                         <div>
-                          <div className="font-semibold text-base text-gray-900 dark:text-white">
-                            {b.Products?.name || <span className="italic text-gray-400">Dịch vụ đã bị xóa</span>}
-                          </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400 capitalize">
-                            {b.Products?.product_type || 'N/A'}
-                          </div>
+                          <div className="font-semibold text-base text-gray-900 dark:text-white"> {b.Products?.name || <span className="italic text-gray-400">Dịch vụ đã bị xóa</span>} </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400 capitalize"> {b.Products?.product_type || 'N/A'} </div>
                         </div>
                       </div>
                     </td>
-                    <td className="td-style text-sm">
-                      {new Date(b.created_at).toLocaleDateString('vi-VN')}
-                    </td>
-                    <td className="td-style text-right font-semibold text-lg whitespace-nowrap">
-                      {formatCurrency(b.total_price)}
-                    </td>
+                    <td className="td-style text-sm"> {new Date(b.created_at).toLocaleDateString('vi-VN')} </td>
+                    <td className="td-style text-right font-semibold text-lg whitespace-nowrap"> {formatCurrency(b.total_price)} </td>
                     <td className="td-style text-center">
-                      <span className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider ${getStatusBadge(b.status)}`}>
-                        {b.status}
-                      </span>
+                      <span className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider ${getStatusBadge(b.status)}`}> {b.status} </span>
                     </td>
                   </tr>
                 ))}
@@ -307,7 +373,6 @@ const CustomerBookingsModal = ({ customer, onClose }) => {
 };
 
 // --- (*** FIX v7.7 ***) Component InputWrapper (Đã di chuyển ra ngoài) ---
-// Component này được di chuyển ra ngoài CustomerForm để tránh bị tạo lại khi render
 const InputWrapper = ({ label, icon, children }) => (
   <div className="mb-5">
     <label className="flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
@@ -320,9 +385,7 @@ const InputWrapper = ({ label, icon, children }) => (
   </div>
 );
 
-
 // --- Component Form (Logic v6) ---
-// (InputWrapper đã được chuyển ra ngoài)
 const CustomerForm = ({ initialData, onSubmit, isSaving, onCancel }) => {
   const [formData, setFormData] = useState({
     full_name: initialData?.full_name || '',
@@ -356,88 +419,30 @@ const CustomerForm = ({ initialData, onSubmit, isSaving, onCancel }) => {
     };
     onSubmit(dataToSubmit);
   };
-
-  // (*** FIX v7.7 ***) InputWrapper đã được XÓA khỏi đây
   
   return (
     <form onSubmit={handleSubmit}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
         <InputWrapper label="Họ và Tên" icon={<User size={18} className="mr-2" />}>
-          <input
-            type="text"
-            name="full_name"
-            value={formData.full_name}
-            onChange={handleChange}
-            className="form-input-style"
-            placeholder="Nguyễn Văn A"
-            required
-          />
+          <input type="text" name="full_name" value={formData.full_name} onChange={handleChange} className="form-input-style" placeholder="Nguyễn Văn A" required />
         </InputWrapper>
-
         <InputWrapper label="Email" icon={<Envelope size={18} className="mr-2" />}>
-          <input
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            className={`form-input-style ${isEditMode ? 'bg-gray-100 dark:bg-slate-700 cursor-not-allowed' : ''}`}
-            placeholder="example@gmail.com"
-            required
-            disabled={isEditMode}
-          />
+          <input type="email" name="email" value={formData.email} onChange={handleChange} className={`form-input-style ${isEditMode ? 'bg-gray-100 dark:bg-slate-700 cursor-not-allowed' : ''}`} placeholder="example@gmail.com" required disabled={isEditMode} />
         </InputWrapper>
-
         <InputWrapper label="Số Điện Thoại" icon={<Phone size={18} className="mr-2" />}>
-          <input
-            type="tel"
-            name="phone_number"
-            value={formData.phone_number}
-            onChange={handleChange}
-            className="form-input-style"
-            placeholder="090..."
-          />
+          <input type="tel" name="phone_number" value={formData.phone_number} onChange={handleChange} className="form-input-style" placeholder="090..." />
         </InputWrapper>
-
         <InputWrapper label="Ngày Sinh" icon={<CalendarBlank size={18} className="mr-2" />}>
-          <input
-            type="date"
-            name="ngay_sinh"
-            value={formData.ngay_sinh}
-            onChange={handleChange}
-            className="form-input-style"
-          />
+          <input type="date" name="ngay_sinh" value={formData.ngay_sinh} onChange={handleChange} className="form-input-style" />
         </InputWrapper>
       </div>
-
       <InputWrapper label="Địa chỉ" icon={<House size={18} className="mr-2" />}>
-        <textarea
-          name="address"
-          value={formData.address}
-          onChange={handleChange}
-          className="form-input-style min-h-[80px]"
-          placeholder="Số 1, đường..."
-        />
+        <textarea name="address" value={formData.address} onChange={handleChange} className="form-input-style min-h-[80px]" placeholder="Số 1, đường..." />
       </InputWrapper>
-
       <div className="flex justify-end gap-4 pt-6 border-t dark:border-slate-700 mt-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={isSaving}
-          className="modal-button-secondary"
-        >
-          Hủy
-        </button>
-        <button
-          type="submit"
-          disabled={isSaving}
-          className="modal-button-primary"
-        >
-          {isSaving ? (
-            <CircleNotch size={20} className="animate-spin" />
-          ) : (
-            isEditMode ? "Lưu thay đổi" : "Thêm Khách Hàng"
-          )}
+        <button type="button" onClick={onCancel} disabled={isSaving} className="modal-button-secondary"> Hủy </button>
+        <button type="submit" disabled={isSaving} className="modal-button-primary">
+          {isSaving ? ( <CircleNotch size={20} className="animate-spin" /> ) : ( isEditMode ? "Lưu thay đổi" : "Thêm Khách Hàng" )}
         </button>
       </div>
     </form>
@@ -472,7 +477,6 @@ const FormModal = ({ title, onClose, children }) => (
   </motion.div>
 );
 
-
 // --- Component Chính ---
 export default function ManageCustomersSupabase() {
   const [customers, setCustomers] = useState([]);
@@ -501,33 +505,26 @@ export default function ManageCustomersSupabase() {
     try {
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
-      
       let countQuery = supabase.from("Users").select("id", { count: "exact", head: true }).eq("role", "user");
       let dataQuery = supabase.from("Users").select("*, customer_tier, ngay_sinh").eq("role", "user");
-
       if (debouncedSearch.trim() !== "") {
         const searchTerm = `%${debouncedSearch.trim()}%`;
         const searchQuery = `full_name.ilike.${searchTerm},email.ilike.${searchTerm},address.ilike.${searchTerm},phone_number.ilike.${searchTerm}`;
         countQuery = countQuery.or(searchQuery);
         dataQuery = dataQuery.or(searchQuery);
       }
-
       dataQuery = dataQuery.order("full_name", { ascending: true }).range(from, to);
-
       const { count, error: countError } = await countQuery;
       if (countError) throw countError;
       const { data: usersData, error: usersError } = await dataQuery;
       if (usersError) throw usersError;
-
       if (!usersData || usersData.length === 0) {
         setCustomers([]); setTotalItems(count || 0);
         if (!isInitialLoad && count > 0 && currentPage > 1) { setCurrentPage(1); }
         return;
       }
-
       const userIds = usersData.map((u) => u.id);
       const { data: bookingsData } = await supabase.from("Bookings").select("user_id, total_price").in("user_id", userIds).eq("status", "confirmed");
-
       const statsMap = (bookingsData || []).reduce((acc, booking) => {
         const userId = booking.user_id;
         if (!acc[userId]) { acc[userId] = { order_count: 0, total_spend: 0 }; }
@@ -535,11 +532,9 @@ export default function ManageCustomersSupabase() {
         acc[userId].total_spend += booking.total_price || 0;
         return acc;
       }, {});
-
       const combinedData = usersData.map((user) => {
         const order_count = statsMap[user.id]?.order_count || 0;
         const total_spend = statsMap[user.id]?.total_spend || 0;
-        
         let dynamic_tier = 'Tiêu chuẩn';
         if (total_spend > 20000000) {
             dynamic_tier = 'VIP';
@@ -548,16 +543,8 @@ export default function ManageCustomersSupabase() {
         } else if (order_count > 2) {
             dynamic_tier = 'Thường xuyên';
         }
-
-        return {
-          ...user,
-          order_count: order_count,
-          total_spend: total_spend,
-          customer_tier: dynamic_tier,
-          ngay_sinh: user.ngay_sinh ? user.ngay_sinh.split('T')[0] : '', 
-        };
+        return { ...user, order_count: order_count, total_spend: total_spend, customer_tier: dynamic_tier, ngay_sinh: user.ngay_sinh ? user.ngay_sinh.split('T')[0] : '', };
       });
-
       setCustomers(combinedData);
       setTotalItems(count || 0);
     } catch (err) {
@@ -578,17 +565,11 @@ export default function ManageCustomersSupabase() {
     if (currentPage !== 1) { setCurrentPage(1); }
   }, [debouncedSearch]);
 
-
   // --- Handlers cho Modal Form (Bọc useCallback) ---
   const handleUpdateCustomer = useCallback(async (formData) => {
     if (!editingCustomer || isSaving) return;
     setIsSaving(true);
-    const updateData = {
-        full_name: formData.full_name,
-        address: formData.address,
-        phone_number: formData.phone_number,
-        ngay_sinh: formData.ngay_sinh,
-    };
+    const updateData = { full_name: formData.full_name, address: formData.address, phone_number: formData.phone_number, ngay_sinh: formData.ngay_sinh, };
     try {
       const { error } = await supabase.from("Users").update(updateData).eq("id", editingCustomer.id);
       if (error) throw error;
@@ -601,7 +582,7 @@ export default function ManageCustomersSupabase() {
     } finally {
       setIsSaving(false);
     }
-  }, [editingCustomer, isSaving, fetchCustomers]); // Thêm dependencies
+  }, [editingCustomer, isSaving, fetchCustomers]); 
 
   const handleAddNewCustomer = useCallback(async (formData) => {
     if (isSaving) return;
@@ -622,47 +603,25 @@ export default function ManageCustomersSupabase() {
     } finally {
       setIsSaving(false);
     }
-  }, [isSaving, fetchCustomers]); // Thêm dependencies
+  }, [isSaving, fetchCustomers]);
 
   // --- Handlers ổn định để đóng/mở Modals ---
-  const handleOpenAddModal = useCallback(() => {
-    setIsAddingCustomer(true);
-  }, []);
-  
-  const handleCloseAddModal = useCallback(() => {
-    setIsAddingCustomer(false);
-  }, []);
-
-  const handleCloseEditModal = useCallback(() => {
-    setEditingCustomer(null);
-  }, []);
-
-  const handleCloseBookingsModal = useCallback(() => {
-    setViewingBookingsCustomer(null);
-  }, []);
+  const handleOpenAddModal = useCallback(() => { setIsAddingCustomer(true); }, []);
+  const handleCloseAddModal = useCallback(() => { setIsAddingCustomer(false); }, []);
+  const handleCloseEditModal = useCallback(() => { setEditingCustomer(null); }, []);
+  const handleCloseBookingsModal = useCallback(() => { setViewingBookingsCustomer(null); }, []);
 
   // --- Delete Handlers (Bọc useCallback) ---
-  const openDeleteConfirm = useCallback((c) => {
-    setSelectedCustomer(c); 
-    setShowDeleteConfirm(true);
-  }, []);
-  
-  const closeDeleteConfirm = useCallback(() => {
-    setSelectedCustomer(null); 
-    setShowDeleteConfirm(false);
-  }, []);
-
+  const openDeleteConfirm = useCallback((c) => { setSelectedCustomer(c); setShowDeleteConfirm(true); }, []);
+  const closeDeleteConfirm = useCallback(() => { setSelectedCustomer(null); setShowDeleteConfirm(false); }, []);
   const handleDelete = useCallback(async () => {
     if (!selectedCustomer) return;
     try {
       const { error } = await supabase.from("Users").delete().eq("id", selectedCustomer.id);
       if (error) throw error;
       toast.success(`Đã xóa hồ sơ "${selectedCustomer.full_name || selectedCustomer.email}"!`);
-      if (customers.length === 1 && currentPage > 1) { 
-        setCurrentPage(currentPage - 1); 
-      } else { 
-        fetchCustomers(); 
-      }
+      if (customers.length === 1 && currentPage > 1) { setCurrentPage(currentPage - 1); } 
+      else { fetchCustomers(); }
       closeDeleteConfirm();
     } catch (err) {
       console.error("Lỗi xóa:", err);
@@ -714,6 +673,10 @@ export default function ManageCustomersSupabase() {
       </div>
 
       <CustomerStats />
+
+      {/* --- (*** SỬA v8: THÊM COMPONENT YÊU CẦU ***) --- */}
+      <PasswordResetRequests />
+      {/* --- (*** KẾT THÚC SỬA v8 ***) --- */}
 
       <div className="bg-white dark:bg-slate-800 shadow-2xl shadow-gray-200/50 dark:shadow-black/30 rounded-2xl overflow-hidden border border-gray-200 dark:border-slate-700">
         <div className="p-5 border-b border-gray-200 dark:border-slate-700">
@@ -836,7 +799,6 @@ export default function ManageCustomersSupabase() {
           />
         )}
       </AnimatePresence>
-      
       <AnimatePresence>
         {showDeleteConfirm && selectedCustomer && (
           <motion.div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex justify-center items-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -858,7 +820,6 @@ export default function ManageCustomersSupabase() {
           </motion.div>
         )}
       </AnimatePresence>
-
       <AnimatePresence>
         {isAddingCustomer && (
           <FormModal title="Thêm Khách Hàng Mới" onClose={handleCloseAddModal}>
@@ -870,7 +831,6 @@ export default function ManageCustomersSupabase() {
           </FormModal>
         )}
       </AnimatePresence>
-      
       <AnimatePresence>
         {editingCustomer && (
           <FormModal title="Chỉnh Sửa Thông Tin Khách Hàng" onClose={handleCloseEditModal}>
@@ -884,66 +844,28 @@ export default function ManageCustomersSupabase() {
         )}
       </AnimatePresence>
       
-      
       {/* (FIX v7) Đổi font "Be Vietnam Pro" */}
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&display=swap');
-        :root {
-          --font-main: 'Be Vietnam Pro', sans-serif;
-        }
-        /* Áp dụng font cho body và class tùy chỉnh */
-        body, .font-vietnam-main {
-          font-family: var(--font-main), sans-serif;
-        }
+        :root { --font-main: 'Be Vietnam Pro', sans-serif; }
+        body, .font-vietnam-main { font-family: var(--font-main), sans-serif; }
       `}</style>
-
-      {/* --- CSS (Chỉnh sửa .th-style về text-sm, py-5) (v7.2) --- */}
       <style jsx>{`
-        .th-style { 
-          @apply px-6 py-5 text-left text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider; 
-        }
-        .td-style { 
-          @apply px-6 py-6 text-sm text-gray-600 dark:text-gray-300 align-middle;
-        }
-        .action-button { 
-          @apply p-2 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-2 dark:focus:ring-offset-slate-800 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-110 active:scale-95; 
-        }
-        .pagination-arrow { 
-          @apply p-2.5 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors; 
-        }
-        .pagination-number { 
-          @apply w-10 h-10 rounded-md font-semibold transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-base; 
-        }
-        .pagination-active { 
-          @apply bg-sky-600 text-white hover:bg-sky-600 dark:hover:bg-sky-600; 
-        }
-        .pagination-dots { 
-          @apply px-2 py-1 text-gray-500 dark:text-gray-400; 
-        }
-        
-        .form-input-style {
-          @apply p-3.5 border border-slate-300 dark:border-slate-600 rounded-lg w-full bg-white dark:bg-slate-700/50 focus:ring-2 focus:ring-sky-400 focus:border-sky-400 outline-none transition duration-200 text-base;
-        }
-
-        .modal-button-secondary { 
-          @apply px-6 py-3 bg-neutral-200 dark:bg-neutral-700 rounded-lg font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-600 text-sm transition-all duration-200 disabled:opacity-50; 
-        }
-        .modal-button-danger { 
-          @apply px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 text-sm transition-all duration-200 shadow-lg shadow-red-500/30; 
-        }
-        .modal-button-primary {
-          @apply flex items-center justify-center px-6 py-3 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 text-sm transition-all duration-200 shadow-lg shadow-sky-500/30 disabled:opacity-50;
-        }
-
+        .th-style { @apply px-6 py-5 text-left text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider; }
+        .td-style { @apply px-6 py-6 text-sm text-gray-600 dark:text-gray-300 align-middle; }
+        .action-button { @apply p-2 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-2 dark:focus:ring-offset-slate-800 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-110 active:scale-95; }
+        .pagination-arrow { @apply p-2.5 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors; }
+        .pagination-number { @apply w-10 h-10 rounded-md font-semibold transition-colors hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-base; }
+        .pagination-active { @apply bg-sky-600 text-white hover:bg-sky-600 dark:hover:bg-sky-600; }
+        .pagination-dots { @apply px-2 py-1 text-gray-500 dark:text-gray-400; }
+        .form-input-style { @apply p-3.5 border border-slate-300 dark:border-slate-600 rounded-lg w-full bg-white dark:bg-slate-700/50 focus:ring-2 focus:ring-sky-400 focus:border-sky-400 outline-none transition duration-200 text-base; }
+        .modal-button-secondary { @apply px-6 py-3 bg-neutral-200 dark:bg-neutral-700 rounded-lg font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-600 text-sm transition-all duration-200 disabled:opacity-50; }
+        .modal-button-danger { @apply px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 text-sm transition-all duration-200 shadow-lg shadow-red-500/30; }
+        .modal-button-primary { @apply flex items-center justify-center px-6 py-3 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 text-sm transition-all duration-200 shadow-lg shadow-sky-500/30 disabled:opacity-50; }
         .simple-scrollbar::-webkit-scrollbar { width: 8px; }
         .simple-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .simple-scrollbar::-webkit-scrollbar-thumb {
-          background: #d1d5db; /* gray-300 */
-          border-radius: 10px;
-        }
-        .dark .simple-scrollbar::-webkit-scrollbar-thumb {
-          background: #4b5563; /* dark:gray-600 */
-        }
+        .simple-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+        .dark .simple-scrollbar::-webkit-scrollbar-thumb { background: #4b5563; }
       `}</style>
     </motion.div>
   );

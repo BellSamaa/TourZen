@@ -1,5 +1,5 @@
 // src/pages/TourDetail.jsx
-// (NÂNG CẤP: Giữ nguyên giao diện, chỉ xóa phần chọn Slot & Lịch khởi hành)
+// (NÂNG CẤP: Thêm mục hiển thị Đánh giá của Khách hàng)
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -10,7 +10,7 @@ import Slider from "react-slick";
 import { 
     FaCreditCard, FaSpinner, FaMapMarkerAlt, FaClock, FaInfoCircle,
     FaCalendarAlt, FaMoneyBillWave, FaChild, FaUser, FaPlus, FaGift, FaPlane, FaStickyNote,
-    FaUsers
+    FaUsers, FaStar, FaRegStar, FaUserCircle // (MỚI) Thêm icon
 } from "react-icons/fa";
 import { motion, useScroll, useTransform } from "framer-motion";
 import "slick-carousel/slick/slick.css";
@@ -60,6 +60,129 @@ const ErrorComponent = ({ message }) => (
     </motion.div>
 ); 
 
+// --- (MỚI) Component Hiển thị Sao ---
+const StarRating = ({ rating, size = "text-lg" }) => {
+    const totalStars = 5;
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating - fullStars >= 0.5; // Không dùng nửa sao ở đây, làm tròn
+    
+    // Làm tròn rating lên 0.5 gần nhất
+    const displayRating = Math.round(rating * 2) / 2;
+
+    return (
+        <div className={`flex items-center gap-0.5 text-amber-400 ${size}`}>
+            {[...Array(totalStars)].map((_, i) => (
+                <FaStar key={i} />
+                // (Logic nửa sao nếu cần)
+                // i + 1 <= displayRating ? <FaStar key={i} /> : (i < displayRating ? <FaStarHalfAlt key={i} /> : <FaRegStar key={i} />)
+            ))}
+        </div>
+    );
+};
+
+// --- (MỚI) Component Mục Đánh giá ---
+const ReviewsSection = ({ tourId, initialRating }) => {
+    const [reviews, setReviews] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        if (!tourId) return;
+
+        async function fetchReviews() {
+            setLoading(true);
+            try {
+                // Lấy review và join với bảng Users để lấy tên
+                const { data, error: fetchError } = await supabase
+                    .from("Reviews")
+                    .select(`
+                        id,
+                        created_at,
+                        rating,
+                        comment,
+                        user:user_id ( full_name, email ) 
+                    `)
+                    .eq("product_id", tourId)
+                    .order("created_at", { ascending: false })
+                    .limit(10); // Chỉ lấy 10 review mới nhất
+
+                if (fetchError) throw fetchError;
+                setReviews(data || []);
+            } catch (err) {
+                console.error("Lỗi tải reviews:", err);
+                setError("Không thể tải đánh giá.");
+            } finally {
+                setLoading(false);
+            }
+        }
+        fetchReviews();
+    }, [tourId]);
+
+    const averageRating = parseFloat(initialRating) || 0; // Lấy từ cột Product.rating
+
+    return (
+        <motion.section 
+            className="max-w-4xl mx-auto p-6 md:p-10 my-16 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border dark:border-slate-700"
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+        >
+            <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center text-sky-700 dark:text-sky-400">
+                Đánh giá từ Khách hàng
+            </h2>
+
+            {/* Rating trung bình */}
+            <div className="flex flex-col items-center justify-center mb-8 p-6 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                <span className="text-5xl font-extrabold text-slate-800 dark:text-white">
+                    {averageRating.toFixed(1)} / 5
+                </span>
+                <StarRating rating={averageRating} size="text-3xl" />
+                <span className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+                    Dựa trên {reviews.length} đánh giá
+                </span>
+            </div>
+
+            {/* Danh sách review */}
+            <div className="space-y-6">
+                {loading && <div className="text-center"><FaSpinner className="animate-spin text-2xl text-sky-500 mx-auto" /></div>}
+                {error && <div className="text-center text-red-500">{error}</div>}
+                
+                {!loading && !error && reviews.length === 0 && (
+                    <p className="text-center text-slate-500 italic">Chưa có đánh giá nào cho tour này.</p>
+                )}
+
+                {reviews.map(review => (
+                    <motion.div 
+                        key={review.id} 
+                        className="pb-6 border-b border-slate-200 dark:border-slate-700 last:border-b-0"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.4 }}
+                    >
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                                <FaUserCircle className="text-2xl text-slate-400" />
+                                <span className="font-semibold text-slate-800 dark:text-white">
+                                    {review.user?.full_name || review.user?.email || "Khách ẩn danh"}
+                                </span>
+                            </div>
+                            <StarRating rating={review.rating} size="text-base" />
+                        </div>
+                        <p className="text-slate-600 dark:text-slate-300 text-base leading-relaxed pl-8">
+                            {review.comment}
+                        </p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 text-right mt-2">
+                            {new Date(review.created_at).toLocaleDateString("vi-VN")}
+                        </p>
+                    </motion.div>
+                ))}
+            </div>
+        </motion.section>
+    );
+};
+
+
 // --- Component Chính ---
 const TourDetail = () => {
     const { id } = useParams();
@@ -87,9 +210,10 @@ const TourDetail = () => {
 
             try {
                 // Fetch 1: Lấy thông tin Tour
+                // (SỬA) Lấy thêm cột 'rating'
                 const { data: tourData, error: tourError } = await supabase
                     .from("Products")
-                    .select("*, supplier_name:Suppliers(name)")
+                    .select("*, rating, supplier_name:Suppliers(name)") // Lấy cột rating
                     .eq("id", id)
                     .eq("is_published", true)
                     .eq("approval_status", "approved")
@@ -130,7 +254,7 @@ const TourDetail = () => {
     if (loading) { return <LoadingComponent />; }
     if (!tour) { return <ErrorComponent message={error || "Tour không tồn tại."} />; }
 
-    // --- Xử lý Ảnh (Giữ nguyên) ---
+    // --- Xử lý Ảnh (Giỳ_nguyên) ---
     const mainImageUrl = getTourImage(tour);
     const galleryImages = tour?.galleryImages && tour.galleryImages.length > 0
         ? tour.galleryImages
@@ -158,7 +282,7 @@ const TourDetail = () => {
         >
             <Toaster position="top-center" reverseOrder={false} />
             
-            {/* === Banner (Giữ nguyên) === */}
+            {/* === Banner (SỬA: Thêm rating) === */}
             <div ref={bannerRef} className="relative overflow-hidden">
                 <ParallaxBanner layers={[{ image: mainImageUrl, speed: -18, props: { onError: (e) => { e.target.onerror = null; e.target.src = placeholderImg } } }]} className="h-[60vh] md:h-[75vh]" >
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent " />
@@ -167,9 +291,18 @@ const TourDetail = () => {
                     <motion.h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-3 drop-shadow-xl leading-tight" variants={itemVariants}>
                         {tour.name}
                     </motion.h1>
-                    <motion.p className="text-lg md:text-xl flex items-center gap-2 drop-shadow-lg opacity-90" variants={itemVariants}>
-                        <FaMapMarkerAlt /> {tour.location || 'Chưa rõ'}
-                    </motion.p>
+                    <motion.div className="flex items-center gap-4 drop-shadow-lg opacity-90" variants={itemVariants}>
+                        <p className="text-lg md:text-xl flex items-center gap-2">
+                            <FaMapMarkerAlt /> {tour.location || 'Chưa rõ'}
+                        </p>
+                        {/* (MỚI) Hiển thị rating trung bình */}
+                        {tour.rating > 0 && (
+                            <div className="flex items-center gap-1.5 text-amber-400">
+                                <FaStar />
+                                <span className="text-lg md:text-xl font-bold text-white">{parseFloat(tour.rating).toFixed(1)}</span>
+                            </div>
+                        )}
+                    </motion.div>
                 </motion.div>
             </div>
 
@@ -247,6 +380,9 @@ const TourDetail = () => {
                    </div>
                 </motion.section>
             )}
+
+            {/* === (MỚI) Mục Đánh giá === */}
+            <ReviewsSection tourId={tour.id} initialRating={tour.rating} />
 
             {/* === Bản đồ (Giữ nguyên) === */}
             <motion.section className="max-w-5xl mx-auto my-16 px-4" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>

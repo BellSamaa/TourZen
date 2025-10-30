@@ -1,27 +1,30 @@
 // src/pages/Login.jsx
 // (Nâng cấp giao diện "Hoa lá cành" + Hiệu ứng - Đã sửa lỗi khai báo kép)
 // (ĐÃ SỬA: Thêm trường Ngày Sinh)
+// (*** NÂNG CẤP v8: Thêm Validate SĐT + Chức năng Quên Mật Khẩu ***)
+
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     FaLock, FaEye, FaEyeSlash, FaUser, FaEnvelope, FaSignInAlt,
     FaMapMarkerAlt, FaPhone, FaInfoCircle, FaCheckCircle,
-    FaCalendarAlt // SỬA: Thêm icon Lịch
+    FaCalendarAlt, FaQuestionCircle // SỬA v8: Thêm icon
 } from "react-icons/fa";
 import { getSupabase } from "../lib/supabaseClient";
 
 const supabase = getSupabase();
 
+// --- (SỬA v8) Regex Validate SĐT Việt Nam ---
+const phoneRegex = /^(0(3[2-9]|5[6|8|9]|7[0|6-9]|8[1-6|8|9]|9[0-4|6-9]))\d{7}$/;
+
 // --- Component PasswordStrengthMeter (Định nghĩa đầy đủ ở dưới) ---
-// <<< ĐÃ XÓA ĐỊNH NGHĨA Ở ĐÂY >>>
 
 // --- Component chính ---
 export default function Login() {
     const navigate = useNavigate();
     const location = useLocation();
-    const [mode, setMode] = useState('login');
-    // SỬA: Thêm 'ngay_sinh' vào state
+    const [mode, setMode] = useState('login'); // 'login', 'register', 'forgot'
     const initialFormState = { name: "", email: "", password: "", confirm: "", address: "", phone_number: "", ngay_sinh: "" };
     const [form, setForm] = useState(initialFormState);
     const [error, setError] = useState("");
@@ -30,7 +33,7 @@ export default function Login() {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
 
-    // --- Hàm handleSubmit (Đã sửa điều hướng) ---
+    // --- Hàm handleSubmit (Đã sửa điều hướng + Thêm mode 'forgot') ---
      const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
@@ -40,36 +43,37 @@ export default function Login() {
             if (mode === 'register') {
                 if (form.password !== form.confirm) throw new Error("Mật khẩu không khớp.");
                 if (form.password.length < 6) throw new Error("Mật khẩu phải có ít nhất 6 ký tự.");
+                
+                // --- SỬA v8: VALIDATE SĐT ---
+                if (form.phone_number && !phoneRegex.test(form.phone_number)) {
+                    throw new Error("Số điện thoại không hợp lệ. Phải đủ 10 số và đúng đầu số (03, 05, 07, 08, 09).");
+                }
+                // --- KẾT THÚC SỬA SĐT ---
+
                 const { data: { user }, error: signUpError } = await supabase.auth.signUp({ email: form.email, password: form.password, options: { data: { full_name: form.name, } } });
                 if (signUpError) throw signUpError;
                 if (user) {
-                    
-                    // <<< SỬA LỖI 409 TẠI ĐÂY: Thay .insert() bằng .upsert() >>>
-                    // Lý do: Trigger trong DB đã tạo hàng, ta chỉ cần cập nhật (UPDATE) nó.
-                    
-                    // SỬA: Thêm 'ngay_sinh' vào .upsert()
                     const { error: insertError } = await supabase.from('Users').upsert({ 
                         id: user.id, 
                         full_name: form.name, 
                         email: form.email, 
                         address: form.address, 
                         phone_number: form.phone_number,
-                        ngay_sinh: form.ngay_sinh || null // Gửi null nếu rỗng
+                        ngay_sinh: form.ngay_sinh || null 
                     });
                     
                     if (insertError) { console.error("Upsert profile error:", insertError); throw new Error(`Lỗi lưu hồ sơ: ${insertError.message}. Vui lòng thử lại.`); }
                     setSuccess("Đăng ký thành công! 🎉 Vui lòng kiểm tra email để xác nhận.");
                     setForm(initialFormState);
                 } else throw new Error("Không thể tạo người dùng.");
-            } else { // Login
+            
+            } else if (mode === 'login') { // Login
                 const { data: { user }, error: signInError } = await supabase.auth.signInWithPassword({ email: form.email, password: form.password });
                 if (signInError) throw new Error("Email hoặc mật khẩu không đúng.");
                 if (user) {
                     const { data: userData, error: userError } = await supabase.from('Users').select('role, is_active').eq('id', user.id).single();
                     if (userError) {
                          if (userError.code === 'PGRST116') {
-                             // Nếu hồ sơ không tồn tại (PGRST116), tạo một hồ sơ cơ bản
-                             // Dùng .upsert() ở đây cũng an toàn hơn
                              const { error: insertError } = await supabase.from('Users').upsert({ id: user.id, email: user.email });
                              if (insertError) throw new Error("Lỗi tạo hồ sơ người dùng.");
                              navigate(location.state?.from?.pathname || "/", { replace: true });
@@ -86,6 +90,19 @@ export default function Login() {
                         throw new Error("Không tìm thấy hồ sơ người dùng.");
                     }
                 }
+            } else if (mode === 'forgot') { // SỬA v8: Thêm mode 'forgot'
+                if (!form.email) throw new Error("Vui lòng nhập email của bạn.");
+                
+                // Gửi yêu cầu lên Supabase (Cần tạo bảng 'password_reset_requests' và set Policy)
+                const { error: requestError } = await supabase
+                    .from('password_reset_requests')
+                    .insert({ email: form.email, is_resolved: false });
+                
+                if (requestError) throw new Error(`Lỗi gửi yêu cầu: ${requestError.message}`);
+                
+                setSuccess("Yêu cầu đã được gửi! Vui lòng liên hệ Admin qua SĐT: 0987.654.321 (hoặc Zalo) và chờ phê duyệt.");
+                setForm(initialFormState);
+                setMode('login'); // Quay lại mode login sau khi thành công
             }
         } catch (err) { setError(err.message || "Đã có lỗi xảy ra."); }
         finally { setLoading(false); }
@@ -139,16 +156,21 @@ export default function Login() {
                 {/* Logo */}
                 <motion.div className="text-center mb-8" variants={inputGroupVariants}>
                      <h2 className="text-4xl font-bold text-white tracking-tight drop-shadow-lg">TourZen</h2>
-                     <p className="text-sm text-sky-300 mt-1">Khám phá thế giới trong tầm tay</p>
+                     <p className="text-sm text-sky-300 mt-1">
+                        {/* SỬA v8: Thay đổi tiêu đề con khi 'forgot' */}
+                        {mode === 'forgot' ? 'Đặt lại mật khẩu' : 'Khám phá thế giới trong tầm tay'}
+                     </p>
                 </motion.div>
 
-                {/* Mode Switcher */}
-                <motion.div className="flex justify-center mb-8" variants={inputGroupVariants}>
-                    <div className="inline-flex rounded-full bg-white/10 p-1 border border-white/20 shadow-inner">
-                        <button onClick={() => handleModeChange('login')} className={`px-5 py-2 text-sm font-medium rounded-full transition-all duration-300 ${mode === 'login' ? 'bg-sky-500 text-white shadow-md' : 'text-gray-200 hover:text-white'}`}>Đăng nhập</button>
-                        <button onClick={() => handleModeChange('register')} className={`px-5 py-2 text-sm font-medium rounded-full transition-all duration-300 ${mode === 'register' ? 'bg-purple-500 text-white shadow-md' : 'text-gray-200 hover:text-white'}`}>Đăng ký</button>
-                    </div>
-                </motion.div>
+                {/* Mode Switcher (Ẩn khi 'forgot') */}
+                {mode !== 'forgot' && (
+                    <motion.div className="flex justify-center mb-8" variants={inputGroupVariants}>
+                        <div className="inline-flex rounded-full bg-white/10 p-1 border border-white/20 shadow-inner">
+                            <button onClick={() => handleModeChange('login')} className={`px-5 py-2 text-sm font-medium rounded-full transition-all duration-300 ${mode === 'login' ? 'bg-sky-500 text-white shadow-md' : 'text-gray-200 hover:text-white'}`}>Đăng nhập</button>
+                            <button onClick={() => handleModeChange('register')} className={`px-5 py-2 text-sm font-medium rounded-full transition-all duration-300 ${mode === 'register' ? 'bg-purple-500 text-white shadow-md' : 'text-gray-200 hover:text-white'}`}>Đăng ký</button>
+                        </div>
+                    </motion.div>
+                )}
 
                 {/* Error/Success Messages */}
                 <AnimatePresence mode="wait">
@@ -182,6 +204,7 @@ export default function Login() {
                             </motion.div>
                         )}
 
+                        {/* (SỬA v8) Email (Hiển thị cho cả 3 mode) */}
                         <motion.div className="relative" variants={inputGroupVariants} layout>
                             <FaEnvelope className="input-icon" />
                             <input type="email" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input-field" required />
@@ -198,7 +221,7 @@ export default function Login() {
                                     <input type="tel" placeholder="Số điện thoại" value={form.phone_number} onChange={(e) => setForm({ ...form, phone_number: e.target.value })} className="input-field" />
                                 </motion.div>
 
-                                {/* === SỬA: THÊM TRƯỜNG NGÀY SINH === */}
+                                {/* === THÊM TRƯỜNG NGÀY SINH === */}
                                 <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
                                     <FaCalendarAlt className="input-icon" />
                                     <input
@@ -209,40 +232,63 @@ export default function Login() {
                                         className="input-field"
                                     />
                                 </motion.div>
-                                {/* === KẾT THÚC SỬA === */}
                             </>
                         )}
 
-                        <motion.div className="relative" variants={inputGroupVariants} layout>
-                            <FaLock className="input-icon" />
-                            <input type={showPassword ? "text" : "password"} placeholder="Mật khẩu" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="input-field pr-10" required />
-                            <span className="absolute top-1/2 transform -translate-y-1/2 right-3 cursor-pointer text-gray-400 hover:text-white transition-colors" onClick={() => setShowPassword(!showPassword)}>
-                                {showPassword ? <FaEyeSlash /> : <FaEye />}
-                            </span>
-                        </motion.div>
+                        {/* (SỬA v8) Ẩn Password khi 'forgot' */}
+                        {mode !== 'forgot' && (
+                            <>
+                                <motion.div className="relative" variants={inputGroupVariants} layout>
+                                    <FaLock className="input-icon" />
+                                    <input type={showPassword ? "text" : "password"} placeholder="Mật khẩu" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="input-field pr-10" required />
+                                    <span className="absolute top-1/2 transform -translate-y-1/2 right-3 cursor-pointer text-gray-400 hover:text-white transition-colors" onClick={() => setShowPassword(!showPassword)}>
+                                        {showPassword ? <FaEyeSlash /> : <FaEye />}
+                                    </span>
+                                </motion.div>
 
-                        {mode === 'register' && (
-                            <motion.div variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
-                                <PasswordStrengthMeter password={form.password} />
-                            </motion.div>
-                        )}
+                                {mode === 'register' && (
+                                    <motion.div variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
+                                        <PasswordStrengthMeter password={form.password} />
+                                    </motion.div>
+                                )}
 
-                        {mode === 'register' && (
-                            <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
-                                <FaLock className="input-icon" />
-                                <input type={showConfirm ? "text" : "password"} placeholder="Nhập lại mật khẩu" value={form.confirm} onChange={(e) => setForm({ ...form, confirm: e.target.value })} className="input-field pr-10" required />
-                                <span className="absolute top-1/2 transform -translate-y-1/2 right-3 cursor-pointer text-gray-400 hover:text-white transition-colors" onClick={() => setShowConfirm(!showConfirm)}>
-                                    {showConfirm ? <FaEyeSlash /> : <FaEye />}
-                                </span>
-                            </motion.div>
+                                {mode === 'register' && (
+                                    <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
+                                        <FaLock className="input-icon" />
+                                        <input type={showConfirm ? "text" : "password"} placeholder="Nhập lại mật khẩu" value={form.confirm} onChange={(e) => setForm({ ...form, confirm: e.target.value })} className="input-field pr-10" required />
+                                        <span className="absolute top-1/2 transform -translate-y-1/2 right-3 cursor-pointer text-gray-400 hover:text-white transition-colors" onClick={() => setShowConfirm(!showConfirm)}>
+                                            {showConfirm ? <FaEyeSlash /> : <FaEye />}
+                                        </span>
+                                    </motion.div>
+                                )}
+                            </>
                         )}
                     </AnimatePresence>
+                     
+                    {/* (SỬA v8) Ghi chú cho mode 'forgot' */}
+                    {mode === 'forgot' && (
+                       <motion.p 
+                           className="text-sm text-center text-gray-200"
+                           variants={inputGroupVariants}
+                       >
+                           Nhập email của bạn. Một yêu cầu sẽ được gửi đến Admin.
+                           <br/>
+                           <b className="text-white">SĐT Admin: 0987.654.321</b>.
+                           <br/>
+                           Vui lòng liên hệ và chờ phê duyệt.
+                       </motion.p>
+                    )}
 
                     {/* Submit Button */}
                     <motion.button
                         type="submit"
                         disabled={loading}
-                        className={`w-full bg-gradient-to-r ${mode === 'login' ? 'from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700' : 'from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700'} text-white py-3.5 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center space-x-2 mt-8 transform active:scale-[0.97]`}
+                        /* (SỬA v8) Thêm màu cho 'forgot' */
+                        className={`w-full bg-gradient-to-r ${
+                            mode === 'login' ? 'from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700' 
+                            : mode === 'register' ? 'from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700' 
+                            : 'from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700'
+                        } text-white py-3.5 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center space-x-2 mt-8 transform active:scale-[0.97]`}
                         whileHover={{ scale: 1.03, y: -3, transition: { type: 'spring', stiffness: 300 } }}
                         variants={inputGroupVariants}
                     >
@@ -255,11 +301,28 @@ export default function Login() {
                             </>
                         ) : (
                             <>
-                               {mode === 'login' ? <FaSignInAlt /> : <FaUser />}
-                               <span>{mode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}</span>
+                               {/* (SỬA v8) Thêm icon cho 'forgot' */}
+                               {mode === 'login' ? <FaSignInAlt /> : mode === 'register' ? <FaUser /> : <FaQuestionCircle />}
+                               <span>{mode === 'login' ? 'Đăng nhập' : mode === 'register' ? 'Tạo tài khoản' : 'Gửi yêu cầu'}</span>
                             </>
                         )}
                     </motion.button>
+                    
+                    {/* (SỬA v8) Nút 'Quên mật khẩu' / 'Quay lại Đăng nhập' */}
+                    <motion.div className="text-center pt-2" variants={inputGroupVariants}>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setError("");
+                                setSuccess("");
+                                setForm(initialFormState); // Reset form khi chuyển
+                                setMode(mode === 'forgot' ? 'login' : 'forgot');
+                            }}
+                            className="text-sm text-sky-300 hover:text-white transition-colors"
+                        >
+                            {mode === 'forgot' ? 'Quay lại trang Đăng nhập' : (mode === 'login' ? 'Quên mật khẩu?' : '')}
+                        </button>
+                    </motion.div>
                 </motion.form>
             </motion.div>
 
@@ -330,10 +393,9 @@ export default function Login() {
 
 // --- Component PasswordStrengthMeter (Định nghĩa đầy đủ ở đây) ---
 const PasswordStrengthMeter = ({ password }) => {
-    const [strength, setStrength] = useState({ score: 0, label: '', color: '', textColor: 'text-gray-400' }); // <<< Mặc định màu text xám nhạt
-
+    const [strength, setStrength] = useState({ score: 0, label: '', color: '', textColor: 'text-gray-400' });
     useEffect(() => {
-        let score = 0; let label = 'Yếu 😕'; let color = 'bg-red-500'; let textColor = 'text-red-300'; // <<< Màu chữ sáng hơn
+        let score = 0; let label = 'Yếu 😕'; let color = 'bg-red-500'; let textColor = 'text-red-300';
         if (!password) { setStrength({ score: 0, label: '', color: '', textColor: 'text-gray-400' }); return; }
         if (password.length >= 8) score++; if (/[A-Z]/.test(password)) score++; if (/[a-z]/.test(password)) score++; if (/[0-9]/.test(password)) score++; if (/[^A-Za-z0-9]/.test(password)) score++;
         switch (score) {
@@ -349,7 +411,7 @@ const PasswordStrengthMeter = ({ password }) => {
 
     return (
         <div className="w-full mt-1">
-            <div className="relative w-full h-1.5 bg-white/20 rounded-full overflow-hidden"> {/* <<< Nền thanh trắng mờ */}
+            <div className="relative w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
                 <motion.div
                     className={`absolute top-0 left-0 h-full rounded-full ${strength.color}`}
                     initial={{ width: '0%' }}
@@ -361,7 +423,7 @@ const PasswordStrengthMeter = ({ password }) => {
                 {strength.label && (
                     <motion.p
                         key={strength.label}
-                        className={`text-xs text-right mt-1 font-medium ${strength.textColor}`} // <<< Dùng textColor đã sửa
+                        className={`text-xs text-right mt-1 font-medium ${strength.textColor}`}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}

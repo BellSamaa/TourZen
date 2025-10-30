@@ -1,5 +1,5 @@
 // src/pages/Payment.jsx
-// (V12: Sửa lỗi thiếu 'async' và THÊM LẠI logic trừ inventory dịch vụ)
+// (V13: Thêm phương thức 'virtual_qr' và lưu 'payment_method' vào booking)
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -12,7 +12,8 @@ import {
     FaUserTie // Icon Người già
 } from "react-icons/fa";
 import { IoIosMail, IoIosCall } from "react-icons/io";
-import { Buildings, Ticket, CircleNotch, X, WarningCircle } from "@phosphor-icons/react"; 
+// (MỚI) Thêm icon QrCode
+import { Buildings, Ticket, CircleNotch, X, WarningCircle, QrCode, Bank } from "@phosphor-icons/react"; 
 import { getSupabase } from "../lib/supabaseClient";
 import toast from 'react-hot-toast';
 import { useAuth } from "../context/AuthContext.jsx"; // Cần user auth
@@ -98,6 +99,7 @@ export default function Payment() {
     // State khác
     const [contactInfo, setContactInfo] = useState({ name: "", phone: "", email: "", address: "" });
     const [notes, setNotes] = useState("");
+    // (SỬA) Mặc định là 'direct'
     const [paymentMethod, setPaymentMethod] = useState("direct");
     const [selectedBranch, setSelectedBranch] = useState("VP Hà Nội: Số 123, Đường ABC, Quận Hoàn Kiếm");
     const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -424,11 +426,11 @@ export default function Payment() {
         setIsCheckingVoucher(false);
     };
 
-    // --- (CẬP NHẬT) HÀM CHECKOUT (ĐÃ SỬA: Thêm 'async' và logic trừ inventory Dịch vụ) ---
-    const handleCheckout = async (e) => { // <--- SỬA 1: THÊM 'async'
+    // --- (CẬP NHẬT) HÀM CHECKOUT (Thêm payment_method và điều hướng) ---
+    const handleCheckout = async (e) => { 
         e.preventDefault();
 
-        // 1. Kiểm tra dữ liệu
+        // 1. Kiểm tra dữ liệu (Giữ nguyên)
         if (!currentUser) { showNotification("Bạn cần đăng nhập..."); navigate('/login', { state: { from: location } }); return; }
         if (!contactInfo.name || !contactInfo.phone || !contactInfo.email) { showNotification("Vui lòng điền đủ thông tin liên lạc."); return; }
         if (displayItems.length === 0) { showNotification("Giỏ hàng trống."); return; }
@@ -448,11 +450,9 @@ export default function Payment() {
         let bookingErrorOccurred = false;
         let successfulBookingIds = [];
         const bookingPromises = []; // Khai báo mảng
-
-        // SỬA 2: Tính tổng số khách cho dịch vụ (ví dụ: vé máy bay)
         const totalAllGuests = displayItems.reduce((sum, i) => sum + (i.adults || 0) + (i.children || 0) + (i.elders || 0) + (i.infants || 0), 0);
 
-        // 2. Xử lý từng tour
+        // 2. Xử lý từng tour (Giữ nguyên logic RPC)
         for (const item of displayItems) {
             const numAdults = item.adults || 0;
             const numChildren = item.children || 0;
@@ -465,95 +465,57 @@ export default function Payment() {
                 departure_id_input: item.departure_id,
                 guest_count_input: quantity
             });
-
             if (rpcError || !bookedSuccess) { 
                 console.error("Lỗi RPC book_tour_slot:", rpcError);
                 toast.error(`"${item.title}": Đã hết chỗ hoặc lỗi. ${rpcError?.message || ''}`);
                 bookingErrorOccurred = true;
-                break; // Dừng nếu có lỗi
+                break; 
         	 }
 
-            // 2.2. (SỬA 3) Giữ chỗ DỊCH VỤ
-            // Chỉ chạy một lần cho dịch vụ của cả đơn hàng (gắn vào tour đầu tiên)
+            // 2.2. Giữ chỗ DỊCH VỤ (Giữ nguyên logic RPC)
             if (item === displayItems[0]) {
                 const servicePromises = [];
-                
-                // Trừ 1 inventory cho Khách sạn (giả định 1 đơn/1 phòng)
-                if (selectedHotel) {
-                    servicePromises.push(
-                        supabase.rpc('book_service_slot', { 
-                            product_id_input: selectedHotel, 
-                            quantity_input: 1 
-                        })
-                    );
-                }
-                
-                // Trừ 1 inventory cho Xe (giả định 1 đơn/1 xe)
-                if (selectedTransport) {
-                    servicePromises.push(
-                        supabase.rpc('book_service_slot', { 
-                            product_id_input: selectedTransport, 
-                            quantity_input: 1 
-                        })
-                    );
-                }
-                
-                // Trừ inventory cho Vé máy bay (giả định 1 vé / 1 khách)
-                if (selectedFlight) {
-                    servicePromises.push(
-                        supabase.rpc('book_service_slot', { 
-                            product_id_input: selectedFlight, 
-                            quantity_input: totalAllGuests // Dùng tổng số khách
-                        })
-                    );
-                }
+                if (selectedHotel) servicePromises.push(supabase.rpc('book_service_slot', { product_id_input: selectedHotel, quantity_input: 1 }));
+                if (selectedTransport) servicePromises.push(supabase.rpc('book_service_slot', { product_id_input: selectedTransport, quantity_input: 1 }));
+                if (selectedFlight) servicePromises.push(supabase.rpc('book_service_slot', { product_id_input: selectedFlight, quantity_input: totalAllGuests }));
 
-                // Chạy tất cả các RPC dịch vụ
                 if (servicePromises.length > 0) {
                     const serviceResults = await Promise.all(servicePromises);
-                    
-                    // Kiểm tra kết quả
                     for (const result of serviceResults) {
-                        // Nếu 'data' trả về false (hết hàng) hoặc có lỗi
                         if (result.error || !result.data) { 
                             console.error("Lỗi RPC book_service_slot:", result.error);
                             toast.error("Lỗi: Một dịch vụ (Xe/KS/Vé) đã hết hàng.");
                             bookingErrorOccurred = true;
-                            
-                            // (Quan trọng) Rollback lại slot tour đã giữ
                             await supabase.rpc('book_tour_slot', { 
                                 departure_id_input: item.departure_id,
-                                guest_count_input: -quantity // Trừ (âm) để trả lại slot
+                                guest_count_input: -quantity 
                             });
                             break; 
                         }
                     }
                 }
             }
-            
-            // Nếu có lỗi (từ tour hoặc dịch vụ), dừng vòng lặp
             if (bookingErrorOccurred) break;
 
             // 2.3. Tạo bản ghi Booking nếu RPC thành công
-            const itemTotalPrice = calculateItemTotal(item); // Dùng hàm helper
-
+            const itemTotalPrice = calculateItemTotal(item); 
             const bookingPayload = {
                 user_id: currentUser.id, product_id: item.tourId,
                 departure_id: item.departure_id, 
                 departure_date: (departuresData[item.tourId] || []).find(d => d.id === item.departure_id)?.departure_date,
                 quantity: quantity,
                 num_adult: numAdults, num_child: numChildren, num_elder: numElders, num_infant: numInfants,
-                total_price: itemTotalPrice, // Giá tour của item này
+                total_price: itemTotalPrice, 
                 status: 'pending', notes: notes,
-                // Gán dịch vụ & voucher cho booking đầu tiên
                 hotel_product_id: item === displayItems[0] ? selectedHotel || null : null,
                 transport_product_id: item === displayItems[0] ? selectedTransport || null : null,
                 flight_product_id: item === displayItems[0] ? selectedFlight || null : null,
                 voucher_code: item === displayItems[0] ? voucherCode || null : null,
                 voucher_discount: item === displayItems[0] ? voucherDiscount || 0 : 0,
+                // --- (THÊM MỚI) ---
+                payment_method: paymentMethod 
+                // --- (HẾT THÊM MỚI) ---
             };
-
-            // Thêm vào DB (sẽ chạy đồng loạt)
             bookingPromises.push(
                 supabase.from('Bookings').insert(bookingPayload).select('id')
             );
@@ -563,31 +525,49 @@ export default function Payment() {
         if (!bookingErrorOccurred) {
             try {
                 const results = await Promise.all(bookingPromises);
-                
                 successfulBookingIds = results.map(r => r.data?.[0]?.id).filter(Boolean);
 
+                if (successfulBookingIds.length === 0) {
+                   throw new Error("Không thể tạo đơn hàng, vui lòng thử lại.");
+                }
+
                 if (!isBuyNow) clearCart(); 
-                toast.success("Đặt tour thành công! Kiểm tra email để xem chi tiết.");
+                toast.success("Đã giữ chỗ thành công!");
                 
-                navigate('/booking-success', { 
-                    state: { 
-                        bookingIds: successfulBookingIds,
-                        method: paymentMethod,
-                        branch: selectedBranch,
-                        deadline: formattedDeadline
-                    } 
-                });
+                // --- (CẬP NHẬT) Điều hướng dựa trên paymentMethod ---
+                if (paymentMethod === 'virtual_qr') {
+                    // Đi đến trang thanh toán ảo
+                    navigate('/virtual-payment', { 
+                        state: { 
+                            bookingIds: successfulBookingIds,
+                            finalTotal: finalTotal, // Tổng tiền cuối cùng
+                            contactInfo: contactInfo, // Thông tin liên lạc
+                            deadline: formattedDeadline
+                        } 
+                    });
+                } else {
+                    // Đi đến trang thành công (cho 'direct' và 'transfer')
+                    navigate('/booking-success', { 
+                        state: { 
+                            bookingIds: successfulBookingIds,
+                            method: paymentMethod,
+                            branch: selectedBranch,
+                            deadline: formattedDeadline,
+                            total: finalTotal // (Thêm) Gửi tổng tiền
+                        } 
+                    });
+                }
+                // --- (HẾT CẬP NHẬT) ---
 
             } catch (insertError) { 
                  console.error("Lỗi insert Bookings:", insertError);
                  toast.error("Lỗi khi lưu đơn hàng. Đang thử hoàn lại chỗ...");
                  bookingErrorOccurred = true;
                  
-                 // (SỬA 4) Rollback dịch vụ và tour nếu insert lỗi
+                 // Rollback (Giữ nguyên)
                  console.warn("ĐANG THỬ ROLLBACK...");
                  for (const item of displayItems) {
                      const quantity = (item.adults || 0) + (item.children || 0) + (item.elders || 0) + (item.infants || 0);
-                     // Bỏ 'await' nếu không cần thiết trong vòng lặp (cho phép chạy song song)
                      supabase.rpc('book_tour_slot', { 
                         departure_id_input: item.departure_id,
                         guest_count_input: -quantity 
@@ -598,7 +578,6 @@ export default function Payment() {
                  if(selectedFlight) supabase.rpc('book_service_slot', { product_id_input: selectedFlight, quantity_input: -totalAllGuests });
             }
         }
-
         setIsSubmitting(false);
     };
     // --- KẾT THÚC CHECKOUT ---
@@ -633,7 +612,7 @@ export default function Payment() {
                  <form onSubmit={handleCheckout} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                      {/* Cột Trái */}
                      <div className="lg:col-span-2 space-y-6">
-                        {/* Mục Tour & Số lượng */}
+                        {/* Mục Tour & Số lượng (Giữ nguyên JSX) */}
                         <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg overflow-hidden border dark:border-neutral-700">
                             <h2 className="text-xl font-semibold p-5 border-b dark:border-neutral-700 flex items-center gap-2 text-gray-800 dark:text-white">
                                 <FaUmbrellaBeach className="text-sky-500" />
@@ -750,7 +729,7 @@ export default function Payment() {
                             </AnimatePresence>
                         </div>
                         
-                        {/* Thông tin liên lạc */}
+                        {/* Thông tin liên lạc (Giữ nguyên JSX) */}
                         <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg p-5 border dark:border-neutral-700">
                            <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white flex items-center gap-2"><FaUserFriends className="text-sky-500"/> THÔNG TIN LIÊN LẠC</h2>
                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -762,7 +741,7 @@ export default function Payment() {
                            <p className="text-xs text-gray-500 mt-3 italic">* Thông tin bắt buộc</p>
                         </div>
                         
-                        {/* Dịch vụ cộng thêm */}
+                        {/* Dịch vụ cộng thêm (Giữ nguyên JSX) */}
                         {(availableServices.hotels.length > 0 || availableServices.transport.length > 0 || availableServices.flights.length > 0) && (
                            <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg p-5 border dark:border-neutral-700">
                                <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white flex items-center gap-2"><FaPlus className="text-sky-500"/> DỊCH VỤ CỘNG THÊM (Tùy chọn)</h2>
@@ -818,30 +797,41 @@ export default function Payment() {
                            </div>
                         )}
                         
-                        {/* Ghi chú */}
+                        {/* Ghi chú (Giữ nguyên JSX) */}
                         <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg p-5 border dark:border-neutral-700">
                            <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">GHI CHÚ</h2>
                            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Yêu cầu đặc biệt (ví dụ: ăn chay, phòng tầng cao...)" className="input-style w-full h-24" />
                         </div>
                         
-                        {/* Phương thức thanh toán */}
+                        {/* (CẬP NHẬT) Phương thức thanh toán */}
                         <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg p-5 border dark:border-neutral-700">
                             <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">PHƯƠNG THỨC THANH TOÁN</h2>
                             <div className="space-y-3">
-                                <label className="flex items-center p-3 border dark:border-neutral-600 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-700/50 cursor-pointer">
+                                {/* 1. Trực tiếp */}
+                                <label className="flex items-center p-3 border dark:border-neutral-600 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-700/50 cursor-pointer transition-colors">
                                     <input type="radio" name="paymentMethod" value="direct" checked={paymentMethod === "direct"} onChange={(e) => setPaymentMethod(e.target.value)} className="mr-3 text-sky-600 focus:ring-sky-500"/>
+                                    <Bank size={20} className="mr-2 text-sky-600 dark:text-sky-400" />
                                     <span className="font-medium dark:text-white">Thanh toán trực tiếp tại văn phòng</span>
                                 </label>
-                                <label className="flex items-center p-3 border dark:border-neutral-600 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-700/50 cursor-pointer">
+                                
+                                {/* 2. Chuyển khoản (Admin xác nhận) */}
+                                <label className="flex items-center p-3 border dark:border-neutral-600 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-700/50 cursor-pointer transition-colors">
                                     <input type="radio" name="paymentMethod" value="transfer" checked={paymentMethod === "transfer"} onChange={(e) => setPaymentMethod(e.target.value)} className="mr-3 text-sky-600 focus:ring-sky-500"/>
-                                    <span className="font-medium dark:text-white">Chuyển khoản ngân hàng (Admin sẽ gọi xác nhận)</span>
+                                    <IoIosCall size={20} className="mr-2 text-sky-600 dark:text-sky-400" />
+                                    <span className="font-medium dark:text-white">Chuyển khoản (Admin sẽ gọi xác nhận)</span>
                                 </label>
-                                {/* Thêm VNPAY/MOMO nếu có */}
+
+                                {/* 3. (MỚI) QR Ảo */}
+                                <label className="flex items-center p-3 border dark:border-neutral-600 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-700/50 cursor-pointer transition-colors">
+                                    <input type="radio" name="paymentMethod" value="virtual_qr" checked={paymentMethod === "virtual_qr"} onChange={(e) => setPaymentMethod(e.target.value)} className="mr-3 text-sky-600 focus:ring-sky-500"/>
+                                    <QrCode size={20} className="mr-2 text-sky-600 dark:text-sky-400" />
+                                    <span className="font-medium dark:text-white">Thanh toán QR Ảo (Giả lập)</span>
+                                </label>
                             </div>
                         </div>
                      </div>
 
-                     {/* Cột Phải: Tóm tắt */}
+                     {/* Cột Phải: Tóm tắt (Giữ nguyên JSX) */}
                      <aside className="lg:col-span-1">
                          <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg border dark:border-neutral-700 p-5 sticky top-24">
                              <h2 className="text-xl font-semibold mb-4 pb-4 border-b dark:border-neutral-700 text-gray-800 dark:text-white">TÓM TẮT ĐƠN HÀNG</h2>
@@ -913,7 +903,7 @@ export default function Payment() {
                  </form>
              </div>
              
-             {/* Notification */}
+             {/* Notification (Giữ nguyên JSX) */}
              <AnimatePresence>
                 {notification.message && (
                     <motion.div
@@ -927,7 +917,7 @@ export default function Payment() {
                 )}
              </AnimatePresence>
              
-             {/* Styles */}
+             {/* Styles (Giữ nguyên JSX) */}
              <style jsx>{`
                 .input-style { @apply border border-gray-300 p-2 rounded-md w-full dark:bg-neutral-700 dark:border-neutral-600 dark:text-white focus:ring-sky-500 focus:border-sky-500 transition-colors duration-200 text-sm; }
                 .button-secondary { @apply px-4 py-2 bg-neutral-200 dark:bg-neutral-600 rounded-md font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-500 dark:text-neutral-900 dark:text-neutral-100 text-sm disabled:opacity-50; }
