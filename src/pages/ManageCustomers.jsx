@@ -5,18 +5,18 @@
 /* *** SỬA LỖI v7.7 (Fix Lỗi Mất Focus Input) ***
   (Giữ nguyên)
 */
-/* *** NÂNG CẤP v9 (Thay đổi Luồng Reset Mật Khẩu) ***
-  1. (Sửa Component) Thay đổi `PasswordResetRequests` để Admin có thể
-     kích hoạt Gửi Email/Link Reset Mật Khẩu.
-  2. (Giữ lại logic cũ) Giữ lại logic cũ (dùng bảng password_reset_requests) 
-     nhưng đổi tên nút hành động để Admin thực hiện.
-  LƯU Ý: Luồng mới trên Login.jsx sử dụng Supabase Auth Recovery OTP.
-     Component này sẽ mô phỏng việc Admin hỗ trợ khách hàng bằng cách 
-     thực hiện hành động reset thủ công.
+/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v10 (Admin Tạo Mã OTP 6 Số) ***
+  1. (Sửa Component) Thay đổi `PasswordResetRequests` để Admin
+     kích hoạt tạo mã OTP 6 số.
+  2. (Sửa Logic) Mã này được lưu vào cột `token` và `expires_at`
+     của bảng `password_reset_requests`.
+  3. (Hiển thị) Hiển thị mã OTP cho Admin để Admin có thể
+     gửi thủ công cho khách hàng.
 */
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { FaSpinner, FaSearch, FaTrash, FaBell, FaPaperPlane } from "react-icons/fa"; // SỬA v9: Thêm FaPaperPlane
+// (SỬA v10) Bỏ FaPaperPlane, dùng Sparkle đã import
+import { FaSpinner, FaSearch, FaTrash, FaBell } from "react-icons/fa"; 
 import {
   UserList, CaretLeft, CaretRight, CircleNotch, X, Plus, UsersThree, Crown, Sparkle, Wallet,
   PencilSimple, List, Package, Bed, Airplane, Receipt, Info,
@@ -167,8 +167,8 @@ const CustomerStats = () => {
   );
 };
 
-// --- (*** SỬA v9: THAY ĐỔI COMPONENT YÊU CẦU RESET MẬT KHẨU ***) ---
-// --- Component Hiển Thị Yêu Cầu Reset Mật Khẩu (Vẫn dựa trên bảng `password_reset_requests` cũ) ---
+// --- (*** SỬA v10: THAY ĐỔI COMPONENT YÊU CẦU RESET MẬT KHẨU ***) ---
+// --- Component Hiển Thị Yêu Cầu Reset Mật Khẩu (Dựa trên bảng `password_reset_requests`) ---
 const PasswordResetRequests = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -179,7 +179,8 @@ const PasswordResetRequests = () => {
     try {
       const { data, error } = await supabase
         .from("password_reset_requests")
-        .select("id, email, requested_at")
+        // (SỬA v10) Lấy thêm token và expires_at
+        .select("id, email, requested_at, token, expires_at") 
         .eq("is_resolved", false) // Chỉ lấy các yêu cầu CHƯA giải quyết
         .order("requested_at", { ascending: true });
       if (error) throw error;
@@ -195,35 +196,35 @@ const PasswordResetRequests = () => {
   // Fetch data khi component mount
   useEffect(() => {
     fetchRequests();
-    // Thiết lập polling để cập nhật tự động (tùy chọn)
-    const interval = setInterval(fetchRequests, 60000); // Tải lại mỗi 60 giây
+    const interval = setInterval(fetchRequests, 60000); 
     return () => clearInterval(interval);
   }, [fetchRequests]);
 
-  // SỬA v9: Hàm xử lý Gửi Email Reset Mật Khẩu
-  const handleSendResetEmail = async (email, id) => {
+  // (SỬA v10): Hàm xử lý Tạo Mã OTP 6 Số
+  const handleGenerateResetCode = async (id) => {
     try {
-      // 1. Gửi email reset mật khẩu từ Supabase (sẽ gửi link hoặc mã OTP)
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password` // Nếu dùng link
-        // Nếu dùng OTP: Khách hàng chỉ cần làm lại luồng 'forgot' trên Login.jsx
-        // Vì Supabase không có API để Admin gửi OTP thay mặt user,
-        // ta mô phỏng bằng cách dùng `resetPasswordForEmail` (gửi link).
-      });
-      if (resetError) throw resetError;
+      // 1. Tạo mã OTP 6 số
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      // 2. Tạo thời gian hết hạn (ví dụ: 10 phút)
+      const expires_at = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
-      // 2. Cập nhật cột is_resolved = true (giả định là Admin đã hỗ trợ)
+      // 3. Cập nhật mã OTP và thời hạn vào bảng
       const { error: updateError } = await supabase
         .from("password_reset_requests")
-        .update({ is_resolved: true })
+        .update({ 
+          token: otp, 
+          expires_at: expires_at,
+          is_resolved: false // Đảm bảo nó vẫn chưa được giải quyết
+        })
         .eq("id", id);
+        
       if (updateError) throw updateError;
       
-      toast.success("Đã gửi email/link reset mật khẩu cho khách hàng!");
-      fetchRequests(); // Tải lại danh sách
+      toast.success(`Đã tạo mã OTP: ${otp}. Vui lòng cung cấp mã này cho khách hàng.`);
+      fetchRequests(); // Tải lại danh sách để hiển thị mã
     } catch (err) {
-      console.error("Lỗi xử lý yêu cầu:", err);
-      toast.error("Lỗi xử lý yêu cầu: " + err.message);
+      console.error("Lỗi tạo mã OTP:", err);
+      toast.error("Lỗi tạo mã OTP: " + err.message);
     }
   };
 
@@ -252,32 +253,50 @@ const PasswordResetRequests = () => {
         Yêu Cầu Hỗ Trợ Đổi Mật Khẩu ({requests.length})
       </h3>
       <div className="space-y-3 max-h-60 overflow-y-auto simple-scrollbar pr-2">
-        {requests.map((req) => (
-          <motion.div 
-            key={req.id} 
-            className="flex flex-wrap justify-between items-center bg-white/20 p-4 rounded-lg gap-3"
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-          >
-            <div>
-              <span className="font-bold text-lg">{req.email}</span>
-              <span className="block text-sm opacity-90">
-                Yêu cầu lúc: {new Date(req.requested_at).toLocaleString('vi-VN')}
-              </span>
-            </div>
-            <button
-              onClick={() => handleSendResetEmail(req.email, req.id)} // SỬA v9: Gửi link/mã
-              className="px-4 py-2 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors shadow-md flex items-center gap-2"
+        {requests.map((req) => {
+          // (SỬA v10) Kiểm tra token/hết hạn
+          const isExpired = req.expires_at && new Date(req.expires_at) < new Date();
+          const hasValidToken = req.token && !isExpired;
+
+          return (
+            <motion.div 
+              key={req.id} 
+              className="flex flex-wrap justify-between items-center bg-white/20 p-4 rounded-lg gap-3"
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
             >
-              <FaPaperPlane/> Gửi Link/OTP Reset
-            </button>
-          </motion.div>
-        ))}
+              <div>
+                <span className="font-bold text-lg">{req.email}</span>
+                <span className="block text-sm opacity-90">
+                  Yêu cầu lúc: {new Date(req.requested_at).toLocaleString('vi-VN')}
+                </span>
+                {/* (SỬA v10) Hiển thị mã nếu có */}
+                {hasValidToken && (
+                  <span className="block text-sm font-bold text-green-200 mt-1">
+                    Mã OTP: {req.token} (Hiệu lực đến: {new Date(req.expires_at).toLocaleTimeString('vi-VN')})
+                  </span>
+                )}
+                {req.token && isExpired && (
+                  <span className="block text-sm font-bold text-yellow-200 mt-1">
+                    Mã OTP ({req.token}) đã hết hạn.
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => handleGenerateResetCode(req.id)} // (SỬA v10)
+                className="px-4 py-2 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors shadow-md flex items-center gap-2"
+              >
+                <Sparkle/> 
+                {hasValidToken ? "Tạo Lại Mã" : "Tạo Mã OTP"}
+              </button>
+            </motion.div>
+          );
+        })}
       </div>
     </motion.div>
   );
 };
-// --- (*** KẾT THÚC SỬA COMPONENT MỚI v9 ***) ---
+// --- (*** KẾT THÚC SỬA COMPONENT MỚI v10 ***) ---
 
 
 // --- Component Modal Xem Chi Tiết Đơn Hàng (Giữ nguyên) ---
@@ -688,9 +707,9 @@ export default function ManageCustomersSupabase() {
 
       <CustomerStats />
 
-      {/* --- (*** SỬA v9: COMPONENT YÊU CẦU RESET MẬT KHẨU ***) --- */}
+      {/* --- (*** SỬA v10: COMPONENT YÊU CẦU RESET MẬT KHẨU ***) --- */}
       <PasswordResetRequests />
-      {/* --- (*** KẾT THÚC SỬA v9 ***) --- */}
+      {/* --- (*** KẾT THÚC SỬA v10 ***) --- */}
 
       <div className="bg-white dark:bg-slate-800 shadow-2xl shadow-gray-200/50 dark:shadow-black/30 rounded-2xl overflow-hidden border border-gray-200 dark:border-slate-700">
         <div className="p-5 border-b border-gray-200 dark:border-slate-700">
