@@ -1,5 +1,5 @@
 // src/pages/ManageTour.jsx
-// (V12: FIX LỖI PARSING - Đã xóa comment khỏi chuỗi select)
+// (V13: FIX LỖI QUERY REVIEWS - Sử dụng tên Foreign Key tường minh)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -425,6 +425,7 @@ const EditBookingModal = ({
     );
 };
 
+
 // --- Component Modal Xác nhận Xóa (Giữ nguyên) ---
 const DeleteConfirmationModal = ({ booking, onClose, onConfirm }) => {
     const [isDeleting, setIsDeleting] = useState(false);
@@ -474,8 +475,9 @@ const DeleteConfirmationModal = ({ booking, onClose, onConfirm }) => {
 const ViewReviewModal = ({ review, onClose }) => {
     if (!review) return null;
 
-    // Lấy tên người dùng (từ cột join Reviews(user) )
-    const userName = review.user?.full_name || review.user?.email || "Khách ẩn danh";
+    // Lấy tên người dùng (từ cột join Reviews(reviewer) )
+    // SỬA V13: Dùng alias 'reviewer' mới
+    const userName = review.reviewer?.full_name || review.reviewer?.email || "Khách ẩn danh";
 
     return (
         <motion.div
@@ -724,7 +726,7 @@ export default function ManageTour() {
     const [viewingReview, setViewingReview] = useState(null); // Lưu object review
 
     
-    // (CẬP NHẬT v11) Fetch Bookings (Fix lỗi Query Reviews)
+    // (CẬP NHẬT v13) Fetch Bookings (Fix lỗi Query Reviews)
     const fetchBookings = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         else setLoading(true); 
@@ -745,7 +747,8 @@ export default function ManageTour() {
                     voucher_code, voucher_discount, notes, 
                     payment_method,
                     Invoices ( id ),
-                    Reviews ( id, rating, comment, user:user_id ( full_name, email ) ) 
+                    -- Cú pháp SỬA LỖI: dùng alias + Tên bảng đích + Tên Foreign Key
+                    Reviews ( id, rating, comment, reviewer:Users!Reviews_user_id_fkey ( full_name, email ) )
                 `, { count: 'exact' }); 
                 
             if (filterStatus !== 'all') { query = query.eq('status', filterStatus); }
@@ -1029,7 +1032,7 @@ export default function ManageTour() {
                                 <th className="th-style-figma">Số người</th>
                                 <th className="th-style-figma text-right">Tổng tiền</th>
                                 <th className="th-style-figma text-center">P.Thức TT</th>
-                                <th className="th-style-figma text-center">Đánh giá</th> {/* Vẫn là v9 */}
+                                <th className="th-style-figma text-center">Đánh giá</th>
                                 <th className="th-style-figma text-center">Trạng thái</th>
                                 <th className="th-style-figma text-center">Thao tác</th>
                             </tr>
