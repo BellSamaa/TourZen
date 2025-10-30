@@ -1,6 +1,6 @@
 // src/pages/BookingHistory.jsx
 // (Đây là trang "Đơn hàng của tôi" có chức năng Đánh giá/Review)
-// (SỬA LỖI: Xóa comment khỏi chuỗi select)
+// (SỬA LỖI v3: Thêm 'booking_id' vào ReviewModal)
 
 import React, { useState, useEffect, useCallback } from "react";
 import { getSupabase } from "../lib/supabaseClient";
@@ -74,15 +74,18 @@ const ReviewModal = ({ booking, onClose, onSubmitSuccess }) => {
     setIsSubmitting(true);
     setError("");
 
-    // Lấy user_id và product_id từ booking
-    const { user_id, product_id } = booking;
+    // ========== SỬA LỖI TẠI ĐÂY ==========
+    // Lấy user_id, product_id, VÀ id (chính là booking_id) từ booking
+    const { user_id, product_id, id: booking_id } = booking; // Thêm 'id: booking_id'
 
     const { error: insertError } = await supabase.from("Reviews").insert({
       user_id: user_id,
       product_id: product_id,
       rating: rating,
       comment: comment.trim(),
+      booking_id: booking_id // <-- THÊM DÒNG NÀY
     });
+    // ======================================
 
     setIsSubmitting(false);
 
@@ -193,8 +196,8 @@ export default function BookingHistory() {
 
     setCurrentUser(user);
 
-    // Lấy dữ liệu từ 'Bookings'
-    // *** SỬA LỖI: Đã xóa các comment lỗi khỏi chuỗi select ***
+    // Code select này bây giờ sẽ hoạt động
+    // vì bạn đã thêm cột 'booking_id' vào 'Reviews'
     const { data, error: fetchError } = await supabase
       .from("Bookings")
       .select(`
@@ -296,6 +299,7 @@ export default function BookingHistory() {
           <div className="space-y-6">
             {bookings.map((booking) => {
               const tour = booking.Products;
+              // 'hasReview' bây giờ sẽ hoạt động chính xác
               const hasReview = booking.Reviews && booking.Reviews.length > 0;
               // Chỉ cho phép review khi tour đã 'confirmed' VÀ tour đó vẫn còn tồn tại (chưa bị xóa)
               const canReview = booking.status === 'confirmed' && tour;
