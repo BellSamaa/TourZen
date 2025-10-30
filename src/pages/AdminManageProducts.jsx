@@ -1,5 +1,6 @@
 // src/pages/AdminManageProducts.jsx
 // (File này đã đúng logic, Admin đặt Giá Bán, NCC lo Slots)
+// (SỬA LỖI: Sửa 'e.container.value' thành 'e.target.value' trong modal)
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from 'react-router-dom';
@@ -307,9 +308,26 @@ const EditTourModalAdmin = ({ tour, onClose, onSuccess, suppliers }) => {
                         <div className="space-y-3 max-h-48 overflow-y-auto pr-2"> 
                             {formData.itinerary.map((item, index) => ( 
                                 <div key={index} className="flex gap-2 items-start"> 
-                                    <input value={item.title} onChange={(e) => handleItineraryChange(index, 'title', e.target.value)} placeholder="Tiêu đề (VD: Ngày 1)" className="input-style !w-32 !text-sm"/> 
-                                    <textarea value={item.content} onChange={(e) => handleItineraryChange(index, 'content', e.target.value)} placeholder="Nội dung lịch trình..." className="input-style flex-1 !text-sm h-16"/> 
-                                    <button type="button" onClick={() => removeItineraryItem(index)} className="button-icon-red mt-1"><Minus/></button> 
+                                    {/* ================================================================== */}
+                                    {/* === SỬA LỖI TẠI ĐÂY: 'e.container.value' -> 'e.target.value' === */}
+                                    {/* ================================================================== */}
+                                    <input 
+                                        value={item.title} 
+                                        onChange={(e) => handleItineraryChange(index, 'title', e.target.value)} 
+                                        placeholder="Tiêu đề (VD: Ngày 1)" 
+                                        className="input-style !w-32 !text-sm"
+                                    /> 
+                                    <textarea 
+                                        value={item.content} 
+                                        onChange={(e) => handleItineraryChange(index, 'content', e.target.value)} 
+                                        placeholder="Nội dung lịch trình..." 
+                                        className="input-style flex-1 !text-sm h-16"
+                                    /> 
+                                    <button 
+                                        type="button" 
+                                        onClick={() => removeItineraryItem(index)} 
+                                        className="button-icon-red mt-1"
+                                    ><Minus/></button> 
                                 </div> 
                             ))} 
                         </div> 
