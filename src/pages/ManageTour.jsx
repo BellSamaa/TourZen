@@ -1,5 +1,5 @@
 // src/pages/ManageTour.jsx
-// (V17: FIX LỖI QUERY REVIEWS CUỐI CÙNG - Join an toàn với auth.users)
+// (V17-Final: FIX LỖI SCHEMA CACHE REVIEWS)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -725,7 +725,7 @@ export default function ManageTour() {
     const [viewingReview, setViewingReview] = useState(null); // Lưu object review
 
     
-    // (CẬP NHẬT v16) Fetch Bookings (Fix lỗi Parsing Reviews)
+    // (CẬP NHẬT v17) Fetch Bookings (Fix lỗi Parsing Reviews)
     const fetchBookings = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         else setLoading(true); 
@@ -734,18 +734,19 @@ export default function ManageTour() {
             const from = (currentPage - 1) * ITEMS_PER_PAGE;
             const to = from + ITEMS_PER_PAGE - 1;
             
-            // SỬA V16/V17: Cú pháp select an toàn (loại bỏ lỗi parsing và lỗi relation)
+            // SỬA V17: Cú pháp select an toàn (đã loại bỏ lỗi parsing) và dùng alias an toàn cho Users
             const selectQuery = `
-                id, created_at, departure_date, status, total_price, quantity,
-                num_adult, num_child, num_elder, num_infant, departure_id,
-                user:user_id ( id, full_name, email ),
-                product:product_id ( id, name, image_url ),
-                hotel:hotel_product_id (id, name),
-                transport:Products!Bookings_transport_product_id_fkey (id, name, price, product_type, details),
-                flight:flight_product_id (id, name, price, product_type, details),
-                voucher_code, voucher_discount, notes, payment_method,
-                Invoices ( id ),
-                Reviews ( id, rating, comment, reviewer:Users!Reviews_user_id_fkey ( full_name, email ) )
+                id,created_at,departure_date,status,total_price,quantity,
+                num_adult,num_child,num_elder,num_infant,departure_id,
+                user:user_id(id,full_name,email),
+                product:product_id(id,name,image_url),
+                hotel:hotel_product_id(id,name),
+                transport:Products!Bookings_transport_product_id_fkey(id,name,price,product_type,details),
+                flight:flight_product_id(id,name,price,product_type,details),
+                voucher_code,voucher_discount,notes,payment_method,
+                Invoices(id),
+                -- Cú pháp an toàn nhất để join Users từ Reviews
+                Reviews(id,rating,comment,reviewer:user_id(full_name,email)) 
             `.replace(/\s+/g, ''); // Loại bỏ tất cả khoảng trắng, tab, newline
             
             let query = supabase
