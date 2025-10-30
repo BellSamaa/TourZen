@@ -1,5 +1,5 @@
 // src/pages/ManageTour.jsx
-// (V9: Thêm cột Payment Method, Nút xem Hóa đơn, VÀ cột xem Đánh giá/Rating)
+// (V10: Thêm Modal "ViewReviewModal" để xem chi tiết bình luận khi bấm vào)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -11,8 +11,9 @@ import {
     User, CalendarBlank, UsersThree, Tag, Wallet, CheckCircle, XCircle, Clock, Info, PencilSimple, Trash, Plus, WarningCircle, Envelope,
     Buildings, AirplaneTilt, Car, Ticket as VoucherIcon, Bank, Image as ImageIcon, FloppyDisk,
     Receipt, // (V8) Icon Hóa đơn
-    Star, // (MỚI v9) Icon Sao
-    ChatCircleDots // (MỚI v9) Icon Bình luận
+    Star, // (V9) Icon Sao
+    ChatCircleDots, // (V9) Icon Bình luận
+    UserCircle // (MỚI v10) Icon user
 } from "@phosphor-icons/react";
 
 // (V8) Import Modal Hóa đơn
@@ -90,13 +91,13 @@ const StatusBadge = ({ status }) => {
   }
 };
 
-// --- (MỚI v9) Component hiển thị sao Rating ---
-const RatingDisplay = ({ rating }) => {
+// --- (V9) Component hiển thị sao Rating ---
+const RatingDisplay = ({ rating, size = 16 }) => {
     const totalStars = 5;
     return (
         <div className="flex justify-center text-yellow-500" title={`${rating}/${totalStars} sao`}>
             {[...Array(totalStars)].map((_, i) => (
-                <Star key={i} weight={i < rating ? "fill" : "regular"} size={16} />
+                <Star key={i} weight={i < rating ? "fill" : "regular"} size={size} />
             ))}
         </div>
     );
@@ -468,6 +469,69 @@ const DeleteConfirmationModal = ({ booking, onClose, onConfirm }) => {
     );
 };
 
+// --- (MỚI v10) Component Modal xem Review ---
+const ViewReviewModal = ({ review, onClose }) => {
+    if (!review) return null;
+
+    const userName = review.user?.full_name || review.user?.email || "Khách ẩn danh";
+
+    return (
+        <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4"
+            onClick={onClose}
+        >
+            <motion.div
+                initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ type: 'spring', damping: 18, stiffness: 250 }}
+                className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div className="flex justify-between items-center p-5 border-b dark:border-slate-700">
+                    <h3 className="text-xl font-semibold text-slate-800 dark:text-white">
+                        Chi tiết Đánh giá
+                    </h3>
+                    <button onClick={onClose} className="text-gray-400 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                        <X size={22} weight="bold" />
+                    </button>
+                </div>
+                
+                {/* Body */}
+                <div className="p-6 space-y-4 overflow-y-auto simple-scrollbar">
+                    <div className="flex items-center gap-3">
+                        <UserCircle size={40} className="text-gray-400" weight="duotone" />
+                        <div>
+                            <p className="font-semibold text-gray-800 dark:text-white">{userName}</p>
+                            <RatingDisplay rating={review.rating} size={20} />
+                        </div>
+                    </div>
+                    <div className="pt-4 border-t dark:border-slate-700">
+                        <p className="text-gray-700 dark:text-gray-300 text-base italic leading-relaxed">
+                            "{review.comment || 'Không có bình luận.'}"
+                        </p>
+                    </div>
+                </div>
+                
+                {/* Footer */}
+                <div className="p-4 border-t dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-b-lg">
+                    <button type="button" onClick={onClose} className="modal-button-primary">
+                        Đóng
+                    </button>
+                </div>
+            </motion.div>
+             <style jsx>{`
+                 /* (Copy style từ các modal khác) */
+                 .modal-button-primary { @apply px-5 py-2 bg-sky-600 text-white rounded-md font-semibold hover:bg-sky-700 text-sm disabled:opacity-50 transition-colors; }
+                 .simple-scrollbar::-webkit-scrollbar { width: 6px; }
+                 .simple-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                 .simple-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+                 .dark .simple-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
+            `}</style>
+        </motion.div>
+    );
+};
+
 
 // --- Component Modal Thêm Đơn Hàng (Giữ nguyên v8) ---
 const AddBookingModal = ({ users, tours, onClose, onSuccess }) => {
@@ -654,7 +718,11 @@ export default function ManageTour() {
     // (V8) State cho Modal Hóa đơn
     const [viewingInvoiceId, setViewingInvoiceId] = useState(null); // Lưu booking_id
     
-    // (CẬP NHẬT v9) Fetch Bookings (thêm join Invoices và Reviews)
+    // (MỚI v10) State cho Modal Review
+    const [viewingReview, setViewingReview] = useState(null); // Lưu object review
+
+    
+    // (CẬP NHẬT v10) Fetch Bookings (thêm join User vào Review)
     const fetchBookings = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         else setLoading(true); 
@@ -675,8 +743,8 @@ export default function ManageTour() {
                     voucher_code, voucher_discount, notes, 
                     payment_method,
                     Invoices ( id ),
-                    Reviews ( id, rating, comment ) 
-                `, { count: 'exact' }); // <-- ĐÃ THÊM REVIEWS
+                    Reviews ( id, rating, comment, user:user_id ( full_name, email ) ) 
+                `, { count: 'exact' }); // <-- ĐÃ THÊM user VÀO REVIEW
                 
             if (filterStatus !== 'all') { query = query.eq('status', filterStatus); }
             if (debouncedSearch) {
@@ -883,6 +951,9 @@ export default function ManageTour() {
     const handleDeleteClick = (booking) => { setBookingToDelete(booking); };
     // (V8) Mở modal hóa đơn
     const handleViewInvoice = (bookingId) => { setViewingInvoiceId(bookingId); };
+    // (MỚI v10) Mở modal review
+    const handleViewReview = (review) => { setViewingReview(review); };
+
     
     const handleAddBooking = () => {
         if (loadingAddData) { toast.loading("Đang tải dữ liệu Users/Tours..."); return; }
@@ -942,7 +1013,7 @@ export default function ManageTour() {
                     </button>
                 </div>
 
-                {/* (CẬP NHẬT v9) Bảng Dữ liệu (Thêm cột Đánh giá) */}
+                {/* (CẬP NHẬT v10) Bảng Dữ liệu (Sửa cột Đánh giá) */}
                 <div className="overflow-x-auto relative">
                     {isFetchingPage && <div className="loading-overlay"><CircleNotch size={32} className="animate-spin text-sky-500" /></div>}
                     <table className="min-w-full divide-y divide-gray-100 dark:divide-slate-700">
@@ -956,7 +1027,7 @@ export default function ManageTour() {
                                 <th className="th-style-figma">Số người</th>
                                 <th className="th-style-figma text-right">Tổng tiền</th>
                                 <th className="th-style-figma text-center">P.Thức TT</th>
-                                <th className="th-style-figma text-center">Đánh giá</th> {/* MỚI v9 */}
+                                <th className="th-style-figma text-center">Đánh giá</th> {/* Vẫn là v9 */}
                                 <th className="th-style-figma text-center">Trạng thái</th>
                                 <th className="th-style-figma text-center">Thao tác</th>
                             </tr>
@@ -992,18 +1063,19 @@ export default function ManageTour() {
                                         {formatPaymentMethod(booking.payment_method)}
                                     </td>
                                     
-                                    {/* (MỚI v9) Cột Đánh giá */}
+                                    {/* (CẬP NHẬT v10) Cột Đánh giá (Thêm onClick) */}
                                     <td className="td-style-figma text-center">
                                         {booking.review_data ? (
                                             <div className="flex flex-col items-center gap-0.5">
                                                 <RatingDisplay rating={booking.review_data.rating} />
                                                 {booking.review_data.comment && (
-                                                    <span 
-                                                        className="cursor-help" 
-                                                        title={`Comment: ${booking.review_data.comment}`}
+                                                    <button 
+                                                        className="action-button-figma text-gray-500 hover:text-sky-500 dark:hover:text-sky-400 p-1"
+                                                        title="Xem bình luận"
+                                                        onClick={() => handleViewReview(booking.review_data)}
                                                     >
-                                                        <ChatCircleDots size={16} className="text-gray-500" />
-                                                    </span>
+                                                        <ChatCircleDots size={16} />
+                                                    </button>
                                                 )}
                                             </div>
                                         ) : (
@@ -1046,7 +1118,7 @@ export default function ManageTour() {
                   </div>
             )}
 
-            {/* (V8) Modals (Thêm Modal Hóa đơn) */}
+            {/* (CẬP NHẬT v10) Modals (Thêm Modal Review) */}
             <AnimatePresence>
                 {modalBooking && (
                     <EditBookingModal 
@@ -1076,6 +1148,14 @@ export default function ManageTour() {
                          bookingId={viewingInvoiceId}
                          onClose={() => setViewingInvoiceId(null)}
                      />
+                )}
+                
+                {/* (MỚI v10) Modal Xem Review */}
+                {viewingReview && (
+                    <ViewReviewModal
+                        review={viewingReview}
+                        onClose={() => setViewingReview(null)}
+                    />
                 )}
             </AnimatePresence>
 
