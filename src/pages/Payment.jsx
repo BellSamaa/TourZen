@@ -546,7 +546,7 @@ export default function Payment() {
                         } 
                     });
                 } else {
-                    // Đi đến trang thành công (cho 'direct' và 'transfer')
+                    // Đi đến trang thành công (cho 'direct')
                     navigate('/booking-success', { 
                         state: { 
                             bookingIds: successfulBookingIds,
@@ -814,14 +814,9 @@ export default function Payment() {
                                     <span className="font-medium dark:text-white">Thanh toán trực tiếp tại văn phòng</span>
                                 </label>
                                 
-                                {/* 2. Chuyển khoản (Admin xác nhận) */}
-                                <label className="flex items-center p-3 border dark:border-neutral-600 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-700/50 cursor-pointer transition-colors">
-                                    <input type="radio" name="paymentMethod" value="transfer" checked={paymentMethod === "transfer"} onChange={(e) => setPaymentMethod(e.target.value)} className="mr-3 text-sky-600 focus:ring-sky-500"/>
-                                    <IoIosCall size={20} className="mr-2 text-sky-600 dark:text-sky-400" />
-                                    <span className="font-medium dark:text-white">Chuyển khoản (Admin sẽ gọi xác nhận)</span>
-                                </label>
+                                {/* 2. (BỊ XÓA: Chuyển khoản Admin) */}
 
-                                {/* 3. (MỚI) QR Ảo */}
+                                {/* 3. QR Ảo */}
                                 <label className="flex items-center p-3 border dark:border-neutral-600 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-700/50 cursor-pointer transition-colors">
                                     <input type="radio" name="paymentMethod" value="virtual_qr" checked={paymentMethod === "virtual_qr"} onChange={(e) => setPaymentMethod(e.target.value)} className="mr-3 text-sky-600 focus:ring-sky-500"/>
                                     <QrCode size={20} className="mr-2 text-sky-600 dark:text-sky-400" />
