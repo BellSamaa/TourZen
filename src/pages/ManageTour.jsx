@@ -1,5 +1,5 @@
 // src/pages/ManageTour.jsx
-// (V11: Fix lỗi query Reviews, thêm Modal xem Review khi click)
+// (V12: FIX LỖI PARSING - Đã xóa comment khỏi chuỗi select)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -653,7 +653,7 @@ const AddBookingModal = ({ users, tours, onClose, onSuccess }) => {
                             <input type="number" id="num_infant" name="num_infant" value={formData.num_infant} onChange={handleChange} min={0} className="input-style w-full mt-1"/>
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t dark:border-slate-700">
+                    <div className="grid grid-cols-2 md:grid-cols-2 gap-4 pt-3 border-t dark:border-slate-700">
                         <div>
                             <label className="label-modal font-semibold" htmlFor="total_price">Tổng tiền (Admin tự nhập) *</label>
                             <input type="number" id="total_price" name="total_price" value={formData.total_price} onChange={handleChange} min={0} className="input-style w-full mt-1 !text-lg !font-bold !text-red-600" required placeholder="0 ₫"/>
@@ -745,7 +745,6 @@ export default function ManageTour() {
                     voucher_code, voucher_discount, notes, 
                     payment_method,
                     Invoices ( id ),
-                    -- SỬA LỖI QUERY: Phải dùng user:user_id để join bảng Users
                     Reviews ( id, rating, comment, user:user_id ( full_name, email ) ) 
                 `, { count: 'exact' }); 
                 
