@@ -1,5 +1,5 @@
 // src/pages/ManageTour.jsx
-// (V13: FIX LỖI QUERY REVIEWS - Sử dụng tên Foreign Key tường minh)
+// (V14: FIX LỖI PARSING QUERY - Chuyển sang cú pháp Array Select an toàn)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -476,7 +476,6 @@ const ViewReviewModal = ({ review, onClose }) => {
     if (!review) return null;
 
     // Lấy tên người dùng (từ cột join Reviews(reviewer) )
-    // SỬA V13: Dùng alias 'reviewer' mới
     const userName = review.reviewer?.full_name || review.reviewer?.email || "Khách ẩn danh";
 
     return (
@@ -747,7 +746,6 @@ export default function ManageTour() {
                     voucher_code, voucher_discount, notes, 
                     payment_method,
                     Invoices ( id ),
-                    -- Cú pháp SỬA LỖI: dùng alias + Tên bảng đích + Tên Foreign Key
                     Reviews ( id, rating, comment, reviewer:Users!Reviews_user_id_fkey ( full_name, email ) )
                 `, { count: 'exact' }); 
                 

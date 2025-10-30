@@ -1,13 +1,14 @@
 // src/pages/Home.jsx
 // (Phiên bản cuối cùng, đã thêm lại các section Điểm Đến, Blog, Features)
-// (SỬA v5: Fix lỗi 'Giá chỉ từ 0 đ' bằng cách kiểm tra giá trị của price/price_adult)
+// (SỬA v6: Fix lỗi 'price_adult' không tồn tại, chỉ dùng 'price' và kiểm tra giá trị)
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { getSupabase } from "../lib/supabaseClient"; // Import Supabase
 import { FaMapMarkerAlt, FaStar, FaAward, FaHeadset, FaTags } from "react-icons/fa";
-import { MapPin, Clock, Fire, Sun, CircleNotch, Star as PhosphorStar, Gift } from "@phosphor-icons/react";
+// (SỬA v2) Thêm Gift (Quà)
+import { MapPin, Clock, Fire, Sun, CircleNotch, Ticket, ArrowRight, Star as PhosphorStar, Gift } from "@phosphor-icons/react";
 
 // Swiper
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -77,10 +78,10 @@ const MostLovedTour = () => {
         const fetchTopTour = async () => {
             setLoading(true);
             
-            // SỬA V5: Lấy cả 'price' và 'price_adult'
+            // SỬA V6: Chỉ select cột 'price' (đã fix lỗi trước)
             const { data, error } = await supabase
                 .from('Products')
-                .select('id, name, image_url, price, price_adult, rating, location') 
+                .select('id, name, image_url, price, rating, location') 
                 .eq('product_type', 'tour')
                 .eq('is_published', true)
                 .order('rating', { ascending: false, nulls: 'last' })
@@ -97,8 +98,8 @@ const MostLovedTour = () => {
         fetchTopTour();
     }, []);
 
-    // SỬA V5: Xác định giá hiển thị (ưu tiên price_adult nếu lớn hơn 0)
-    const displayPrice = tour ? (tour.price_adult > 0 ? tour.price_adult : tour.price) : 0;
+    // SỬA V6: Giá hiển thị chính là cột 'price'
+    const displayPrice = tour?.price || 0;
 
 
     if (loading) {
@@ -108,7 +109,7 @@ const MostLovedTour = () => {
             </div>
         );
     }
-    // SỬA V5: Ẩn nếu không có tour hoặc giá vẫn là 0
+    // SỬA V6: Ẩn nếu không có tour hoặc giá vẫn là 0
     if (!tour || displayPrice === 0) { return null; /* Ẩn đi nếu không có tour hoặc không có giá */ }
 
     return (
@@ -278,8 +279,8 @@ export default function Home() {
             setLoading(true);
             setError(null);
             try {
-                // SỬA V5: Lấy cột 'price' và 'price_adult' từ Products
-                const queryColumns = 'id, name, location, duration, image_url, price, price_adult, rating';
+                // SỬA V6: Chỉ select cột 'price' (đã fix lỗi trước)
+                const queryColumns = 'id, name, location, duration, image_url, price, rating';
 
                 const [featuredPromise, newestPromise] = await Promise.all([
                     supabase.rpc('get_most_booked_tours', { limit_count: 4 }),
@@ -307,12 +308,15 @@ export default function Home() {
                     console.error("Lỗi RPC (get_most_booked_tours):", featuredPromise.error);
                     throw new Error(`Lỗi RPC get_most_booked_tours: ${featuredPromise.error.message}.`);
                 } else {
-                    // SỬA V5: Ánh xạ giá trị hợp lệ (price hoặc price_adult)
-                    const featuredData = (featuredPromise.data || []).map(tour => ({
-                        ...tour,
-                        // Fix lỗi giá 0đ: Ưu tiên price_adult nếu > 0, nếu không dùng price (từ Products)
-                        price: tour.price_adult || tour.price || 0 
-                    }));
+                    // SỬA V6: Lấy giá trị đầu tiên lớn hơn 0
+                    const featuredData = (featuredPromise.data || []).map(tour => {
+                        const priceFromRPC = tour.price_adult || tour.price || 0;
+                        return {
+                            ...tour,
+                            // Gán giá bằng giá từ RPC (ưu tiên price_adult nếu có)
+                            price: priceFromRPC 
+                        };
+                    });
                     setFeaturedTours(featuredData);
                 }
 
@@ -386,7 +390,6 @@ export default function Home() {
             {!loading && !error && featuredTours.length > 0 && (
                 <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
                     {featuredTours.map((tour) => (
-                        // TourCard sử dụng tour.price (đã được ánh xạ)
                         <TourCard key={tour.id} tour={tour} isFeatured={true} />
                     ))}
                 </div>
