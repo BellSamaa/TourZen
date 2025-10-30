@@ -12,6 +12,8 @@ import {
   SignOut,
   House,
   PlusCircle,
+  UserCircle,
+  Gear
 } from "@phosphor-icons/react";
 import { useAuth } from "../context/AuthContext";
 
