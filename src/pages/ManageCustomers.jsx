@@ -13,6 +13,11 @@
   3. (Hiển thị) Hiển thị mã OTP cho Admin để Admin có thể
      gửi thủ công cho khách hàng.
 */
+/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v10.1 (Thêm nút Giải Quyết Yêu Cầu) ***
+  1. (Thêm Logic) Thêm hàm `handleResolveRequest` để cập nhật
+     `is_resolved = true` cho một yêu cầu.
+  2. (Thêm UI) Thêm nút 'X' để kích hoạt hàm `handleResolveRequest`.
+*/
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 // (SỬA v10) Bỏ FaPaperPlane, dùng Sparkle đã import
@@ -167,7 +172,7 @@ const CustomerStats = () => {
   );
 };
 
-// --- (*** SỬA v10: THAY ĐỔI COMPONENT YÊU CẦU RESET MẬT KHẨU ***) ---
+// --- (*** SỬA v10 & v10.1: THAY ĐỔI COMPONENT YÊU CẦU RESET MẬT KHẨU ***) ---
 // --- Component Hiển Thị Yêu Cầu Reset Mật Khẩu (Dựa trên bảng `password_reset_requests`) ---
 const PasswordResetRequests = () => {
   const [requests, setRequests] = useState([]);
@@ -228,6 +233,28 @@ const PasswordResetRequests = () => {
     }
   };
 
+  // (SỬA v10.1): Hàm xử lý Đánh Dấu Đã Giải Quyết (Xóa khỏi danh sách)
+  const handleResolveRequest = async (id, email) => {
+    try {
+      // 1. Cập nhật 'is_resolved' = true
+      const { error } = await supabase
+        .from("password_reset_requests")
+        .update({ 
+          is_resolved: true
+        })
+        .eq("id", id);
+        
+      if (error) throw error;
+      
+      toast.success(`Đã giải quyết yêu cầu của: ${email}.`);
+      fetchRequests(); // Tải lại danh sách
+    } catch (err)
+    {
+      console.error("Lỗi giải quyết yêu cầu:", err);
+      toast.error("Lỗi giải quyết yêu cầu: " + err.message);
+    }
+  };
+
 
   if (loading && requests.length === 0) {
     return (
@@ -282,13 +309,26 @@ const PasswordResetRequests = () => {
                   </span>
                 )}
               </div>
-              <button
-                onClick={() => handleGenerateResetCode(req.id)} // (SỬA v10)
-                className="px-4 py-2 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors shadow-md flex items-center gap-2"
-              >
-                <Sparkle/> 
-                {hasValidToken ? "Tạo Lại Mã" : "Tạo Mã OTP"}
-              </button>
+
+              {/* (SỬA v10.1) Bọc các nút trong 1 div */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => handleGenerateResetCode(req.id)} // (SỬA v10)
+                  className="px-4 py-2 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors shadow-md flex items-center gap-2"
+                >
+                  <Sparkle/> 
+                  {hasValidToken ? "Tạo Lại Mã" : "Tạo Mã OTP"}
+                </button>
+                
+                {/* (SỬA v10.1) Nút giải quyết/xóa (Đánh dấu is_resolved = true) */}
+                <button
+                  onClick={() => handleResolveRequest(req.id, req.email)}
+                  title="Đánh dấu là đã giải quyết"
+                  className="p-2.5 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors shadow-md flex items-center justify-center"
+                >
+                  <X size={18} weight="bold" />
+                </button>
+              </div>
             </motion.div>
           );
         })}
@@ -296,7 +336,7 @@ const PasswordResetRequests = () => {
     </motion.div>
   );
 };
-// --- (*** KẾT THÚC SỬA COMPONENT MỚI v10 ***) ---
+// --- (*** KẾT THÚC SỬA COMPONENT MỚI v10.1 ***) ---
 
 
 // --- Component Modal Xem Chi Tiết Đơn Hàng (Giữ nguyên) ---
@@ -707,9 +747,9 @@ export default function ManageCustomersSupabase() {
 
       <CustomerStats />
 
-      {/* --- (*** SỬA v10: COMPONENT YÊU CẦU RESET MẬT KHẨU ***) --- */}
+      {/* --- (*** SỬA v10.1: COMPONENT YÊU CẦU RESET MẬT KHẨU ***) --- */}
       <PasswordResetRequests />
-      {/* --- (*** KẾT THÚC SỬA v10 ***) --- */}
+      {/* --- (*** KẾT THÚC SỬA v10.1 ***) --- */}
 
       <div className="bg-white dark:bg-slate-800 shadow-2xl shadow-gray-200/50 dark:shadow-black/30 rounded-2xl overflow-hidden border border-gray-200 dark:border-slate-700">
         <div className="p-5 border-b border-gray-200 dark:border-slate-700">
