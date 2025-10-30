@@ -10,6 +10,15 @@
   2. (CSS Bảng) Giảm cỡ chữ "Đơn" và "Tổng chi" từ text-base -> text-sm cho đồng bộ.
 */
 
+/* *** SỬA LỖI v7.6 (Fix Lỗi Mất Focus Input) ***
+  1. (useCallback) Bọc tất cả các hàm xử lý (handleUpdateCustomer, handleAddNewCustomer, v.v.)
+     trong `useCallback` để ổn định props truyền vào các Modal và Form.
+  2. (Stable Handlers) Tạo các hàm đóng modal (handleCloseAddModal, handleCloseEditModal)
+     để thay thế các hàm inline (ẩn danh) `() => ...` trong props `onClose` và `onCancel`.
+  3. (Nguyên nhân) Lỗi này xảy ra do component cha render lại, tạo hàm mới, 
+     khiến component con (Form) cũng render lại và làm mất focus của input.
+*/
+
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { FaSpinner, FaSearch, FaTrash } from "react-icons/fa";
 import {
@@ -299,6 +308,7 @@ const CustomerBookingsModal = ({ customer, onClose }) => {
 };
 
 // --- Component Form (Logic v6) ---
+// (Component này giữ nguyên, không cần thay đổi)
 const CustomerForm = ({ initialData, onSubmit, isSaving, onCancel }) => {
   const [formData, setFormData] = useState({
     full_name: initialData?.full_name || '',
@@ -565,8 +575,8 @@ export default function ManageCustomersSupabase() {
   }, [debouncedSearch]);
 
 
-  // --- Handlers cho Modal Form (Logic v6) ---
-  const handleUpdateCustomer = async (formData) => {
+  // --- (*** FIX v7.6 ***) Handlers cho Modal Form (Bọc useCallback) ---
+  const handleUpdateCustomer = useCallback(async (formData) => {
     if (!editingCustomer || isSaving) return;
     setIsSaving(true);
     const updateData = {
@@ -587,9 +597,9 @@ export default function ManageCustomersSupabase() {
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [editingCustomer, isSaving, fetchCustomers]); // Thêm dependencies
 
-  const handleAddNewCustomer = async (formData) => {
+  const handleAddNewCustomer = useCallback(async (formData) => {
     if (isSaving) return;
     setIsSaving(true);
     const insertData = { ...formData, role: 'user' };
@@ -600,7 +610,7 @@ export default function ManageCustomersSupabase() {
         throw error;
       }
       toast.success("Thêm khách hàng mới thành công!");
-      setIsAddingCustomer(null);
+      setIsAddingCustomer(false); // Sửa: setIsAddingCustomer(null) -> setIsAddingCustomer(false)
       fetchCustomers();
     } catch (err) {
       console.error("Lỗi thêm mới:", err);
@@ -608,29 +618,53 @@ export default function ManageCustomersSupabase() {
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [isSaving, fetchCustomers]); // Thêm dependencies
 
-  // --- Delete Handlers (Giữ nguyên) ---
-  const openDeleteConfirm = (c) => {
-    setSelectedCustomer(c); setShowDeleteConfirm(true);
-  };
-  const closeDeleteConfirm = () => {
-    setSelectedCustomer(null); setShowDeleteConfirm(false);
-  };
-  const handleDelete = async () => {
+  // --- (*** FIX v7.6 ***) Handlers ổn định để đóng/mở Modals ---
+  const handleOpenAddModal = useCallback(() => {
+    setIsAddingCustomer(true);
+  }, []);
+  
+  const handleCloseAddModal = useCallback(() => {
+    setIsAddingCustomer(false);
+  }, []);
+
+  const handleCloseEditModal = useCallback(() => {
+    setEditingCustomer(null);
+  }, []);
+
+  const handleCloseBookingsModal = useCallback(() => {
+    setViewingBookingsCustomer(null);
+  }, []);
+
+  // --- (*** FIX v7.6 ***) Delete Handlers (Bọc useCallback) ---
+  const openDeleteConfirm = useCallback((c) => {
+    setSelectedCustomer(c); 
+    setShowDeleteConfirm(true);
+  }, []); // Dependency rỗng vì chỉ set state
+  
+  const closeDeleteConfirm = useCallback(() => {
+    setSelectedCustomer(null); 
+    setShowDeleteConfirm(false);
+  }, []); // Dependency rỗng vì chỉ set state
+
+  const handleDelete = useCallback(async () => {
     if (!selectedCustomer) return;
     try {
       const { error } = await supabase.from("Users").delete().eq("id", selectedCustomer.id);
       if (error) throw error;
       toast.success(`Đã xóa hồ sơ "${selectedCustomer.full_name || selectedCustomer.email}"!`);
-      if (customers.length === 1 && currentPage > 1) { setCurrentPage(currentPage - 1); } 
-      else { fetchCustomers(); }
+      if (customers.length === 1 && currentPage > 1) { 
+        setCurrentPage(currentPage - 1); 
+      } else { 
+        fetchCustomers(); 
+      }
       closeDeleteConfirm();
     } catch (err) {
       console.error("Lỗi xóa:", err);
       toast.error(`Xóa thất bại: ${err.message}.`);
     }
-  };
+  }, [selectedCustomer, customers.length, currentPage, fetchCustomers, closeDeleteConfirm]); // Thêm dependencies
 
   const paginationWindow = useMemo(() => getPaginationWindow(currentPage, totalPages, 2), [currentPage, totalPages]);
 
@@ -668,7 +702,7 @@ export default function ManageCustomersSupabase() {
           </p>
         </div>
         <button
-          onClick={() => setIsAddingCustomer(true)} 
+          onClick={handleOpenAddModal} // (*** FIX v7.6 ***)
           className="flex items-center gap-2.5 px-6 py-3 bg-gradient-to-r from-sky-500 to-sky-600 text-white rounded-xl shadow-lg shadow-sky-500/30 hover:shadow-xl hover:shadow-sky-500/40 hover:-translate-y-0.5 transition-all duration-300 font-semibold focus:outline-none focus:ring-4 focus:ring-sky-300"
         >
           <Plus size={20} weight="bold" />
@@ -771,6 +805,7 @@ export default function ManageCustomersSupabase() {
                     </td>
                     <td className="td-style text-center whitespace-nowrap space-x-2">
                         <>
+                          {/* (*** FIX v7.6 ***) Thay thế hàm inline bằng cách gọi hàm đã định nghĩa */}
                           <button onClick={() => setViewingBookingsCustomer(c)} disabled={isFetchingPage || !!editingCustomer || isAddingCustomer} className="action-button text-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/30" title="Xem các đơn hàng"><List size={20} weight="bold" /></button>
                           <button onClick={() => setEditingCustomer(c)} disabled={isFetchingPage || !!editingCustomer || isAddingCustomer} className="action-button text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa thông tin"><PencilSimple size={20} weight="bold" /></button>
                           <button onClick={() => openDeleteConfirm(c)} disabled={isFetchingPage || !!editingCustomer || isAddingCustomer} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa hồ sơ"><FaTrash size={18} /></button>
@@ -797,12 +832,12 @@ export default function ManageCustomersSupabase() {
         </div>
       )}
 
-      {/* --- Modals (Giữ nguyên) --- */}
+      {/* --- (*** FIX v7.6 ***) Modals (Sử dụng handlers ổn định) --- */}
       <AnimatePresence>
         {viewingBookingsCustomer && (
           <CustomerBookingsModal
             customer={viewingBookingsCustomer}
-            onClose={() => setViewingBookingsCustomer(null)}
+            onClose={handleCloseBookingsModal} // (*** FIX v7.6 ***)
           />
         )}
       </AnimatePresence>
@@ -831,24 +866,24 @@ export default function ManageCustomersSupabase() {
 
       <AnimatePresence>
         {isAddingCustomer && (
-          <FormModal title="Thêm Khách Hàng Mới" onClose={() => setIsAddingCustomer(false)}>
+          <FormModal title="Thêm Khách Hàng Mới" onClose={handleCloseAddModal}> {/* (*** FIX v7.6 ***) */}
             <CustomerForm
               isSaving={isSaving}
-              onSubmit={handleAddNewCustomer}
-              onCancel={() => setIsAddingCustomer(false)}
+              onSubmit={handleAddNewCustomer} // (*** FIX v7.6 ***)
+              onCancel={handleCloseAddModal} // (*** FIX v7.6 ***)
             />
           </FormModal>
         )}
-      </AnimatePresence> {/* --- SỬA LỖI BUILD (AnAtePresence -> AnimatePresence) (v7.4) --- */}
+      </AnimatePresence>
       
       <AnimatePresence>
         {editingCustomer && (
-          <FormModal title="Chỉnh Sửa Thông Tin Khách Hàng" onClose={() => setEditingCustomer(null)}>
+          <FormModal title="Chỉnh Sửa Thông Tin Khách Hàng" onClose={handleCloseEditModal}> {/* (*** FIX v7.6 ***) */}
             <CustomerForm
               initialData={editingCustomer}
               isSaving={isSaving}
-              onSubmit={handleUpdateCustomer}
-              onCancel={() => setEditingCustomer(null)}
+              onSubmit={handleUpdateCustomer} // (*** FIX v7.6 ***)
+              onCancel={handleCloseEditModal} // (*** FIX v7.6 ***)
             />
           </FormModal>
         )}
