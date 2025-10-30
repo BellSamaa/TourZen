@@ -1,481 +1,404 @@
-// src/pages/Home.jsx
-// (Phiên bản cuối cùng, đã thêm lại các section Điểm Đến, Blog, Features)
-// (SỬA v3: Sửa lỗi 'price_adult' không tồn tại, đổi về 'price')
+// src/pages/TourDetail.jsx
+// (V4: FIX LỖI useEffect - Đảm bảo tải lại khi ID thay đổi)
 
-import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom";
-import { getSupabase } from "../lib/supabaseClient"; // Import Supabase
-import { FaMapMarkerAlt, FaStar, FaAward, FaHeadset, FaTags } from "react-icons/fa";
-// (SỬA v2) Thêm Gift (Quà)
-import { MapPin, Clock, Fire, Sun, CircleNotch, Ticket, ArrowRight, Star as PhosphorStar, Gift } from "@phosphor-icons/react";
-
-// Swiper
-import { Swiper, SwiperSlide } from "swiper/react";
-import { Autoplay, Pagination, Navigation } from "swiper/modules";
-import "swiper/css";
-import "swiper/css/pagination";
-import "swiper/css/navigation";
+import React, { useState, useEffect, useMemo } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { getSupabase } from "../lib/supabaseClient";
+import toast, { Toaster } from "react-hot-toast";
+import { ParallaxBanner, useParallax } from "react-scroll-parallax";
+import Slider from "react-slick";
+import { 
+    FaCreditCard, FaSpinner, FaMapMarkerAlt, FaClock, FaInfoCircle,
+    FaCalendarAlt, FaMoneyBillWave, FaChild, FaUser, FaPlus, FaGift, FaPlane, FaStickyNote,
+    FaUsers, FaStar, FaRegStar, FaUserCircle // (MỚI) Thêm icon
+} from "react-icons/fa";
+import { motion, useScroll, useTransform } from "framer-motion";
+import "slick-carousel/slick/slick.css";
+import "slick-carousel/slick/slick-theme.css";
 
 const supabase = getSupabase();
 
-// ===================================
-// === CÁC HÀM HELPER ===
-// ===================================
-
-/**
- * Chuyển đổi văn bản thành dạng "slug" (URL-friendly).
- */
-function slugify(text) {
-  if (!text) return '';
-  return text.toString().toLowerCase()
-    .normalize('NFD') // Chuẩn hóa Unicode (tách dấu)
-    .replace(/[\u0300-\u036f]/g, '') // Bỏ dấu
-    .replace(/đ/g, 'd') // Xử lý chữ 'đ'
-    .replace(/\s+/g, '-') // Thay khoảng trắng bằng gạch nối
-    .replace(/[^\w-]+/g, '') // Bỏ ký tự không phải chữ/số/gạch nối
-    .replace(/--+/g, '-') // Bỏ gạch nối thừa
-    .replace(/^-+/, '') // Bỏ gạch nối đầu
-    .replace(/-+$/, ''); // Bỏ gạch nối cuối
-}
-
-/**
- * Định dạng số thành tiền tệ Việt Nam (VND).
- */
-const formatCurrency = (num) => {
-    if (typeof num !== 'number' || isNaN(num)) return "0 ₫";
-    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(num);
+const formatCurrency = (number) => {
+    if (typeof number !== "number" || isNaN(number)) return "Liên hệ";
+    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(number);
 };
 
-// ===================================
-// === (MỚI v2) COMPONENT PHỤ ===
-// ===================================
+// --- Function Slugify (Giữ nguyên) ---
+function slugify(text) {
+    if (!text) return '';
+    return text.toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-').replace(/[^\w-]+/g, '').replace(/--+/g, '-').replace(/^-+/, '').replace(/-+$/, '');
+}
 
-/**
- * (MỚI v2) Component hiển thị sao Rating (dùng PhosphorStar)
- */
-const RatingDisplay = ({ rating, size = 18 }) => {
+// --- Function lấy đường dẫn ảnh (Giữ nguyên) ---
+const getTourImage = (tour) => {
+    if (tour?.galleryImages && tour.galleryImages.length > 0 && tour.galleryImages[0]) { return tour.galleryImages[0]; }
+    if (tour?.image_url) { return tour.image_url; }
+    if (tour?.name) { const conventionalFileName = `tour-${slugify(tour.name)}.jpg`; return `/images/${conventionalFileName}`; }
+    return `https://placehold.co/1200x800/003366/FFFFFF?text=${encodeURIComponent(tour?.name || 'TourZen')}`;
+};
+
+// --- Ảnh Placeholder (Giữ nguyên) ---
+const placeholderImg = 'https://placehold.co/600x400/CCCCCC/FFFFFF?text=Image+Not+Found';
+
+
+// --- Component con cho Loading (Giữ nguyên) ---
+const LoadingComponent = () => (
+    <div className="flex justify-center items-center min-h-[70vh]">
+        <FaSpinner className="animate-spin text-4xl text-sky-500" />
+    </div>
+); 
+
+// --- Component con cho Lỗi/Không tìm thấy (Giữ nguyên) ---
+const ErrorComponent = ({ message }) => (
+    <motion.div
+        className="flex flex-col justify-center items-center min-h-[70vh] text-center text-xl py-20 px-4 text-red-600 dark:text-red-400"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+    >
+       <FaInfoCircle className="text-4xl mb-4 opacity-50"/>
+       <p>{message}</p>
+    </motion.div>
+); 
+
+// --- (MỚI) Component Hiển thị Sao ---
+const StarRating = ({ rating, size = "text-lg" }) => {
     const totalStars = 5;
-    const ratingValue = rating || 0;
+    // Làm tròn rating lên 0.5 gần nhất
+    const displayRating = Math.round((rating || 0) * 2) / 2;
+
     return (
-        <div className="flex text-yellow-500" title={`${ratingValue.toFixed(1)}/${totalStars} sao`}>
+        <div className={`flex items-center gap-0.5 text-amber-400 ${size}`}>
             {[...Array(totalStars)].map((_, i) => (
-                <PhosphorStar key={i} weight={i < ratingValue ? "fill" : "regular"} size={size} />
+                // Hiển thị sao đầy
+                i + 1 <= displayRating ? <FaStar key={i} /> : <FaRegStar key={i} />
             ))}
-            <span className="ml-2 text-sm font-semibold text-gray-600 dark:text-gray-300">({ratingValue.toFixed(1)})</span>
         </div>
     );
 };
 
-/**
- * (MỚI v2) Component Tour được yêu thích nhất
- */
-const MostLovedTour = () => {
-    const [tour, setTour] = useState(null);
+// --- (MỚI) Component Mục Đánh giá (SỬA v2: Bỏ join user) ---
+const ReviewsSection = ({ tourId, initialRating }) => {
+    const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [totalReviews, setTotalReviews] = useState(0);
 
     useEffect(() => {
-        const fetchTopTour = async () => {
+        if (!tourId) return;
+
+        async function fetchReviews() {
             setLoading(true);
-            
-            // (SỬA v3) Đổi 'price_adult' thành 'price'
-            const { data, error } = await supabase
-                .from('Products')
-                .select('id, name, image_url, price, rating, location') // SỬA Ở ĐÂY
-                .eq('product_type', 'tour') // Chỉ lấy tour
-                .eq('is_published', true)
-                .order('rating', { ascending: false, nulls: 'last' }) // Sắp xếp theo rating
-                .limit(1) // Lấy 1
-                .single(); // Lấy 1 đối tượng duy nhất
+            try {
+                // (SỬA v2) GỠ BỎ JOIN VỚI BẢNG 'Users' ĐỂ TRÁNH LỖI RLS
+                const { data, error: fetchError, count } = await supabase
+                    .from("Reviews")
+                    .select(`
+                        id,
+                        created_at,
+                        rating,
+                        comment
+                    `, { count: 'exact' }) // Thêm 'count'
+                    .eq("product_id", tourId)
+                    .order("created_at", { ascending: false })
+                    .limit(10); // Chỉ lấy 10 review mới nhất
 
-            if (data && !error) {
-                setTour(data);
-            } else {
-                console.error("Lỗi tải top tour:", error);
+                if (fetchError) throw fetchError;
+                setReviews(data || []);
+                setTotalReviews(count || 0); // Lưu tổng số
+            } catch (err) {
+                console.error("Lỗi tải reviews:", err);
+                setError("Không thể tải đánh giá.");
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
-        };
-        fetchTopTour();
-    }, []);
+        }
+        fetchReviews();
+    }, [tourId]);
 
-    if (loading) {
-        return (
-            <div className="flex justify-center items-center h-60 bg-gray-100 dark:bg-neutral-800 rounded-lg">
-                <CircleNotch size={32} className="animate-spin text-sky-500" />
-            </div>
-        );
-    }
-    if (!tour) { return null; /* Ẩn đi nếu không có tour nào */ }
+    const averageRating = parseFloat(initialRating) || 0; // Lấy từ cột Product.rating
 
     return (
-        <motion.div 
-            className="bg-gradient-to-r from-sky-50 to-blue-50 dark:from-neutral-900 dark:to-slate-900 p-8 rounded-xl shadow-lg border dark:border-neutral-700"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+        <motion.section 
+            className="max-w-4xl mx-auto p-6 md:p-10 my-16 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border dark:border-slate-700"
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
         >
-            <h2 className="text-3xl font-bold text-center mb-6 text-sky-700 dark:text-sky-400 flex items-center justify-center gap-3">
-                <Gift size={32} /> Tour được yêu thích nhất
+            <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center text-sky-700 dark:text-sky-400">
+                Đánh giá từ Khách hàng
             </h2>
-            <motion.div 
-                className="flex flex-col md:flex-row bg-white dark:bg-neutral-800 rounded-lg shadow-xl overflow-hidden"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-            >
-                <img 
-                    src={tour.image_url} 
-                    alt={tour.name} 
-                    className="w-full md:w-1/2 h-64 md:h-auto object-cover"
-                />
-                <div className="p-6 flex flex-col justify-between flex-1">
-                    <div>
-                        <span className="text-sm text-gray-500 dark:text-gray-400">{tour.location}</span>
-                        <h3 className="text-2xl font-bold text-gray-800 dark:text-white my-2">
-                            {tour.name}
-                        </h3>
-                        {tour.rating > 0 && <RatingDisplay rating={tour.rating} />}
-                    </div>
-                    <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <span className="text-sm text-gray-500 dark:text-gray-400">Giá chỉ từ</span>
-                            <p className="text-3xl font-bold text-red-600 dark:text-red-500">
-                                {/* (SỬA v3) Đổi 'tour.price_adult' thành 'tour.price' */}
-                                {formatCurrency(tour.price)}
-                            </p>
+
+            {/* Rating trung bình */}
+            <div className="flex flex-col items-center justify-center mb-8 p-6 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                <span className="text-5xl font-extrabold text-slate-800 dark:text-white">
+                    {averageRating.toFixed(1)} / 5
+                </span>
+                <StarRating rating={averageRating} size="text-3xl" />
+                <span className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+                    Dựa trên {totalReviews} đánh giá {/* (SỬA v2) Dùng totalReviews */}
+                </span>
+            </div>
+
+            {/* Danh sách review */}
+            <div className="space-y-6">
+                {loading && <div className="text-center"><FaSpinner className="animate-spin text-2xl text-sky-500 mx-auto" /></div>}
+                {error && <div className="text-center text-red-500">{error}</div>}
+                
+                {!loading && !error && reviews.length === 0 && (
+                    <p className="text-center text-slate-500 italic">Chưa có đánh giá nào cho tour này.</p>
+                )}
+
+                {reviews.map(review => (
+                    <motion.div 
+                        key={review.id} 
+                        className="pb-6 border-b border-slate-200 dark:border-slate-700 last:border-b-0"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.4 }}
+                    >
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                                <FaUserCircle className="text-2xl text-slate-400" />
+                                <span className="font-semibold text-slate-800 dark:text-white">
+                                    {/* (SỬA v2) Luôn hiển thị "Khách ẩn danh" */}
+                                    {"Khách ẩn danh"}
+                                </span>
+                            </div>
+                            <StarRating rating={review.rating} size="text-base" />
                         </div>
-                        <Link 
-                            to={`/tour/${tour.id}`} 
-                            className="mt-4 sm:mt-0 px-6 py-3 bg-sky-600 text-white font-semibold rounded-lg text-center hover:bg-sky-700 transition-colors shadow-md"
-                        >
-                            Xem Chi Tiết
-                        </Link>
+                        <p className="text-slate-600 dark:text-slate-300 text-base leading-relaxed pl-8">
+                            {review.comment}
+                        </p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 text-right mt-2">
+                            {new Date(review.created_at).toLocaleDateString("vi-VN")}
+                        </p>
+                    </motion.div>
+                ))}
+            </div>
+        </motion.section>
+    );
+};
+
+
+// --- Component Chính ---
+const TourDetail = () => {
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const [tour, setTour] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    const { ref: bannerRef, scrollYProgress } = useScroll();
+    const bannerTextY = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
+
+    // --- (SỬA V4) useEffect fix lỗi không tự tải lại ---
+    useEffect(() => {
+        // --- 1. RESET STATE NGAY LẬP TỨC ---
+        setLoading(true);
+        setError(null);
+        setTour(null);
+        window.scrollTo(0, 0);
+
+        // --- 2. HÀM FETCH DATA ---
+        async function fetchTour() {
+            if (!id || !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id)) {
+                 setError("ID tour không hợp lệ.");
+                 setLoading(false);
+                 return;
+            }
+            
+            try {
+                // Fetch 1: Lấy thông tin Tour
+                const { data: tourData, error: tourError } = await supabase
+                    .from("Products")
+                    .select("*, rating, price, supplier_name:Suppliers(name)") // Lấy cột rating và price
+                    .eq("id", id)
+                    .eq("is_published", true)
+                    .eq("approval_status", "approved")
+                    .single();
+
+                if (tourError || !tourData) {
+                    throw new Error("Tour không tồn tại hoặc đã bị ẩn.");
+                }
+                setTour(tourData);
+
+            } catch (err) {
+                 console.error("Lỗi fetch chi tiết tour:", err);
+                 setError(err.message || "Không thể tải thông tin tour. Vui lòng thử lại.");
+                 setTour(null);
+            } finally {
+                 setLoading(false);
+            }
+        }
+        
+        fetchTour();
+    }, [id]); // Chạy lại mỗi khi ID thay đổi
+
+    // --- (SỬA v3) Dùng 'price' ---
+    const displayPrice = tour?.price || 0;
+
+    // --- (SỬA) Logic "Đặt Ngay" ---
+    const handleBookNow = () => {
+        // Gửi data qua trang Payment
+        navigate('/payment', {
+            state: {
+                item: tour, // Gửi toàn bộ thông tin tour
+            }
+        });
+    };
+    // --- KẾT THÚC SỬA ---
+
+    if (loading) { return <LoadingComponent />; }
+    if (!tour) { return <ErrorComponent message={error || "Tour không tồn tại."} />; }
+
+    // --- Xử lý Ảnh (Giữ nguyên) ---
+    const mainImageUrl = getTourImage(tour);
+    const galleryImages = tour?.galleryImages && tour.galleryImages.length > 0
+        ? tour.galleryImages
+        : [mainImageUrl]; // Luôn có ít nhất 1 ảnh
+
+    const sliderSettings = {
+        dots: true,
+        appendDots: dots => ( <div style={{ bottom: "-45px" }}><ul style={{ margin: "0px" }}> {dots} </ul></div> ), 
+        customPaging: i => ( <div className="w-2.5 h-2.5 bg-gray-300 dark:bg-gray-600 rounded-full transition-colors duration-300 slick-dot-active:bg-sky-500"></div> ), 
+        infinite: galleryImages.length > 1,
+        speed: 700, slidesToShow: 1, slidesToScroll: 1,
+        autoplay: true, autoplaySpeed: 4500, 
+        fade: true, pauseOnHover: true,
+     };
+
+    // --- Animation Variants (Giữ nguyên) ---
+    const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.1 } } }; 
+    const itemVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } } }; 
+
+    return (
+        <motion.div
+            className="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-200 overflow-x-hidden"
+            initial="hidden" animate="visible" exit={{ opacity: 0 }}
+            variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { duration: 0.4 } } }} 
+        >
+            <Toaster position="top-center" reverseOrder={false} />
+            
+            {/* === Banner (SỬA: Thêm rating) === */}
+            <div ref={bannerRef} className="relative overflow-hidden">
+                <ParallaxBanner layers={[{ image: mainImageUrl, speed: -18, props: { onError: (e) => { e.target.onerror = null; e.target.src = placeholderImg } } }]} className="h-[60vh] md:h-[75vh]" >
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent " />
+                </ParallaxBanner>
+                <motion.div className="absolute inset-0 flex flex-col justify-center items-center text-white text-center p-6 md:p-12 pointer-events-none" style={{ y: bannerTextY }} >
+                    <motion.h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-3 drop-shadow-xl leading-tight" variants={itemVariants}>
+                        {tour.name}
+                    </motion.h1>
+                    <motion.div className="flex items-center gap-4 drop-shadow-lg opacity-90" variants={itemVariants}>
+                        <p className="text-lg md:text-xl flex items-center gap-2">
+                            <FaMapMarkerAlt /> {tour.location || 'Chưa rõ'}
+                        </p>
+                        {/* (MỚI) Hiển thị rating trung bình */}
+                        {tour.rating > 0 && (
+                            <div className="flex items-center gap-1.5 text-amber-400">
+                                <FaStar />
+                                <span className="text-lg md:text-xl font-bold text-white">{parseFloat(tour.rating).toFixed(1)}</span>
+                            </div>
+                        )}
+                    </motion.div>
+                </motion.div>
+            </div>
+
+
+            {/* === Gallery Slider (Giữ nguyên) === */}
+            <motion.section className="max-w-6xl mx-auto py-10 px-4 -mt-24 md:-mt-40 relative z-10" variants={itemVariants} initial="hidden" whileInView="visible" viewport={{ once: true }}>
+              <div className="rounded-2xl overflow-hidden shadow-2xl border-4 border-white dark:border-slate-800 bg-white dark:bg-slate-800">
+                <Slider {...sliderSettings}>
+                  {galleryImages.map((src, i) => (
+                    <div key={i}>
+                      <img src={src || placeholderImg} alt={`${tour.name} - ảnh ${i + 1}`} className="h-[400px] md:h-[650px] object-cover w-full" onError={(e) => { e.target.onerror = null; e.target.src=placeholderImg }} />
                     </div>
-                </div>
-            </motion.div>
+                  ))}
+                </Slider>
+              </div>
+            </motion.section>
+
+            {/* === Thông tin chính & Đặt vé === */}
+            <motion.section className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12 px-4 mt-10 mb-16" variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.1 }}>
+                
+                {/* --- Cột Thông tin (Giữ nguyên) --- */}
+                <motion.div className="lg:col-span-2 bg-white dark:bg-slate-800 p-6 md:p-10 rounded-2xl shadow-xl border dark:border-slate-700" variants={itemVariants}>
+                    <h2 className="text-2xl md:text-3xl font-bold mb-6 text-sky-700 dark:text-sky-400 border-b pb-4 dark:border-slate-600"> Thông tin chi tiết Tour </h2>
+                    <div className="space-y-5 text-slate-700 dark:text-slate-300">
+                        <div className="flex items-start gap-4"> <FaClock className="text-sky-500 mt-1 flex-shrink-0" size={20} /> <div> <strong className="font-semibold block text-slate-800 dark:text-slate-100">Thời gian:</strong> <span>{tour.duration || 'N/A'}</span> </div> </div>
+                        <div className="flex items-start gap-4"> <FaMapMarkerAlt className="text-sky-500 mt-1 flex-shrink-0" size={20} /> <div> <strong className="font-semibold block text-slate-800 dark:text-slate-100">Điểm đến:</strong> <span>{tour.location || 'N/A'}</span> </div> </div>
+                        {tour.supplier_name && ( <div className="flex items-start gap-4"> <FaInfoCircle className="text-sky-500 mt-1 flex-shrink-0" size={20} /> <div> <strong className="font-semibold block text-slate-800 dark:text-slate-100">Nhà cung cấp:</strong> 
+                            <span>{tour.supplier_name?.name}</span> 
+                        </div> </div> )}
+                        <div className="pt-5 mt-5 border-t dark:border-slate-600">
+                            <h3 className="text-xl font-semibold mb-3 text-slate-800 dark:text-slate-100">Mô tả chi tiết</h3>
+                            <div className="prose prose-slate dark:prose-invert max-w-none text-base leading-relaxed">
+                                {tour.description ? ( <p>{tour.description}</p> ) : ( <p className="italic">Chưa có mô tả chi tiết.</p> )}
+                            </div>
+                        </div>
+                    </div>
+                </motion.div>
+
+                {/* --- Cột Đặt vé (ĐÃ SỬA) --- */}
+                <motion.div className="lg:col-span-1 bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border dark:border-slate-700 lg:sticky lg:top-24 self-start" variants={itemVariants}>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm mb-1 font-medium">Giá chỉ từ</p>
+                    <p className="text-4xl md:text-5xl font-bold text-red-600 mb-6 pb-6 border-b dark:border-slate-600">
+                        {/* (SỬA v3) Dùng displayPrice (tức price) */}
+                        {displayPrice > 0 ? formatCurrency(displayPrice) : "Liên hệ"}
+                    </p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
+                        Bạn sẽ chọn ngày khởi hành và số lượng khách ở bước tiếp theo.
+                    </p>
+                    <motion.button onClick={handleBookNow} className="w-full px-6 py-4 bg-gradient-to-r from-orange-500 to-red-600 text-white text-lg font-bold rounded-xl shadow-lg hover:shadow-xl hover:from-orange-600 focus:outline-none focus:ring-4 focus:ring-orange-300 dark:focus:ring-orange-800 transition-all duration-300 flex items-center justify-center gap-3 transform active:scale-95" whileHover={{ scale: 1.03, y: -3, boxShadow: "0 10px 20px rgba(0,0,0,0.2)" }}>
+                        <FaCreditCard /> Đặt Tour Ngay
+                    </motion.button>
+                     <p className="text-xs text-slate-500 mt-4 text-center"> Nhân viên sẽ liên hệ xác nhận sau khi bạn đặt. </p>
+                </motion.div>
+            </motion.section>
+
+            {/* --- (XÓA) Đã xóa phần Lịch khởi hành --- */}
+
+            {/* === Lịch trình (Giữ nguyên) === */}
+            {tour.itinerary && tour.itinerary.length > 0 && (
+                <motion.section className="max-w-4xl mx-auto p-6 md:p-10 mt-8 mb-16 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border dark:border-slate-700" initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
+                   <h2 className="text-2xl md:text-3xl font-bold mb-10 text-center text-sky-700 dark:text-sky-400"> Lịch Trình Dự Kiến </h2>
+                   <div className="relative pl-6 border-l-4 border-sky-300 dark:border-sky-700 space-y-10">
+                     {tour.itinerary.map((item, i) => (
+                        <motion.div key={i} className="relative pl-10" initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: i * 0.15 }}>
+                          {/* Sửa logic hiển thị tiêu đề/nội dung lịch trình */}
+                          <div className="absolute top-1 left-[-1.45rem] w-8 h-8 bg-sky-500 border-4 border-white dark:border-slate-800 rounded-full z-10 flex items-center justify-center shadow"> <span className="text-sm font-bold text-white">{i + 1}</span> </div>
+                          <h4 className="font-semibold text-lg md:text-xl text-slate-800 dark:text-slate-100 mb-1.5"> 
+                            { (typeof item === 'object' && item.title) ? item.title : `Ngày ${i + 1}` }
+                          </h4>
+                          <p className="text-slate-600 dark:text-slate-300 text-base leading-relaxed"> 
+                            { (typeof item === 'object' && item.content) ? item.content : (typeof item === 'string' ? item : '') }
+                          </p>
+                        </motion.div>
+                     ))}
+                   </div>
+                </motion.section>
+            )}
+
+            {/* === (MỚI) Mục Đánh giá === */}
+            {/* Truyền tour.id (UUID) và tour.rating (số) vào */}
+            <ReviewsSection tourId={tour.id} initialRating={tour.rating} />
+
+            {/* === Bản đồ (Giữ nguyên) === */}
+            <motion.section className="max-w-5xl mx-auto my-16 px-4" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
+              <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center dark:text-white">Vị trí trên Bản đồ</h2>
+              <div className="rounded-2xl overflow-hidden shadow-xl border dark:border-slate-700 aspect-video md:aspect-[16/6]">
+                <iframe 
+                    title="map" 
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(tour.name + ", " + (tour.location || ''))}&output=embed`} 
+                    width="100%" 
+                    height="100%" 
+                    loading="lazy" 
+                    className="border-0">
+                </iframe>
+              </div>
+            </motion.section>
         </motion.div>
     );
 };
 
-
-// ===================================
-// === KẾT THÚC HELPER ===
-// ===================================
-
-
-// Dữ liệu cho các điểm đến (Giữ nguyên từ file gốc)
-const destinationsData = {
-  mienBac: [
-    { name: 'Quảng Ninh', image: '/images/destinations/quangninh.jpg', gridClass: 'md:col-span-2 md:row-span-2' },
-    { name: 'Hà Giang', image: '/images/destinations/hagiang.jpg', gridClass: 'md:col-span-2' },
-    { name: 'Lào Cai', image: '/images/destinations/laocai.jpg', gridClass: '' },
-    { name: 'Ninh Bình', image: '/images/destinations/ninhbinh.jpg', gridClass: '' },
-    { name: 'Yên Bái', image: '/images/destinations/yenbai.jpg', gridClass: '' },
-    { name: 'Sơn La', image: '/images/destinations/sonla.jpg', gridClass: 'md:col-span-2' },
-    { name: 'Cao Bằng', image: '/images/destinations/caobang.jpg', gridClass: '' },
-    { name: 'Hải Phòng', image: '/images/destinations/haiphong.jpg', gridClass: '' },
-    { name: 'Hà Nội', image: '/images/destinations/hanoi.jpg', gridClass: '' },
-  ],
-  mienTrung: [
-    { name: 'Đà Nẵng', image: '/images/destinations/danang.jpg', gridClass: 'md:col-span-2 md:row-span-2' },
-    { name: 'Hội An', image: '/images/destinations/hoian.jpg', gridClass: 'md:col-span-2' },
-    { name: 'Huế', image: '/images/destinations/hue.jpg', gridClass: '' },
-    { name: 'Quy Nhơn', image: '/images/destinations/quynhon.jpg', gridClass: '' },
-    { name: 'Nha Trang', image: '/images/destinations/nhatrang_dest.jpg', gridClass: '' },
-    { name: 'Phan Thiết', image: '/images/destinations/phanthiet.jpg', gridClass: 'md:col-span-2' },
-  ],
-  mienDongNamBo: [], // Giả sử chưa có dữ liệu
-  mienTayNamBo: [], // Giả sử chưa có dữ liệu
-};
-
-const tabs = [
-  { key: 'mienBac', label: 'Miền Bắc' },
-  { key: 'mienTrung', label: 'Miền Trung' },
-  { key: 'mienDongNamBo', label: 'Miền Đông Nam Bộ' },
-  { key: 'mienTayNamBo', label: 'Miền Tây Nam Bộ' },
-];
-
-// Blog mẫu (Giữ nguyên)
-const blogs = [
-    { id: 1, title: "Top 5 bãi biển đẹp nhất Việt Nam", excerpt: "Cùng khám phá 5 bãi biển tuyệt đẹp trải dài từ Bắc chí Nam...", image: "/images/blog_beach.jpg" },
-    { id: 2, title: "Kinh nghiệm du lịch Đà Lạt 3N2Đ", excerpt: "Thành phố ngàn hoa luôn là điểm đến mơ ước của giới trẻ...", image: "/images/blog_dalat.jpg" },
-    { id: 3, title: "Ẩm thực đường phố Nha Trang", excerpt: "Không chỉ có hải sản, Nha Trang còn là thiên đường ăn vặt...", image: "/images/blog_nhatrang.jpg" },
-];
-
-// Features (Giữ nguyên)
-const features = [
-    { icon: <FaAward />, title: "Chất Lượng Hàng Đầu", description: "Chúng tôi cam kết mang đến những trải nghiệm vượt trội và dịch vụ đẳng cấp." },
-    { icon: <FaHeadset />, title: "Hỗ Trợ 24/7", description: "Đội ngũ chuyên viên luôn sẵn sàng hỗ trợ bạn mọi lúc, mọi nơi." },
-    { icon: <FaTags />, title: "Giá Cả Tối Ưu", description: "Luôn có những ưu đãi tốt nhất và mức giá cạnh tranh trên thị trường." },
-];
-
-/**
- * Component Thẻ Tour (Tái sử dụng)
- * Dùng FaStar và cột 'price'
- */
-const TourCard = ({ tour, isFeatured = false }) => (
-    <Link
-        to={`/tour/${tour.id}`}
-        className="group block bg-white dark:bg-neutral-800 shadow-lg rounded-2xl overflow-hidden transform transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 border dark:border-neutral-700"
-    >
-        <div className="relative h-56 w-full overflow-hidden">
-            <img
-                src={tour.image_url || 'https://placehold.co/600x400/eee/ccc?text=Tour+Image'}
-                alt={tour.name}
-                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/600x400/eee/ccc?text=No+Image'; }}
-            />
-            {isFeatured && (
-                 <div className="absolute top-4 left-4 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg">
-                    <Fire size={14} weight="bold" /> Nổi Bật
-                </div>
-            )}
-            <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur-sm text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
-                <MapPin size={14} /> {tour.location || 'Việt Nam'}
-            </div>
-        </div>
-        <div className="p-5 space-y-3">
-            <h3 className="text-xl font-bold text-neutral-800 dark:text-white group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors truncate" title={tour.name}>
-                {tour.name}
-            </h3>
-            <div className="flex justify-between items-center text-sm text-neutral-600 dark:text-neutral-400">
-                 <span className="flex items-center gap-1.5"> <Clock size={16} className="text-sky-500" /> {tour.duration || 'N/A ngày'} </span>
-                 <span className="flex items-center gap-1.5">
-                     <FaStar size={16} className="text-yellow-500" /> {tour.rating?.toFixed(1) || '4.5'}
-                 </span>
-            </div>
-            <div className="pt-3 border-t dark:border-neutral-700 flex justify-between items-center">
-                <p className="text-xs text-neutral-500">Giá chỉ từ</p>
-                <p className="text-2xl font-extrabold text-red-600">
-                    {formatCurrency(tour.price || 0)}
-                </p>
-            </div>
-        </div>
-    </Link>
-);
-
-/** Component Spinner Tải */
-const LoadingSpinner = () => (
-    <div className="flex justify-center items-center h-64">
-        <CircleNotch size={40} className="animate-spin text-sky-600" />
-        <span className="ml-3 text-lg text-neutral-600 dark:text-neutral-400">Đang tải dữ liệu...</span>
-    </div>
-);
-
-export default function Home() {
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('mienBac');
-  const [featuredTours, setFeaturedTours] = useState([]);
-  const [newestTours, setNewestTours] = useState([]);
-  const [sliderTours, setSliderTours] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-        const fetchHomePageData = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                // (SỬA v3) Đổi 'price_adult' thành 'price'
-                const queryColumns = 'id, name, location, duration, image_url, price, rating';
-
-                const [featuredPromise, newestPromise] = await Promise.all([
-                    supabase.rpc('get_most_booked_tours', { limit_count: 4 }),
-                    supabase
-                        .from('Products')
-                        .select(queryColumns)
-                        .eq('product_type', 'tour')
-                        .eq('approval_status', 'approved')
-                        .eq('is_published', true)
-                        .order('created_at', { ascending: false })
-                        .limit(8)
-                ]);
-
-                // Xử lý Tour Mới Nhất
-                if (newestPromise.error) {
-                    console.error("Lỗi Query Tour Mới Nhất:", newestPromise.error);
-                    throw new Error(`Lỗi query Products: ${newestPromise.error.message}.`);
-                }
-                const allNewTours = newestPromise.data || [];
-                setNewestTours(allNewTours);
-                setSliderTours(allNewTours.slice(0, 5));
-
-                // Xử lý Tour Nổi Bật
-                if (featuredPromise.error) {
-                    console.error("Lỗi RPC (get_most_booked_tours):", featuredPromise.error);
-                    throw new Error(`Lỗi RPC get_most_booked_tours: ${featuredPromise.error.message}.`);
-                } else {
-                    // (SỬA v3) Ánh xạ price_adult (từ RPC) sang price (cho TourCard)
-                    const featuredData = (featuredPromise.data || []).map(tour => ({
-                        ...tour,
-                        price: tour.price_adult // Giả định RPC trả về price_adult
-                    }));
-                    setFeaturedTours(featuredData);
-                }
-
-            } catch (err) {
-                console.error("Lỗi tải dữ liệu trang chủ:", err);
-                setError(err.message || "Không thể tải dữ liệu. Vui lòng thử lại sau.");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchHomePageData();
-    }, []);
-
-
-  return (
-    <div className="bg-slate-50 dark:bg-neutral-900 text-slate-800 dark:text-neutral-200 overflow-x-hidden">
-      {/* <FlyingPlane /> */} {/* (Tùy chọn) */}
-
-      {/* SLIDE GIỚI THIỆU */}
-      <section className="relative w-full h-[90vh] -mt-[76px] text-white">
-          <Swiper
-            modules={[Autoplay, Pagination, Navigation]}
-            autoplay={{ delay: 5000, disableOnInteraction: false }}
-            pagination={{ clickable: true }}
-            navigation
-            loop={sliderTours.length > 1}
-            className="h-full"
-          >
-              {loading && sliderTours.length === 0 ? (
-                 <SwiperSlide>
-                     <div className="h-full bg-gray-700 flex justify-center items-center"><CircleNotch size={40} className="animate-spin text-white" /></div>
-                </SwiperSlide>
-              )
-              : sliderTours.length === 0 && !loading ? (
-                 <SwiperSlide>
-                     <div className="h-full bg-gray-700 flex justify-center items-center text-gray-400">Không có tour nào để hiển thị</div>
-                </SwiperSlide>
-              )
-              : (
-                sliderTours.map((tour) => (
-                    <SwiperSlide key={`slide-${tour.id}`}>
-                        <div className="h-full bg-cover bg-center" style={{ backgroundImage: `url(${tour.image_url})` }}>
-                            <div className="w-full h-full flex flex-col justify-center items-center text-center bg-black/50 p-4">
-                                <motion.h1 initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }} className="text-4xl md:text-6xl font-bold mb-4 drop-shadow-lg">
-                                    {tour.name}
-                                </motion.h1>
-                                <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2 }} className="text-lg mb-6 drop-shadow-lg">
-                                    <FaMapMarkerAlt className="inline mr-2" />{tour.location}
-                                </motion.p>
-                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8, delay: 0.4 }}>
-                                    <Link to={`/tour/${tour.id}`} className="bg-sky-600 hover:bg-sky-700 text-white px-8 py-3 rounded-lg font-semibold shadow-lg transition-transform transform hover:scale-105">
-                                        Khám phá ngay
-                                    </Link>
-                                </motion.div>
-                            </div>
-                        </div>
-                    </SwiperSlide>
-                ))
-              )}
-          </Swiper>
-      </section>
-
-      {/* TOUR NỔI BẬT */}
-      <section className="py-20">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-            <h2 className="text-3xl font-bold mb-4 dark:text-white">🌍 Tour Du Lịch Nổi Bật</h2>
-            <p className="text-slate-500 dark:text-neutral-400 max-w-2xl mx-auto mb-12">Những hành trình được yêu thích nhất...</p>
-            {loading && <LoadingSpinner />}
-            {error && <p className="text-center text-red-500 bg-red-100 dark:bg-red-900/20 p-4 rounded-md">{error}</p>}
-            {!loading && !error && featuredTours.length > 0 && (
-                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-                    {featuredTours.map((tour) => (
-                        <TourCard key={tour.id} tour={tour} isFeatured={true} />
-                    ))}
-                </div>
-            )}
-             {!loading && !error && featuredTours.length === 0 && (
-                <p className="text-center text-neutral-500 italic">Chưa có tour nổi bật.</p>
-             )}
-        </div>
-      </section>
-      
-      {/* === (MỚI v2) TOUR YÊU THÍCH NHẤT === */}
-      <section className="py-20 bg-white dark:bg-neutral-800">
-          <div className="max-w-7xl mx-auto px-6">
-              <MostLovedTour />
-          </div>
-      </section>
-      
-      {/* === (THÊM LẠI) ĐIỂM ĐẾN YÊU THÍCH === */}
-      <section className="py-20 bg-white dark:bg-neutral-800">
-        <div className="max-w-7xl mx-auto px-6">
-            <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold mb-4 dark:text-white">🏖️ Điểm Đến Yêu Thích</h2>
-                <p className="text-slate-500 dark:text-neutral-400 max-w-2xl mx-auto">Khám phá vẻ đẹp bất tận của Việt Nam qua những điểm đến không thể bỏ lỡ.</p>
-            </div>
-            <div className="flex justify-center flex-wrap gap-x-6 gap-y-2 mb-8 border-b dark:border-neutral-700">
-                {tabs.map((tab) => (
-                    <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`px-3 py-2 font-semibold transition-colors duration-300 relative ${activeTab === tab.key ? 'text-sky-600' : 'text-slate-500 dark:text-neutral-300 hover:text-sky-500'}`}>
-                        {tab.label}
-                        {activeTab === tab.key && <motion.div className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-sky-600" layoutId="underline" />}
-                    </button>
-                ))}
-            </div>
-            <motion.div key={activeTab} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="grid grid-cols-2 md:grid-cols-4 md:grid-flow-row-dense gap-4 auto-rows-[250px]">
-                {destinationsData[activeTab] && destinationsData[activeTab].length > 0 ? (
-                    destinationsData[activeTab].map((dest, index) => (
-                        <motion.div key={`${activeTab}-${index}`} className={`relative rounded-2xl overflow-hidden shadow-lg group cursor-pointer ${dest.gridClass}`} whileHover={{ scale: 1.03 }} transition={{ type: 'spring', stiffness: 300 }}>
-                            <img src={dest.image} alt={dest.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end p-5">
-                                <h3 className="text-white text-xl font-bold drop-shadow-lg">{dest.name}</h3>
-                            </div>
-                        </motion.div>
-                    ))
-                ) : (
-                    <div className="col-span-full text-center text-slate-500 dark:text-neutral-400 py-10">
-                        <p>Chưa có điểm đến nào cho khu vực này. Vui lòng quay lại sau.</p>
-                    </div>
-                )}
-            </motion.div>
-        </div>
-      </section>
-
-      {/* === (THÊM LẠI) BLOG DU LỊCH === */}
-      <section className="py-20">
-        <div className="max-w-7xl mx-auto px-6">
-             <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold mb-4 dark:text-white">📰 Cẩm Nang Du Lịch</h2>
-                <p className="text-slate-500 dark:text-neutral-400 max-w-2xl mx-auto">Những bài viết chia sẻ kinh nghiệm, mẹo hay và cảm hứng cho chuyến đi sắp tới của bạn.</p>
-            </div>
-            <div className="grid md:grid-cols-3 gap-8">
-                {blogs.map((post) => (
-                    <motion.div key={post.id} whileHover={{ y: -8 }} className="bg-white dark:bg-neutral-800 rounded-2xl shadow-md hover:shadow-xl overflow-hidden cursor-pointer transition-all duration-300 group">
-                        <div className="overflow-hidden h-56">
-                            <img src={post.image} alt={post.title} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                        </div>
-                        <div className="p-6">
-                            <h3 className="font-semibold text-lg mb-2 h-14 dark:text-white">{post.title}</h3>
-                            <p className="text-slate-500 dark:text-neutral-400 text-sm mb-4 line-clamp-2">{post.excerpt}</p>
-                            {/* Giả sử link blog chưa có, tạm để button */}
-                            <button className="font-semibold text-sky-600 hover:text-sky-700">Đọc thêm →</button>
-                        </div>
-                    </motion.div>
-                ))}
-            </div>
-        </div>
-      </section>
-      
-      {/* === (THÊM LẠI) TẠI SAO CHỌN CHÚNG TÔI === */}
-      <section className="py-20 bg-white dark:bg-neutral-800">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-            <h2 className="text-3xl font-bold mb-4 dark:text-white">💖 Tại Sao Chọn TourZen?</h2>
-            <p className="text-slate-500 dark:text-neutral-400 max-w-2xl mx-auto mb-12">Chúng tôi không chỉ bán tour, chúng tôi mang đến những hành trình và kỷ niệm trọn đời.</p>
-            <div className="grid md:grid-cols-3 gap-10">
-                {features.map((feature, index) => (
-                    <motion.div key={index} initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.5 }} transition={{ duration: 0.5, delay: index * 0.1 }} className="flex flex-col items-center">
-                        <div className="bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 w-20 h-20 rounded-full flex items-center justify-center text-4xl mb-4">
-                            {feature.icon}
-                        </div>
-                        <h3 className="text-xl font-semibold mb-2 dark:text-white">{feature.title}</h3>
-                        <p className="text-slate-500 dark:text-neutral-400 leading-relaxed">{feature.description}</p>
-                    </motion.div>
-                ))}
-            </div>
-        </div>
-      </section>
-    </div>
-  );
-}
+export default TourDetail;
