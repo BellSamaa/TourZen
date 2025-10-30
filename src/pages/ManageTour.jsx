@@ -1,5 +1,5 @@
 // src/pages/ManageTour.jsx
-// (V16: FIX LỖI PARSING CUỐI CÙNG - Truy vấn Reviews an toàn)
+// (V17: FIX LỖI QUERY REVIEWS CUỐI CÙNG - Join an toàn với auth.users)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -734,7 +734,7 @@ export default function ManageTour() {
             const from = (currentPage - 1) * ITEMS_PER_PAGE;
             const to = from + ITEMS_PER_PAGE - 1;
             
-            // SỬA V16: Xóa tất cả các comment và đưa về 1 chuỗi an toàn
+            // SỬA V16/V17: Cú pháp select an toàn (loại bỏ lỗi parsing và lỗi relation)
             const selectQuery = `
                 id, created_at, departure_date, status, total_price, quantity,
                 num_adult, num_child, num_elder, num_infant, departure_id,
@@ -745,7 +745,7 @@ export default function ManageTour() {
                 flight:flight_product_id (id, name, price, product_type, details),
                 voucher_code, voucher_discount, notes, payment_method,
                 Invoices ( id ),
-                Reviews ( id, rating, comment, reviewer:user_id ( full_name, email ) )
+                Reviews ( id, rating, comment, reviewer:Users!Reviews_user_id_fkey ( full_name, email ) )
             `.replace(/\s+/g, ''); // Loại bỏ tất cả khoảng trắng, tab, newline
             
             let query = supabase
