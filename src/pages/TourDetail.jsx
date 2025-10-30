@@ -1,5 +1,5 @@
 // src/pages/TourDetail.jsx
-// (V4: FIX LỖI useEffect - Đảm bảo tải lại khi ID thay đổi)
+// (V5: FIX LỖI WHITE SCREEN - Thêm useEffect cuộn trang khi ID thay đổi)
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -10,7 +10,7 @@ import Slider from "react-slick";
 import { 
     FaCreditCard, FaSpinner, FaMapMarkerAlt, FaClock, FaInfoCircle,
     FaCalendarAlt, FaMoneyBillWave, FaChild, FaUser, FaPlus, FaGift, FaPlane, FaStickyNote,
-    FaUsers, FaStar, FaRegStar, FaUserCircle // (MỚI) Thêm icon
+    FaUsers, FaStar, FaRegStar, FaUserCircle 
 } from "react-icons/fa";
 import { motion, useScroll, useTransform } from "framer-motion";
 import "slick-carousel/slick/slick.css";
@@ -192,13 +192,21 @@ const TourDetail = () => {
     const { ref: bannerRef, scrollYProgress } = useScroll();
     const bannerTextY = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
 
+    // --- (FIX V5) useEffect cuộn trang khi ID thay đổi ---
+    // Đảm bảo trang luôn cuộn lên đầu ngay khi ID thay đổi, tránh lỗi hiển thị trắng
+    useEffect(() => {
+        if(id) {
+            window.scrollTo(0, 0);
+        }
+    }, [id]);
+
     // --- (SỬA V4) useEffect fix lỗi không tự tải lại ---
     useEffect(() => {
         // --- 1. RESET STATE NGAY LẬP TỨC ---
         setLoading(true);
         setError(null);
         setTour(null);
-        window.scrollTo(0, 0);
+        // window.scrollTo(0, 0); // Đã chuyển lên useEffect độc lập
 
         // --- 2. HÀM FETCH DATA ---
         async function fetchTour() {
