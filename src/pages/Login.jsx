@@ -1,11 +1,13 @@
 // src/pages/Login.jsx
 // (Nâng cấp giao diện "Hoa lá cành" + Hiệu ứng - Đã sửa lỗi khai báo kép)
+// (ĐÃ SỬA: Thêm trường Ngày Sinh)
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     FaLock, FaEye, FaEyeSlash, FaUser, FaEnvelope, FaSignInAlt,
-    FaMapMarkerAlt, FaPhone, FaInfoCircle, FaCheckCircle
+    FaMapMarkerAlt, FaPhone, FaInfoCircle, FaCheckCircle,
+    FaCalendarAlt // SỬA: Thêm icon Lịch
 } from "react-icons/fa";
 import { getSupabase } from "../lib/supabaseClient";
 
@@ -19,7 +21,8 @@ export default function Login() {
     const navigate = useNavigate();
     const location = useLocation();
     const [mode, setMode] = useState('login');
-    const initialFormState = { name: "", email: "", password: "", confirm: "", address: "", phone_number: "" };
+    // SỬA: Thêm 'ngay_sinh' vào state
+    const initialFormState = { name: "", email: "", password: "", confirm: "", address: "", phone_number: "", ngay_sinh: "" };
     const [form, setForm] = useState(initialFormState);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
@@ -43,12 +46,15 @@ export default function Login() {
                     
                     // <<< SỬA LỖI 409 TẠI ĐÂY: Thay .insert() bằng .upsert() >>>
                     // Lý do: Trigger trong DB đã tạo hàng, ta chỉ cần cập nhật (UPDATE) nó.
+                    
+                    // SỬA: Thêm 'ngay_sinh' vào .upsert()
                     const { error: insertError } = await supabase.from('Users').upsert({ 
                         id: user.id, 
                         full_name: form.name, 
                         email: form.email, 
                         address: form.address, 
-                        phone_number: form.phone_number 
+                        phone_number: form.phone_number,
+                        ngay_sinh: form.ngay_sinh || null // Gửi null nếu rỗng
                     });
                     
                     if (insertError) { console.error("Upsert profile error:", insertError); throw new Error(`Lỗi lưu hồ sơ: ${insertError.message}. Vui lòng thử lại.`); }
@@ -191,6 +197,19 @@ export default function Login() {
                                     <FaPhone className="input-icon" />
                                     <input type="tel" placeholder="Số điện thoại" value={form.phone_number} onChange={(e) => setForm({ ...form, phone_number: e.target.value })} className="input-field" />
                                 </motion.div>
+
+                                {/* === SỬA: THÊM TRƯỜNG NGÀY SINH === */}
+                                <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
+                                    <FaCalendarAlt className="input-icon" />
+                                    <input
+                                        type="date"
+                                        title="Ngày sinh" // Tooltip
+                                        value={form.ngay_sinh}
+                                        onChange={(e) => setForm({ ...form, ngay_sinh: e.target.value })}
+                                        className="input-field"
+                                    />
+                                </motion.div>
+                                {/* === KẾT THÚC SỬA === */}
                             </>
                         )}
 
@@ -276,7 +295,34 @@ export default function Login() {
                   color: rgba(255, 255, 255, 0.5);
                   pointer-events: none;
                 }
-                /* Bỏ animation gradient nền vì dùng ảnh */
+                
+                /* SỬA: Thêm kiểu cho input date */
+                input[type="date"].input-field {
+                    position: relative;
+                    color-scheme: dark; /* Giúp calendar picker thân thiện với nền tối */
+                }
+                
+                /* Ẩn placeholder 'yyyy-mm-dd' mặc định và hiển thị chữ 'Ngày sinh' */
+                input[type="date"].input-field::before {
+                    content: 'Ngày sinh';
+                    position: absolute;
+                    left: 2.75rem; /* Giống padding-left */
+                    top: 0.8rem; /* Giống padding-top */
+                    color: rgba(255, 255, 255, 0.6); /* Màu placeholder */
+                    display: block;
+                    pointer-events: none; /* Cho phép click xuyên qua */
+                }
+                
+                /* Ẩn chữ 'Ngày sinh' khi input có giá trị hoặc đang được focus */
+                input[type="date"].input-field:focus::before,
+                input[type="date"].input-field:valid::before {
+                    display: none;
+                }
+                
+                /* Đảm bảo text do người dùng nhập là màu trắng */
+                input[type="date"].input-field:valid {
+                   color: #FFFFFF;
+                }
             `}</style>
         </div>
     );
