@@ -282,6 +282,7 @@ const TourDetail = () => {
 
     return (
         <motion.div
+            key={id} // (SỬA MỚI) Thêm key={id} để force remount component khi ID thay đổi, tránh lỗi white screen khi navigate client-side
             className="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-200 overflow-x-hidden"
             initial="hidden" animate="visible" exit={{ opacity: 0 }}
             variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { duration: 0.4 } } }} 
