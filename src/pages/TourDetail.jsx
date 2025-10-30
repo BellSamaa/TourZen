@@ -1,6 +1,5 @@
 // src/pages/TourDetail.jsx
-// (NÂNG CẤP: Thêm mục hiển thị Đánh giá của Khách hàng)
-// (SỬA v3: Sửa lỗi 'price_adult' không tồn tại, đổi về 'price')
+// (V4: FIX LỖI useEffect - Đảm bảo tải lại khi ID thay đổi)
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -193,23 +192,24 @@ const TourDetail = () => {
     const { ref: bannerRef, scrollYProgress } = useScroll();
     const bannerTextY = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
 
-    // --- (SỬA) useEffect fetch data (chỉ fetch tour) ---
+    // --- (SỬA V4) useEffect fix lỗi không tự tải lại ---
     useEffect(() => {
+        // --- 1. RESET STATE NGAY LẬP TỨC ---
+        setLoading(true);
+        setError(null);
+        setTour(null);
+        window.scrollTo(0, 0);
+
+        // --- 2. HÀM FETCH DATA ---
         async function fetchTour() {
             if (!id || !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id)) {
                  setError("ID tour không hợp lệ.");
                  setLoading(false);
                  return;
             }
-            setLoading(true);
-            setError(null);
-            setTour(null);
-            window.scrollTo(0, 0);
-
+            
             try {
-                // (SỬA v3) Lấy 'price' thay vì 'price_adult' (mặc dù có vẻ
-                // trong file Home bạn lại muốn dùng 'price_adult'. 
-                // Tôi sẽ dùng 'price' ở đây cho nhất quán với lỗi)
+                // Fetch 1: Lấy thông tin Tour
                 const { data: tourData, error: tourError } = await supabase
                     .from("Products")
                     .select("*, rating, price, supplier_name:Suppliers(name)") // Lấy cột rating và price
@@ -233,12 +233,12 @@ const TourDetail = () => {
         }
         
         fetchTour();
-    }, [id]);
+    }, [id]); // Chạy lại mỗi khi ID thay đổi
 
     // --- (SỬA v3) Dùng 'price' ---
     const displayPrice = tour?.price || 0;
 
-    // --- (SỬA) Logic "Đặt Ngay" (Không cần chọn slot nữa) ---
+    // --- (SỬA) Logic "Đặt Ngay" ---
     const handleBookNow = () => {
         // Gửi data qua trang Payment
         navigate('/payment', {
