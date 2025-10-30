@@ -429,6 +429,7 @@ const EditTourModalAdmin = ({ tour, onClose, onSuccess, suppliers }) => {
 
 // --- Component chính AdminManageProducts ---
 export default function AdminManageProducts() {
+    const ITEMS_PER_PAGE = 10;
     const [products, setProducts] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -447,7 +448,7 @@ export default function AdminManageProducts() {
         try {
             let query = supabase
                 .from('Products')
-                .select('id, name, description, image_url, location, duration, price, supplier_price, approval_status, is_published, departures, supplier:supplier_id(name)')
+                .select('id, name, description, image_url, location, duration, price, supplier_price, approval_status, is_published, departures, supplier:supplier_id(name)', { count: 'exact' })
                 .eq('product_type', 'tour')
                 .order('created_at', { ascending: false })
                 .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1);
@@ -456,7 +457,7 @@ export default function AdminManageProducts() {
                 query = query.ilike('name', `%${search}%`);
             }
 
-            const { data, error } = await query;
+            const { data, count, error } = await query;
 
             if (error) throw error;
 
