@@ -1,5 +1,6 @@
 // src/pages/BookingHistory.jsx
 // (Đây là trang "Đơn hàng của tôi" có chức năng Đánh giá/Review)
+// (SỬA LỖI: Xóa comment khỏi chuỗi select)
 
 import React, { useState, useEffect, useCallback } from "react";
 import { getSupabase } from "../lib/supabaseClient";
@@ -111,10 +112,6 @@ const ReviewModal = ({ booking, onClose, onSubmitSuccess }) => {
         <h2 className="text-xl font-bold mb-2 dark:text-white">
           Đánh giá tour:
         </h2>
-        {/*
-          Code này vẫn hoạt động vì câu select đã sửa
-          đã alias kết quả trở lại thành 'Products'
-        */}
         <p className="text-sky-600 dark:text-sky-400 font-semibold mb-6">
           {booking.Products.name}
         </p>
@@ -197,8 +194,7 @@ export default function BookingHistory() {
     setCurrentUser(user);
 
     // Lấy dữ liệu từ 'Bookings'
-    // JOIN với 'Products' để lấy tên tour
-    // LEFT JOIN với 'Reviews' để kiểm tra xem đã đánh giá chưa
+    // *** SỬA LỖI: Đã xóa các comment lỗi khỏi chuỗi select ***
     const { data, error: fetchError } = await supabase
       .from("Bookings")
       .select(`
@@ -208,14 +204,7 @@ export default function BookingHistory() {
         status,
         user_id,
         product_id,
-
-        -- ========== SỬA LỖI SQL TẠI ĐÂY ==========
-        -- Chỉ định rõ khóa ngoại 'product_id' vì có nhiều hơn 1 khóa ngoại
-        -- đến bảng Products.
-        -- Cú pháp: Tên_alias:Tên_bảng!tên_khóa_ngoại (các_cột)
         Products:Products!product_id ( id, name, image_url ),
-        -- =======================================
-
         Reviews ( id ) 
       `)
       .eq("user_id", user.id) // Chỉ lấy của user hiện tại
@@ -306,8 +295,6 @@ export default function BookingHistory() {
         ) : (
           <div className="space-y-6">
             {bookings.map((booking) => {
-              // Code này vẫn hoạt động vì câu select đã sửa
-              // đã alias kết quả trở lại thành 'Products'
               const tour = booking.Products;
               const hasReview = booking.Reviews && booking.Reviews.length > 0;
               // Chỉ cho phép review khi tour đã 'confirmed' VÀ tour đó vẫn còn tồn tại (chưa bị xóa)
