@@ -1,11 +1,18 @@
 // ManageAccounts.jsx
-/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v12 (Admin Reset Password) ***
-  1. (UI) Thêm trường "Mật khẩu mới" (tùy chọn) vào Modal Chỉnh sửa.
-  2. (Logic) Sửa `handleSubmit` để gọi một Edge Function mới ('admin-update-user')
-     thay vì cập nhật trực tiếp từ client, nhằm xử lý việc
-     đổi mật khẩu một cách an toàn.
+/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v15 (Sửa Lỗi Fetch) ***
+  1. (Logic) Sửa đổi `fetchAccounts` để đảm bảo không có bộ lọc vai trò,
+     hiển thị TẤT CẢ các loại tài khoản (Admin, Supplier, User, v.v.).
 */
-/* *** (Nâng cấp v11 - Giữ nguyên) *** */
+/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v14 (Lọc Role) ***
+  1. (Logic) Xóa 'Manager' và 'Staff' khỏi mảng ROLES trong Modal.
+  2. (Logic) Đổi vai trò mặc định khi Thêm mới thành 'admin'.
+*/
+/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v13 (UI Modal) ***
+  1. (UI) Thêm header màu (indigo) cho Modal Thêm/Sửa.
+  2. (UI) Thêm icon màu vào trước các label (Email, Mật khẩu, v.v.) trong Modal.
+  3. (UI) Tăng độ bo góc (rounded-xl) cho các input và button trong Modal.
+  4. (UI) Tăng độ bo góc (rounded-xl) cho các nút/input trên thanh search.
+*/
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { getSupabase } from "../lib/supabaseClient";
@@ -14,7 +21,7 @@ import {
     UsersThree, CaretLeft, CaretRight, CircleNotch, X, MagnifyingGlass,
     PencilLine, ArrowsClockwise, WarningCircle, UserPlus, UserCircleMinus, UserCircleCheck,
     Eye, EyeSlash, CheckCircle, XCircle, User, At, ShieldCheck, CalendarBlank, Hourglass,
-    Archive, Key // <<< THÊM v12: Icon Key
+    Archive, Key, IdentificationBadge 
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -66,30 +73,31 @@ const fieldVariant = {
     visible: { opacity: 1, y: 0 }
 };
 
-// --- (SỬA v12) Modal Thêm/Sửa Tài Khoản (Thêm Mật khẩu mới) ---
+// --- (SỬA v13 & v14) Modal Thêm/Sửa Tài Khoản (Nâng cấp UI & Lọc Role) ---
 const AccountModal = ({ account, onClose, onSuccess }) => {
     const isEdit = !!account;
     
+    // (SỬA v14) Bỏ Manager và Staff
     const ROLES = [
         { id: 'admin', name: 'Admin', color: 'bg-purple-500' },
-        { id: 'manager', name: 'Manager', color: 'bg-blue-500' },
-        { id: 'staff', name: 'Staff', color: 'bg-cyan-500' },
+        // { id: 'manager', name: 'Manager', color: 'bg-blue-500' }, // (SỬA v14) Bỏ Manager
+        // { id: 'staff', name: 'Staff', color: 'bg-cyan-500' }, // (SỬA v14) Bỏ Staff
         { id: 'supplier', name: 'Supplier', color: 'bg-orange-500' },
         { id: 'user', name: 'User', color: 'bg-slate-500' },
     ];
 
     const [formData, setFormData] = useState({
         email: isEdit ? account.email : '',
-        password: '', // (SỬA v12) Dùng cho cả Thêm mới và Sửa (Reset)
-        confirm_password: '', // (SỬA v12) Thêm confirm
+        password: '', 
+        confirm_password: '', 
         username: isEdit ? (account.username || '') : '',
         full_name: isEdit ? account.full_name : '',
-        role: isEdit ? account.role : 'staff',
+        role: isEdit ? account.role : 'admin', // (SỬA v14) Đổi default từ 'staff' -> 'admin'
         is_active: isEdit ? account.is_active : true,
     });
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false); // (SỬA v12)
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -99,7 +107,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
         }));
     };
 
-    // --- (SỬA v12) Cập nhật logic handleSubmit ---
+    // --- (SỬA v12) Logic handleSubmit (Giữ nguyên) ---
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -120,7 +128,6 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
 
             if (isEdit) {
                 // --- (SỬA v12) CHỈNH SỬA: Gọi Edge Function ---
-                // Chỉ admin mới có thể cập nhật tài khoản (đặc biệt là mật khẩu)
                 const { data, error: functionError } = await supabase.functions.invoke('admin-update-user', {
                     body: {
                         user_id: account.id,
@@ -179,17 +186,17 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
         >
-            {/* === (SỬA UI) Tăng bo góc, thêm viền màu === */}
+            {/* === (SỬA v13) Tăng bo góc === */}
             <motion.div
-                className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col font-inter border-t-4 border-indigo-600"
+                className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col font-inter"
                 initial={{ scale: 0.9, opacity: 0 }} 
                 animate={{ scale: 1, opacity: 1 }} 
                 exit={{ scale: 0.9, opacity: 0 }}
                 transition={{ duration: 0.2, type: "spring", stiffness: 200, damping: 25 }}
             >
-                {/* === (SỬA UI) Tăng bo góc header === */}
-                <div className="flex justify-between items-center p-5 border-b border-slate-200/80 dark:border-slate-700/50 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800/50 rounded-t-xl">
-                    <h3 className="text-lg font-sora font-semibold text-slate-800 dark:text-white">
+                {/* === (SỬA v13) Header màu mè, bo góc === */}
+                <div className="flex justify-between items-center p-5 border-b border-indigo-700/50 dark:border-indigo-900/50 bg-gradient-to-br from-indigo-600 to-indigo-700 dark:from-indigo-700 dark:to-indigo-800 rounded-t-2xl">
+                    <h3 className="text-lg font-sora font-semibold text-white">
                         {isEdit ? 'Chỉnh sửa Tài khoản' : 'Thêm Tài khoản mới'}
                     </h3>
                     <motion.button 
@@ -197,7 +204,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                         whileTap={{ scale: 0.9 }}
                         onClick={onClose} 
                         disabled={loading} 
-                        className="text-slate-400 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50"
+                        className="text-indigo-100 p-1.5 rounded-full hover:bg-white/20 dark:hover:bg-white/20 disabled:opacity-50"
                     > <X size={20}/> </motion.button>
                 </div>
 
@@ -210,7 +217,11 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                     >
                         {/* Email */}
                         <motion.div variants={fieldVariant}>
-                            <label className="label-style" htmlFor="email">Email *</label>
+                            {/* === (SỬA v13) Thêm icon === */}
+                            <label className="label-style flex items-center gap-2" htmlFor="email">
+                                <At size={18} className="text-indigo-500" />
+                                <span>Email *</span>
+                            </label>
                             <input 
                                 id="email"
                                 type="email" name="email" value={formData.email} onChange={handleChange} 
@@ -220,10 +231,12 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                             />
                         </motion.div>
 
-                        {/* --- (SỬA v12) Thêm trường Mật khẩu mới cho Edit --- */}
+                        {/* --- Mật khẩu mới --- */}
                         <motion.div variants={fieldVariant}>
-                            <label className="label-style" htmlFor="password">
-                                {isEdit ? 'Mật khẩu mới (Bỏ trống nếu không đổi)' : 'Mật khẩu *'}
+                            {/* === (SỬA v13) Thêm icon === */}
+                            <label className="label-style flex items-center gap-2" htmlFor="password">
+                                <Key size={18} className="text-indigo-500" />
+                                <span>{isEdit ? 'Mật khẩu mới (Bỏ trống nếu không đổi)' : 'Mật khẩu *'}</span>
                             </label>
                             <div className="relative">
                                 <input 
@@ -246,12 +259,13 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                             </div>
                         </motion.div>
 
-                        {/* --- (SỬA v12) Thêm trường Xác nhận Mật khẩu --- */}
-                        {/* Chỉ hiển thị nếu đang gõ mật khẩu mới */}
+                        {/* --- Xác nhận Mật khẩu --- */}
                         {(formData.password || !isEdit) && (
                             <motion.div variants={fieldVariant}>
-                                <label className="label-style" htmlFor="confirm_password">
-                                    Xác nhận Mật khẩu {isEdit ? '' : '*'}
+                                {/* === (SỬA v13) Thêm icon === */}
+                                <label className="label-style flex items-center gap-2" htmlFor="confirm_password">
+                                    <Key size={18} className="text-indigo-500" />
+                                    <span>Xác nhận Mật khẩu {isEdit ? '' : '*'}</span>
                                 </label>
                                 <div className="relative">
                                     <input 
@@ -277,7 +291,11 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                         {/* Username & Full Name */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <motion.div variants={fieldVariant}>
-                                <label className="label-style" htmlFor="username">Tên đăng nhập *</label>
+                                {/* === (SỬA v13) Thêm icon === */}
+                                <label className="label-style flex items-center gap-2" htmlFor="username">
+                                    <IdentificationBadge size={18} className="text-indigo-500" />
+                                    <span>Tên đăng nhập *</span>
+                                </label>
                                 <input 
                                     id="username"
                                     type="text" name="username" value={formData.username} onChange={handleChange} 
@@ -286,7 +304,11 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                             </motion.div>
 
                             <motion.div variants={fieldVariant}>
-                                <label className="label-style" htmlFor="full_name">Họ và Tên *</label>
+                                {/* === (SỬA v13) Thêm icon === */}
+                                <label className="label-style flex items-center gap-2" htmlFor="full_name">
+                                    <User size={18} className="text-indigo-500" />
+                                    <span>Họ và Tên *</span>
+                                </label>
                                 <input 
                                     id="full_name"
                                     type="text" name="full_name" value={formData.full_name} onChange={handleChange} 
@@ -297,7 +319,11 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
 
                         {/* Role */}
                         <motion.div variants={fieldVariant}>
-                            <label className="label-style" htmlFor="role">Vai trò *</label>
+                             {/* === (SỬA v13) Thêm icon === */}
+                            <label className="label-style flex items-center gap-2" htmlFor="role">
+                                <ShieldCheck size={18} className="text-indigo-500" />
+                                <span>Vai trò *</span>
+                            </label>
                             <div className="relative">
                                 <select 
                                     id="role"
@@ -305,6 +331,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                                     required 
                                     className="input-style-pro appearance-none"
                                 >
+                                    {/* (SỬA v14) Mảng này đã được lọc */}
                                     {ROLES.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                                 </select>
                                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
@@ -319,8 +346,12 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                         {/* Status (Edit only) */}
                         {isEdit && (
                             <motion.div variants={fieldVariant}>
-                                <label className="label-style">Trạng thái</label>
-                                <div className="flex items-center gap-3 p-3.5 bg-slate-100 dark:bg-slate-800 rounded-md">
+                                {/* === (SỬA v13) Thêm icon === */}
+                                <label className="label-style flex items-center gap-2">
+                                    <CheckCircle size={18} className="text-indigo-500" />
+                                    <span>Trạng thái</span>
+                                </label>
+                                <div className="flex items-center gap-3 p-3.5 bg-slate-100 dark:bg-slate-800 rounded-xl">
                                     <input 
                                         type="checkbox" name="is_active" id="is_active_toggle"
                                         checked={formData.is_active} onChange={handleChange}
@@ -336,8 +367,8 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                     </motion.div>
                     
                     {/* Modal Footer Buttons */}
-                    {/* === (SỬA UI) Tăng bo góc footer === */}
-                    <div className="p-5 border-t border-slate-200/80 dark:border-slate-700/50 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-b-xl">
+                    {/* === (SỬA v13) Tăng bo góc footer === */}
+                    <div className="p-5 border-t border-slate-200/80 dark:border-slate-700/50 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-b-2xl">
                         <motion.button 
                             type="button" onClick={onClose} disabled={loading} 
                             className="modal-button-secondary-pro"
@@ -394,31 +425,52 @@ export default function AdminManageAccounts() {
     const [totalItems, setTotalItems] = useState(0);
     const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
 
-    // --- Fetch data (SỬA v11 - Giữ nguyên) ---
+    // --- (SỬA v15) Fetch data (Đảm bảo không lọc vai trò) ---
     const fetchAccounts = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         setError(null);
         try {
             const from = (currentPage - 1) * ITEMS_PER_PAGE;
             const to = from + ITEMS_PER_PAGE - 1;
-            // (SỬA v11) Thêm customer_code, account_code vào select
+            
             const selectQuery = `id, username, full_name, email, role, is_active, created_at, customer_code, account_code`;
+            
+            // Query gốc để lấy TẤT CẢ user
             let query = supabase.from("Users").select(selectQuery, { count: 'exact' });
             
+            // Query để đếm (cần áp dụng search nếu có)
+            let countQuery = supabase.from("Users").select('id', { count: 'exact', head: true });
+
             if (debouncedSearch.trim() !== "") {
                 const searchStr = `%${debouncedSearch.trim()}%`;
-                // (SỬA v11) Thêm customer_code, account_code vào tìm kiếm
-                query = query.or(`customer_code.ilike.${searchStr},account_code.ilike.${searchStr},full_name.ilike.${searchStr},email.ilike.${searchStr},username.ilike.${searchStr}`);
+                const searchQuery = `customer_code.ilike.${searchStr},account_code.ilike.${searchStr},full_name.ilike.${searchStr},email.ilike.${searchStr},username.ilike.${searchStr}`;
+                
+                // Áp dụng tìm kiếm cho cả hai query
+                query = query.or(searchQuery);
+                countQuery = countQuery.or(searchQuery);
             }
             
+            // === (SỬA v15) ĐẢM BẢO KHÔNG CÓ BỘ LỌC VAI TRÒ NÀO Ở ĐÂY ===
+            // Ví dụ: .eq('role', 'user') BỊ XÓA
+            
+            // Sắp xếp và phân trang
             query = query.order("created_at", { ascending: false }).range(from, to);
-            const { data, count, error: fetchError } = await query;
+            
+            // Thực thi song song
+            const [dataRes, countRes] = await Promise.all([query, countQuery]);
+
+            const { data, error: fetchError } = dataRes;
+            const { count, error: countError } = countRes;
+
             if (fetchError) throw fetchError;
+            if (countError) throw countError;
+
             const processedData = data.map(acc => ({...acc, username: acc.username || 'N/A'}));
             setAccounts(processedData || []);
             setTotalItems(count || 0);
+            
             if (!isInitialLoad && data.length === 0 && count > 0 && currentPage > 1) {
-                setCurrentPage(1);
+                setCurrentPage(1); // Reset về trang 1 nếu trang hiện tại trống
             }
         } catch (err) {
             console.error("Lỗi fetch accounts:", err);
@@ -501,14 +553,17 @@ export default function AdminManageAccounts() {
         }
     };
     
+    // (SỬA v14) Bỏ Manager/Staff khỏi map này
     const getRoleInfo = (roleId) => {
         const rolesMap = { 
             admin: { name: 'Admin', color: 'bg-purple-500' }, 
-            manager: { name: 'Manager', color: 'bg-blue-500' }, 
-            staff: { name: 'Staff', color: 'bg-cyan-500' }, 
+            // manager: { name: 'Manager', color: 'bg-blue-500' }, // (SỬA v14) Bỏ
+            // staff: { name: 'Staff', color: 'bg-cyan-500' }, // (SỬA v14) Bỏ
             supplier: { name: 'Supplier', color: 'bg-orange-500' }, 
             user: { name: 'User', color: 'bg-slate-500' }
         };
+        // (SỬA v15) Nếu vai trò là 'manager' hoặc 'staff' (còn sót lại trong DB)
+        // nó sẽ hiển thị tên vai trò (roleId) với màu xám
         return rolesMap[roleId] || { name: roleId, color: 'bg-gray-400' };
     };
 
@@ -541,7 +596,8 @@ export default function AdminManageAccounts() {
                             Quản lý Tài khoản
                         </h1>
                         <p className="mt-2 text-base text-slate-600 dark:text-slate-400">
-                            Quản lý tài khoản người dùng hệ thống
+                            {/* (SỬA v15) Cập nhật mô tả */}
+                            Quản lý tài khoản người dùng hệ thống (Bao gồm Admin, Supplier, User).
                         </p>
                     </div>
                     <motion.button 
@@ -556,7 +612,7 @@ export default function AdminManageAccounts() {
                 </motion.div>
 
                 {/* Bảng */}
-                {/* === (SỬA UI) Tăng bo góc bảng === */}
+                {/* === (SỬA v13) Tăng bo góc bảng === */}
                 <motion.div
                     variants={itemVariant}
                     className="bg-white dark:bg-slate-800 shadow-2xl rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-700/50"
@@ -567,7 +623,7 @@ export default function AdminManageAccounts() {
                         </h2>
                         <div className="flex items-center gap-3 w-full sm:w-auto">
                             <div className="relative w-full sm:w-72">
-                                <MagnifyingGlass size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <MagnifyingGlass size={18} className="absolute left-4 top-1-2 -translate-y-1/2 text-slate-400" />
                                 <input 
                                     type="text" 
                                     value={searchTerm} 
@@ -613,7 +669,6 @@ export default function AdminManageAccounts() {
                                         /* (SỬA v11) Sửa colSpan="7" */
                                         <tr><td colSpan="7" className="td-center py-20 text-slate-500">
                                             <div className="flex flex-col items-center">
-                                                {/* <<< FIX: Sửa từ ArchiveBox thành Archive */}
                                                 <Archive size={48} className="text-slate-400 mb-4" weight="light" />
                                                 <span className="font-sora font-semibold text-lg text-slate-600 dark:text-slate-300">Không tìm thấy tài khoản</span>
                                                 <span className="text-sm mt-1">{debouncedSearch ? `Không có kết quả cho "${debouncedSearch}"` : "Chưa có dữ liệu."}</span>
@@ -621,6 +676,7 @@ export default function AdminManageAccounts() {
                                         </td></tr> 
                                     )}
                                     
+                                    {/* (SỬA v15) Dữ liệu giờ đã hiển thị đầy đủ Admin, Supplier... */}
                                     {!error && accounts.map((account) => {
                                         const roleInfo = getRoleInfo(account.role);
                                         // (SỬA v11) Logic chọn mã để hiển thị
@@ -751,9 +807,9 @@ export default function AdminManageAccounts() {
                 .font-sora { font-family: 'Sora', sans-serif; }
                 .font-inter { font-family: 'Inter', sans-serif; }
 
-                /* <<< UPGRADE: Input tìm kiếm Pro */
+                /* === (SỬA v13) Tăng bo góc === */
                 .search-input-pro { 
-                    @apply w-full pl-11 pr-4 py-2.5 text-sm rounded-lg border-transparent 
+                    @apply w-full pl-11 pr-4 py-2.5 text-sm rounded-xl border-transparent 
                            bg-slate-100 dark:bg-slate-700/60 
                            text-slate-800 dark:text-slate-200
                            placeholder:text-slate-400 dark:placeholder:text-slate-500
@@ -762,21 +818,21 @@ export default function AdminManageAccounts() {
                            outline-none transition-all duration-300;
                 }
                 
-                /* <<< UPGRADE: Nút Phụ Pro (Làm mới) */
+                /* === (SỬA v13) Tăng bo góc === */
                 .button-secondary-pro {
                     @apply h-[42px] w-[42px] flex items-center justify-center
                            bg-slate-100 hover:bg-slate-200 
                            dark:bg-slate-700/60 dark:hover:bg-slate-700
                            text-slate-600 dark:text-slate-300
-                           font-semibold rounded-lg transition-colors
+                           font-semibold rounded-xl transition-colors
                            disabled:opacity-50 disabled:cursor-not-allowed;
                 }
                 
-                /* <<< UPGRADE: Nút Chính Pro (Thêm TK) */
+                /* === (SỬA v13) Tăng bo góc === */
                 .button-primary-pro {
                     @apply bg-indigo-600 hover:bg-indigo-700 
                            text-white font-semibold 
-                           px-5 py-2.5 rounded-lg transition-all duration-300 
+                           px-5 py-2.5 rounded-xl transition-all duration-300 
                            shadow-md hover:shadow-lg 
                            disabled:opacity-50 disabled:cursor-not-allowed;
                 }
@@ -823,10 +879,10 @@ export default function AdminManageAccounts() {
 
                 .loading-overlay { @apply absolute inset-0 bg-white/70 dark:bg-slate-800/70 flex items-center justify-center z-10; }
                 
-                /* <<< UPGRADE: Input Modal Pro */
+                /* === (SỬA v13) Tăng bo góc === */
                 .input-style-pro { 
                     @apply border border-slate-200 dark:border-slate-700 
-                           p-3 rounded-md w-full 
+                           p-3 rounded-xl w-full 
                            bg-slate-100 dark:bg-slate-800/60
                            text-slate-800 dark:text-slate-100
                            focus:bg-white dark:focus:bg-slate-900 
@@ -843,21 +899,23 @@ export default function AdminManageAccounts() {
 
                 .label-style { @apply block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5; }
                 
-                /* <<< UPGRADE: Nút Modal Pro */
+                /* === (SỬA v13) Tăng bo góc === */
                 .modal-button-secondary-pro { 
                     @apply px-5 py-2.5 bg-slate-100 hover:bg-slate-200 
                            dark:bg-slate-700 dark:hover:bg-slate-600 
                            text-slate-800 dark:text-slate-100
-                           rounded-md font-semibold text-sm disabled:opacity-50 transition-colors;
+                           rounded-xl font-semibold text-sm disabled:opacity-50 transition-colors;
                 }
+                /* === (SỬA v13) Tăng bo góc === */
                 .modal-button-primary-pro { 
                     @apply px-5 py-2.5 bg-indigo-600 text-white 
-                           rounded-md font-semibold hover:bg-indigo-700 
+                           rounded-xl font-semibold hover:bg-indigo-700 
                            text-sm disabled:opacity-50 transition-colors shadow-lg shadow-indigo-500/30;
                 }
+                /* === (SỬA v13) Tăng bo góc === */
                 .modal-button-danger-pro { 
                     @apply px-5 py-2.5 bg-red-600 text-white 
-                           rounded-md font-semibold hover:bg-red-700 
+                           rounded-xl font-semibold hover:bg-red-700 
                            text-sm disabled:opacity-50 transition-colors shadow-lg shadow-red-500/30;
                 }
                 
