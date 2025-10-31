@@ -1,6 +1,7 @@
 // src/pages/ManageSuppliers.jsx
 // (UPGRADED V4: Sửa logic Thống kê, Sửa Trạng thái click, Thêm Icons)
 // (Nâng cấp giao diện: Tăng kích thước font, padding; Thêm nhiều icon; Nút bấm màu sắc đa dạng hơn với gradient, hover effects; Cải thiện layout cho dễ nhìn)
+// (Nâng cấp Form NCC: Thêm icons vào các ô input)
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -232,7 +233,7 @@ const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
 // Component con hiển thị Sản phẩm cần duyệt
 // ====================================================================
 const SupplierProductsApproval = ({ supplierId, supplierName }) => {
-    const [products, setProducts] = useState([]);
+    const [products, setProducts] =useState([]);
     const [loading, setLoading] = useState(true); 
     const [editingProduct, setEditingProduct] = useState(null); 
 
@@ -384,7 +385,7 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
                                             </>
                                         )}
                                         {(p.approval_status === 'approved' || p.approval_status === 'rejected') && (
-                                             <button onClick={() => handleApproval(p.id, 'pending')} className="action-button text-white bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 p-2 rounded-lg" title="Đặt lại chờ duyệt"><Clock size={20}/></button>
+                                             <button onClick={() => handleApproval(p.id, 'pending')} className="action-button text-white bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 p-2 rounded-lg" title="Đặt lại chờ duyệt"><Clock size={2GPO_lock_0}/></button>
                                         )}
                                     </div>
                                 </div>
@@ -874,35 +875,51 @@ export default function ManageSuppliers() {
                                 </button>
                             </div>
                             
+                            {/* (YÊU CẦU) Nâng cấp Form: Thêm icon vào input */}
                             <div className="p-8 space-y-5 overflow-y-auto">
                                 <div>
                                     <label htmlFor="name" className="label-style text-lg">Tên Nhà cung cấp *</label>
-                                    <input id="name" type="text" name="name" value={formData.name} onChange={handleChange} required className="input-style text-lg" />
+                                    <div className="relative">
+                                        <Briefcase size={24} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                                        <input id="name" type="text" name="name" value={formData.name} onChange={handleChange} required className="input-style text-lg pl-12" />
+                                    </div>
                                 </div>
                                 <div>
                                     <label htmlFor="user_id" className="label-style text-lg">Tài khoản quản lý (Quyết định Trạng thái)</label>
-                                    <select id="user_id" name="user_id" value={formData.user_id} onChange={handleChange} className="input-style text-lg">
-                                        <option value="">-- Không liên kết (Trạng thái: Ngừng) --</option>
-                                        {users.map(user => (
-                                            <option key={user.id} value={user.id}>
-                                                {user.full_name} ({user.email})
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <div className="relative">
+                                        <UserCircle size={24} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                                        <select id="user_id" name="user_id" value={formData.user_id} onChange={handleChange} className="input-style text-lg pl-12">
+                                            <option value="">-- Không liên kết (Trạng thái: Ngừng) --</option>
+                                            {users.map(user => (
+                                                <option key={user.id} value={user.id}>
+                                                    {user.full_name} ({user.email})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                      <div>
                                         <label htmlFor="phone" className="label-style text-lg">Số điện thoại (NCC)</label>
-                                        <input id="phone" type="tel" name="phone" value={formData.phone} onChange={handleChange} className="input-style text-lg" />
+                                        <div className="relative">
+                                            <Phone size={24} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                                            <input id="phone" type="tel" name="phone" value={formData.phone} onChange={handleChange} className="input-style text-lg pl-12" />
+                                        </div>
                                     </div>
                                     <div>
                                         <label htmlFor="email" className="label-style text-lg">Email (NCC)</label>
-                                        <input id="email" type="email" name="email" value={formData.email} onChange={handleChange} className="input-style text-lg" />
+                                        <div className="relative">
+                                            <Envelope size={24} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                                            <input id="email" type="email" name="email" value={formData.email} onChange={handleChange} className="input-style text-lg pl-12" />
+                                        </div>
                                     </div>
                                 </div>
                                 <div>
                                     <label htmlFor="address" className="label-style text-lg">Địa chỉ (NCC)</label>
-                                    <textarea id="address" name="address" value={formData.address} onChange={handleChange} rows="4" className="input-style text-lg resize-y"></textarea>
+                                    <div className="relative">
+                                         <MapPin size={24} className="absolute left-4 top-5 text-gray-400 dark:text-gray-500" />
+                                        <textarea id="address" name="address" value={formData.address} onChange={handleChange} rows="4" className="input-style text-lg resize-y pl-12"></textarea>
+                                    </div>
                                 </div>
                             </div>
                             
