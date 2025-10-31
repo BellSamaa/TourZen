@@ -1,4 +1,5 @@
 // src/components/Navbar.jsx
+// (SỬA LỖI v19.1) Sửa tên icon 'IdentificationCard' -> 'IdCard'
 // (SỬA v19) Thêm link "Thông tin cá nhân" (/profile) vào dropdown
 
 import React, { useState, useEffect } from "react";
@@ -17,7 +18,7 @@ import {
   Sun,
   Moon,
   ShoppingBag, // Thêm icon cho đơn hàng
-  IdentificationCard // <<< THÊM v19: Icon cho Profile
+  IdCard // <<< SỬA LỖI v19.1: Đổi tên icon từ IdentificationCard -> IdCard
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
@@ -133,7 +134,8 @@ const ProfileMenu = ({ user }) => {
                     }}
                     className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-md text-sm text-gray-700 dark:text-gray-200 hover:bg-sky-500 hover:text-white"
                   >
-                    <IdentificationCard size={16} />
+                    {/* <<< SỬA LỖI v19.1: Đổi tên icon >>> */}
+                    <IdCard size={16} /> 
                     Thông tin cá nhân
                   </button>
                 </>
@@ -317,7 +319,9 @@ export default function Navbar() {
                         onClick={() => setIsMobileMenuOpen(false)}
                         className="flex items-center gap-3 font-medium text-sky-600 dark:text-sky-400 px-1"
                       >
-                        <IdentificationCard size={18} /> Thông tin cá nhân
+                         {/* <<< SỬA LỖI v19.1: Đổi tên icon >>> */}
+                        <IdCard size={18} /> 
+                        Thông tin cá nhân
                       </Link>
                     </>
                   )}
