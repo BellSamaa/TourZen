@@ -1,9 +1,9 @@
 // src/pages/Profile.jsx
-// (NÂNG CẤP v20) "ĐỈNH NÓC" - Thiết kế lại toàn bộ giao diện
-// 1. Layout 2 cột (Sidebar Tabs + Content)
-// 2. Thêm hiệu ứng Framer Motion mượt mà khi chuyển tab
-// 3. Thêm nhiều icon màu mè
-// 4. Thiết kế lại khu vực Upload File (Scan CMND) thành dạng Dropzone "xịn xò"
+// (NÂNG CẤP v21) "ĐỈNH NÓC PLUS" - Nâng cấp giao diện theo yêu cầu
+// 1. Bo góc đẹp hơn (tăng border-radius lên 1.5rem hoặc 2rem)
+// 2. Thêm nhiều màu sắc hơn (gradient background, màu icon đa dạng, highlight colors)
+// 3. Thêm nhiều icon hơn (thêm vào labels, buttons, badges)
+// 4. Xóa input "Tên đăng nhập" trong ProfileInfoForm
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -13,17 +13,17 @@ import toast from 'react-hot-toast';
 import { 
     User, Envelope, Phone, House, CalendarBlank, Key, IdentificationCard, 
     UploadSimple, CircleNotch, PaperPlaneRight, Lock, Eye, EyeSlash, CheckCircle, 
-    WarningCircle, ShieldCheck, FileArrowUp, XCircle // Thêm icon
+    WarningCircle, ShieldCheck, FileArrowUp, XCircle, Info, Sparkle, Palette // Thêm icon mới
 } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const supabase = getSupabase();
 
-// --- (v19) Component con: Cập nhật Thông tin ---
-// (v20) Sửa lại: Bỏ thẻ <form>, <h3
+// --- (v21) Component con: Cập nhật Thông tin ---
+// (v21) Sửa: Xóa input username, thêm icon vào buttons, thêm màu gradient
 const ProfileInfoForm = ({ user, onProfileUpdate }) => {
     const [formData, setFormData] = useState({
-        full_name: '', phone_number: '', address: '', ngay_sinh: '', username: ''
+        full_name: '', phone_number: '', address: '', ngay_sinh: '', 
     });
     const [loading, setLoading] = useState(false);
 
@@ -34,7 +34,6 @@ const ProfileInfoForm = ({ user, onProfileUpdate }) => {
                 phone_number: user.phone_number || '',
                 address: user.address || '',
                 ngay_sinh: user.ngay_sinh ? user.ngay_sinh.split('T')[0] : '',
-                username: user.username || 'N/A'
             });
         }
     }, [user]);
@@ -80,29 +79,27 @@ const ProfileInfoForm = ({ user, onProfileUpdate }) => {
 
     return (
         <form onSubmit={handleSubmit} className="space-y-5">
-            <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6">Thông tin Cơ bản</h3>
+            <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
+                <Info size={24} className="text-indigo-600" /> Thông tin Cơ bản
+            </h3>
             
-            <InputGroup icon={<User />} label="Tên đăng nhập (Không thể đổi)">
-                <input type="text" value={formData.username} className="input-style-pro" disabled />
-            </InputGroup>
-            
-            <InputGroup icon={<Envelope />} label="Email (Không thể đổi)">
+            <InputGroup icon={<Envelope className="text-pink-600" />} label="Email (Không thể đổi)">
                 <input type="email" value={user.email || ''} className="input-style-pro" disabled />
             </InputGroup>
 
-            <InputGroup icon={<User />} label="Họ và Tên">
+            <InputGroup icon={<User className="text-green-600" />} label="Họ và Tên">
                 <input type="text" name="full_name" value={formData.full_name} onChange={handleChange} className="input-style-pro" required />
             </InputGroup>
 
-            <InputGroup icon={<Phone />} label="Số điện thoại">
+            <InputGroup icon={<Phone className="text-yellow-600" />} label="Số điện thoại">
                 <input type="tel" name="phone_number" value={formData.phone_number} onChange={handleChange} className="input-style-pro" />
             </InputGroup>
 
-            <InputGroup icon={<House />} label="Địa chỉ">
+            <InputGroup icon={<House className="text-purple-600" />} label="Địa chỉ">
                 <input type="text" name="address" value={formData.address} onChange={handleChange} className="input-style-pro" required minLength={10} />
             </InputGroup>
 
-            <InputGroup icon={<CalendarBlank />} label="Ngày sinh">
+            <InputGroup icon={<CalendarBlank className="text-red-600" />} label="Ngày sinh">
                 <input type="date" name="ngay_sinh" value={formData.ngay_sinh} onChange={handleChange} className="input-style-pro" />
             </InputGroup>
 
@@ -110,18 +107,19 @@ const ProfileInfoForm = ({ user, onProfileUpdate }) => {
                 <motion.button 
                     type="submit" 
                     disabled={loading}
-                    className="modal-button-primary-pro flex items-center justify-center gap-2 min-w-[150px]"
+                    className="modal-button-primary-pro flex items-center justify-center gap-2 min-w-[150px] bg-gradient-to-r from-sky-500 to-indigo-500"
                     whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                 >
-                    {loading ? <CircleNotch size={18} className="animate-spin" /> : 'Lưu thay đổi'}
+                    {loading ? <CircleNotch size={18} className="animate-spin" /> : <Sparkle size={18} />}
+                    Lưu thay đổi
                 </motion.button>
             </div>
         </form>
     );
 };
 
-// --- (v19) Component con: Đổi Mật khẩu (Giống Login.jsx) ---
-// (v20) Sửa lại: Bỏ thẻ <form>, <h3
+// --- (v21) Component con: Đổi Mật khẩu ---
+// (v21) Thêm icon màu vào buttons, thêm gradient
 const ChangePasswordForm = ({ user }) => {
     const [isOtpSent, setIsOtpSent] = useState(false);
     const [form, setForm] = useState({ otp: '', password: '', confirm: '' });
@@ -188,17 +186,19 @@ const ChangePasswordForm = ({ user }) => {
 
     return (
         <div className="">
-            <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6">Bảo mật & Đăng nhập</h3>
+            <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
+                <ShieldCheck size={24} className="text-orange-600" /> Bảo mật & Đăng nhập
+            </h3>
             
             {!isOtpSent ? (
-                <div className="bg-slate-50 dark:bg-slate-800/60 p-5 rounded-xl border dark:border-slate-700">
+                <div className="bg-gradient-to-br from-slate-50 to-indigo-50 dark:from-slate-800/60 to-indigo-900/30 p-5 rounded-2xl border dark:border-slate-700">
                     <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">
                         Để đổi mật khẩu, bạn cần yêu cầu một mã OTP từ Admin (Quản trị viên) để xác thực.
                     </p>
                     <motion.button 
                         onClick={handleSendRequest}
                         disabled={loading}
-                        className="modal-button-primary-pro bg-orange-600 hover:bg-orange-700 shadow-orange-500/30 flex items-center justify-center gap-2"
+                        className="modal-button-primary-pro bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 to-red-700 shadow-orange-500/30 flex items-center justify-center gap-2"
                         whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                     >
                         {loading ? <CircleNotch size={18} className="animate-spin" /> : <PaperPlaneRight size={18} />}
@@ -206,15 +206,15 @@ const ChangePasswordForm = ({ user }) => {
                     </motion.button>
                 </div>
             ) : (
-                <form onSubmit={handleChangePassword} className="space-y-4 bg-slate-50 dark:bg-slate-800/60 p-5 rounded-xl border dark:border-slate-700">
+                <form onSubmit={handleChangePassword} className="space-y-4 bg-gradient-to-br from-slate-50 to-indigo-50 dark:from-slate-800/60 to-indigo-900/30 p-5 rounded-2xl border dark:border-slate-700">
                     <p className="text-sm text-slate-600 dark:text-slate-300">
                         Vui lòng liên hệ Admin (SĐT: <strong className="text-slate-800 dark:text-white">{ADMIN_PHONE}</strong>) để nhận Mã OTP.
                     </p>
-                    <InputGroup icon={<Key />} label="Mã OTP 6 số">
+                    <InputGroup icon={<Key className="text-blue-600" />} label="Mã OTP 6 số">
                         <input type="text" name="otp" value={form.otp} onChange={handleChange} className="input-style-pro" required />
                     </InputGroup>
                     
-                    <InputGroup icon={<Lock />} label="Mật khẩu mới (tối thiểu 6 ký tự)">
+                    <InputGroup icon={<Lock className="text-teal-600" />} label="Mật khẩu mới (tối thiểu 6 ký tự)">
                         <div className="relative">
                             <input 
                                 type={showPassword ? "text" : "password"} 
@@ -227,7 +227,7 @@ const ChangePasswordForm = ({ user }) => {
                         </div>
                     </InputGroup>
 
-                    <InputGroup icon={<Lock />} label="Xác nhận mật khẩu mới">
+                    <InputGroup icon={<Lock className="text-cyan-600" />} label="Xác nhận mật khẩu mới">
                         <div className="relative">
                             <input 
                                 type={showConfirm ? "text" : "password"} 
@@ -245,7 +245,7 @@ const ChangePasswordForm = ({ user }) => {
                             type="button" 
                             onClick={() => setIsOtpSent(false)}
                             disabled={loading}
-                            className="modal-button-secondary-pro"
+                            className="modal-button-secondary-pro bg-gradient-to-r from-slate-200 to-slate-300 dark:from-slate-600 to-slate-700"
                             whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                         >
                             Hủy
@@ -253,10 +253,11 @@ const ChangePasswordForm = ({ user }) => {
                         <motion.button 
                             type="submit" 
                             disabled={loading}
-                            className="modal-button-primary-pro flex items-center justify-center gap-2 min-w-[150px]"
+                            className="modal-button-primary-pro flex items-center justify-center gap-2 min-w-[150px] bg-gradient-to-r from-green-500 to-teal-500"
                             whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                         >
-                            {loading ? <CircleNotch size={18} className="animate-spin" /> : 'Xác nhận Đổi'}
+                            {loading ? <CircleNotch size={18} className="animate-spin" /> : <CheckCircle size={18} />}
+                            Xác nhận Đổi
                         </motion.button>
                     </div>
                 </form>
@@ -265,8 +266,8 @@ const ChangePasswordForm = ({ user }) => {
     );
 };
 
-// --- (v19) Component con: Xác thực CMND/CCCD ---
-// (v20) Sửa lại: Bỏ thẻ <form>, <h3, nâng cấp UI Upload
+// --- (v21) Component con: Xác thực CMND/CCCD ---
+// (v21) Thêm icon màu, gradient cho panels, bo góc lớn hơn
 const IdentityForm = ({ user }) => {
     const [identity, setIdentity] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -395,36 +396,38 @@ const IdentityForm = ({ user }) => {
         return <div className="flex justify-center mt-10"><CircleNotch size={32} className="animate-spin text-sky-500" /></div>;
     }
 
-    // (v20) Giao diện khi đã gửi và đang chờ duyệt
+    // (v21) Giao diện khi đã gửi và đang chờ duyệt, thêm icon vào badge, gradient
     if (identity && !isEditing) {
         let statusBadge;
         switch (identity.status) {
             case 'approved':
                 statusBadge = (
-                    <div className="badge-status-pro bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
-                        <CheckCircle weight="bold" /> Đã Xác Thực
+                    <div className="badge-status-pro bg-gradient-to-r from-green-100 to-green-200 dark:from-green-900/30 to-green-800/30 text-green-800 dark:text-green-300">
+                        <CheckCircle weight="bold" className="text-green-600" /> Đã Xác Thực
                     </div>
                 );
                 break;
             case 'rejected':
                  statusBadge = (
-                    <div className="badge-status-pro bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">
-                        <XCircle weight="bold" /> Bị Từ Chối
+                    <div className="badge-status-pro bg-gradient-to-r from-red-100 to-red-200 dark:from-red-900/30 to-red-800/30 text-red-800 dark:text-red-300">
+                        <XCircle weight="bold" className="text-red-600" /> Bị Từ Chối
                     </div>
                 );
                 break;
             default: // pending
                 statusBadge = (
-                    <div className="badge-status-pro bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300">
-                        <WarningCircle weight="bold" /> Đang Chờ Duyệt
+                    <div className="badge-status-pro bg-gradient-to-r from-yellow-100 to-yellow-200 dark:from-yellow-900/30 to-yellow-800/30 text-yellow-800 dark:text-yellow-300">
+                        <WarningCircle weight="bold" className="text-yellow-600" /> Đang Chờ Duyệt
                     </div>
                 );
         }
 
         return (
             <div className="">
-                <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6">Xác thực Danh tính (CMND/CCCD)</h3>
-                <div className="bg-slate-50 dark:bg-slate-800/60 p-5 rounded-xl border dark:border-slate-700 space-y-3">
+                <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
+                    <Palette size={24} className="text-violet-600" /> Xác thực Danh tính (CMND/CCCD)
+                </h3>
+                <div className="bg-gradient-to-br from-slate-50 to-violet-50 dark:from-slate-800/60 to-violet-900/30 p-5 rounded-2xl border dark:border-slate-700 space-y-3">
                     {statusBadge}
                     <p className="text-sm text-slate-600 dark:text-slate-300 pt-2"><strong>Số CMND/CCCD:</strong> {identity.id_number}</p>
                     <p className="text-sm text-slate-600 dark:text-slate-300"><strong>Họ và tên:</strong> {identity.full_name}</p>
@@ -432,57 +435,57 @@ const IdentityForm = ({ user }) => {
                     
                     <motion.button 
                         onClick={() => setIsEditing(true)}
-                        className="modal-button-secondary-pro mt-4"
+                        className="modal-button-secondary-pro mt-4 bg-gradient-to-r from-violet-500 to-purple-500 text-white"
                         whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                     >
-                        Cập nhật / Gửi lại thông tin
+                        <Sparkle size={18} className="inline mr-2" /> Cập nhật / Gửi lại thông tin
                     </motion.button>
                 </div>
             </div>
         );
     }
 
-    // (v20) Giao diện Form (khi chưa có, hoặc khi bấm "Cập nhật")
+    // (v21) Giao diện Form, thêm màu icon, gradient
     return (
         <form onSubmit={handleSubmit} className="space-y-5">
-            <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6">
-                {identity ? 'Cập nhật Thông tin Xác thực' : 'Bổ sung Thông tin Xác thực (CMND/CCCD)'}
+            <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
+                <Palette size={24} className="text-violet-600" /> {identity ? 'Cập nhật Thông tin Xác thực' : 'Bổ sung Thông tin Xác thực (CMND/CCCD)'}
             </h3>
             
-            <InputGroup icon={<IdentificationCard />} label="Số CMND/CCCD">
+            <InputGroup icon={<IdentificationCard className="text-lime-600" />} label="Số CMND/CCCD">
                 <input type="text" name="id_number" value={formData.id_number} onChange={(e) => setFormData({...formData, id_number: e.target.value})} className="input-style-pro" required />
             </InputGroup>
 
-            <InputGroup icon={<User />} label="Họ và Tên (Trên CMND)">
+            <InputGroup icon={<User className="text-fuchsia-600" />} label="Họ và Tên (Trên CMND)">
                 <input type="text" name="full_name" value={formData.full_name} onChange={(e) => setFormData({...formData, full_name: e.target.value})} className="input-style-pro" required />
             </InputGroup>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <InputGroup icon={<CalendarBlank />} label="Ngày sinh (Trên CMND)">
+                <InputGroup icon={<CalendarBlank className="text-amber-600" />} label="Ngày sinh (Trên CMND)">
                     <input type="date" name="dob" value={formData.dob} onChange={(e) => setFormData({...formData, dob: e.target.value})} className="input-style-pro" required />
                 </InputGroup>
-                <InputGroup icon={<CalendarBlank />} label="Ngày cấp">
+                <InputGroup icon={<CalendarBlank className="text-rose-600" />} label="Ngày cấp">
                     <input type="date" name="issue_date" value={formData.issue_date} onChange={(e) => setFormData({...formData, issue_date: e.target.value})} className="input-style-pro" required />
                 </InputGroup>
             </div>
 
-            <InputGroup icon={<House />} label="Nơi cấp">
+            <InputGroup icon={<House className="text-indigo-600" />} label="Nơi cấp">
                 <input type="text" name="issue_place" value={formData.issue_place} onChange={(e) => setFormData({...formData, issue_place: e.target.value})} className="input-style-pro" required />
             </InputGroup>
 
-            {/* (v20) Upload Ảnh "Xịn Xò" */}
+            {/* (v21) Upload Ảnh "Xịn" hơn với màu */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <InputGroup icon={<FileArrowUp />} label="Ảnh Scan Mặt trước CMND/CCCD">
-                    <label htmlFor="front-image-upload" className="input-file-label-pro">
-                        <UploadSimple size={20} />
+                <InputGroup icon={<FileArrowUp className="text-sky-600" />} label="Ảnh Scan Mặt trước CMND/CCCD">
+                    <label htmlFor="front-image-upload" className="input-file-label-pro bg-gradient-to-r from-sky-100 to-sky-200 dark:from-sky-900/30 to-sky-800/30">
+                        <UploadSimple size={20} className="text-sky-600" />
                         <span>{frontImage ? frontImage.name : 'Nhấp để tải lên'}</span>
                     </label>
                     <input id="front-image-upload" type="file" onChange={(e) => handleFileChange(e, 'front')} className="hidden" accept="image/*" />
                 </InputGroup>
                 
-                <InputGroup icon={<FileArrowUp />} label="Ảnh Scan Mặt sau CMND/CCCD">
-                     <label htmlFor="back-image-upload" className="input-file-label-pro">
-                        <UploadSimple size={20} />
+                <InputGroup icon={<FileArrowUp className="text-pink-600" />} label="Ảnh Scan Mặt sau CMND/CCCD">
+                     <label htmlFor="back-image-upload" className="input-file-label-pro bg-gradient-to-r from-pink-100 to-pink-200 dark:from-pink-900/30 to-pink-800/30">
+                        <UploadSimple size={20} className="text-pink-600" />
                         <span>{backImage ? backImage.name : 'Nhấp để tải lên'}</span>
                     </label>
                     <input id="back-image-upload" type="file" onChange={(e) => handleFileChange(e, 'back')} className="hidden" accept="image/*" />
@@ -496,19 +499,20 @@ const IdentityForm = ({ user }) => {
                         type="button" 
                         onClick={() => setIsEditing(false)}
                         disabled={isUploading}
-                        className="modal-button-secondary-pro"
+                        className="modal-button-secondary-pro bg-gradient-to-r from-red-500 to-rose-500 text-white"
                         whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                     >
-                        Hủy
+                        <XCircle size={18} className="inline mr-2" /> Hủy
                     </motion.button>
                 )}
                 <motion.button 
                     type="submit" 
                     disabled={isUploading}
-                    className="modal-button-primary-pro flex items-center justify-center gap-2 min-w-[150px]"
+                    className="modal-button-primary-pro flex items-center justify-center gap-2 min-w-[150px] bg-gradient-to-r from-lime-500 to-green-500"
                     whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                 >
-                    {isUploading ? <CircleNotch size={18} className="animate-spin" /> : 'Gửi thông tin'}
+                    {isUploading ? <CircleNotch size={18} className="animate-spin" /> : <PaperPlaneRight size={18} />}
+                    Gửi thông tin
                 </motion.button>
             </div>
         </form>
@@ -517,21 +521,23 @@ const IdentityForm = ({ user }) => {
 
 
 // --- (v19) Component Helper: InputGroup ---
+// (v21) Cập nhật icon với màu từ props
 const InputGroup = ({ icon, label, children }) => (
     <div>
         <label className="label-style flex items-center gap-2">
-            {React.cloneElement(icon, { size: 18, className: "text-sky-600 dark:text-sky-500" })}
+            {React.cloneElement(icon, { size: 18 })}
             <span>{label}</span>
         </label>
         {children}
     </div>
 );
 
-// --- (v20) Component Helper: TabButton ---
-const TabButton = ({ label, icon, isActive, onClick }) => (
+// --- (v21) Component Helper: TabButton ---
+// (v21) Thêm màu icon đa dạng cho từng tab
+const TabButton = ({ label, icon, isActive, onClick, colorClass }) => (
     <motion.button
         onClick={onClick}
-        className={`tab-button ${isActive ? 'tab-button-active' : ''}`}
+        className={`tab-button ${isActive ? 'tab-button-active' : ''} ${colorClass}`}
         whileHover={{ scale: 1.03 }}
         whileTap={{ scale: 0.98 }}
     >
@@ -541,7 +547,7 @@ const TabButton = ({ label, icon, isActive, onClick }) => (
 );
 
 
-// --- (v20) Component Chính: Profile (Đã thiết kế lại) ---
+// --- (v21) Component Chính: Profile (Nâng cấp) ---
 export default function Profile() {
     const { user, loading, refreshUser } = useAuth();
     const navigate = useNavigate();
@@ -567,9 +573,9 @@ export default function Profile() {
         );
     }
 
-    // (v20) Giao diện chính "Đỉnh Nóc"
+    // (v21) Giao diện chính với gradient background
     return (
-        <div className="bg-slate-100 dark:bg-slate-900 min-h-screen font-inter">
+        <div className="bg-gradient-to-br from-slate-100 to-sky-50 dark:from-slate-900 to-sky-950 min-h-screen font-inter">
             {/* Header (Giả, vì Navbar đã fixed) */}
             <div className="h-20" /> 
             
@@ -590,37 +596,40 @@ export default function Profile() {
                     </p>
                 </div>
 
-                {/* (v20) Layout 2 Cột */}
+                {/* (v21) Layout 2 Cột */}
                 <div className="md:flex md:gap-8">
                     
-                    {/* (v20) Cột 1: Sidebar Tabs */}
+                    {/* (v21) Cột 1: Sidebar Tabs với màu khác nhau */}
                     <aside className="md:w-1/4 mb-6 md:mb-0">
                         <nav className="flex flex-col gap-2 sticky top-24">
                             <TabButton
                                 label="Thông tin Chung"
-                                icon={<IdentificationCard />}
+                                icon={<Info className="text-indigo-600" />}
                                 isActive={activeTab === 'profile'}
                                 onClick={() => setActiveTab('profile')}
+                                colorClass="hover:bg-indigo-100 dark:hover:bg-indigo-900/50"
                             />
                             <TabButton
                                 label="Bảo mật & Mật khẩu"
-                                icon={<ShieldCheck />}
+                                icon={<ShieldCheck className="text-orange-600" />}
                                 isActive={activeTab === 'password'}
                                 onClick={() => setActiveTab('password')}
+                                colorClass="hover:bg-orange-100 dark:hover:bg-orange-900/50"
                             />
                             <TabButton
                                 label="Xác thực CMND/CCCD"
-                                icon={<User />}
+                                icon={<IdentificationCard className="text-violet-600" />}
                                 isActive={activeTab === 'identity'}
                                 onClick={() => setActiveTab('identity')}
+                                colorClass="hover:bg-violet-100 dark:hover:bg-violet-900/50"
                             />
                         </nav>
                     </aside>
 
-                    {/* (v20) Cột 2: Content Panel */}
+                    {/* (v21) Cột 2: Content Panel với bo góc lớn hơn */}
                     <main className="md:w-3/4">
                         <motion.div 
-                            className="bg-white dark:bg-slate-800 shadow-xl rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-700/50"
+                            className="bg-white dark:bg-slate-800 shadow-xl rounded-3xl overflow-hidden border border-slate-200/80 dark:border-slate-700/50"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             transition={{ duration: 0.3 }}
@@ -651,13 +660,13 @@ export default function Profile() {
                 </div>
             </motion.div>
 
-            {/* (v20) CSS "Xịn" */}
+            {/* (v21) CSS "Xịn" hơn */}
             <style jsx>{`
                 .label-style { @apply block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5; }
                 
                 .input-style-pro { 
                     @apply border border-slate-200 dark:border-slate-700 
-                           p-3 rounded-xl w-full 
+                           p-3 rounded-2xl w-full 
                            bg-slate-100 dark:bg-slate-800/60
                            text-slate-800 dark:text-slate-100
                            focus:bg-white dark:focus:bg-slate-900 
@@ -665,9 +674,9 @@ export default function Profile() {
                            outline-none transition text-sm disabled:opacity-60 disabled:cursor-not-allowed;
                 }
                 
-                /* (v20) Nút Tab Sidebar */
+                /* (v21) Nút Tab Sidebar */
                 .tab-button {
-                    @apply flex items-center gap-3 w-full p-3 rounded-lg text-base font-medium
+                    @apply flex items-center gap-3 w-full p-3 rounded-2xl text-base font-medium
                            text-slate-600 dark:text-slate-300
                            hover:bg-slate-100 dark:hover:bg-slate-700
                            transition-colors duration-200;
@@ -676,14 +685,14 @@ export default function Profile() {
                     @apply bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-400 font-semibold;
                 }
 
-                /* (v20) Trạng thái xác thực (Badge) */
+                /* (v21) Trạng thái xác thực (Badge) */
                 .badge-status-pro {
-                    @apply px-4 py-2 text-sm font-semibold rounded-lg inline-flex items-center gap-2;
+                    @apply px-4 py-2 text-sm font-semibold rounded-2xl inline-flex items-center gap-2;
                 }
 
-                /* (v20) Upload "Xịn" */
+                /* (v21) Upload "Xịn" */
                 .input-file-label-pro {
-                    @apply flex items-center justify-center gap-2 w-full p-4 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 
+                    @apply flex items-center justify-center gap-2 w-full p-4 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-600 
                            text-slate-500 dark:text-slate-400 cursor-pointer 
                            hover:border-sky-500 hover:text-sky-600 dark:hover:border-sky-500 dark:hover:text-sky-400 
                            hover:bg-sky-50 dark:hover:bg-sky-900/30 transition-all duration-300;
@@ -693,11 +702,11 @@ export default function Profile() {
                     @apply px-5 py-2.5 bg-slate-100 hover:bg-slate-200 
                            dark:bg-slate-700 dark:hover:bg-slate-600 
                            text-slate-800 dark:text-slate-100
-                           rounded-xl font-semibold text-sm disabled:opacity-50 transition-colors;
+                           rounded-2xl font-semibold text-sm disabled:opacity-50 transition-colors;
                 }
                 .modal-button-primary-pro { 
                     @apply px-5 py-2.5 bg-sky-600 text-white 
-                           rounded-xl font-semibold hover:bg-sky-700 
+                           rounded-2xl font-semibold hover:bg-sky-700 
                            text-sm disabled:opacity-50 transition-colors shadow-lg shadow-sky-500/30;
                 }
                 .password-toggle-btn {
