@@ -169,7 +169,7 @@ const CustomerStats = () => {
   );
 };
 
-// --- (*** SỬA v10 & v10.1: COMPONENT YÊU CẦU RESET MẬT KHẨU ***) ---
+// --- (*** ĐÃ SỬA: COMPONENT YÊU CẦU RESET MẬT KHẨU SỬ DỤNG REALTIME ***) ---
 const PasswordResetRequests = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -194,11 +194,37 @@ const PasswordResetRequests = () => {
     }
   }, []);
 
-  // Fetch data khi component mount
+  // Thay thế setInterval bằng Realtime Listener
   useEffect(() => {
-    fetchRequests();
-    const interval = setInterval(fetchRequests, 60000); 
-    return () => clearInterval(interval);
+    fetchRequests(); // Tải lần đầu
+
+    // 1. Khởi tạo Realtime Listener
+    const channel = supabase.channel('password_reset_channel')
+      .on(
+        'postgres_changes',
+        { 
+          event: '*', // Lắng nghe mọi sự kiện (INSERT, UPDATE, DELETE)
+          schema: 'public', 
+          table: 'password_reset_requests' 
+        },
+        // Callback khi có sự kiện (tự động gọi lại fetchRequests)
+        (payload) => {
+          console.log('Realtime update received:', payload.eventType);
+          // Gọi lại hàm fetchRequests để cập nhật giao diện Admin ngay lập tức
+          fetchRequests(); 
+
+          // Tùy chọn: Thêm thông báo toast cho sự kiện INSERT mới
+          if (payload.eventType === 'INSERT') {
+             toast(`🔔 Yêu cầu hỗ trợ mật khẩu mới từ: ${payload.new.email}!`, { duration: 5000 });
+          }
+        }
+      )
+      .subscribe(); // Bắt đầu lắng nghe
+
+    // Hủy đăng ký khi component unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [fetchRequests]);
 
   // (SỬA v10): Hàm xử lý Tạo Mã OTP 6 Số
