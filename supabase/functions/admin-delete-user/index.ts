@@ -1,10 +1,8 @@
 // supabase/functions/admin-delete-user/index.ts
-// Code này được thiết kế để:
-// 1. Xác thực người gọi (Phải là 'admin')
-// 2. Xóa vĩnh viễn người dùng khỏi hệ thống (Auth)
+// (SỬA v2) Đổi tên biến để fix lỗi "cannot start with SUPABASE_"
 
-import { serve } from 'https-deno-land-std-http-server.ts'
-import { createClient, SupabaseClient } from 'https-esm-sh-supabase.ts'
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 // Cấu hình CORS
 const corsHeaders = {
@@ -20,7 +18,6 @@ async function isUserAdmin(supabaseClient: SupabaseClient) {
     if (authError) throw authError
     if (!user) throw new Error("User not found (isUserAdmin)")
 
-    // Truy vấn bảng 'Users' của bạn (hoặc 'profiles' nếu tên bảng khác)
     const { data: adminData, error: rpcError } = await supabaseClient
       .from('Users') // << Đảm bảo đây là đúng tên bảng public của bạn
       .select('role')
@@ -29,7 +26,6 @@ async function isUserAdmin(supabaseClient: SupabaseClient) {
     
     if (rpcError) throw rpcError
     
-    // Nếu vai trò không phải 'admin', báo lỗi
     if (adminData?.role !== 'admin') {
       throw new Error("Permission denied: User is not an admin.")
     }
@@ -41,36 +37,31 @@ async function isUserAdmin(supabaseClient: SupabaseClient) {
 
 // Hàm chính của Edge Function
 serve(async (req) => {
-  // Xử lý CORS Preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // 1. Lấy user_id CẦN XÓA từ body của request
     const { user_id } = await req.json()
     if (!user_id) throw new Error("Missing 'user_id' in request body")
 
-    // 2. Tạo một client với quyền của NGƯỜI GỌI (để kiểm tra)
-    // Cần có SUPABASE_ANON_KEY
+    // 1. (SỬA v2) Dùng biến MY_SUPABASE_URL và MY_SUPABASE_ANON_KEY
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '', // Dùng Anon key
+      Deno.env.get('MY_SUPABASE_URL') ?? '',
+      Deno.env.get('MY_SUPABASE_ANON_KEY') ?? '', // Dùng Anon key
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     )
 
-    // 3. Xác thực: Người gọi có phải là admin không?
-    // Dòng này sẽ báo lỗi nếu người gọi không phải admin
+    // 2. Xác thực admin
     await isUserAdmin(supabaseClient)
 
-    // 4. QUAN TRỌNG: Tạo Admin client (Service Role) để THỰC HIỆN xóa
-    // Cần có SUPABASE_SERVICE_ROLE_KEY
+    // 3. (SỬA v2) Dùng biến MY_SUPABASE_SERVICE_ROLE_KEY
     const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('MY_SUPABASE_URL') ?? '',
+      Deno.env.get('MY_SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // 5. Thực hiện xóa người dùng vĩnh viễn
+    // 4. Thực hiện xóa vĩnh viễn
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(
       user_id,
       true // true = xóa vĩnh viễn
@@ -78,13 +69,13 @@ serve(async (req) => {
 
     if (deleteError) throw deleteError
 
-    // 6. Trả về thành công
+    // 5. Trả về thành công
     return new Response(JSON.stringify({ message: `User ${user_id} deleted successfully` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
   } catch (error) {
-    // 7. Trả về lỗi
+    // 6. Trả về lỗi
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
