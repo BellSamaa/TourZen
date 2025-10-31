@@ -1,20 +1,19 @@
 // ManageAccounts.jsx
+/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v18 (Thêm Chức Năng Xóa) ***
+  1. (UI) Thêm nút Xóa (Trash icon) vào bảng.
+  2. (UI) Thêm Modal Xác nhận Xóa (màu đỏ) để cảnh báo.
+  3. (Logic) Thêm state `deletingAccount` và `isDeleting`.
+  4. (Logic) Thêm hàm `handleDeleteAccount` để gọi Edge Function 'admin-delete-user'.
+     (LƯU Ý: Bạn cần tự tạo Edge Function tên 'admin-delete-user' trong Supabase
+     để code này hoạt động).
+*/
 /* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v17 (Sửa Lỗi Ẩn Vai Trò & UI) ***
-  1. (Logic) Sửa lại hàm `fetchAccounts` để ĐẢM BẢO không có bộ lọc vai trò.
-     Nó sẽ lấy TẤT CẢ các vai trò (Admin, Supplier, User).
-  2. (UI) Xóa dòng "ID: {account.username}" (ví dụ: "ID: default_user")
-     khỏi cột "Họ và Tên" trong bảng.
+  1. (Logic) Sửa `fetchAccounts` để lấy TẤT CẢ các vai trò.
+  2. (UI) Xóa dòng "ID: {account.username}" khỏi bảng.
   3. (LƯU Ý) Nếu vai trò Admin/Supplier vẫn bị ẩn, BẠN PHẢI KIỂM TRA RLS
      (ROW LEVEL SECURITY) TRÊN BẢNG 'Users' TRONG SUPABASE.
 */
-/* *** (Nâng cấp v14 - Giữ nguyên) ***
-  1. (Logic) Xóa 'Manager' và 'Staff' khỏi mảng ROLES trong Modal.
-  2. (Logic) Đổi vai trò mặc định khi Thêm mới thành 'admin'.
-*/
-/* *** (Nâng cấp v13 - Giữ nguyên) ***
-  1. (UI) Nâng cấp Modal với header màu, icon, bo góc.
-  2. (UI) Nâng cấp bo góc các nút và thanh tìm kiếm.
-*/
+/* *** (Nâng cấp v14, v13 - Giữ nguyên) *** */
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { getSupabase } from "../lib/supabaseClient";
@@ -23,7 +22,7 @@ import {
     UsersThree, CaretLeft, CaretRight, CircleNotch, X, MagnifyingGlass,
     PencilLine, ArrowsClockwise, WarningCircle, UserPlus, UserCircleMinus, UserCircleCheck,
     Eye, EyeSlash, CheckCircle, XCircle, User, At, ShieldCheck, CalendarBlank, Hourglass,
-    Archive, Key, IdentificationBadge 
+    Archive, Key, IdentificationBadge, Trash // <<< THÊM v18: Icon Trash
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -82,8 +81,6 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
     // (SỬA v14) Bỏ Manager và Staff
     const ROLES = [
         { id: 'admin', name: 'Admin', color: 'bg-purple-500' },
-        // { id: 'manager', name: 'Manager', color: 'bg-blue-500' }, // (SỬA v14) Bỏ Manager
-        // { id: 'staff', name: 'Staff', color: 'bg-cyan-500' }, // (SỬA v14) Bỏ Staff
         { id: 'supplier', name: 'Supplier', color: 'bg-orange-500' },
         { id: 'user', name: 'User', color: 'bg-slate-500' },
     ];
@@ -420,6 +417,8 @@ export default function AdminManageAccounts() {
     const [isFetchingPage, setIsFetchingPage] = useState(false);
     const [error, setError] = useState(null);
     const [modalAccount, setModalAccount] = useState(null);
+    const [deletingAccount, setDeletingAccount] = useState(null); // <<< THÊM v18: State cho modal xóa
+    const [isDeleting, setIsDeleting] = useState(false); // <<< THÊM v18: State loading cho nút xóa
     const [searchTerm, setSearchTerm] = useState("");
     const debouncedSearch = useDebounce(searchTerm, 400);
     const ITEMS_PER_PAGE = 10;
@@ -540,6 +539,39 @@ export default function AdminManageAccounts() {
             </div>
           ), { icon: <WarningCircle size={24} className="text-red-500"/>, duration: 8000 });
     };
+
+    // <<< THÊM v18: Hàm Xử lý Xóa Tài Khoản Vĩnh Viễn >>>
+    const handleDeleteAccount = async () => {
+        if (!deletingAccount || isDeleting) return;
+
+        setIsDeleting(true);
+        setIsFetchingPage(true); // Dùng state fetching chung để làm mờ bảng
+        
+        try {
+            // Gọi Edge Function để xóa user. 
+            // Cần tạo function 'admin-delete-user' trong Supabase.
+            const { data, error: functionError } = await supabase.functions.invoke('admin-delete-user', {
+                body: {
+                    user_id: deletingAccount.id
+                }
+            });
+
+            if (functionError) throw functionError;
+            if (data && data.error) throw new Error(data.error);
+
+            toast.success(`Đã xóa vĩnh viễn tài khoản: ${deletingAccount.full_name || deletingAccount.email}`);
+            setDeletingAccount(null);
+            fetchAccounts(false); // Tải lại danh sách
+
+        } catch (error) {
+            console.error("Lỗi xóa tài khoản:", error);
+            toast.error(`Xóa thất bại: ${error.message}. (Lưu ý: Bạn cần tạo Edge Function 'admin-delete-user'.)`);
+        } finally {
+            setIsDeleting(false);
+            setIsFetchingPage(false);
+        }
+    };
+    // <<< KẾT THÚC v18 >>>
 
     const formatDate = (dateString) => {
         if (!dateString) return "N/A";
@@ -738,7 +770,7 @@ export default function AdminManageAccounts() {
                                                             whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }}
                                                             onClick={() => handleSuspend(account)} 
                                                             disabled={isFetchingPage} 
-                                                            className="action-button-pro text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40"
+                                                            className="action-button-pro text-orange-500 hover:bg-orange-100 dark:hover:bg-orange-900/40"
                                                             title="Ngừng tài khoản"
                                                         > <UserCircleMinus size={18}/> </motion.button>
                                                     ) : (
@@ -751,6 +783,17 @@ export default function AdminManageAccounts() {
                                                             title="Kích hoạt lại (trong Sửa)"
                                                         > <UserCircleCheck size={18}/> </motion.button>
                                                     )}
+                                                    
+                                                    {/* === (THÊM v18) Nút Xóa === */}
+                                                    <motion.button
+                                                        whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }}
+                                                        onClick={() => setDeletingAccount(account)} // Mở modal xác nhận
+                                                        disabled={isFetchingPage} 
+                                                        className="action-button-pro text-red-600 hover:bg-red-100 dark:hover:bg-red-900/40"
+                                                        title="Xóa vĩnh viễn tài khoản"
+                                                    >
+                                                        <Trash size={18}/>
+                                                    </motion.button>
                                                 </div>
                                             </td>
                                         </motion.tr>
@@ -791,7 +834,7 @@ export default function AdminManageAccounts() {
                 )}
             </motion.div>
 
-            {/* Modal */}
+            {/* Modal Thêm/Sửa */}
             <AnimatePresence>
                 {modalAccount && (
                     <AccountModal
@@ -802,6 +845,71 @@ export default function AdminManageAccounts() {
                     />
                 )}
             </AnimatePresence>
+
+            {/* <<< THÊM v18: Modal Xác nhận Xóa >>> */}
+            <AnimatePresence>
+                {deletingAccount && (
+                    <motion.div
+                        className="fixed inset-0 bg-black/70 z-50 flex justify-center items-center p-4"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                    >
+                        <motion.div
+                            className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-md border-t-4 border-red-600"
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            transition={{ duration: 0.2, type: "spring", stiffness: 200, damping: 25 }}
+                        >
+                            <div className="flex justify-between items-center p-5 border-b border-slate-200 dark:border-slate-700">
+                                <h3 className="text-lg font-sora font-semibold text-red-600 dark:text-red-500 flex items-center gap-2">
+                                    <WarningCircle size={22} />
+                                    Xác nhận Xóa Tài Khoản
+                                </h3>
+                                <motion.button
+                                    whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+                                    onClick={() => setDeletingAccount(null)}
+                                    disabled={isDeleting}
+                                    className="text-slate-400 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700"
+                                > <X size={20} /> </motion.button>
+                            </div>
+                            <div className="p-6">
+                                <p className="text-slate-700 dark:text-slate-300 text-base">
+                                    Bạn có chắc chắn muốn xóa vĩnh viễn tài khoản:
+                                    <br />
+                                    <strong className="font-sora text-slate-900 dark:text-white">{deletingAccount.full_name}</strong>
+                                    <br />
+                                    <span className="text-sm">({deletingAccount.email})</span>?
+                                </p>
+                                <p className="mt-4 text-sm text-red-600 dark:text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">
+                                    <strong>Cảnh báo:</strong> Hành động này không thể hoàn tác. Tài khoản sẽ bị xóa khỏi hệ thống đăng nhập và toàn bộ dữ liệu liên quan.
+                                </p>
+                            </div>
+                            <div className="p-5 border-t border-slate-200/80 dark:border-slate-700/50 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-b-2xl">
+                                <motion.button
+                                    type="button" onClick={() => setDeletingAccount(null)} disabled={isDeleting}
+                                    className="modal-button-secondary-pro"
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                >
+                                    Hủy
+                                </motion.button>
+                                <motion.button
+                                    type="button" onClick={handleDeleteAccount} disabled={isDeleting}
+                                    className="modal-button-danger-pro flex items-center justify-center gap-2 min-w-[140px]"
+                                    whileHover={{ scale: 1.05, y: -2 }}
+                                    whileTap={{ scale: 0.95 }}
+                                >
+                                    {isDeleting ? <CircleNotch size={18} className="animate-spin" /> : <Trash size={18} />}
+                                    Xác nhận Xóa
+                                </motion.button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+            {/* <<< KẾT THÚC v18 >>> */}
 
             {/* <<< UPGRADE: Toàn bộ CSS mới */}
             <style jsx>{`
@@ -832,7 +940,7 @@ export default function AdminManageAccounts() {
                            disabled:opacity-50 disabled:cursor-not-allowed;
                 }
                 
-                /* === (SGỬI v13) Tăng bo góc === */
+                /* === (SỬA v13) Tăng bo góc === */
                 .button-primary-pro {
                     @apply bg-indigo-600 hover:bg-indigo-700 
                            text-white font-semibold 
