@@ -385,7 +385,7 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
                                             </>
                                         )}
                                         {(p.approval_status === 'approved' || p.approval_status === 'rejected') && (
-                                             <button onClick={() => handleApproval(p.id, 'pending')} className="action-button text-white bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 p-2 rounded-lg" title="Đặt lại chờ duyệt"><Clock size={2GPO_lock_0}/></button>
+                                             <button onClick={() => handleApproval(p.id, 'pending')} className="action-button text-white bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 p-2 rounded-lg" title="Đặt lại chờ duyệt"><Clock size={20}/></button>
                                         )}
                                     </div>
                                 </div>
