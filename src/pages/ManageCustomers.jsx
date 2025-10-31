@@ -408,8 +408,9 @@ const CustomerBookingsModal = ({ customer, onClose }) => {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
+      {/* === (SỬA UI) Thêm viền màu === */}
       <motion.div
-        className="bg-white dark:bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 p-8 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-gray-200 dark:border-slate-700"
+        className="bg-white dark:bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 p-8 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-gray-200 dark:border-slate-700 border-t-4 border-sky-500"
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
@@ -558,8 +559,9 @@ const FormModal = ({ title, onClose, children }) => (
     animate={{ opacity: 1 }}
     exit={{ opacity: 0 }}
   >
+    {/* === (SỬA UI) Thêm viền màu === */}
     <motion.div
-      className="bg-white dark:bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 p-8 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col border border-gray-200 dark:border-slate-700"
+      className="bg-white dark:bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 p-8 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col border border-gray-200 dark:border-slate-700 border-t-4 border-sky-500"
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
@@ -784,6 +786,7 @@ export default function ManageCustomersSupabase() {
       <PasswordResetRequests />
       {/* --- (*** KẾT THÚC SỬA v10.1 ***) --- */}
 
+      {/* (Ghi chú: Bảng này đã có sẵn rounded-2xl và shadow-2xl từ v11) */}
       <div className="bg-white dark:bg-slate-800 shadow-2xl shadow-gray-200/50 dark:shadow-black/30 rounded-2xl overflow-hidden border border-gray-200 dark:border-slate-700">
         <div className="p-5 border-b border-gray-200 dark:border-slate-700">
           <div className="relative flex-grow w-full max-w-lg">
@@ -877,6 +880,7 @@ export default function ManageCustomersSupabase() {
                       </span>
                     </td>
                     <td className="td-style text-center whitespace-nowrap space-x-2">
+                        {/* (Ghi chú: Các nút này đã có sẵn hover màu từ v11) */}
                         <>
                           <button onClick={() => setViewingBookingsCustomer(c)} disabled={isFetchingPage || !!editingCustomer || isAddingCustomer} className="action-button text-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/30" title="Xem các đơn hàng"><List size={20} weight="bold" /></button>
                           <button onClick={() => setEditingCustomer(c)} disabled={isFetchingPage || !!editingCustomer || isAddingCustomer} className="action-button text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa thông tin"><PencilSimple size={20} weight="bold" /></button>
@@ -916,8 +920,9 @@ export default function ManageCustomersSupabase() {
       <AnimatePresence>
         {showDeleteConfirm && selectedCustomer && (
           <motion.div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex justify-center items-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            {/* === (SỬA UI) Thêm viền màu (danger) === */}
             <motion.div 
-              className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border border-gray-200 dark:border-slate-700"
+              className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border border-gray-200 dark:border-slate-700 border-t-4 border-red-500"
               initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
             >
               <h4 className="text-xl font-bold text-red-600 dark:text-red-500 mb-4"> Xác nhận xóa hồ sơ </h4>

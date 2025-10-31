@@ -372,18 +372,19 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
                                         {p.is_published ? <ToggleRight size={28} weight="fill" /> : <ToggleLeft size={28} />}
                                     </button>
                                     
-                                    <div className="flex items-center gap-1">
-                                        <button onClick={() => setEditingProduct(p)} className="action-button text-blue-600 hover:bg-blue-200 dark:hover:bg-blue-900/40 p-2" title="Sửa"><Pencil size={20}/></button>
-                                        <button onClick={() => handleDelete(p.id)} className="action-button text-red-600 hover:bg-red-200 dark:hover:bg-red-900/40 p-2" title="Xóa"><Trash size={20}/></button>
+                                    {/* (YÊU CẦU) Nâng cấp Giao diện: Thêm màu sắc cho các nút hành động */}
+                                    <div className="flex items-center gap-2">
+                                        <button onClick={() => setEditingProduct(p)} className="action-button text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 p-2 rounded-lg" title="Sửa"><Pencil size={20}/></button>
+                                        <button onClick={() => handleDelete(p.id)} className="action-button text-white bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 p-2 rounded-lg" title="Xóa"><Trash size={20}/></button>
 
                                         {p.approval_status === 'pending' && (
                                             <>
-                                            <button onClick={() => handleApproval(p.id, 'approved')} className="action-button text-green-600 hover:bg-green-200 dark:hover:bg-green-900/40 p-2" title="Duyệt"><CheckCircle size={20}/></button>
-                                            <button onClick={() => handleApproval(p.id, 'rejected')} className="action-button text-red-600 hover:bg-red-200 dark:hover:bg-red-900/40 p-2" title="Từ chối"><XCircle size={20}/></button>
+                                            <button onClick={() => handleApproval(p.id, 'approved')} className="action-button text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 p-2 rounded-lg" title="Duyệt"><CheckCircle size={20}/></button>
+                                            <button onClick={() => handleApproval(p.id, 'rejected')} className="action-button text-white bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 p-2 rounded-lg" title="Từ chối"><XCircle size={20}/></button>
                                             </>
                                         )}
                                         {(p.approval_status === 'approved' || p.approval_status === 'rejected') && (
-                                             <button onClick={() => handleApproval(p.id, 'pending')} className="action-button text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700/60 p-2" title="Đặt lại chờ duyệt"><Clock size={20}/></button>
+                                             <button onClick={() => handleApproval(p.id, 'pending')} className="action-button text-white bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 p-2 rounded-lg" title="Đặt lại chờ duyệt"><Clock size={20}/></button>
                                         )}
                                     </div>
                                 </div>
@@ -535,6 +536,7 @@ export default function ManageSuppliers() {
         if(isInitialLoad) setLoading(true); 
         const selectQuery = `
             id, name, created_at, user_id, phone, email, address,
+            supplier_code,
             managing_user:Users(id, full_name, email)
         `;
         const { data, error: fetchError } = await supabase
@@ -632,6 +634,7 @@ export default function ManageSuppliers() {
             const { error: updateError } = await supabase.from('Suppliers').update(dataToSubmit).eq('id', editingId);
             error = updateError;
         } else {
+            // Khi insert, 'supplier_code' sẽ được trigger SQL tự động thêm vào
             const { error: insertError } = await supabase.from('Suppliers').insert(dataToSubmit);
             error = insertError;
         }
@@ -784,7 +787,8 @@ export default function ManageSuppliers() {
 
                                 return (
                                 <tr key={supplier.id} className="hover:bg-gray-100 dark:hover:bg-slate-700/40 align-top transition-colors duration-300">
-                                    <td className="td-style-new font-mono text-lg">NCC-{supplier.id.slice(-4).toUpperCase()}</td>
+                                    {/* (YÊU CẦU) Hiển thị 'supplier_code' từ DB */}
+                                    <td className="td-style-new font-mono text-lg">{supplier.supplier_code || 'N/A'}</td>
                                     <td className="td-style-new max-w-md">
                                         <div className="flex items-center gap-3">
                                             <Briefcase size={24} weight="duotone" className="text-gray-600 flex-shrink-0" />

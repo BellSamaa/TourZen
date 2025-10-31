@@ -179,14 +179,16 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
         >
+            {/* === (SỬA UI) Tăng bo góc, thêm viền màu === */}
             <motion.div
-                className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col font-inter"
+                className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col font-inter border-t-4 border-indigo-600"
                 initial={{ scale: 0.9, opacity: 0 }} 
                 animate={{ scale: 1, opacity: 1 }} 
                 exit={{ scale: 0.9, opacity: 0 }}
                 transition={{ duration: 0.2, type: "spring", stiffness: 200, damping: 25 }}
             >
-                <div className="flex justify-between items-center p-5 border-b border-slate-200/80 dark:border-slate-700/50 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800/50 rounded-t-lg">
+                {/* === (SỬA UI) Tăng bo góc header === */}
+                <div className="flex justify-between items-center p-5 border-b border-slate-200/80 dark:border-slate-700/50 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800/50 rounded-t-xl">
                     <h3 className="text-lg font-sora font-semibold text-slate-800 dark:text-white">
                         {isEdit ? 'Chỉnh sửa Tài khoản' : 'Thêm Tài khoản mới'}
                     </h3>
@@ -334,7 +336,8 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                     </motion.div>
                     
                     {/* Modal Footer Buttons */}
-                    <div className="p-5 border-t border-slate-200/80 dark:border-slate-700/50 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-b-lg">
+                    {/* === (SỬA UI) Tăng bo góc footer === */}
+                    <div className="p-5 border-t border-slate-200/80 dark:border-slate-700/50 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-b-xl">
                         <motion.button 
                             type="button" onClick={onClose} disabled={loading} 
                             className="modal-button-secondary-pro"
@@ -553,9 +556,10 @@ export default function AdminManageAccounts() {
                 </motion.div>
 
                 {/* Bảng */}
+                {/* === (SỬA UI) Tăng bo góc bảng === */}
                 <motion.div
                     variants={itemVariant}
-                    className="bg-white dark:bg-slate-800 shadow-xl rounded-lg overflow-hidden border border-slate-200/80 dark:border-slate-700/50"
+                    className="bg-white dark:bg-slate-800 shadow-2xl rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-700/50"
                 >
                     <div className="p-6 flex flex-wrap justify-between items-center gap-4 border-b border-slate-200 dark:border-slate-700">
                         <h2 className="text-xl font-sora font-semibold text-slate-800 dark:text-slate-100">
@@ -659,28 +663,31 @@ export default function AdminManageAccounts() {
                                             <td className="td-style-pro font-inter text-slate-500 text-sm">{formatDate(account.created_at)}</td>
                                             <td className="td-style-pro text-center">
                                                 <div className="flex justify-center gap-1">
+                                                    {/* === (SỬA UI) Thêm hover màu === */}
                                                     <motion.button 
                                                         whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }}
                                                         onClick={() => setModalAccount(account)} 
                                                         disabled={isFetchingPage} 
-                                                        className="action-button-pro text-sky-600" 
+                                                        className="action-button-pro text-sky-600 hover:bg-sky-100 dark:hover:bg-sky-900/40" 
                                                         title="Sửa tài khoản"
                                                     > <PencilLine size={18}/> </motion.button>
                                                     
                                                     {account.is_active ? (
+                                                        /* === (SỬA UI) Thêm hover màu === */
                                                         <motion.button
                                                             whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }}
                                                             onClick={() => handleSuspend(account)} 
                                                             disabled={isFetchingPage} 
-                                                            className="action-button-pro text-red-500"
+                                                            className="action-button-pro text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40"
                                                             title="Ngừng tài khoản"
                                                         > <UserCircleMinus size={18}/> </motion.button>
                                                     ) : (
+                                                        /* === (SỬA UI) Thêm hover màu === */
                                                         <motion.button
                                                             whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }}
                                                             onClick={() => setModalAccount(account)}
                                                             disabled={isFetchingPage} 
-                                                            className="action-button-pro text-green-500"
+                                                            className="action-button-pro text-green-500 hover:bg-green-100 dark:hover:bg-green-900/40"
                                                             title="Kích hoạt lại (trong Sửa)"
                                                         > <UserCircleCheck size={18}/> </motion.button>
                                                     )}
@@ -854,10 +861,10 @@ export default function AdminManageAccounts() {
                            text-sm disabled:opacity-50 transition-colors shadow-lg shadow-red-500/30;
                 }
                 
-                /* <<< UPGRADE: Nút hành động Pro (trong bảng) */
+                /* <<< (SỬA UI) Nút hành động Pro (trong bảng) - Xóa hover chung */
                 .action-button-pro { 
                     @apply p-2 rounded-lg transition-colors duration-150 
-                           hover:bg-slate-100 dark:hover:bg-slate-700
+                           /* hover:bg-slate-100 dark:hover:bg-slate-700 (XÓA) - Đã chuyển hover vào class cụ thể */
                            focus:outline-none focus:ring-1 focus:ring-offset-1 
                            dark:focus:ring-offset-slate-800 disabled:opacity-50 disabled:cursor-not-allowed; 
                 }
