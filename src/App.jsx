@@ -1,4 +1,5 @@
 // src/App.jsx
+// (SỬA v19) Thêm import và route cho trang Profile.jsx
 // (ĐÃ SỬA: Sửa lỗi useLocation, lỗi layout 'position: absolute' và sai path route)
 // (SỬA v3: Thêm VNPAYPage và sửa sai route VirtualPayment)
 
@@ -25,6 +26,7 @@ import Services from "./pages/Services.jsx";
 import MyBookings from "./pages/MyBookings.jsx";
 import PromotionPage from "./pages/PromotionPage.jsx";
 import NotFound from "./pages/NotFound.jsx";
+import Profile from "./pages/Profile.jsx"; // <<< THÊM v19: Import trang Profile
 
 // *** SỬA v3: IMPORT CẢ 2 TRANG THANH TOÁN ***
 import VirtualPayment from "./pages/VirtualPayment.jsx"; 
@@ -96,17 +98,17 @@ export default function App() {
             <CartProvider>
                 <ScrollToTop />
                 <Routes>
-                   .  {/* === Public Routes (Sử dụng SiteLayout) === */}
+                    {/* === Public Routes (Sử dụng SiteLayout) === */}
                     <Route path="/" element={<SiteLayout />}>
-                        <Route index element={<Home />} />
+             _            <Route index element={<Home />} />
                         <Route path="about" element={<About />} />
-                       H<Route path="tours" element={<TourList />} />
+                        <Route path="tours" element={<TourList />} />
                         <Route path="tour/:id" element={<TourDetail />} />
                         <Route path="cart" element={<Cart />} />
                         <Route path="payment" element={<Payment />} />
                             {/* SỬA 4: Đổi path để khớp với navigate() trong Payment.jsx */}
                         <Route path="booking-success" element={<PaymentSuccess />} />
-                        
+  
                         {/* *** SỬA v3: SỬA VÀ THÊM 2 ROUTE THANH TOÁN *** */}
                         {/* 1. Trang VNPAY (từ Booking.jsx) trỏ đến VNPAYPage.jsx */}
                         <Route path="payment/vnpay" element={<VNPAYPage />} />
@@ -115,6 +117,7 @@ export default function App() {
 
                         <Route path="services" element={<Services />} />
                         <Route path="my-bookings" element={<MyBookings />} />
+                        <Route path="profile" element={<Profile />} /> {/* <<< THÊM v19: Route cho Profile */}
                         <Route path="promotions" element={<PromotionPage />} />
                         <Route path="login" element={<Login />} />
                         <Route path="register" element={<Login />} />
@@ -132,7 +135,7 @@ export default function App() {
                         <Route path="dashboard" element={<DashboardHome />} />
                         <Route path="reports" element={<Reports />} />
                         <Route path="tours" element={<AdminManageProducts />} />
-CH                     <Route path="bookings" element={<ManageTour />} />
+                        <Route path="bookings" element={<ManageTour />} />
                         <Route path="customers" element={<ManageCustomers />} />
                         <Route path="suppliers" element={<ManageSuppliers />} />
                         <Route path="accounts" element={<ManageAccounts />} />
@@ -148,13 +151,13 @@ CH                     <Route path="bookings" element={<ManageTour />
                          <Route path="dashboard" element={<SupplierHome />} />
                          <Route path="tours" element={<SupplierManageProducts />} />
                          <Route path="transport" element={<ManageTransport />} />
-           Note          <Route path="flights" element={<ManageFlights />} />
-                         <Route path="add-quick-tour" element={<SupplierAddQuickTour />} />
+                         <Route path="flights" element={<ManageFlights />} />
+á                      <Route path="add-quick-tour" element={<SupplierAddQuickTour />} />
                          <Route path="*" element={<SupplierNotFound />} /> // Tạo component SupplierNotFound nếu cần
                          */}
                     </Route>
 
-                   _ {/* Route 404 chung nếu không khớp các path trên */}
+D                   {/* Route 404 chung nếu không khớp các path trên */}
                     {/* Đã được xử lý bên trong SiteLayout và các Dashboard */}
 
                 </Routes>
@@ -182,16 +185,16 @@ CH       <motion.p
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-   Si      >
+        >
             Trang quản trị này không tồn tại.
-        </motion.p>
+s       </motion.p>
          <motion.div
               initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
+s             animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.5, delay: 0.4 }}
-s             className="mt-6"
+              className="mt-6"
           >
-              <Link to="/admin/dashboard" className="px-6 py-2 bg-sky-600 text-white rounded-md hover:bg-sky-700 transition-colors">
+ S            <Link to="/admin/dashboard" className="px-6 py-2 bg-sky-600 text-white rounded-md hover:bg-sky-700 transition-colors">
                   Về Tổng quan
               </Link>
           </motion.div>
@@ -199,4 +202,3 @@ s             className="mt-6"
     </div>
   );
 }
-

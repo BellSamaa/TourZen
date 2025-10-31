@@ -1,8 +1,5 @@
 // src/pages/Login.jsx
-// (Nâng cấp giao diện "Hoa lá cành" + Hiệu ứng - Đã sửa lỗi khai báo kép)
-// (ĐÃ SỬA: Thêm trường Ngày Sinh)
-// (*** NÂNG CẤP v8: Thêm Validate SĐT + Chức năng Quên Mật Khẩu ***)
-// (*** SỬA v10: Thay đổi luồng Quên Mật Khẩu sang Admin duyệt OTP 6 số ***)
+// (SỬA v19) Thêm validation 'minLength' và 'required' cho Địa chỉ
 
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -38,7 +35,7 @@ export default function Login() {
     const [isOtpSent, setIsOtpSent] = useState(false); // Đổi tên: isRequestSent
     const ADMIN_PHONE = "0912345678"; // (*** SỬA v10: Thêm SĐT Admin ***)
 
-    // --- (*** SỬA v10: THAY ĐỔI HOÀN TOÀN LOGIC handleSubmit 'forgot' ***) ---
+    // --- (*** SỬA v10 & v19: Cập nhật handleSubmit ***) ---
      const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
@@ -53,7 +50,12 @@ export default function Login() {
                 if (form.phone_number && !phoneRegex.test(form.phone_number)) {
                     throw new Error("Số điện thoại không hợp lệ. Phải đủ 10 số và đúng đầu số (03, 05, 07, 08, 09).");
                 }
-                // --- KẾT THÚC Sửa SĐT ---
+                
+                // --- (SỬA v19) VALIDATE ĐỊA CHỈ ---
+                if (form.address.length < 10) {
+                    throw new Error("Địa chỉ không hợp lệ. Vui lòng nhập địa chỉ đầy đủ (ít nhất 10 ký tự).");
+                }
+                // --- KẾT THÚC Sửa v19 ---
 
                 const { data: { user }, error: signUpError } = await supabase.auth.signUp({ 
                     email: form.email, 
@@ -73,8 +75,9 @@ export default function Login() {
                 if (signUpError) throw signUpError;
                 
                 if (user) {
-                    // ✅ QUAN TRỌNG: Chỉ upsert nếu user đã được confirm
-                    // Nếu email confirmation bật, bỏ qua bước này - dùng Database Trigger thay thế
+                    // (SỬA v19) Ghi chú: Mã SQL đã sửa trigger handle_new_user
+                    // nên việc insert thủ công này (nếu có chạy) cũng sẽ hoạt động
+                    // vì trigger là ưu tiên.
                     try {
                         const { error: insertError } = await supabase.from('Users').insert({ 
                             id: user.id, 
@@ -168,8 +171,6 @@ export default function Login() {
                     }
                     
                     // 3. GỌI SUPABASE EDGE FUNCTION
-                    // Chúng ta phải dùng Edge Function vì chỉ server mới có quyền
-                    // vừa kiểm tra bảng `password_reset_requests`, vừa đổi mật khẩu `auth.users`
                     const { data, error: functionError } = await supabase.functions.invoke('reset-password-with-admin-otp', {
                         body: {
                             email: form.email,
@@ -323,7 +324,16 @@ export default function Login() {
                             <>
                                 <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
                                     <FaMapMarkerAlt className="input-icon" />
-                                    <input type="text" placeholder="Địa chỉ (Tỉnh/Thành phố)" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="input-field" />
+                                    {/* (SỬA v19) Thêm required và minLength cho địa chỉ */}
+                                    <input 
+                                        type="text" 
+                                        placeholder="Địa chỉ (Tỉnh/Thành phố)" 
+                                        value={form.address} 
+                                        onChange={(e) => setForm({ ...form, address: e.target.value })} 
+                                        className="input-field" 
+                                        required 
+                                        minLength={10}
+                                    />
                                 </motion.div>
                                 <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
                                     <FaPhone className="input-icon" />

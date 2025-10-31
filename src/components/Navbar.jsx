@@ -1,3 +1,6 @@
+// src/components/Navbar.jsx
+// (SỬA v19) Thêm link "Thông tin cá nhân" (/profile) vào dropdown
+
 import React, { useState, useEffect } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
@@ -14,6 +17,7 @@ import {
   Sun,
   Moon,
   ShoppingBag, // Thêm icon cho đơn hàng
+  IdentificationCard // <<< THÊM v19: Icon cho Profile
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
@@ -109,16 +113,30 @@ const ProfileMenu = ({ user }) => {
               )}
 
               {user.role !== "admin" && user.role !== "supplier" && (
-                <button
-                  onClick={() => {
-                    navigate("/my-bookings");
-                    setIsOpen(false);
-                  }}
-                  className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-md text-sm text-gray-700 dark:text-gray-200 hover:bg-sky-500 hover:text-white"
-                >
-                  <ShoppingBag size={16} />
-                  Đơn hàng của tôi
-                </button>
+                <>
+                  <button
+                    onClick={() => {
+                      navigate("/my-bookings");
+                      setIsOpen(false);
+                    }}
+                    className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-md text-sm text-gray-700 dark:text-gray-200 hover:bg-sky-500 hover:text-white"
+                  >
+                    <ShoppingBag size={16} />
+                    Đơn hàng của tôi
+                  </button>
+                  
+                  {/* <<< THÊM v19: Link Thông tin cá nhân >>> */}
+                  <button
+                    onClick={() => {
+                      navigate("/profile");
+                      setIsOpen(false);
+                    }}
+                    className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-md text-sm text-gray-700 dark:text-gray-200 hover:bg-sky-500 hover:text-white"
+                  >
+                    <IdentificationCard size={16} />
+                    Thông tin cá nhân
+                  </button>
+                </>
               )}
 
               <button
@@ -284,13 +302,24 @@ export default function Navbar() {
                     </Link>
                   )}
                   {user.role !== "admin" && user.role !== "supplier" && (
-                    <Link
-                      to="/my-bookings"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="flex items-center gap-3 font-medium text-sky-600 dark:text-sky-400 px-1"
-                    >
-                      <ShoppingBag size={18} /> Đơn hàng của tôi
-                    </Link>
+                    <>
+                      <Link
+                        to="/my-bookings"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-3 font-medium text-sky-600 dark:text-sky-400 px-1"
+                      >
+                        <ShoppingBag size={18} /> Đơn hàng của tôi
+                      </Link>
+                      
+                      {/* <<< THÊM v19: Link Thông tin cá nhân >>> */}
+                      <Link
+                        to="/profile"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-3 font-medium text-sky-600 dark:text-sky-400 px-1"
+                      >
+                        <IdentificationCard size={18} /> Thông tin cá nhân
+                      </Link>
+                    </>
                   )}
                   <button
                     onClick={() => {
