@@ -832,7 +832,7 @@ export default function AdminManageAccounts() {
                            disabled:opacity-50 disabled:cursor-not-allowed;
                 }
                 
-                /* === (SỬA v13) Tăng bo góc === */
+                /* === (SGỬI v13) Tăng bo góc === */
                 .button-primary-pro {
                     @apply bg-indigo-600 hover:bg-indigo-700 
                            text-white font-semibold 
