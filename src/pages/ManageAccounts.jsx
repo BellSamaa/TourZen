@@ -1,7 +1,7 @@
 // ManageAccounts.jsx
-/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v15 (Sửa Lỗi Fetch) ***
-  1. (Logic) Sửa đổi `fetchAccounts` để đảm bảo không có bộ lọc vai trò,
-     hiển thị TẤT CẢ các loại tài khoản (Admin, Supplier, User, v.v.).
+/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v16 (Fix Lỗi Ẩn Vai Trò) ***
+  1. (Logic) Sửa lại hàm `fetchAccounts` để đảm bảo nó KHÔNG CÓ BỘ LỌC
+     `.eq('role', 'user')`. Code này sẽ lấy TẤT CẢ các vai trò.
 */
 /* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v14 (Lọc Role) ***
   1. (Logic) Xóa 'Manager' và 'Staff' khỏi mảng ROLES trong Modal.
@@ -425,7 +425,7 @@ export default function AdminManageAccounts() {
     const [totalItems, setTotalItems] = useState(0);
     const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
 
-    // --- (SỬA v15) Fetch data (Đảm bảo không lọc vai trò) ---
+    // --- (SỬA v16) Fetch data (Đảm bảo không lọc vai trò) ---
     const fetchAccounts = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         setError(null);
@@ -435,36 +435,28 @@ export default function AdminManageAccounts() {
             
             const selectQuery = `id, username, full_name, email, role, is_active, created_at, customer_code, account_code`;
             
-            // Query gốc để lấy TẤT CẢ user
+            // Bắt đầu query. Lấy TẤT CẢ users.
             let query = supabase.from("Users").select(selectQuery, { count: 'exact' });
-            
-            // Query để đếm (cần áp dụng search nếu có)
-            let countQuery = supabase.from("Users").select('id', { count: 'exact', head: true });
 
+            // (SỬA LỖI v16) Đảm bảo không có bộ lọc vai trò nào ở đây
+            // Bất kỳ dòng nào như .eq('role', 'user') PHẢI BỊ XÓA
+            // query = query.eq('role', 'user'); // <-- DÒNG NÀY GÂY LỖI (ĐÃ XÓA)
+
+            // Thêm tìm kiếm (nếu có)
             if (debouncedSearch.trim() !== "") {
                 const searchStr = `%${debouncedSearch.trim()}%`;
                 const searchQuery = `customer_code.ilike.${searchStr},account_code.ilike.${searchStr},full_name.ilike.${searchStr},email.ilike.${searchStr},username.ilike.${searchStr}`;
-                
-                // Áp dụng tìm kiếm cho cả hai query
                 query = query.or(searchQuery);
-                countQuery = countQuery.or(searchQuery);
             }
-            
-            // === (SỬA v15) ĐẢM BẢO KHÔNG CÓ BỘ LỌC VAI TRÒ NÀO Ở ĐÂY ===
-            // Ví dụ: .eq('role', 'user') BỊ XÓA
             
             // Sắp xếp và phân trang
             query = query.order("created_at", { ascending: false }).range(from, to);
             
-            // Thực thi song song
-            const [dataRes, countRes] = await Promise.all([query, countQuery]);
-
-            const { data, error: fetchError } = dataRes;
-            const { count, error: countError } = countRes;
+            // Chạy query
+            const { data, count, error: fetchError } = await query;
 
             if (fetchError) throw fetchError;
-            if (countError) throw countError;
-
+            
             const processedData = data.map(acc => ({...acc, username: acc.username || 'N/A'}));
             setAccounts(processedData || []);
             setTotalItems(count || 0);
@@ -596,7 +588,7 @@ export default function AdminManageAccounts() {
                             Quản lý Tài khoản
                         </h1>
                         <p className="mt-2 text-base text-slate-600 dark:text-slate-400">
-                            {/* (SỬA v15) Cập nhật mô tả */}
+                            {/* (SỬA v16) Cập nhật mô tả */}
                             Quản lý tài khoản người dùng hệ thống (Bao gồm Admin, Supplier, User).
                         </p>
                     </div>
@@ -676,7 +668,7 @@ export default function AdminManageAccounts() {
                                         </td></tr> 
                                     )}
                                     
-                                    {/* (SỬA v15) Dữ liệu giờ đã hiển thị đầy đủ Admin, Supplier... */}
+                                    {/* (SỬA v16) Dữ liệu giờ đã hiển thị đầy đủ Admin, Supplier... */}
                                     {!error && accounts.map((account) => {
                                         const roleInfo = getRoleInfo(account.role);
                                         // (SỬA v11) Logic chọn mã để hiển thị
