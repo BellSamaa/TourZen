@@ -1,5 +1,9 @@
 // src/pages/Profile.jsx
-// (FILE MỚI v19) Trang thông tin cá nhân cho người dùng
+// (NÂNG CẤP v20) "ĐỈNH NÓC" - Thiết kế lại toàn bộ giao diện
+// 1. Layout 2 cột (Sidebar Tabs + Content)
+// 2. Thêm hiệu ứng Framer Motion mượt mà khi chuyển tab
+// 3. Thêm nhiều icon màu mè
+// 4. Thiết kế lại khu vực Upload File (Scan CMND) thành dạng Dropzone "xịn xò"
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -8,20 +12,18 @@ import { getSupabase } from '../lib/supabaseClient';
 import toast from 'react-hot-toast';
 import { 
     User, Envelope, Phone, House, CalendarBlank, Key, IdentificationCard, 
-    UploadSimple, CircleNotch, PaperPlaneRight, Lock, Eye, EyeSlash, CheckCircle, WarningCircle
+    UploadSimple, CircleNotch, PaperPlaneRight, Lock, Eye, EyeSlash, CheckCircle, 
+    WarningCircle, ShieldCheck, FileArrowUp, XCircle // Thêm icon
 } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const supabase = getSupabase();
 
 // --- (v19) Component con: Cập nhật Thông tin ---
+// (v20) Sửa lại: Bỏ thẻ <form>, <h3
 const ProfileInfoForm = ({ user, onProfileUpdate }) => {
     const [formData, setFormData] = useState({
-        full_name: '',
-        phone_number: '',
-        address: '',
-        ngay_sinh: '',
-        username: ''
+        full_name: '', phone_number: '', address: '', ngay_sinh: '', username: ''
     });
     const [loading, setLoading] = useState(false);
 
@@ -53,14 +55,12 @@ const ProfileInfoForm = ({ user, onProfileUpdate }) => {
                 ngay_sinh: formData.ngay_sinh || null,
             };
 
-            // 1. Cập nhật bảng public.Users
             const { error: updateError } = await supabase
                 .from('Users')
                 .update(updates)
                 .eq('id', user.id);
             if (updateError) throw updateError;
 
-            // 2. Cập nhật auth.users.raw_user_meta_data
             const { data: { user: authUser }, error: authUpdateError } = await supabase.auth.updateUser({
                 data: updates
             });
@@ -79,8 +79,8 @@ const ProfileInfoForm = ({ user, onProfileUpdate }) => {
     if (!user) return null;
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
-            <h3 className="text-xl font-sora font-semibold text-slate-800 dark:text-white mb-4">Thông tin Cơ bản</h3>
+        <form onSubmit={handleSubmit} className="space-y-5">
+            <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6">Thông tin Cơ bản</h3>
             
             <InputGroup icon={<User />} label="Tên đăng nhập (Không thể đổi)">
                 <input type="text" value={formData.username} className="input-style-pro" disabled />
@@ -106,7 +106,7 @@ const ProfileInfoForm = ({ user, onProfileUpdate }) => {
                 <input type="date" name="ngay_sinh" value={formData.ngay_sinh} onChange={handleChange} className="input-style-pro" />
             </InputGroup>
 
-            <div className="flex justify-end pt-2">
+            <div className="flex justify-end pt-4 border-t dark:border-slate-700">
                 <motion.button 
                     type="submit" 
                     disabled={loading}
@@ -121,6 +121,7 @@ const ProfileInfoForm = ({ user, onProfileUpdate }) => {
 };
 
 // --- (v19) Component con: Đổi Mật khẩu (Giống Login.jsx) ---
+// (v20) Sửa lại: Bỏ thẻ <form>, <h3
 const ChangePasswordForm = ({ user }) => {
     const [isOtpSent, setIsOtpSent] = useState(false);
     const [form, setForm] = useState({ otp: '', password: '', confirm: '' });
@@ -137,7 +138,6 @@ const ChangePasswordForm = ({ user }) => {
     const handleSendRequest = async () => {
         setLoading(true);
         try {
-            // Tạo bản ghi yêu cầu trong bảng password_reset_requests
             const { error: insertError } = await supabase
                 .from('password_reset_requests')
                 .insert({ 
@@ -161,10 +161,9 @@ const ChangePasswordForm = ({ user }) => {
         setLoading(true);
         try {
             if (!form.otp || form.otp.length !== 6) throw new Error("Vui lòng nhập Mã OTP 6 số (do Admin cung cấp).");
-            if (!form.password || form.password.length < 6) throw new Error("Vui lòng nhập Mật khẩu mới (tối thiểu 6 ký tự).");
+            if (form.password.length < 6) throw new Error("Vui lòng nhập Mật khẩu mới (tối thiểu 6 ký tự).");
             if (form.password !== form.confirm) throw new Error("Mật khẩu không khớp.");
             
-            // GỌI SUPABASE EDGE FUNCTION (giống hệt Login.jsx)
             const { data, error: functionError } = await supabase.functions.invoke('reset-password-with-admin-otp', {
                 body: {
                     email: user.email,
@@ -188,11 +187,11 @@ const ChangePasswordForm = ({ user }) => {
     };
 
     return (
-        <div className="mt-8">
-            <h3 className="text-xl font-sora font-semibold text-slate-800 dark:text-white mb-4">Bảo mật & Đăng nhập</h3>
+        <div className="">
+            <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6">Bảo mật & Đăng nhập</h3>
             
             {!isOtpSent ? (
-                <div className="bg-slate-50 dark:bg-slate-800 p-5 rounded-xl border dark:border-slate-700">
+                <div className="bg-slate-50 dark:bg-slate-800/60 p-5 rounded-xl border dark:border-slate-700">
                     <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">
                         Để đổi mật khẩu, bạn cần yêu cầu một mã OTP từ Admin (Quản trị viên) để xác thực.
                     </p>
@@ -207,7 +206,7 @@ const ChangePasswordForm = ({ user }) => {
                     </motion.button>
                 </div>
             ) : (
-                <form onSubmit={handleChangePassword} className="space-y-4 bg-slate-50 dark:bg-slate-800 p-5 rounded-xl border dark:border-slate-700">
+                <form onSubmit={handleChangePassword} className="space-y-4 bg-slate-50 dark:bg-slate-800/60 p-5 rounded-xl border dark:border-slate-700">
                     <p className="text-sm text-slate-600 dark:text-slate-300">
                         Vui lòng liên hệ Admin (SĐT: <strong className="text-slate-800 dark:text-white">{ADMIN_PHONE}</strong>) để nhận Mã OTP.
                     </p>
@@ -241,7 +240,7 @@ const ChangePasswordForm = ({ user }) => {
                         </div>
                     </InputGroup>
 
-                    <div className="flex justify-end pt-2 gap-3">
+                    <div className="flex justify-end pt-4 border-t dark:border-slate-700 gap-3">
                          <motion.button 
                             type="button" 
                             onClick={() => setIsOtpSent(false)}
@@ -267,6 +266,7 @@ const ChangePasswordForm = ({ user }) => {
 };
 
 // --- (v19) Component con: Xác thực CMND/CCCD ---
+// (v20) Sửa lại: Bỏ thẻ <form>, <h3, nâng cấp UI Upload
 const IdentityForm = ({ user }) => {
     const [identity, setIdentity] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -279,7 +279,6 @@ const IdentityForm = ({ user }) => {
     const [frontImage, setFrontImage] = useState(null);
     const [backImage, setBackImage] = useState(null);
     
-    // Tải thông tin CMND hiện có (nếu có)
     const fetchIdentity = useCallback(async () => {
         if (!user) return;
         setLoading(true);
@@ -295,24 +294,23 @@ const IdentityForm = ({ user }) => {
                 setFormData({
                     id_number: data.id_number || '',
                     full_name: data.full_name || user.full_name || '',
-                    dob: data.dob || user.ngay_sinh || '',
-                    issue_date: data.issue_date || '',
+                    dob: data.dob ? data.dob.split('T')[0] : (user.ngay_sinh ? user.ngay_sinh.split('T')[0] : ''),
+                    issue_date: data.issue_date ? data.issue_date.split('T')[0] : '',
                     issue_place: data.issue_place || '',
                 });
                 setIsEditing(false); // Bắt đầu ở chế độ xem
             } else {
-                // Nếu chưa có, mở form chỉnh sửa
                 setIdentity(null);
                 setFormData({
                     id_number: '', 
                     full_name: user.full_name || '', 
-                    dob: user.ngay_sinh || '', 
+                    dob: user.ngay_sinh ? user.ngay_sinh.split('T')[0] : '', 
                     issue_date: '', 
                     issue_place: ''
                 });
                 setIsEditing(true); 
             }
-            if (error && error.code !== 'PGRST116') throw error; // Bỏ qua lỗi "không tìm thấy"
+            if (error && error.code !== 'PGRST116') throw error;
         } catch (error) {
             toast.error(`Lỗi tải thông tin CMND: ${error.message}`);
         } finally {
@@ -344,11 +342,9 @@ const IdentityForm = ({ user }) => {
             .upload(filePath, file);
 
         if (uploadError) throw uploadError;
-
-        // Lấy URL (đây là URL public, nhưng bucket là private)
-        // Chúng ta sẽ cần tạo signed URL để admin xem
-        const { data } = supabase.storage.from('id-scans').getPublicUrl(filePath);
-        return data.publicUrl; // Tạm thời lưu public URL, dù bucket là private
+        
+        // Trả về đường dẫn để lưu vào DB (dùng để tạo signedURL sau)
+        return filePath;
     };
 
     const handleSubmit = async (e) => {
@@ -356,15 +352,23 @@ const IdentityForm = ({ user }) => {
         setIsUploading(true);
         try {
             // 1. Upload ảnh (nếu có)
-            const front_image_url = await uploadFile(frontImage, 'front');
-            const back_image_url = await uploadFile(backImage, 'back');
+            // (v20) Sửa lại logic: Chỉ upload khi có file mới
+            let front_image_url = identity?.front_image_url || null;
+            if (frontImage) {
+                front_image_url = await uploadFile(frontImage, 'front');
+            }
 
+            let back_image_url = identity?.back_image_url || null;
+            if (backImage) {
+                back_image_url = await uploadFile(backImage, 'back');
+            }
+            
             const updates = {
                 ...formData,
                 id: user.id,
                 status: 'pending', // Luôn đặt là pending khi cập nhật
-                ...(front_image_url && { front_image_url }), // Chỉ thêm nếu upload thành công
-                ...(back_image_url && { back_image_url }),
+                front_image_url: front_image_url,
+                back_image_url: back_image_url,
             };
 
             // 2. Upsert (Insert hoặc Update) thông tin
@@ -391,25 +395,38 @@ const IdentityForm = ({ user }) => {
         return <div className="flex justify-center mt-10"><CircleNotch size={32} className="animate-spin text-sky-500" /></div>;
     }
 
-    // Giao diện khi đã gửi và đang chờ duyệt
+    // (v20) Giao diện khi đã gửi và đang chờ duyệt
     if (identity && !isEditing) {
+        let statusBadge;
+        switch (identity.status) {
+            case 'approved':
+                statusBadge = (
+                    <div className="badge-status-pro bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
+                        <CheckCircle weight="bold" /> Đã Xác Thực
+                    </div>
+                );
+                break;
+            case 'rejected':
+                 statusBadge = (
+                    <div className="badge-status-pro bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">
+                        <XCircle weight="bold" /> Bị Từ Chối
+                    </div>
+                );
+                break;
+            default: // pending
+                statusBadge = (
+                    <div className="badge-status-pro bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300">
+                        <WarningCircle weight="bold" /> Đang Chờ Duyệt
+                    </div>
+                );
+        }
+
         return (
-            <div className="mt-8">
-                <h3 className="text-xl font-sora font-semibold text-slate-800 dark:text-white mb-4">Xác thực Danh tính (CMND/CCCD)</h3>
-                <div className="bg-slate-50 dark:bg-slate-800 p-5 rounded-xl border dark:border-slate-700 space-y-3">
-                    {identity.status === 'pending' && (
-                        <div className="p-3 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 text-sm font-medium flex items-center gap-2">
-                            <WarningCircle weight="bold" />
-                            Thông tin của bạn đang chờ Admin xét duyệt.
-                        </div>
-                    )}
-                    {identity.status === 'approved' && (
-                        <div className="p-3 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-sm font-medium flex items-center gap-2">
-                            <CheckCircle weight="bold" />
-                            Thông tin của bạn đã được xác thực.
-                        </div>
-                    )}
-                    <p className="text-sm text-slate-600 dark:text-slate-300"><strong>Số CMND/CCCD:</strong> {identity.id_number}</p>
+            <div className="">
+                <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6">Xác thực Danh tính (CMND/CCCD)</h3>
+                <div className="bg-slate-50 dark:bg-slate-800/60 p-5 rounded-xl border dark:border-slate-700 space-y-3">
+                    {statusBadge}
+                    <p className="text-sm text-slate-600 dark:text-slate-300 pt-2"><strong>Số CMND/CCCD:</strong> {identity.id_number}</p>
                     <p className="text-sm text-slate-600 dark:text-slate-300"><strong>Họ và tên:</strong> {identity.full_name}</p>
                     <p className="text-sm text-slate-600 dark:text-slate-300"><strong>Ngày sinh:</strong> {new Date(identity.dob).toLocaleDateString('vi-VN')}</p>
                     
@@ -425,22 +442,22 @@ const IdentityForm = ({ user }) => {
         );
     }
 
-    // Giao diện Form (khi chưa có, hoặc khi bấm "Cập nhật")
+    // (v20) Giao diện Form (khi chưa có, hoặc khi bấm "Cập nhật")
     return (
-        <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-            <h3 className="text-xl font-sora font-semibold text-slate-800 dark:text-white mb-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
+            <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6">
                 {identity ? 'Cập nhật Thông tin Xác thực' : 'Bổ sung Thông tin Xác thực (CMND/CCCD)'}
             </h3>
             
             <InputGroup icon={<IdentificationCard />} label="Số CMND/CCCD">
-                <input type_name="text" name="id_number" value={formData.id_number} onChange={(e) => setFormData({...formData, id_number: e.target.value})} className="input-style-pro" required />
+                <input type="text" name="id_number" value={formData.id_number} onChange={(e) => setFormData({...formData, id_number: e.target.value})} className="input-style-pro" required />
             </InputGroup>
 
             <InputGroup icon={<User />} label="Họ và Tên (Trên CMND)">
                 <input type="text" name="full_name" value={formData.full_name} onChange={(e) => setFormData({...formData, full_name: e.target.value})} className="input-style-pro" required />
             </InputGroup>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <InputGroup icon={<CalendarBlank />} label="Ngày sinh (Trên CMND)">
                     <input type="date" name="dob" value={formData.dob} onChange={(e) => setFormData({...formData, dob: e.target.value})} className="input-style-pro" required />
                 </InputGroup>
@@ -453,20 +470,27 @@ const IdentityForm = ({ user }) => {
                 <input type="text" name="issue_place" value={formData.issue_place} onChange={(e) => setFormData({...formData, issue_place: e.target.value})} className="input-style-pro" required />
             </InputGroup>
 
-            {/* Upload Ảnh */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputGroup icon={<UploadSimple />} label="Ảnh Scan Mặt trước CMND/CCCD">
-                    <input type="file" onChange={(e) => handleFileChange(e, 'front')} className="input-file-pro" accept="image/*" />
-                    {frontImage && <span className="text-xs text-green-600 dark:text-green-400 mt-1">{frontImage.name}</span>}
+            {/* (v20) Upload Ảnh "Xịn Xò" */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <InputGroup icon={<FileArrowUp />} label="Ảnh Scan Mặt trước CMND/CCCD">
+                    <label htmlFor="front-image-upload" className="input-file-label-pro">
+                        <UploadSimple size={20} />
+                        <span>{frontImage ? frontImage.name : 'Nhấp để tải lên'}</span>
+                    </label>
+                    <input id="front-image-upload" type="file" onChange={(e) => handleFileChange(e, 'front')} className="hidden" accept="image/*" />
                 </InputGroup>
-                <InputGroup icon={<UploadSimple />} label="Ảnh Scan Mặt sau CMND/CCCD">
-                    <input type="file" onChange={(e) => handleFileChange(e, 'back')} className="input-file-pro" accept="image/*" />
-                    {backImage && <span className="text-xs text-green-600 dark:text-green-400 mt-1">{backImage.name}</span>}
+                
+                <InputGroup icon={<FileArrowUp />} label="Ảnh Scan Mặt sau CMND/CCCD">
+                     <label htmlFor="back-image-upload" className="input-file-label-pro">
+                        <UploadSimple size={20} />
+                        <span>{backImage ? backImage.name : 'Nhấp để tải lên'}</span>
+                    </label>
+                    <input id="back-image-upload" type="file" onChange={(e) => handleFileChange(e, 'back')} className="hidden" accept="image/*" />
                 </InputGroup>
             </div>
 
 
-            <div className="flex justify-end pt-2 gap-3">
+            <div className="flex justify-end pt-4 border-t dark:border-slate-700 gap-3">
                 {identity && ( // Chỉ hiển thị nút Hủy nếu đang ở chế độ "Cập nhật" (đã có data)
                     <motion.button 
                         type="button" 
@@ -503,11 +527,25 @@ const InputGroup = ({ icon, label, children }) => (
     </div>
 );
 
+// --- (v20) Component Helper: TabButton ---
+const TabButton = ({ label, icon, isActive, onClick }) => (
+    <motion.button
+        onClick={onClick}
+        className={`tab-button ${isActive ? 'tab-button-active' : ''}`}
+        whileHover={{ scale: 1.03 }}
+        whileTap={{ scale: 0.98 }}
+    >
+        {React.cloneElement(icon, { size: 20 })}
+        <span>{label}</span>
+    </motion.button>
+);
 
-// --- (v19) Component Chính: Profile ---
+
+// --- (v20) Component Chính: Profile (Đã thiết kế lại) ---
 export default function Profile() {
     const { user, loading, refreshUser } = useAuth();
     const navigate = useNavigate();
+    const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'password', 'identity'
 
     // Chuyển hướng nếu chưa đăng nhập
     useEffect(() => {
@@ -523,20 +561,20 @@ export default function Profile() {
 
     if (loading || !user) {
         return (
-            <div className="p-6 flex justify-center items-center min-h-screen bg-slate-50 dark:bg-slate-900">
-                <CircleNotch size={40} className="animate-spin text-indigo-600" />
+            <div className="p-6 flex justify-center items-center min-h-screen bg-slate-100 dark:bg-slate-900">
+                <CircleNotch size={40} className="animate-spin text-sky-500" />
             </div>
         );
     }
 
-    // Giao diện chính của trang
+    // (v20) Giao diện chính "Đỉnh Nóc"
     return (
-        <div className="bg-slate-50 dark:bg-slate-900 min-h-screen font-inter">
+        <div className="bg-slate-100 dark:bg-slate-900 min-h-screen font-inter">
             {/* Header (Giả, vì Navbar đã fixed) */}
             <div className="h-20" /> 
             
             <motion.div 
-                className="max-w-4xl mx-auto p-4 md:p-8 space-y-8"
+                className="max-w-6xl mx-auto p-4 md:p-8 space-y-8"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
@@ -544,37 +582,76 @@ export default function Profile() {
                 {/* Tiêu đề trang */}
                 <div className="mb-8">
                     <h1 className="text-3xl font-sora font-bold text-slate-900 dark:text-white flex items-center gap-3">
-                        <IdentificationCard weight="duotone" className="text-sky-600" size={36} />
-                        Thông tin Cá nhân
+                        <User weight="duotone" className="text-sky-600" size={36} />
+                        Tài Khoản Của Tôi
                     </h1>
                     <p className="mt-2 text-base text-slate-600 dark:text-slate-400">
                         Quản lý thông tin tài khoản và xác thực danh tính của bạn.
                     </p>
                 </div>
 
-                {/* Box 1: Thông tin cơ bản */}
-                <div className="bg-white dark:bg-slate-800 shadow-xl rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-700/50">
-                    <div className="p-6 md:p-8">
-                        <ProfileInfoForm user={user} onProfileUpdate={handleProfileUpdate} />
-                    </div>
-                </div>
+                {/* (v20) Layout 2 Cột */}
+                <div className="md:flex md:gap-8">
+                    
+                    {/* (v20) Cột 1: Sidebar Tabs */}
+                    <aside className="md:w-1/4 mb-6 md:mb-0">
+                        <nav className="flex flex-col gap-2 sticky top-24">
+                            <TabButton
+                                label="Thông tin Chung"
+                                icon={<IdentificationCard />}
+                                isActive={activeTab === 'profile'}
+                                onClick={() => setActiveTab('profile')}
+                            />
+                            <TabButton
+                                label="Bảo mật & Mật khẩu"
+                                icon={<ShieldCheck />}
+                                isActive={activeTab === 'password'}
+                                onClick={() => setActiveTab('password')}
+                            />
+                            <TabButton
+                                label="Xác thực CMND/CCCD"
+                                icon={<User />}
+                                isActive={activeTab === 'identity'}
+                                onClick={() => setActiveTab('identity')}
+                            />
+                        </nav>
+                    </aside>
 
-                {/* Box 2: Đổi mật khẩu */}
-                <div className="bg-white dark:bg-slate-800 shadow-xl rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-700/50">
-                    <div className="p-6 md:p-8">
-                        <ChangePasswordForm user={user} />
-                    </div>
-                </div>
+                    {/* (v20) Cột 2: Content Panel */}
+                    <main className="md:w-3/4">
+                        <motion.div 
+                            className="bg-white dark:bg-slate-800 shadow-xl rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-700/50"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.3 }}
+                        >
+                            <AnimatePresence mode="wait">
+                                <motion.div
+                                    key={activeTab}
+                                    initial={{ opacity: 0, x: 20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -20 }}
+                                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                                    className="p-6 md:p-8"
+                                >
+                                    {activeTab === 'profile' && (
+                                        <ProfileInfoForm user={user} onProfileUpdate={handleProfileUpdate} />
+                                    )}
+                                    {activeTab === 'password' && (
+                                        <ChangePasswordForm user={user} />
+                                    )}
+                                    {activeTab === 'identity' && (
+                                        <IdentityForm user={user} />
+                                    )}
+                                </motion.div>
+                            </AnimatePresence>
+                        </motion.div>
+                    </main>
 
-                {/* Box 3: Xác thực CMND/CCCD */}
-                <div className="bg-white dark:bg-slate-800 shadow-xl rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-700/50">
-                    <div className="p-6 md:p-8">
-                        <IdentityForm user={user} />
-                    </div>
                 </div>
             </motion.div>
 
-            {/* CSS styles (giống ManageAccounts) */}
+            {/* (v20) CSS "Xịn" */}
             <style jsx>{`
                 .label-style { @apply block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5; }
                 
@@ -588,14 +665,28 @@ export default function Profile() {
                            outline-none transition text-sm disabled:opacity-60 disabled:cursor-not-allowed;
                 }
                 
-                .input-file-pro {
-                    @apply w-full text-sm text-slate-500 dark:text-slate-400
-                           file:mr-4 file:py-2 file:px-4
-                           file:rounded-lg file:border-0
-                           file:text-sm file:font-semibold
-                           file:bg-sky-50 file:text-sky-700
-                           dark:file:bg-sky-900/40 dark:file:text-sky-300
-                           hover:file:bg-sky-100 dark:hover:file:bg-sky-900;
+                /* (v20) Nút Tab Sidebar */
+                .tab-button {
+                    @apply flex items-center gap-3 w-full p-3 rounded-lg text-base font-medium
+                           text-slate-600 dark:text-slate-300
+                           hover:bg-slate-100 dark:hover:bg-slate-700
+                           transition-colors duration-200;
+                }
+                .tab-button-active {
+                    @apply bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-400 font-semibold;
+                }
+
+                /* (v20) Trạng thái xác thực (Badge) */
+                .badge-status-pro {
+                    @apply px-4 py-2 text-sm font-semibold rounded-lg inline-flex items-center gap-2;
+                }
+
+                /* (v20) Upload "Xịn" */
+                .input-file-label-pro {
+                    @apply flex items-center justify-center gap-2 w-full p-4 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 
+                           text-slate-500 dark:text-slate-400 cursor-pointer 
+                           hover:border-sky-500 hover:text-sky-600 dark:hover:border-sky-500 dark:hover:text-sky-400 
+                           hover:bg-sky-50 dark:hover:bg-sky-900/30 transition-all duration-300;
                 }
 
                 .modal-button-secondary-pro { 
