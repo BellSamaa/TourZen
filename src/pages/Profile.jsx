@@ -1,9 +1,11 @@
 // src/pages/Profile.jsx
-// (NÂNG CẤP v21) "ĐỈNH NÓC PLUS" - Nâng cấp giao diện theo yêu cầu
-// 1. Bo góc đẹp hơn (tăng border-radius lên 1.5rem hoặc 2rem)
-// 2. Thêm nhiều màu sắc hơn (gradient background, màu icon đa dạng, highlight colors)
-// 3. Thêm nhiều icon hơn (thêm vào labels, buttons, badges)
-// 4. Xóa input "Tên đăng nhập" trong ProfileInfoForm
+// (NÂNG CẤP v22) "ĐỈNH NÓC ULTRA" - Nâng cấp giao diện inputs giống như trong Login.jsx
+// 1. Thay đổi cấu trúc InputGroup để icon absolute bên trong input
+// 2. Áp dụng style input-field tương tự Login: bg rgba(255,255,255,0.1), border rgba(255,255,255,0.3), padding-left 2.75rem, etc.
+// 3. Update content panel: bg-white/10 backdrop-blur-xl border white/20 rounded-3xl
+// 4. Điều chỉnh colors cho dark mode, giữ gradients và icons đa sắc
+// 5. Update toggle eye cho passwords giống Login
+// 6. Update upload labels để giống input-field style
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -19,8 +21,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const supabase = getSupabase();
 
-// --- (v21) Component con: Cập nhật Thông tin ---
-// (v21) Sửa: Xóa input username, thêm icon vào buttons, thêm màu gradient
+// --- (v22) Component con: Cập nhật Thông tin ---
+// (v22) Update inputs giống Login
 const ProfileInfoForm = ({ user, onProfileUpdate }) => {
     const [formData, setFormData] = useState({
         full_name: '', phone_number: '', address: '', ngay_sinh: '', 
@@ -83,24 +85,29 @@ const ProfileInfoForm = ({ user, onProfileUpdate }) => {
                 <Info size={24} className="text-indigo-600" /> Thông tin Cơ bản
             </h3>
             
-            <InputGroup icon={<Envelope className="text-pink-600" />} label="Email (Không thể đổi)">
-                <input type="email" value={user.email || ''} className="input-style-pro" disabled />
+            <InputGroup label="Email (Không thể đổi)">
+                <Envelope className="input-icon text-pink-600" size={18} />
+                <input type="email" value={user.email || ''} className="input-field" disabled />
             </InputGroup>
 
-            <InputGroup icon={<User className="text-green-600" />} label="Họ và Tên">
-                <input type="text" name="full_name" value={formData.full_name} onChange={handleChange} className="input-style-pro" required />
+            <InputGroup label="Họ và Tên">
+                <User className="input-icon text-green-600" size={18} />
+                <input type="text" name="full_name" value={formData.full_name} onChange={handleChange} className="input-field" required />
             </InputGroup>
 
-            <InputGroup icon={<Phone className="text-yellow-600" />} label="Số điện thoại">
-                <input type="tel" name="phone_number" value={formData.phone_number} onChange={handleChange} className="input-style-pro" />
+            <InputGroup label="Số điện thoại">
+                <Phone className="input-icon text-yellow-600" size={18} />
+                <input type="tel" name="phone_number" value={formData.phone_number} onChange={handleChange} className="input-field" />
             </InputGroup>
 
-            <InputGroup icon={<House className="text-purple-600" />} label="Địa chỉ">
-                <input type="text" name="address" value={formData.address} onChange={handleChange} className="input-style-pro" required minLength={10} />
+            <InputGroup label="Địa chỉ">
+                <House className="input-icon text-purple-600" size={18} />
+                <input type="text" name="address" value={formData.address} onChange={handleChange} className="input-field" required minLength={10} />
             </InputGroup>
 
-            <InputGroup icon={<CalendarBlank className="text-red-600" />} label="Ngày sinh">
-                <input type="date" name="ngay_sinh" value={formData.ngay_sinh} onChange={handleChange} className="input-style-pro" />
+            <InputGroup label="Ngày sinh">
+                <CalendarBlank className="input-icon text-red-600" size={18} />
+                <input type="date" name="ngay_sinh" value={formData.ngay_sinh} onChange={handleChange} className="input-field" />
             </InputGroup>
 
             <div className="flex justify-end pt-4 border-t dark:border-slate-700">
@@ -118,8 +125,8 @@ const ProfileInfoForm = ({ user, onProfileUpdate }) => {
     );
 };
 
-// --- (v21) Component con: Đổi Mật khẩu ---
-// (v21) Thêm icon màu vào buttons, thêm gradient
+// --- (v22) Component con: Đổi Mật khẩu ---
+// (v22) Update inputs và toggle eye giống Login
 const ChangePasswordForm = ({ user }) => {
     const [isOtpSent, setIsOtpSent] = useState(false);
     const [form, setForm] = useState({ otp: '', password: '', confirm: '' });
@@ -210,34 +217,33 @@ const ChangePasswordForm = ({ user }) => {
                     <p className="text-sm text-slate-600 dark:text-slate-300">
                         Vui lòng liên hệ Admin (SĐT: <strong className="text-slate-800 dark:text-white">{ADMIN_PHONE}</strong>) để nhận Mã OTP.
                     </p>
-                    <InputGroup icon={<Key className="text-blue-600" />} label="Mã OTP 6 số">
-                        <input type="text" name="otp" value={form.otp} onChange={handleChange} className="input-style-pro" required />
+                    <InputGroup label="Mã OTP 6 số">
+                        <Key className="input-icon text-blue-600" size={18} />
+                        <input type="text" name="otp" value={form.otp} onChange={handleChange} className="input-field" required />
                     </InputGroup>
                     
-                    <InputGroup icon={<Lock className="text-teal-600" />} label="Mật khẩu mới (tối thiểu 6 ký tự)">
-                        <div className="relative">
-                            <input 
-                                type={showPassword ? "text" : "password"} 
-                                name="password" value={form.password} onChange={handleChange} 
-                                className="input-style-pro pr-10" required 
-                            />
-                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="password-toggle-btn">
-                                {showPassword ? <EyeSlash size={20} /> : <Eye size={20} />}
-                            </button>
-                        </div>
+                    <InputGroup label="Mật khẩu mới (tối thiểu 6 ký tự)">
+                        <Lock className="input-icon text-teal-600" size={18} />
+                        <input 
+                            type={showPassword ? "text" : "password"} 
+                            name="password" value={form.password} onChange={handleChange} 
+                            className="input-field pr-10" required 
+                        />
+                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="password-toggle-btn">
+                            {showPassword ? <EyeSlash size={20} /> : <Eye size={20} />}
+                        </button>
                     </InputGroup>
 
-                    <InputGroup icon={<Lock className="text-cyan-600" />} label="Xác nhận mật khẩu mới">
-                        <div className="relative">
-                            <input 
-                                type={showConfirm ? "text" : "password"} 
-                                name="confirm" value={form.confirm} onChange={handleChange} 
-                                className="input-style-pro pr-10" required 
-                            />
-                            <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="password-toggle-btn">
-                                {showConfirm ? <EyeSlash size={20} /> : <Eye size={20} />}
-                            </button>
-                        </div>
+                    <InputGroup label="Xác nhận mật khẩu mới">
+                        <Lock className="input-icon text-cyan-600" size={18} />
+                        <input 
+                            type={showConfirm ? "text" : "password"} 
+                            name="confirm" value={form.confirm} onChange={handleChange} 
+                            className="input-field pr-10" required 
+                        />
+                        <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="password-toggle-btn">
+                            {showConfirm ? <EyeSlash size={20} /> : <Eye size={20} />}
+                        </button>
                     </InputGroup>
 
                     <div className="flex justify-end pt-4 border-t dark:border-slate-700 gap-3">
@@ -266,8 +272,8 @@ const ChangePasswordForm = ({ user }) => {
     );
 };
 
-// --- (v21) Component con: Xác thực CMND/CCCD ---
-// (v21) Thêm icon màu, gradient cho panels, bo góc lớn hơn
+// --- (v22) Component con: Xác thực CMND/CCCD ---
+// (v22) Update inputs giống Login, update upload để giống input-field
 const IdentityForm = ({ user }) => {
     const [identity, setIdentity] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -353,7 +359,6 @@ const IdentityForm = ({ user }) => {
         setIsUploading(true);
         try {
             // 1. Upload ảnh (nếu có)
-            // (v20) Sửa lại logic: Chỉ upload khi có file mới
             let front_image_url = identity?.front_image_url || null;
             if (frontImage) {
                 front_image_url = await uploadFile(frontImage, 'front');
@@ -396,7 +401,7 @@ const IdentityForm = ({ user }) => {
         return <div className="flex justify-center mt-10"><CircleNotch size={32} className="animate-spin text-sky-500" /></div>;
     }
 
-    // (v21) Giao diện khi đã gửi và đang chờ duyệt, thêm icon vào badge, gradient
+    // (v22) Giao diện khi đã gửi và đang chờ duyệt
     if (identity && !isEditing) {
         let statusBadge;
         switch (identity.status) {
@@ -445,48 +450,53 @@ const IdentityForm = ({ user }) => {
         );
     }
 
-    // (v21) Giao diện Form, thêm màu icon, gradient
+    // (v22) Giao diện Form với inputs mới
     return (
         <form onSubmit={handleSubmit} className="space-y-5">
             <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
                 <Palette size={24} className="text-violet-600" /> {identity ? 'Cập nhật Thông tin Xác thực' : 'Bổ sung Thông tin Xác thực (CMND/CCCD)'}
             </h3>
             
-            <InputGroup icon={<IdentificationCard className="text-lime-600" />} label="Số CMND/CCCD">
-                <input type="text" name="id_number" value={formData.id_number} onChange={(e) => setFormData({...formData, id_number: e.target.value})} className="input-style-pro" required />
+            <InputGroup label="Số CMND/CCCD">
+                <IdentificationCard className="input-icon text-lime-600" size={18} />
+                <input type="text" name="id_number" value={formData.id_number} onChange={(e) => setFormData({...formData, id_number: e.target.value})} className="input-field" required />
             </InputGroup>
 
-            <InputGroup icon={<User className="text-fuchsia-600" />} label="Họ và Tên (Trên CMND)">
-                <input type="text" name="full_name" value={formData.full_name} onChange={(e) => setFormData({...formData, full_name: e.target.value})} className="input-style-pro" required />
+            <InputGroup label="Họ và Tên (Trên CMND)">
+                <User className="input-icon text-fuchsia-600" size={18} />
+                <input type="text" name="full_name" value={formData.full_name} onChange={(e) => setFormData({...formData, full_name: e.target.value})} className="input-field" required />
             </InputGroup>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <InputGroup icon={<CalendarBlank className="text-amber-600" />} label="Ngày sinh (Trên CMND)">
-                    <input type="date" name="dob" value={formData.dob} onChange={(e) => setFormData({...formData, dob: e.target.value})} className="input-style-pro" required />
+                <InputGroup label="Ngày sinh (Trên CMND)">
+                    <CalendarBlank className="input-icon text-amber-600" size={18} />
+                    <input type="date" name="dob" value={formData.dob} onChange={(e) => setFormData({...formData, dob: e.target.value})} className="input-field" required />
                 </InputGroup>
-                <InputGroup icon={<CalendarBlank className="text-rose-600" />} label="Ngày cấp">
-                    <input type="date" name="issue_date" value={formData.issue_date} onChange={(e) => setFormData({...formData, issue_date: e.target.value})} className="input-style-pro" required />
+                <InputGroup label="Ngày cấp">
+                    <CalendarBlank className="input-icon text-rose-600" size={18} />
+                    <input type="date" name="issue_date" value={formData.issue_date} onChange={(e) => setFormData({...formData, issue_date: e.target.value})} className="input-field" required />
                 </InputGroup>
             </div>
 
-            <InputGroup icon={<House className="text-indigo-600" />} label="Nơi cấp">
-                <input type="text" name="issue_place" value={formData.issue_place} onChange={(e) => setFormData({...formData, issue_place: e.target.value})} className="input-style-pro" required />
+            <InputGroup label="Nơi cấp">
+                <House className="input-icon text-indigo-600" size={18} />
+                <input type="text" name="issue_place" value={formData.issue_place} onChange={(e) => setFormData({...formData, issue_place: e.target.value})} className="input-field" required />
             </InputGroup>
 
-            {/* (v21) Upload Ảnh "Xịn" hơn với màu */}
+            {/* (v22) Upload Ảnh giống input-field */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <InputGroup icon={<FileArrowUp className="text-sky-600" />} label="Ảnh Scan Mặt trước CMND/CCCD">
-                    <label htmlFor="front-image-upload" className="input-file-label-pro bg-gradient-to-r from-sky-100 to-sky-200 dark:from-sky-900/30 to-sky-800/30">
-                        <UploadSimple size={20} className="text-sky-600" />
-                        <span>{frontImage ? frontImage.name : 'Nhấp để tải lên'}</span>
+                <InputGroup label="Ảnh Scan Mặt trước CMND/CCCD">
+                    <label htmlFor="front-image-upload" className="input-file-label-pro relative flex items-center gap-2 cursor-pointer">
+                        <FileArrowUp className="input-icon text-sky-600" size={18} />
+                        <span className="w-full input-field flex items-center">{frontImage ? frontImage.name : 'Nhấp để tải lên'}</span>
                     </label>
                     <input id="front-image-upload" type="file" onChange={(e) => handleFileChange(e, 'front')} className="hidden" accept="image/*" />
                 </InputGroup>
                 
-                <InputGroup icon={<FileArrowUp className="text-pink-600" />} label="Ảnh Scan Mặt sau CMND/CCCD">
-                     <label htmlFor="back-image-upload" className="input-file-label-pro bg-gradient-to-r from-pink-100 to-pink-200 dark:from-pink-900/30 to-pink-800/30">
-                        <UploadSimple size={20} className="text-pink-600" />
-                        <span>{backImage ? backImage.name : 'Nhấp để tải lên'}</span>
+                <InputGroup label="Ảnh Scan Mặt sau CMND/CCCD">
+                    <label htmlFor="back-image-upload" className="input-file-label-pro relative flex items-center gap-2 cursor-pointer">
+                        <FileArrowUp className="input-icon text-pink-600" size={18} />
+                        <span className="w-full input-field flex items-center">{backImage ? backImage.name : 'Nhấp để tải lên'}</span>
                     </label>
                     <input id="back-image-upload" type="file" onChange={(e) => handleFileChange(e, 'back')} className="hidden" accept="image/*" />
                 </InputGroup>
@@ -520,20 +530,18 @@ const IdentityForm = ({ user }) => {
 };
 
 
-// --- (v19) Component Helper: InputGroup ---
-// (v21) Cập nhật icon với màu từ props
-const InputGroup = ({ icon, label, children }) => (
-    <div>
-        <label className="label-style flex items-center gap-2">
-            {React.cloneElement(icon, { size: 18 })}
-            <span>{label}</span>
-        </label>
-        {children}
+// --- (v22) Component Helper: InputGroup ---
+// (v22) Thay đổi cấu trúc: Bỏ label flex, thêm relative div, icon absolute, label riêng trên
+const InputGroup = ({ label, children, icon }) => (
+    <div className="space-y-1">
+        <label className="label-style block">{label}</label>
+        <div className="relative">
+            {children}
+        </div>
     </div>
 );
 
 // --- (v21) Component Helper: TabButton ---
-// (v21) Thêm màu icon đa dạng cho từng tab
 const TabButton = ({ label, icon, isActive, onClick, colorClass }) => (
     <motion.button
         onClick={onClick}
@@ -547,7 +555,7 @@ const TabButton = ({ label, icon, isActive, onClick, colorClass }) => (
 );
 
 
-// --- (v21) Component Chính: Profile (Nâng cấp) ---
+// --- (v22) Component Chính: Profile ---
 export default function Profile() {
     const { user, loading, refreshUser } = useAuth();
     const navigate = useNavigate();
@@ -573,7 +581,7 @@ export default function Profile() {
         );
     }
 
-    // (v21) Giao diện chính với gradient background
+    // (v22) Giao diện chính với style panel giống Login
     return (
         <div className="bg-gradient-to-br from-slate-100 to-sky-50 dark:from-slate-900 to-sky-950 min-h-screen font-inter">
             {/* Header (Giả, vì Navbar đã fixed) */}
@@ -596,10 +604,10 @@ export default function Profile() {
                     </p>
                 </div>
 
-                {/* (v21) Layout 2 Cột */}
+                {/* (v22) Layout 2 Cột */}
                 <div className="md:flex md:gap-8">
                     
-                    {/* (v21) Cột 1: Sidebar Tabs với màu khác nhau */}
+                    {/* (v22) Cột 1: Sidebar Tabs */}
                     <aside className="md:w-1/4 mb-6 md:mb-0">
                         <nav className="flex flex-col gap-2 sticky top-24">
                             <TabButton
@@ -626,10 +634,10 @@ export default function Profile() {
                         </nav>
                     </aside>
 
-                    {/* (v21) Cột 2: Content Panel với bo góc lớn hơn */}
+                    {/* (v22) Cột 2: Content Panel giống Login */}
                     <main className="md:w-3/4">
                         <motion.div 
-                            className="bg-white dark:bg-slate-800 shadow-xl rounded-3xl overflow-hidden border border-slate-200/80 dark:border-slate-700/50"
+                            className="bg-white/10 dark:bg-slate-800/10 backdrop-blur-xl border border-white/20 dark:border-slate-700/20 shadow-xl rounded-3xl overflow-hidden"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             transition={{ duration: 0.3 }}
@@ -641,7 +649,7 @@ export default function Profile() {
                                     animate={{ opacity: 1, x: 0 }}
                                     exit={{ opacity: 0, x: -20 }}
                                     transition={{ duration: 0.3, ease: "easeInOut" }}
-                                    className="p-6 md:p-8"
+                                    className="p-6 md:p-8 text-slate-800 dark:text-white"
                                 >
                                     {activeTab === 'profile' && (
                                         <ProfileInfoForm user={user} onProfileUpdate={handleProfileUpdate} />
@@ -660,21 +668,27 @@ export default function Profile() {
                 </div>
             </motion.div>
 
-            {/* (v21) CSS "Xịn" hơn */}
+            {/* (v22) CSS giống Login */}
             <style jsx>{`
                 .label-style { @apply block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5; }
                 
-                .input-style-pro { 
-                    @apply border border-slate-200 dark:border-slate-700 
-                           p-3 rounded-2xl w-full 
-                           bg-slate-100 dark:bg-slate-800/60
-                           text-slate-800 dark:text-slate-100
-                           focus:bg-white dark:focus:bg-slate-900 
-                           focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500
-                           outline-none transition text-sm disabled:opacity-60 disabled:cursor-not-allowed;
+                .input-field { 
+                    @apply w-full pl-11 py-3 border border-white/30 rounded-xl bg-white/10 dark:bg-slate-800/10 text-slate-800 dark:text-white 
+                           focus:border-sky-400 focus:bg-white/15 dark:focus:bg-slate-900/15 focus:ring-0 outline-none transition text-sm disabled:opacity-60 disabled:cursor-not-allowed backdrop-blur-sm;
+                }
+                .input-field::placeholder {
+                    @apply text-slate-400 dark:text-slate-500;
                 }
                 
-                /* (v21) Nút Tab Sidebar */
+                .input-icon {
+                    @apply absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 pointer-events-none;
+                }
+                
+                .password-toggle-btn {
+                    @apply absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300 transition-colors;
+                }
+
+                /* (v22) Nút Tab Sidebar */
                 .tab-button {
                     @apply flex items-center gap-3 w-full p-3 rounded-2xl text-base font-medium
                            text-slate-600 dark:text-slate-300
@@ -685,17 +699,15 @@ export default function Profile() {
                     @apply bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-400 font-semibold;
                 }
 
-                /* (v21) Trạng thái xác thực (Badge) */
+                /* (v22) Trạng thái xác thực (Badge) */
                 .badge-status-pro {
                     @apply px-4 py-2 text-sm font-semibold rounded-2xl inline-flex items-center gap-2;
                 }
 
-                /* (v21) Upload "Xịn" */
+                /* (v22) Upload "Giống input-field" */
                 .input-file-label-pro {
-                    @apply flex items-center justify-center gap-2 w-full p-4 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-600 
-                           text-slate-500 dark:text-slate-400 cursor-pointer 
-                           hover:border-sky-500 hover:text-sky-600 dark:hover:border-sky-500 dark:hover:text-sky-400 
-                           hover:bg-sky-50 dark:hover:bg-sky-900/30 transition-all duration-300;
+                    @apply flex items-center justify-start gap-2 w-full py-3 pl-11 pr-3 border border-white/30 rounded-xl bg-white/10 dark:bg-slate-800/10 text-slate-800 dark:text-white 
+                           hover:border-sky-400 hover:bg-white/15 dark:hover:bg-slate-900/15 transition-all duration-300 cursor-pointer backdrop-blur-sm;
                 }
 
                 .modal-button-secondary-pro { 
@@ -708,9 +720,6 @@ export default function Profile() {
                     @apply px-5 py-2.5 bg-sky-600 text-white 
                            rounded-2xl font-semibold hover:bg-sky-700 
                            text-sm disabled:opacity-50 transition-colors shadow-lg shadow-sky-500/30;
-                }
-                .password-toggle-btn {
-                    @apply absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors;
                 }
             `}</style>
         </div>
