@@ -1,5 +1,5 @@
 // supabase/functions/admin-delete-user/index.ts
-// (SỬA v2) Đổi tên biến để fix lỗi "cannot start with SUPABASE_"
+// (SỬA v3) Đọc 'SUPABASE_URL' (tên có sẵn) thay vì 'MY_SUPABASE_URL'
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -45,19 +45,19 @@ serve(async (req) => {
     const { user_id } = await req.json()
     if (!user_id) throw new Error("Missing 'user_id' in request body")
 
-    // 1. (SỬA v2) Dùng biến MY_SUPABASE_URL và MY_SUPABASE_ANON_KEY
+    // 1. (SỬA v3) Dùng 'SUPABASE_URL' (có sẵn) và 'MY_SUPABASE_ANON_KEY'
     const supabaseClient = createClient(
-      Deno.env.get('MY_SUPABASE_URL') ?? '',
-      Deno.env.get('MY_SUPABASE_ANON_KEY') ?? '', // Dùng Anon key
+      Deno.env.get('SUPABASE_URL') ?? '', // <<< ĐÃ SỬA TÊN BIẾN NÀY
+      Deno.env.get('MY_SUPABASE_ANON_KEY') ?? '', 
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     )
 
     // 2. Xác thực admin
     await isUserAdmin(supabaseClient)
 
-    // 3. (SỬA v2) Dùng biến MY_SUPABASE_SERVICE_ROLE_KEY
+    // 3. (SỬA v3) Dùng 'SUPABASE_URL' (có sẵn) và 'MY_SUPABASE_SERVICE_ROLE_KEY'
     const supabaseAdmin = createClient(
-      Deno.env.get('MY_SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_URL') ?? '', // <<< ĐÃ SỬA TÊN BIẾN NÀY
       Deno.env.get('MY_SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
