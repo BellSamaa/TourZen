@@ -1,17 +1,19 @@
 // ManageAccounts.jsx
-/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v16 (Fix Lỗi Ẩn Vai Trò) ***
-  1. (Logic) Sửa lại hàm `fetchAccounts` để đảm bảo nó KHÔNG CÓ BỘ LỌC
-     `.eq('role', 'user')`. Code này sẽ lấy TẤT CẢ các vai trò.
+/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v17 (Sửa Lỗi Ẩn Vai Trò & UI) ***
+  1. (Logic) Sửa lại hàm `fetchAccounts` để ĐẢM BẢO không có bộ lọc vai trò.
+     Nó sẽ lấy TẤT CẢ các vai trò (Admin, Supplier, User).
+  2. (UI) Xóa dòng "ID: {account.username}" (ví dụ: "ID: default_user")
+     khỏi cột "Họ và Tên" trong bảng.
+  3. (LƯU Ý) Nếu vai trò Admin/Supplier vẫn bị ẩn, BẠN PHẢI KIỂM TRA RLS
+     (ROW LEVEL SECURITY) TRÊN BẢNG 'Users' TRONG SUPABASE.
 */
-/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v14 (Lọc Role) ***
+/* *** (Nâng cấp v14 - Giữ nguyên) ***
   1. (Logic) Xóa 'Manager' và 'Staff' khỏi mảng ROLES trong Modal.
   2. (Logic) Đổi vai trò mặc định khi Thêm mới thành 'admin'.
 */
-/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v13 (UI Modal) ***
-  1. (UI) Thêm header màu (indigo) cho Modal Thêm/Sửa.
-  2. (UI) Thêm icon màu vào trước các label (Email, Mật khẩu, v.v.) trong Modal.
-  3. (UI) Tăng độ bo góc (rounded-xl) cho các input và button trong Modal.
-  4. (UI) Tăng độ bo góc (rounded-xl) cho các nút/input trên thanh search.
+/* *** (Nâng cấp v13 - Giữ nguyên) ***
+  1. (UI) Nâng cấp Modal với header màu, icon, bo góc.
+  2. (UI) Nâng cấp bo góc các nút và thanh tìm kiếm.
 */
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
@@ -425,7 +427,8 @@ export default function AdminManageAccounts() {
     const [totalItems, setTotalItems] = useState(0);
     const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
 
-    // --- (SỬA v16) Fetch data (Đảm bảo không lọc vai trò) ---
+    // --- (SỬA v17) Fetch data (Đảm bảo không lọc vai trò) ---
+    // HÀM NÀY LÀ QUAN TRỌNG NHẤT
     const fetchAccounts = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         setError(null);
@@ -438,7 +441,7 @@ export default function AdminManageAccounts() {
             // Bắt đầu query. Lấy TẤT CẢ users.
             let query = supabase.from("Users").select(selectQuery, { count: 'exact' });
 
-            // (SỬA LỖI v16) Đảm bảo không có bộ lọc vai trò nào ở đây
+            // (SỬA LỖI v17) Đảm bảo không có bộ lọc vai trò nào ở đây
             // Bất kỳ dòng nào như .eq('role', 'user') PHẢI BỊ XÓA
             // query = query.eq('role', 'user'); // <-- DÒNG NÀY GÂY LỖI (ĐÃ XÓA)
 
@@ -455,7 +458,13 @@ export default function AdminManageAccounts() {
             // Chạy query
             const { data, count, error: fetchError } = await query;
 
-            if (fetchError) throw fetchError;
+            if (fetchError) {
+                // (SỬA v17) Thêm cảnh báo về RLS
+                if (fetchError.message.includes("policy")) {
+                    throw new Error(`Lỗi RLS (Row Level Security): ${fetchError.message}. Hãy kiểm tra RLS trên bảng Users.`);
+                }
+                throw fetchError;
+            }
             
             const processedData = data.map(acc => ({...acc, username: acc.username || 'N/A'}));
             setAccounts(processedData || []);
@@ -466,7 +475,7 @@ export default function AdminManageAccounts() {
             }
         } catch (err) {
             console.error("Lỗi fetch accounts:", err);
-            setError(err);
+            setError(err); // Hiển thị lỗi ra UI (bao gồm cả lỗi RLS)
         } finally {
             if (isInitialLoad) setLoading(false);
             setIsFetchingPage(false);
@@ -654,7 +663,10 @@ export default function AdminManageAccounts() {
                                 <AnimatePresence>
                                     {/* (SỬA v11) Sửa colSpan="7" */}
                                     {error && !isFetchingPage && ( 
-                                        <tr><td colSpan="7" className="td-center py-20 text-red-500">{`Lỗi: ${error.message}`}</td></tr> 
+                                        <tr><td colSpan="7" className="td-center py-20 text-red-500">
+                                            {/* (SỬA v17) Hiển thị lỗi (quan trọng cho debug RLS) */}
+                                            {`Lỗi: ${error.message}`}
+                                        </td></tr> 
                                     )}
                                     
                                     {!error && !loading && !isFetchingPage && accounts.length === 0 && ( 
@@ -690,10 +702,10 @@ export default function AdminManageAccounts() {
                                                 </span>
                                             </td>
 
-                                            {/* === THAY ĐỔI TẠI ĐÂY: Hoán đổi full_name và username === */}
+                                            {/* === (SỬA v17) Xóa "ID: default_user" === */}
                                             <td className="td-style-pro">
                                                 <div className="font-sora font-semibold text-slate-800 dark:text-slate-100">{account.full_name}</div>
-                                                <div className="font-inter text-sm text-slate-500 dark:text-slate-400">ID: {account.username}</div>
+                                                {/* <div className="font-inter text-sm text-slate-500 dark:text-slate-400">ID: {account.username}</div> (SỬA v17) ĐÃ XÓA DÒNG NÀY */}
                                             </td>
                                             
                                             <td className="td-style-pro font-inter text-slate-600 dark:text-slate-400">{account.email}</td>
