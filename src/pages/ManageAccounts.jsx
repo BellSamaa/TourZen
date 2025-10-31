@@ -380,16 +380,12 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                         
                         <motion.button 
                             type="submit" disabled={loading} 
-                            className="modal-button-primary-pro flex items-center gap-2"
-                            whileHover={{ scale: 1.05 }}
+                            className="modal-button-primary-pro flex items-center justify-center gap-2 min-w-[120px]"
+                            whileHover={{ scale: 1.05, y: -2 }}
                             whileTap={{ scale: 0.95 }}
                         >
-                            {loading ? (
-                                <CircleNotch size={20} className="animate-spin" />
-                            ) : (
-                                <CheckCircle size={20} />
-                            )}
-                            {isEdit ? 'Lưu thay đổi' : 'Thêm tài khoản'}
+                            {loading ? <CircleNotch size={18} className="animate-spin" /> : (isEdit ? <PencilLine size={18} /> : <UserPlus size={18} />) }
+                            {isEdit ? 'Lưu thay đổi' : 'Thêm mới'}
                         </motion.button>
                     </div>
                 </form>
@@ -398,290 +394,402 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
     );
 };
 
-export default function ManageAccounts() {
-    const ITEMS_PER_PAGE = 10;
+
+// --- (Giữ nguyên phần còn lại của file) ---
+// --- Variants cho Stagger (Giữ nguyên) ---
+const pageVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+};
+const itemVariant = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100 } }
+};
+
+
+// --- (STYLE UPGRADE) Component chính: Quản lý Tài Khoản ---
+export default function AdminManageAccounts() {
+    // ... (States giữ nguyên) ...
     const [accounts, setAccounts] = useState([]);
-    const [totalItems, setTotalItems] = useState(0);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [search, setSearch] = useState('');
-    const debouncedSearch = useDebounce(search, 500);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [isFetchingPage, setIsFetchingPage] = useState(false);
     const [error, setError] = useState(null);
     const [modalAccount, setModalAccount] = useState(null);
+    const [searchTerm, setSearchTerm] = useState("");
+    const debouncedSearch = useDebounce(searchTerm, 400);
+    const ITEMS_PER_PAGE = 10;
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalItems, setTotalItems] = useState(0);
+    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
 
-    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
-    const paginationWindow = getPaginationWindow(currentPage, totalPages);
-
-    const getRoleInfo = useCallback((role) => {
-        switch (role) {
-            case 'admin': return { name: 'Admin', color: 'bg-purple-500' };
-            // case 'manager': return { name: 'Manager', color: 'bg-blue-500' };
-            // case 'staff': return { name: 'Staff', color: 'bg-cyan-500' };
-            case 'supplier': return { name: 'Supplier', color: 'bg-orange-500' };
-            default: return { name: 'User', color: 'bg-slate-500' };
-        }
-    }, []);
-
-    const formatDate = useCallback((dateString) => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    }, []);
-
-    const handleSuspend = async (account) => {
-        if (!window.confirm(`Bạn có chắc chắn muốn ngừng tài khoản "${account.full_name}"?`)) return;
+    // --- (SỬA v17) Fetch data (Đảm bảo không lọc vai trò) ---
+    // HÀM NÀY LÀ QUAN TRỌNG NHẤT
+    const fetchAccounts = useCallback(async (isInitialLoad = false) => {
+        if (!isInitialLoad) setIsFetchingPage(true);
+        setError(null);
         try {
-            const { error } = await supabase
-                .from('Users')
-                .update({ is_active: false })
-                .eq('id', account.id);
-            if (error) throw error;
-            toast.success('Ngừng tài khoản thành công!');
-            fetchAccounts(false);
-        } catch (error) {
-            toast.error('Lỗi ngừng tài khoản: ' + error.message);
-        }
-    };
-
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [debouncedSearch]);
-
-    // --- (SỬA v17) Fetch Accounts (Xóa bộ lọc role) ---
-    const fetchAccounts = useCallback(async (isInitial = true) => {
-        if (isInitial) {
-            setLoading(true);
-            setError(null);
-        } else {
-            setIsFetchingPage(true);
-        }
-        try {
-            let query = supabase
-                .from('Users')
-                .select('*', { count: 'exact' })
-                .order('created_at', { ascending: false });
-            if (debouncedSearch) {
-                query = query.or(`full_name.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%,username.ilike.%${debouncedSearch}%`);
-            }
-            // (SỬA v17) Đã xóa bất kỳ bộ lọc role nào để lấy TẤT CẢ vai trò
             const from = (currentPage - 1) * ITEMS_PER_PAGE;
             const to = from + ITEMS_PER_PAGE - 1;
-            const { data, error, count } = await query.range(from, to);
-            if (error) throw error;
-            setAccounts(data || []);
+            
+            const selectQuery = `id, username, full_name, email, role, is_active, created_at, customer_code, account_code`;
+            
+            // Bắt đầu query. Lấy TẤT CẢ users.
+            let query = supabase.from("Users").select(selectQuery, { count: 'exact' });
+
+            // (SỬA LỖI v17) Đảm bảo không có bộ lọc vai trò nào ở đây
+            // Bất kỳ dòng nào như .eq('role', 'user') PHẢI BỊ XÓA
+            // query = query.eq('role', 'user'); // <-- DÒNG NÀY GÂY LỖI (ĐÃ XÓA)
+
+            // Thêm tìm kiếm (nếu có)
+            if (debouncedSearch.trim() !== "") {
+                const searchStr = `%${debouncedSearch.trim()}%`;
+                const searchQuery = `customer_code.ilike.${searchStr},account_code.ilike.${searchStr},full_name.ilike.${searchStr},email.ilike.${searchStr},username.ilike.${searchStr}`;
+                query = query.or(searchQuery);
+            }
+            
+            // Sắp xếp và phân trang
+            query = query.order("created_at", { ascending: false }).range(from, to);
+            
+            // Chạy query
+            const { data, count, error: fetchError } = await query;
+
+            if (fetchError) {
+                // (SỬA v17) Thêm cảnh báo về RLS
+                if (fetchError.message.includes("policy")) {
+                    throw new Error(`Lỗi RLS (Row Level Security): ${fetchError.message}. Hãy kiểm tra RLS trên bảng Users.`);
+                }
+                throw fetchError;
+            }
+            
+            const processedData = data.map(acc => ({...acc, username: acc.username || 'N/A'}));
+            setAccounts(processedData || []);
             setTotalItems(count || 0);
+            
+            if (!isInitialLoad && data.length === 0 && count > 0 && currentPage > 1) {
+                setCurrentPage(1); // Reset về trang 1 nếu trang hiện tại trống
+            }
         } catch (err) {
-            setError(err);
-            setAccounts([]);
-            setTotalItems(0);
+            console.error("Lỗi fetch accounts:", err);
+            setError(err); // Hiển thị lỗi ra UI (bao gồm cả lỗi RLS)
         } finally {
-            if (isInitial) setLoading(false);
-            else setIsFetchingPage(false);
+            if (isInitialLoad) setLoading(false);
+            setIsFetchingPage(false);
         }
     }, [currentPage, debouncedSearch]);
 
+    // --- UseEffects (Giữ nguyên) ---
     useEffect(() => {
-        fetchAccounts();
+        fetchAccounts(true);
     }, [fetchAccounts]);
 
-    const itemVariant = {
-        hidden: { opacity: 0, y: 20 },
-        visible: { opacity: 1, y: 0 }
+    useEffect(() => {
+        if (currentPage !== 1) {
+            setCurrentPage(1);
+        }
+    }, [debouncedSearch]);
+    
+    // --- (SỬA v12) Sửa logic handleSuspend để gọi Edge Function ---
+    const handleSuspend = (account) => {
+        toast((t) => (
+            <div className="flex flex-col items-center p-1">
+                 <span className="text-center font-inter">
+                    Ngừng hoạt động tài khoản <b className="font-sora">{account.username}</b>?<br/>
+                    <span className="text-xs text-orange-600">Tài khoản sẽ không thể đăng nhập.</span>
+                 </span>
+                <div className="mt-3 flex gap-2">
+                 <motion.button
+                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                    className="modal-button-danger-pro text-sm"
+                    onClick={async () => {
+                        toast.dismiss(t.id);
+                        setIsFetchingPage(true);
+                        
+                        // --- (SỬA v12) Gọi Edge Function để ngừng ---
+                        const { data, error: functionError } = await supabase.functions.invoke('admin-update-user', {
+                            body: {
+                                user_id: account.id,
+                                is_active: false, // Chỉ cập nhật trạng thái
+                                // Gửi các giá trị còn lại là 'undefined' để function bỏ qua
+                                username: undefined,
+                                full_name: undefined,
+                                role: undefined,
+                                password: null
+                            }
+                        });
+                        
+                        setIsFetchingPage(false);
+                        if (functionError || (data && data.error)) {
+                            toast.error("Lỗi: " + (functionError?.message || data?.error));
+                        } else {
+                            toast.success("Đã ngừng tài khoản.");
+                            fetchAccounts(false);
+                        }
+                    }}
+                  > Xác nhận Ngừng </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                    className="modal-button-secondary-pro text-sm"
+                    onClick={() => toast.dismiss(t.id)}
+                  > Hủy </motion.button>
+                </div>
+            </div>
+          ), { icon: <WarningCircle size={24} className="text-red-500"/>, duration: 8000 });
     };
 
+    const formatDate = (dateString) => {
+        if (!dateString) return "N/A";
+        try {
+            return new Date(dateString).toLocaleDateString('vi-VN', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+        } catch (error) {
+            return "Invalid Date";
+        }
+    };
+    
+    // (SỬA v14) Bỏ Manager/Staff khỏi map này
+    const getRoleInfo = (roleId) => {
+        const rolesMap = { 
+            admin: { name: 'Admin', color: 'bg-purple-500' }, 
+            // manager: { name: 'Manager', color: 'bg-blue-500' }, // (SỬA v14) Bỏ
+            // staff: { name: 'Staff', color: 'bg-cyan-500' }, // (SỬA v14) Bỏ
+            supplier: { name: 'Supplier', color: 'bg-orange-500' }, 
+            user: { name: 'User', color: 'bg-slate-500' }
+        };
+        // (SỬA v15) Nếu vai trò là 'manager' hoặc 'staff' (còn sót lại trong DB)
+        // nó sẽ hiển thị tên vai trò (roleId) với màu xám
+        return rolesMap[roleId] || { name: roleId, color: 'bg-gray-400' };
+    };
+
+    const paginationWindow = useMemo(() => getPaginationWindow(currentPage, totalPages, 2), [currentPage, totalPages]);
+
+     if (loading && accounts.length === 0) {
+        return (
+            <div className="p-6 flex justify-center items-center min-h-screen bg-slate-50 dark:bg-slate-900">
+                <CircleNotch size={40} className="animate-spin text-indigo-600" />
+            </div>
+        );
+    }
+
+    // --- JSX (Giữ nguyên) ---
     return (
-        <motion.div 
-            initial="hidden" animate="visible" 
-            variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
-            className="p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-xl space-y-6"
+        <motion.div
+            className="p-4 md:p-8 min-h-screen bg-slate-50 dark:bg-slate-900 font-inter"
+            initial="hidden"
+            animate="visible"
         >
-            {/* Header */}
-            <motion.div variants={itemVariant} className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div className="flex items-center gap-3">
-                    <UsersThree size={32} className="text-indigo-600" weight="duotone" />
+            <motion.div 
+                className="space-y-6"
+                variants={pageVariants}
+            >
+                {/* Header */}
+                <motion.div variants={itemVariant} className="flex flex-wrap items-center justify-between gap-4">
                     <div>
-                        <h2 className="text-xl font-sora font-bold text-slate-800 dark:text-white">Quản lý Tài khoản</h2>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">Danh sách tất cả tài khoản hệ thống</p>
+                        <h1 className="text-3xl font-sora font-bold text-slate-900 dark:text-white flex items-center gap-3">
+                            <UsersThree weight="duotone" className="text-indigo-600" size={36} />
+                            Quản lý Tài khoản
+                        </h1>
+                        <p className="mt-2 text-base text-slate-600 dark:text-slate-400">
+                            {/* (SỬA v16) Cập nhật mô tả */}
+                            Quản lý tài khoản người dùng hệ thống (Bao gồm Admin, Supplier, User).
+                        </p>
                     </div>
-                </div>
-                <motion.button 
-                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                    onClick={() => setModalAccount('new')} 
-                    className="button-primary-pro flex items-center gap-2"
-                >
-                    <UserPlus size={20} /> Thêm mới
-                </motion.button>
-            </motion.div>
+                    <motion.button 
+                        whileHover={{ scale: 1.05, y: -2, boxShadow: '0 10px 20px -10px rgb(99 102 241 / 50%)' }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setModalAccount('new')}
+                        className="button-primary-pro flex items-center gap-2"
+                    >
+                        <UserPlus size={18} weight="bold" />
+                        Thêm Tài Khoản
+                    </motion.button>
+                </motion.div>
 
-            {/* Search and Refresh */}
-            <motion.div variants={itemVariant} className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1">
-                    <MagnifyingGlass size={20} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input 
-                        type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Tìm theo tên, email hoặc username..." 
-                        className="search-input-pro"
-                    />
-                </div>
-                <motion.button 
-                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                    onClick={() => fetchAccounts(false)} disabled={loading || isFetchingPage} 
-                    className="button-secondary-pro"
-                    title="Làm mới dữ liệu"
-                >
-                    <ArrowsClockwise size={20} />
-                </motion.button>
-            </motion.div>
-
-            {/* Table Wrapper */}
-            <motion.div variants={itemVariant} className="relative overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
-                {(loading || isFetchingPage) && (
-                    <div className="loading-overlay">
-                        <CircleNotch size={32} className="animate-spin text-indigo-500" />
-                    </div>
-                )}
-                <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-                    <thead className="bg-slate-50 dark:bg-slate-800/50">
-                        <tr>
-                            {/* === (SỬA v11) Thêm cột Mã ID, điều chỉnh độ rộng === */}
-                            <th className="th-style-pro w-[10%]"><div className="flex items-center gap-1.5"><Archive size={14}/>Mã ID</div></th>
-                            <th className="th-style-pro w-[25%]"><div className="flex items-center gap-1.5"><User size={14}/>Họ và Tên</div></th>
-                            <th className="th-style-pro w-[20%]"><div className="flex items-center gap-1.5"><At size={14}/>Email</div></th>
-                            <th className="th-style-pro w-[15%]"><div className="flex items-center gap-1.5"><ShieldCheck size={14}/>Vai trò</div></th>
-                            <th className="th-style-pro w-[10%]"><div className="flex items-center gap-1.5"><Hourglass size={14}/>Trạng thái</div></th>
-                            <th className="th-style-pro w-[10%]"><div className="flex items-center gap-1.5"><CalendarBlank size={14}/>Ngày tạo</div></th>
-                            <th className="th-style-pro text-center w-[10%]">Thao tác</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                        <AnimatePresence>
-                            {/* (SỬA v11) Sửa colSpan="7" */}
-                            {error && !isFetchingPage && ( 
-                                <tr><td colSpan="7" className="td-center py-20 text-red-500">
-                                    {/* (SỬA v17) Hiển thị lỗi (quan trọng cho debug RLS) */}
-                                    {`Lỗi: ${error.message}`}
-                                </td></tr> 
-                            )}
-                            
-                            {!error && !loading && !isFetchingPage && accounts.length === 0 && ( 
-                                /* (SỬA v11) Sửa colSpan="7" */
-                                <tr><td colSpan="7" className="td-center py-20 text-slate-500">
-                                    <div className="flex flex-col items-center">
-                                        <Archive size={48} className="text-slate-400 mb-4" weight="light" />
-                                        <span className="font-sora font-semibold text-lg text-slate-600 dark:text-slate-300">Không tìm thấy tài khoản</span>
-                                        <span className="text-sm mt-1">{debouncedSearch ? `Không có kết quả cho "${debouncedSearch}"` : "Chưa có dữ liệu."}</span>
-                                    </div>
-                                </td></tr> 
-                            )}
-                            
-                            {/* (SỬA v16) Dữ liệu giờ đã hiển thị đầy đủ Admin, Supplier... */}
-                            {!error && accounts.map((account) => {
-                                const roleInfo = getRoleInfo(account.role);
-                                // (SỬA v11) Logic chọn mã để hiển thị
-                                const displayCode = account.role === 'user' ? account.customer_code : account.account_code;
-                                
-                                return (
-                                <motion.tr
-                                    key={account.id}
-                                    layout
-                                    initial={{ opacity: 0 }} 
-                                    animate={{ opacity: 1 }} 
-                                    exit={{ opacity: 0, x: -50, transition: { duration: 0.2 } }}
-                                    className="hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
-                                >
-                                    {/* === (SỬA v11) Thêm ô Mã ID === */}
-                                    <td className="td-style-pro">
-                                        <span className="font-sora font-semibold text-sm text-indigo-600 dark:text-indigo-400">
-                                            {displayCode || <span className="italic text-slate-400">N/A</span>}
-                                        </span>
-                                    </td>
-
-                                    {/* === (SỬA v17) Xóa "ID: default_user" === */}
-                                    <td className="td-style-pro">
-                                        <div className="font-sora font-semibold text-slate-800 dark:text-slate-100">{account.full_name}</div>
-                                    </td>
-                                    
-                                    <td className="td-style-pro font-inter text-slate-600 dark:text-slate-400">{account.email}</td>
-                                    <td className="td-style-pro">
-                                        <span className="badge-pro">
-                                            <span className={`w-2.5 h-2.5 rounded-full ${roleInfo.color}`}></span>
-                                            <span className="font-medium">{roleInfo.name}</span>
-                                        </span>
-                                    </td>
-                                    <td className="td-style-pro">
-                                        {account.is_active ? 
-                                            <span className="badge-green-pro"><CheckCircle size={14} weight="bold"/>Hoạt động</span> : 
-                                            <span className="badge-gray-pro"><XCircle size={14} weight="bold"/>Ngừng</span>}
-                                    </td>
-                                    <td className="td-style-pro font-inter text-slate-500 text-sm">{formatDate(account.created_at)}</td>
-                                    <td className="td-style-pro text-center">
-                                        <div className="flex justify-center gap-1">
-                                            {/* === (SỬA UI) Thêm hover màu === */}
-                                            <motion.button 
-                                                whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }}
-                                                onClick={() => setModalAccount(account)} 
-                                                disabled={isFetchingPage} 
-                                                className="action-button-pro text-sky-600 hover:bg-sky-100 dark:hover:bg-sky-900/40" 
-                                                title="Sửa tài khoản"
-                                            > <PencilLine size={18}/> </motion.button>
-                                            
-                                            {account.is_active ? (
-                                                /* === (SỬA UI) Thêm hover màu === */
-                                                <motion.button
-                                                    whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }}
-                                                    onClick={() => handleSuspend(account)} 
-                                                    disabled={isFetchingPage} 
-                                                    className="action-button-pro text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40"
-                                                    title="Ngừng tài khoản"
-                                                > <UserCircleMinus size={18}/> </motion.button>
-                                            ) : (
-                                                /* === (SỬA UI) Thêm hover màu === */
-                                                <motion.button
-                                                    whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }}
-                                                    onClick={() => setModalAccount(account)}
-                                                    disabled={isFetchingPage} 
-                                                    className="action-button-pro text-green-500 hover:bg-green-100 dark:hover:bg-green-900/40"
-                                                    title="Kích hoạt lại (trong Sửa)"
-                                                > <UserCircleCheck size={18}/> </motion.button>
-                                            )}
-                                        </div>
-                                    </td>
-                                </motion.tr>
-                            );
-                            })}
-                        </AnimatePresence>
-                    </tbody>
-                </table>
-            </motion.div>
-
-            {/* Pagination UI */}
-            {!loading && totalItems > ITEMS_PER_PAGE && (
+                {/* Bảng */}
+                {/* === (SỬA v13) Tăng bo góc bảng === */}
                 <motion.div
                     variants={itemVariant}
-                    className="flex flex-col sm:flex-row justify-between items-center mt-5 text-sm text-slate-600 dark:text-slate-400"
+                    className="bg-white dark:bg-slate-800 shadow-2xl rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-700/50"
                 >
-                    <div>
-                        Hiển thị <b>{(currentPage - 1) * ITEMS_PER_PAGE + 1}</b> - <b>{Math.min(currentPage * ITEMS_PER_PAGE, totalItems)}</b> trên <b>{totalItems}</b> tài khoản
+                    <div className="p-6 flex flex-wrap justify-between items-center gap-4 border-b border-slate-200 dark:border-slate-700">
+                        <h2 className="text-xl font-sora font-semibold text-slate-800 dark:text-slate-100">
+                            Danh Sách Tài Khoản
+                        </h2>
+                        <div className="flex items-center gap-3 w-full sm:w-auto">
+                            <div className="relative w-full sm:w-72">
+                                <MagnifyingGlass size={18} className="absolute left-4 top-1-2 -translate-y-1/2 text-slate-400" />
+                                <input 
+                                    type="text" 
+                                    value={searchTerm} 
+                                    onChange={(e) => setSearchTerm(e.target.value)} 
+                                    placeholder="Tìm Mã, Tên, Email, Username..." 
+                                    className="search-input-pro"
+                                />
+                            </div>
+                            <motion.button
+                                whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+                                onClick={() => fetchAccounts(false)} disabled={isFetchingPage} 
+                                className="button-secondary-pro"
+                                title="Làm mới"
+                            >
+                                <ArrowsClockwise size={18} className={isFetchingPage ? "animate-spin" : ""} />
+                            </motion.button>
+                        </div>
                     </div>
-                    <nav className="flex items-center gap-1 mt-3 sm:mt-0">
-                        <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={() => setCurrentPage(1)} disabled={currentPage === 1 || isFetchingPage} className="pagination-arrow-pro"> <CaretLeft size={16} weight="bold" /> </motion.button>
-                        {paginationWindow.map((page, index) =>
-                            typeof page === 'number' ? (
-                                <motion.button
-                                    whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-                                    key={index}
-                                    onClick={() => setCurrentPage(page)}
-                                    disabled={currentPage === page || isFetchingPage}
-                                    className={`pagination-number-pro ${currentPage === page ? 'pagination-active-pro' : ''}`}
-                                > {page} </motion.button>
-                            ) : (
-                                <span key={index} className="pagination-dots-pro"> ... </span>
-                            )
-                        )}
-                        <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages || isFetchingPage} className="pagination-arrow-pro"> <CaretRight size={16} weight="bold" /> </motion.button>
-                    </nav>
+
+                    <div className="overflow-x-auto relative">
+                        {isFetchingPage && !loading && ( <div className="loading-overlay"> <CircleNotch size={32} className="animate-spin text-indigo-500" /> </div> )}
+                        <table className="min-w-full">
+                            <thead className="border-b-2 border-slate-100 dark:border-slate-700">
+                                <tr>
+                                    {/* === (SỬA v11) Thêm cột Mã ID, điều chỉnh độ rộng === */}
+                                    <th className="th-style-pro w-[10%]"><div className="flex items-center gap-1.5"><Archive size={14}/>Mã ID</div></th>
+                                    <th className="th-style-pro w-[25%]"><div className="flex items-center gap-1.5"><User size={14}/>Họ và Tên</div></th>
+                                    <th className="th-style-pro w-[20%]"><div className="flex items-center gap-1.5"><At size={14}/>Email</div></th>
+                                    <th className="th-style-pro w-[15%]"><div className="flex items-center gap-1.5"><ShieldCheck size={14}/>Vai trò</div></th>
+                                    <th className="th-style-pro w-[10%]"><div className="flex items-center gap-1.5"><Hourglass size={14}/>Trạng thái</div></th>
+                                    <th className="th-style-pro w-[10%]"><div className="flex items-center gap-1.5"><CalendarBlank size={14}/>Ngày tạo</div></th>
+                                    <th className="th-style-pro text-center w-[10%]">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                                <AnimatePresence>
+                                    {/* (SỬA v11) Sửa colSpan="7" */}
+                                    {error && !isFetchingPage && ( 
+                                        <tr><td colSpan="7" className="td-center py-20 text-red-500">
+                                            {/* (SỬA v17) Hiển thị lỗi (quan trọng cho debug RLS) */}
+                                            {`Lỗi: ${error.message}`}
+                                        </td></tr> 
+                                    )}
+                                    
+                                    {!error && !loading && !isFetchingPage && accounts.length === 0 && ( 
+                                        /* (SỬA v11) Sửa colSpan="7" */
+                                        <tr><td colSpan="7" className="td-center py-20 text-slate-500">
+                                            <div className="flex flex-col items-center">
+                                                <Archive size={48} className="text-slate-400 mb-4" weight="light" />
+                                                <span className="font-sora font-semibold text-lg text-slate-600 dark:text-slate-300">Không tìm thấy tài khoản</span>
+                                                <span className="text-sm mt-1">{debouncedSearch ? `Không có kết quả cho "${debouncedSearch}"` : "Chưa có dữ liệu."}</span>
+                                            </div>
+                                        </td></tr> 
+                                    )}
+                                    
+                                    {/* (SỬA v16) Dữ liệu giờ đã hiển thị đầy đủ Admin, Supplier... */}
+                                    {!error && accounts.map((account) => {
+                                        const roleInfo = getRoleInfo(account.role);
+                                        // (SỬA v11) Logic chọn mã để hiển thị
+                                        const displayCode = account.role === 'user' ? account.customer_code : account.account_code;
+                                        
+                                        return (
+                                        <motion.tr
+                                            key={account.id}
+                                            layout
+                                            initial={{ opacity: 0 }} 
+                                            animate={{ opacity: 1 }} 
+                                            exit={{ opacity: 0, x: -50, transition: { duration: 0.2 } }}
+                                            className="hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+                                        >
+                                            {/* === (SỬA v11) Thêm ô Mã ID === */}
+                                            <td className="td-style-pro">
+                                                <span className="font-sora font-semibold text-sm text-indigo-600 dark:text-indigo-400">
+                                                    {displayCode || <span className="italic text-slate-400">N/A</span>}
+                                                </span>
+                                            </td>
+
+                                            {/* === (SỬA v17) Xóa "ID: default_user" === */}
+                                            <td className="td-style-pro">
+                                                <div className="font-sora font-semibold text-slate-800 dark:text-slate-100">{account.full_name}</div>
+                                                {/* <div className="font-inter text-sm text-slate-500 dark:text-slate-400">ID: {account.username}</div> (SỬA v17) ĐÃ XÓA DÒNG NÀY */}
+                                            </td>
+                                            
+                                            <td className="td-style-pro font-inter text-slate-600 dark:text-slate-400">{account.email}</td>
+                                            <td className="td-style-pro">
+                                                <span className="badge-pro">
+                                                    <span className={`w-2.5 h-2.5 rounded-full ${roleInfo.color}`}></span>
+                                                    <span className="font-medium">{roleInfo.name}</span>
+                                                </span>
+                                            </td>
+                                            <td className="td-style-pro">
+                                                {account.is_active ? 
+                                                    <span className="badge-green-pro"><CheckCircle size={14} weight="bold"/>Hoạt động</span> : 
+                                                    <span className="badge-gray-pro"><XCircle size={14} weight="bold"/>Ngừng</span>}
+                                            </td>
+                                            <td className="td-style-pro font-inter text-slate-500 text-sm">{formatDate(account.created_at)}</td>
+                                            <td className="td-style-pro text-center">
+                                                <div className="flex justify-center gap-1">
+                                                    {/* === (SỬA UI) Thêm hover màu === */}
+                                                    <motion.button 
+                                                        whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }}
+                                                        onClick={() => setModalAccount(account)} 
+                                                        disabled={isFetchingPage} 
+                                                        className="action-button-pro text-sky-600 hover:bg-sky-100 dark:hover:bg-sky-900/40" 
+                                                        title="Sửa tài khoản"
+                                                    > <PencilLine size={18}/> </motion.button>
+                                                    
+                                                    {account.is_active ? (
+                                                        /* === (SỬA UI) Thêm hover màu === */
+                                                        <motion.button
+                                                            whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }}
+                                                            onClick={() => handleSuspend(account)} 
+                                                            disabled={isFetchingPage} 
+                                                            className="action-button-pro text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40"
+                                                            title="Ngừng tài khoản"
+                                                        > <UserCircleMinus size={18}/> </motion.button>
+                                                    ) : (
+                                                        /* === (SỬA UI) Thêm hover màu === */
+                                                        <motion.button
+                                                            whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }}
+                                                            onClick={() => setModalAccount(account)}
+                                                            disabled={isFetchingPage} 
+                                                            className="action-button-pro text-green-500 hover:bg-green-100 dark:hover:bg-green-900/40"
+                                                            title="Kích hoạt lại (trong Sửa)"
+                                                        > <UserCircleCheck size={18}/> </motion.button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </motion.tr>
+                                    )})}
+                                </AnimatePresence>
+                            </tbody>
+                        </table>
+                    </div>
                 </motion.div>
-            )}
+
+                {/* Pagination UI */}
+                {!loading && totalItems > ITEMS_PER_PAGE && (
+                    <motion.div
+                        variants={itemVariant}
+                        className="flex flex-col sm:flex-row justify-between items-center mt-5 text-sm text-slate-600 dark:text-slate-400"
+                    >
+                        <div>
+                            Hiển thị <b>{(currentPage - 1) * ITEMS_PER_PAGE + 1}</b> - <b>{Math.min(currentPage * ITEMS_PER_PAGE, totalItems)}</b> trên <b>{totalItems}</b> tài khoản
+                        </div>
+                        <nav className="flex items-center gap-1 mt-3 sm:mt-0">
+                            <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={() => setCurrentPage(1)} disabled={currentPage === 1 || isFetchingPage} className="pagination-arrow-pro"> <CaretLeft size={16} weight="bold" /> </motion.button>
+                            {paginationWindow.map((page, index) =>
+                                typeof page === 'number' ? (
+                                    <motion.button
+                                        whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+                                        key={index}
+                                        onClick={() => setCurrentPage(page)}
+                                        disabled={currentPage === page || isFetchingPage}
+                                        className={`pagination-number-pro ${currentPage === page ? 'pagination-active-pro' : ''}`}
+                                    > {page} </motion.button>
+                                ) : (
+                                    <span key={index} className="pagination-dots-pro"> ... </span>
+                                )
+                            )}
+                            <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages || isFetchingPage} className="pagination-arrow-pro"> <CaretRight size={16} weight="bold" /> </motion.button>
+                        </nav>
+                    </motion.div>
+                )}
+            </motion.div>
 
             {/* Modal */}
             <AnimatePresence>
@@ -724,7 +832,7 @@ export default function ManageAccounts() {
                            disabled:opacity-50 disabled:cursor-not-allowed;
                 }
                 
-                /* === (SỬA v13) Tăng bo góc === */
+                /* === (SGỬI v13) Tăng bo góc === */
                 .button-primary-pro {
                     @apply bg-indigo-600 hover:bg-indigo-700 
                            text-white font-semibold 
@@ -818,6 +926,7 @@ export default function ManageAccounts() {
                 /* <<< (SỬA UI) Nút hành động Pro (trong bảng) - Xóa hover chung */
                 .action-button-pro { 
                     @apply p-2 rounded-lg transition-colors duration-150 
+                           /* hover:bg-slate-100 dark:hover:bg-slate-700 (XÓA) - Đã chuyển hover vào class cụ thể */
                            focus:outline-none focus:ring-1 focus:ring-offset-1 
                            dark:focus:ring-offset-slate-800 disabled:opacity-50 disabled:cursor-not-allowed; 
                 }
