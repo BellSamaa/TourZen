@@ -1,13 +1,10 @@
 // src/pages/Profile.jsx
-// (SỬA THEO YÊU CẦU) NÂNG CẤP v23 (Bỏ Tự Nhập CMND)
-// 1. Ghi chú: Chức năng "Tự động Scan" (OCR) là một công nghệ AI backend
-//    phức tạp, không thể thực hiện chỉ bằng React.
-// 2. (Thực hiện) Xóa các trường tự nhập (id_number, full_name, dob...)
-//    khỏi form `IdentityForm`.
-// 3. (Thực hiện) `IdentityForm` giờ CHỈ CÓ 2 nút Upload ảnh.
-// 4. (Thực hiện) `handleSubmit` chỉ upload ảnh và set status 'pending'.
-// 5. (Thực hiện) Chế độ View (`!isEditing`) chỉ hiển thị trạng thái (Chờ, Duyệt, Từ chối).
-// 6. (Giữ nguyên) Giữ toàn bộ giao diện v22 "bo góc mượt mà".
+/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v24 (Sửa Lỗi Upload 400) ***
+  1. (Logic) Sửa hàm `uploadFile` trong `IdentityForm`.
+  2. (Logic) Thêm tham số thứ 3 (fileOptions) vào lệnh `supabase.storage.upload()`.
+  3. (Logic) Thêm `{ contentType: file.type }` để fix lỗi "Missing a Content-Type header".
+*/
+/* (Nâng cấp v23, v22 - Giữ nguyên) */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -24,7 +21,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 const supabase = getSupabase();
 
 // --- (v22) Component con: Cập nhật Thông tin ---
-// (v22) Update inputs giống Login
 const ProfileInfoForm = ({ user, onProfileUpdate }) => {
     const [formData, setFormData] = useState({
         full_name: '', phone_number: '', address: '', ngay_sinh: '', 
@@ -128,7 +124,6 @@ const ProfileInfoForm = ({ user, onProfileUpdate }) => {
 };
 
 // --- (v22) Component con: Đổi Mật khẩu ---
-// (v22) Update inputs và toggle eye giống Login
 const ChangePasswordForm = ({ user }) => {
     // ... (Giữ nguyên code ChangePasswordForm)
     const [isOtpSent, setIsOtpSent] = useState(false);
@@ -276,14 +271,12 @@ const ChangePasswordForm = ({ user }) => {
 };
 
 // --- (v23) Component con: Xác thực CMND/CCCD (ĐÃ SỬA) ---
-// (v23) Xóa các trường tự nhập. Chỉ giữ lại Upload ảnh.
 const IdentityForm = ({ user }) => {
     const [identity, setIdentity] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
 
-    // (SỬA v23) Xóa state formData
     const [frontImage, setFrontImage] = useState(null);
     const [backImage, setBackImage] = useState(null);
     
@@ -324,7 +317,7 @@ const IdentityForm = ({ user }) => {
         }
     };
 
-    // (Giữ nguyên) Hàm Upload
+    // --- (SỬA v24) HÀM UPLOAD ĐÃ SỬA ---
     const uploadFile = async (file, type) => {
         if (!file) return null;
         
@@ -332,47 +325,63 @@ const IdentityForm = ({ user }) => {
         const fileName = `${user.id}-${type}-${Date.now()}.${fileExt}`;
         const filePath = `${fileName}`;
 
+        // (SỬA v24) Thêm fileOptions (tham số thứ 3)
+        const fileOptions = {
+            contentType: file.type || 'image/png' // Lấy MIME type của file
+        };
+
         const { error: uploadError } = await supabase.storage
-            .from('id-scans') // Tên bucket đã tạo ở SQL
-            .upload(filePath, file);
+            .from('id-scans')
+            .upload(filePath, file, fileOptions); // <<< ĐÃ THÊM fileOptions
 
         if (uploadError) throw uploadError;
         
         return filePath;
     };
+    // --- KẾT THÚC SỬA v24 ---
 
     // (SỬA v23) handleSubmit đã được đơn giản hóa
     const handleSubmit = async (e) => {
         e.preventDefault();
         
-        if (!frontImage || !backImage) {
-            toast.error("Vui lòng tải lên cả ảnh mặt trước và mặt sau.");
+        // (SỬA v23) Chỉ kiểm tra file, không cần kiểm tra formData
+        if (!frontImage && !identity?.front_image_url) {
+            toast.error("Vui lòng tải lên ảnh mặt trước.");
+            return;
+        }
+        if (!backImage && !identity?.back_image_url) {
+            toast.error("Vui lòng tải lên ảnh mặt sau.");
             return;
         }
         
         setIsUploading(true);
         try {
             // 1. Upload ảnh
-            const front_image_url = await uploadFile(frontImage, 'front');
-            const back_image_url = await uploadFile(backImage, 'back');
+            const front_image_path = await uploadFile(frontImage, 'front');
+            const back_image_path = await uploadFile(backImage, 'back');
 
             const updates = {
                 id: user.id,
                 status: 'pending', // Luôn đặt là pending khi cập nhật
-                front_image_url: front_image_url,
-                back_image_url: back_image_url,
+                // Chỉ cập nhật nếu có file mới
+                ...(front_image_path && { front_image_url: front_image_path }),
+                ...(back_image_path && { back_image_url: back_image_path }),
+                
                 // (SỬA v23) Xóa các trường tự nhập, admin sẽ điền sau
-                id_number: null,
-                full_name: null,
-                dob: null,
-                issue_date: null,
-                issue_place: null,
+                // (SỬA v24) Set là null KHI lần đầu gửi, KHÔNG set là null khi CẬP NHẬT
+                ...(!identity && { // Chỉ set là null nếu đây là lần đầu (chưa có identity)
+                    id_number: null,
+                    full_name: null,
+                    dob: null,
+                    issue_date: null,
+                    issue_place: null,
+                })
             };
 
             // 2. Upsert (Insert hoặc Update) thông tin
             const { error } = await supabase
                 .from('user_identity')
-                .upsert(updates, { onConflict: 'id', ignoreDuplicates: false, defaultToNull: false });
+                .upsert(updates, { onConflict: 'id' });
             
             if (error) throw error;
 
@@ -394,7 +403,6 @@ const IdentityForm = ({ user }) => {
     }
 
     // (SỬA v23) Giao diện khi đã gửi (chế độ View)
-    // Đã xóa phần hiển thị text (số cmnd, tên...) vì user không nhập
     if (identity && !isEditing) {
         let statusBadge;
         switch (identity.status) {
@@ -428,7 +436,6 @@ const IdentityForm = ({ user }) => {
                 <div className="bg-gradient-to-br from-slate-50 to-violet-50 dark:from-slate-800/60 to-violet-900/30 p-5 rounded-2xl border dark:border-slate-700 space-y-3">
                     {statusBadge}
                     
-                    {/* (SỬA v23) Xóa hiển thị thông tin chi tiết */}
                     <p className="text-sm text-slate-600 dark:text-slate-300 pt-2">
                         Trạng thái hồ sơ của bạn. Bạn có thể gửi lại thông tin nếu bị từ chối hoặc cần cập nhật.
                     </p>
@@ -456,15 +463,13 @@ const IdentityForm = ({ user }) => {
                 Vui lòng tải lên ảnh scan 2 mặt CMND/CCCD của bạn. Admin sẽ xem xét và điền thông tin giúp bạn.
             </p>
 
-            {/* (SỬA v23) Xóa các trường tự nhập */}
-
             {/* (v22) Upload Ảnh giống input-field */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <InputGroup label="Ảnh Scan Mặt trước CMND/CCCD">
                     <label htmlFor="front-image-upload" className="input-file-label-pro relative flex items-center gap-2 cursor-pointer">
                         <FileArrowUp className="input-icon text-sky-600" size={18} />
                         <span className="w-full input-field flex items-center truncate">
-                            {frontImage ? frontImage.name : 'Nhấp để tải lên'}
+                            {frontImage ? frontImage.name : (identity?.front_image_url ? "Đã tải lên (Mặt trước)" : 'Nhấp để tải lên')}
                         </span>
                     </label>
                     <input id="front-image-upload" type="file" onChange={(e) => handleFileChange(e, 'front')} className="hidden" accept="image/*" />
@@ -474,7 +479,7 @@ const IdentityForm = ({ user }) => {
                     <label htmlFor="back-image-upload" className="input-file-label-pro relative flex items-center gap-2 cursor-pointer">
                         <FileArrowUp className="input-icon text-pink-600" size={18} />
                         <span className="w-full input-field flex items-center truncate">
-                            {backImage ? backImage.name : 'Nhấp để tải lên'}
+                            {backImage ? backImage.name : (identity?.back_image_url ? "Đã tải lên (Mặt sau)" : 'Nhấp để tải lên')}
                         </span>
                     </label>
                     <input id="back-image-upload" type="file" onChange={(e) => handleFileChange(e, 'back')} className="hidden" accept="image/*" />
