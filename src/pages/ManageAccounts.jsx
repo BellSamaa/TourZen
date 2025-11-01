@@ -626,13 +626,16 @@ export default function AdminManageAccounts() {
                         </h2>
                         <div className="flex items-center gap-3 w-full sm:w-auto">
                             <div className="relative w-full sm:w-72">
+                                {/* ================== SỬA LỖI ICON TẠI ĐÂY ================== */}
                                 <MagnifyingGlass size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                {/* ========================================================== */}
+                                <input 
                                     type="text" 
                                     value={searchTerm} 
                                     onChange={(e) => setSearchTerm(e.target.value)} 
                                     placeholder="Tìm Mã, Tên, Email..." // (SỬA v19) Xóa Username
                                     className="search-input-pro"
-                                /
+                                />
                             </div>
                             <motion.button
                                 whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
