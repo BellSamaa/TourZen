@@ -1,13 +1,14 @@
 // ManageAccounts.jsx
-/* *** (SỬA LỖI v19) Sửa lỗi Logic + Yêu cầu UI ***
+/* *** (SỬA LỖI v20) Sửa lỗi Logic + Crash ***
   1. (Logic) Xóa TẤT CẢ các tham chiếu đến 'username' (vì nó không tồn tại
      trong CSDL 'Users' của bạn). Đã xóa khỏi:
      - State
      - Hàm handleSubmit (Thêm mới & Sửa)
      - Hàm fetchAccounts (selectQuery & searchQuery)
-  2. (UI) Xóa dòng "ID: {account.username}" (ví dụ: "ID: default_user")
+  2. (Logic) ĐỊNH NGHĨA LẠI 'pageVariants' và 'itemVariant' để fix lỗi crash
+     "pageVariants is not defined".
+  3. (UI) Xóa dòng "ID: {account.username}" (ví dụ: "ID: default_user")
      khỏi cột "Họ và Tên" trong bảng (đáp ứng v17).
-  3. (Logic) ĐỊNH NGHĨA LẠI 'pageVariants' và 'itemVariant' để fix lỗi crash.
 */
 /* *** (Nâng cấp v18 - Giữ lại) ***
   1. (UI/Logic) Giữ lại Nút Xóa, Modal Xóa, và hàm handleDeleteAccount.
@@ -20,7 +21,7 @@ import {
     UsersThree, CaretLeft, CaretRight, CircleNotch, X, MagnifyingGlass,
     PencilLine, ArrowsClockwise, WarningCircle, UserPlus, UserCircleMinus, UserCircleCheck,
     Eye, EyeSlash, CheckCircle, XCircle, User, At, ShieldCheck, CalendarBlank, Hourglass,
-    Archive, Key, IdentificationBadge, Trash // Giữ v18: Icon Trash
+    Archive, Key, IdentificationBadge, Trash 
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -152,6 +153,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                     options: {
                         data: {
                             full_name: formData.full_name
+                            // (SỬA v19) Xóa username
                         }
                     }
                 });
@@ -374,7 +376,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
 };
 
 
-// --- (SỬA v19) ĐỊNH NGHĨA LẠI CÁC BIẾN BỊ MẤT ---
+// --- (SỬA v20) ĐỊNH NGHĨA LẠI CÁC BIẾN BỊ MẤT ---
 // Các biến này phải được định nghĩa ở ngoài component
 const pageVariants = {
     hidden: { opacity: 0 },
@@ -389,7 +391,7 @@ const itemVariant = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100 } }
 };
-// --- KẾT THÚC SỬA v19 ---
+// --- KẾT THÚC SỬA v20 ---
 
 
 // --- Component chính: Quản lý Tài Khoản ---
