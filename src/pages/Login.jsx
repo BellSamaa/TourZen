@@ -74,30 +74,45 @@ export default function Login() {
                 
                 if (signUpError) throw signUpError;
                 
-                if (user) {
-                    // (SỬA v19) Ghi chú: Mã SQL đã sửa trigger handle_new_user
-                    // nên việc insert thủ công này (nếu có chạy) cũng sẽ hoạt động
-                    // vì trigger là ưu tiên.
+if (user) {
+                    // Insert profile thủ công (do trigger bị lỗi)
                     try {
-                        const { error: insertError } = await supabase.from('Users').insert({ 
-                            id: user.id, 
-                            full_name: form.name, 
-                            email: form.email, 
-                            address: form.address, 
-                            phone_number: form.phone_number,
-                            ngay_sinh: form.ngay_sinh || null 
-                        });
+                        // Tạo account_code unique
+                        const accountCode = 'TK' + Date.now().toString().slice(-8) + Math.floor(Math.random() * 100).toString().padStart(2, '0');
                         
-                        // Bỏ qua lỗi nếu đã có trigger tự động tạo
-                        if (insertError && insertError.code !== '23505') {
-                            console.warn("Insert profile warning:", insertError);
+                        const { error: insertError } = await supabase
+                            .from('Users')
+                            .insert({
+                                id: user.id,
+                                email: form.email,
+                                full_name: form.name,
+                                address: form.address,
+                                phone_number: form.phone_number || null,
+                                ngay_sinh: form.ngay_sinh || null,
+                                role: 'customer',
+                                account_code: accountCode // Thêm account_code
+                            });
+                        
+                        if (insertError) {
+                            console.error("Insert profile error:", insertError);
+                            // Bỏ qua lỗi duplicate key
+                            if (insertError.code !== '23505') {
+                                throw insertError;
+                            }
                         }
-                    } catch (err) {
-                        console.warn("Profile insert skipped:", err);
+                    } catch (profileError) {
+                        console.warn("Profile creation warning:", profileError);
+                        // Không throw để không chặn signup
                     }
                     
-                    setSuccess("Đăng ký thành công! 🎉 Vui lòng kiểm tra email để xác nhận.");
+                    setSuccess("Đăng ký thành công! 🎉 Bạn có thể đăng nhập ngay.");
                     setForm(initialFormState);
+                    
+                    // Tự động chuyển sang trang đăng nhập sau 2 giây
+                    setTimeout(() => {
+                        setMode('login');
+                        setSuccess('');
+                    }, 2000);
                 } else {
                     throw new Error("Không thể tạo người dùng.");
                 }
