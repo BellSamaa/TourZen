@@ -1,16 +1,12 @@
 // ManageCustomersSupabase.jsx
-/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v12 (Thêm Xác Thực CMND) ***
-  1. (Fetch) Cập nhật `fetchCustomers` để join và lấy `user_identity(id, status)`.
-  2. (UI) Thêm cột "Xác thực" vào bảng (tbody, thead).
-  3. (UI) Thêm nút "Xem CMND" (IdentificationCard) vào cột Thao tác.
-  4. (Logic) Thêm state `viewingIdentity` để mở Modal mới.
-  5. (Component) Tạo Modal `IdentityModal` hoàn chỉnh cho Admin:
-     - Lấy thông tin CMND (bao gồm cả ảnh).
-     - Tạo Signed URL an toàn để xem ảnh private.
-     - Hiển thị form cho Admin nhập thông tin sau khi xem ảnh.
-     - Cung cấp nút "Duyệt" và "Từ chối".
+/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v13 (Tối ưu Modal CMND) ***
+  1. (UI/UX) Thay đổi bố cục `IdentityModal` từ 2 cột (trái-phải)
+     thành bố cục dọc (Ảnh Scan ở trên, Form nhập liệu ở dưới).
+  2. (UI) Đặt 2 ảnh (mặt trước, mặt sau) nằm cạnh nhau trong 1 hàng.
+  3. (UI) Tối ưu hóa cho Admin, giúp dễ dàng xem ảnh và nhập liệu
+     mà không cần cuộn nhiều.
 */
-/* NÂNG CẤP v7, v10, v11 (Giữ nguyên) */
+/* NÂNG CẤP v7, v10, v11, v12 (Giữ nguyên) */
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { FaSpinner, FaSearch, FaTrash, FaBell } from "react-icons/fa"; 
@@ -18,7 +14,7 @@ import {
   UserList, CaretLeft, CaretRight, CircleNotch, X, Plus, UsersThree, Crown, Sparkle, Wallet,
   PencilSimple, List, Package, Bed, Airplane, Receipt, Info,
   User, Envelope, Phone, House, CalendarBlank,
-  IdentificationCard, CheckCircle, WarningCircle, XCircle // <<< THÊM v12
+  IdentificationCard, CheckCircle, WarningCircle, XCircle 
 } from "@phosphor-icons/react";
 import { getSupabase } from "../lib/supabaseClient";
 import toast from "react-hot-toast";
@@ -452,7 +448,7 @@ const CustomerBookingsModal = ({ customer, onClose }) => {
   );
 };
 
-// --- (*** THÊM v12: MODAL XÁC THỰC CMND/CCCD ***) ---
+// --- (*** SỬA v13: TỐI ƯU BỐ CỤC MODAL CMND ***) ---
 const IdentityModal = ({ customer, onClose, onSuccess }) => {
     const [identity, setIdentity] = useState(null);
     const [formData, setFormData] = useState({ id_number: '', full_name: '', dob: '', issue_date: '', issue_place: '' });
@@ -580,32 +576,36 @@ const IdentityModal = ({ customer, onClose, onSuccess }) => {
                     </button>
                 </div>
                 
+                {/* (SỬA v13) Đổi bố cục sang Dọc (space-y-6) */}
                 <div className="overflow-y-auto px-6 pb-6 simple-scrollbar">
                     {loading && ( <div className="flex justify-center items-center p-20"> <CircleNotch size={40} className="animate-spin text-violet-500" /> </div> )}
                     
                     {!loading && !identity && ( <p className="text-center text-gray-500 p-20 italic text-lg">Khách hàng này chưa gửi thông tin xác thực.</p> )}
                     
                     {!loading && identity && (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {/* Cột 1: Ảnh Scan */}
+                        <div className="space-y-6">
+                            {/* (SỬA v13) Phần 1: Ảnh Scan (luôn ở trên) */}
                             <div className="space-y-4">
                                 <h4 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Ảnh Scan</h4>
-                                <div className="space-y-3">
-                                    <label className="text-sm font-medium dark:text-gray-400">Mặt trước</label>
-                                    {frontImageUrl ? (
-                                        <a href={frontImageUrl} target="_blank" rel="noopener noreferrer"><img src={frontImageUrl} alt="Mặt trước CMND" className="w-full rounded-lg border dark:border-slate-600" /></a>
-                                    ) : (<p className="text-sm italic text-gray-500">Chưa tải lên</p>)}
-                                </div>
-                                <div className="space-y-3">
-                                    <label className="text-sm font-medium dark:text-gray-400">Mặt sau</label>
-                                    {backImageUrl ? (
-                                        <a href={backImageUrl} target="_blank" rel="noopener noreferrer"><img src={backImageUrl} alt="Mặt sau CMND" className="w-full rounded-lg border dark:border-slate-600" /></a>
-                                    ) : (<p className="text-sm italic text-gray-500">Chưa tải lên</p>)}
+                                {/* (SỬA v13) Đặt 2 ảnh cạnh nhau */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium dark:text-gray-400">Mặt trước</label>
+                                        {frontImageUrl ? (
+                                            <a href={frontImageUrl} target="_blank" rel="noopener noreferrer"><img src={frontImageUrl} alt="Mặt trước CMND" className="w-full rounded-lg border dark:border-slate-600" /></a>
+                                        ) : (<p className="text-sm italic text-gray-500">Chưa tải lên</p>)}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium dark:text-gray-400">Mặt sau</label>
+                                        {backImageUrl ? (
+                                            <a href={backImageUrl} target="_blank" rel="noopener noreferrer"><img src={backImageUrl} alt="Mặt sau CMND" className="w-full rounded-lg border dark:border-slate-600" /></a>
+                                        ) : (<p className="text-sm italic text-gray-500">Chưa tải lên</p>)}
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Cột 2: Form Nhập liệu của Admin */}
-                            <div className="space-y-4">
+                            {/* (SỬA v13) Phần 2: Form nhập liệu (luôn ở dưới) */}
+                            <div className="space-y-4 pt-6 border-t dark:border-slate-700">
                                 <h4 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Thông tin (Admin nhập)</h4>
                                 <InputWrapper label="Số CMND/CCCD" icon={<IdentificationCard size={18} className="mr-2" />}>
                                     <input type="text" name="id_number" value={formData.id_number} onChange={handleChange} className="form-input-style" placeholder="Nhập số từ ảnh..." />
@@ -613,7 +613,7 @@ const IdentityModal = ({ customer, onClose, onSuccess }) => {
                                 <InputWrapper label="Họ và Tên" icon={<User size={18} className="mr-2" />}>
                                     <input type="text" name="full_name" value={formData.full_name} onChange={handleChange} className="form-input-style" placeholder="Nhập tên từ ảnh..." />
                                 </InputWrapper>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <InputWrapper label="Ngày sinh" icon={<CalendarBlank size={18} className="mr-2" />}>
                                         <input type="date" name="dob" value={formData.dob} onChange={handleChange} className="form-input-style" />
                                     </InputWrapper>
@@ -628,6 +628,7 @@ const IdentityModal = ({ customer, onClose, onSuccess }) => {
                         </div>
                     )}
                 </div>
+                {/* (SỬA v13) KẾT THÚC THAY ĐỔI BỐ CỤC */}
 
                 {!loading && identity && (
                     <div className="p-6 flex justify-end gap-4 border-t dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 rounded-b-2xl">
@@ -643,7 +644,7 @@ const IdentityModal = ({ customer, onClose, onSuccess }) => {
         </motion.div>
     );
 };
-// --- (*** KẾT THÚC v12 ***) ---
+// --- (*** KẾT THÚC v13 ***) ---
 
 // --- (*** FIX v7.7 ***) Component InputWrapper (Đã di chuyển ra ngoài) ---
 const InputWrapper = ({ label, icon, children }) => (
