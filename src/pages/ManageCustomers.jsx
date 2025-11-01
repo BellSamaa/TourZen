@@ -1,28 +1,24 @@
 // ManageCustomersSupabase.jsx
-/* NÂNG CẤP LỚN v7: "Change Font to Be Vietnam Pro"
-  (Giữ nguyên các v7.x)
+/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v12 (Thêm Xác Thực CMND) ***
+  1. (Fetch) Cập nhật `fetchCustomers` để join và lấy `user_identity(id, status)`.
+  2. (UI) Thêm cột "Xác thực" vào bảng (tbody, thead).
+  3. (UI) Thêm nút "Xem CMND" (IdentificationCard) vào cột Thao tác.
+  4. (Logic) Thêm state `viewingIdentity` để mở Modal mới.
+  5. (Component) Tạo Modal `IdentityModal` hoàn chỉnh cho Admin:
+     - Lấy thông tin CMND (bao gồm cả ảnh).
+     - Tạo Signed URL an toàn để xem ảnh private.
+     - Hiển thị form cho Admin nhập thông tin sau khi xem ảnh.
+     - Cung cấp nút "Duyệt" và "Từ chối".
 */
-/* *** SỬA LỖI v7.7 (Fix Lỗi Mất Focus Input) ***
-  (Giữ nguyên)
-*/
-/* *** NÂNG CẤP v10 & v10.1 (Logic OTP & Giải Quyết Yêu Cầu) ***
-  (Giữ nguyên)
-*/
-/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v11 (Thêm Mã KH) ***
-  1. (SQL) Thêm cột `customer_code` vào bảng Users (xem SQL riêng).
-  2. (Fetch) Cập nhật `fetchCustomers` để lấy `customer_code`.
-  3. (UI) Hiển thị `customer_code` trong bảng.
-  4. (Search) Cho phép tìm kiếm theo `customer_code`.
-  5. (UI) Cập nhật các Modal (Xem đơn hàng, Xóa) để hiển thị `customer_code`.
-*/
+/* NÂNG CẤP v7, v10, v11 (Giữ nguyên) */
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-// (SỬA v10) Bỏ FaPaperPlane, dùng Sparkle đã import
 import { FaSpinner, FaSearch, FaTrash, FaBell } from "react-icons/fa"; 
 import {
   UserList, CaretLeft, CaretRight, CircleNotch, X, Plus, UsersThree, Crown, Sparkle, Wallet,
   PencilSimple, List, Package, Bed, Airplane, Receipt, Info,
-  User, Envelope, Phone, House, CalendarBlank
+  User, Envelope, Phone, House, CalendarBlank,
+  IdentificationCard, CheckCircle, WarningCircle, XCircle // <<< THÊM v12
 } from "@phosphor-icons/react";
 import { getSupabase } from "../lib/supabaseClient";
 import toast from "react-hot-toast";
@@ -93,6 +89,7 @@ const StatCard = ({ title, value, icon, loading }) => (
 );
 // --- Component Lấy Dữ Liệu Thống Kê (Logic v6) ---
 const CustomerStats = () => {
+  // ... (Giữ nguyên code CustomerStats)
   const [stats, setStats] = useState({ total: 0, vip: 0, new: 0, spend: 0 });
   const [loading, setLoading] = useState(true);
 
@@ -171,6 +168,7 @@ const CustomerStats = () => {
 
 // --- (*** ĐÃ SỬA: COMPONENT YÊU CẦU RESET MẬT KHẨU SỬ DỤNG REALTIME ***) ---
 const PasswordResetRequests = () => {
+  // ... (Giữ nguyên code PasswordResetRequests)
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -180,9 +178,8 @@ const PasswordResetRequests = () => {
     try {
       const { data, error } = await supabase
         .from("password_reset_requests")
-        // (SỬA v10) Lấy thêm token và expires_at
         .select("id, email, requested_at, token, expires_at") 
-        .eq("is_resolved", false) // Chỉ lấy các yêu cầu CHƯA giải quyết
+        .eq("is_resolved", false) 
         .order("requested_at", { ascending: true });
       if (error) throw error;
       setRequests(data || []);
@@ -198,30 +195,25 @@ const PasswordResetRequests = () => {
   useEffect(() => {
     fetchRequests(); // Tải lần đầu
 
-    // 1. Khởi tạo Realtime Listener
     const channel = supabase.channel('password_reset_channel')
       .on(
         'postgres_changes',
         { 
-          event: '*', // Lắng nghe mọi sự kiện (INSERT, UPDATE, DELETE)
+          event: '*', 
           schema: 'public', 
           table: 'password_reset_requests' 
         },
-        // Callback khi có sự kiện (tự động gọi lại fetchRequests)
         (payload) => {
           console.log('Realtime update received:', payload.eventType);
-          // Gọi lại hàm fetchRequests để cập nhật giao diện Admin ngay lập tức
           fetchRequests(); 
 
-          // Tùy chọn: Thêm thông báo toast cho sự kiện INSERT mới
           if (payload.eventType === 'INSERT') {
              toast(`🔔 Yêu cầu hỗ trợ mật khẩu mới từ: ${payload.new.email}!`, { duration: 5000 });
           }
         }
       )
-      .subscribe(); // Bắt đầu lắng nghe
+      .subscribe(); 
 
-    // Hủy đăng ký khi component unmount
     return () => {
       supabase.removeChannel(channel);
     };
@@ -230,25 +222,22 @@ const PasswordResetRequests = () => {
   // (SỬA v10): Hàm xử lý Tạo Mã OTP 6 Số
   const handleGenerateResetCode = async (id) => {
     try {
-      // 1. Tạo mã OTP 6 số
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      // 2. Tạo thời gian hết hạn (ví dụ: 10 phút)
       const expires_at = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
-      // 3. Cập nhật mã OTP và thời hạn vào bảng
       const { error: updateError } = await supabase
         .from("password_reset_requests")
         .update({ 
           token: otp, 
           expires_at: expires_at,
-          is_resolved: false // Đảm bảo nó vẫn chưa được giải quyết
+          is_resolved: false 
         })
         .eq("id", id);
         
       if (updateError) throw updateError;
       
       toast.success(`Đã tạo mã OTP: ${otp}. Vui lòng cung cấp mã này cho khách hàng.`);
-      fetchRequests(); // Tải lại danh sách để hiển thị mã
+      fetchRequests(); 
     } catch (err) {
       console.error("Lỗi tạo mã OTP:", err);
       toast.error("Lỗi tạo mã OTP: " + err.message);
@@ -258,7 +247,6 @@ const PasswordResetRequests = () => {
   // (SỬA v10.1): Hàm xử lý Đánh Dấu Đã Giải Quyết (Xóa khỏi danh sách)
   const handleResolveRequest = async (id, email) => {
     try {
-      // 1. Cập nhật 'is_resolved' = true
       const { error } = await supabase
         .from("password_reset_requests")
         .update({ 
@@ -303,7 +291,6 @@ const PasswordResetRequests = () => {
       </h3>
       <div className="space-y-3 max-h-60 overflow-y-auto simple-scrollbar pr-2">
         {requests.map((req) => {
-          // (SỬA v10) Kiểm tra token/hết hạn
           const isExpired = req.expires_at && new Date(req.expires_at) < new Date();
           const hasValidToken = req.token && !isExpired;
 
@@ -319,7 +306,6 @@ const PasswordResetRequests = () => {
                 <span className="block text-sm opacity-90">
                   Yêu cầu lúc: {new Date(req.requested_at).toLocaleString('vi-VN')}
                 </span>
-                {/* (SỬA v10) Hiển thị mã nếu có */}
                 {hasValidToken && (
                   <span className="block text-sm font-bold text-green-200 mt-1">
                     Mã OTP: {req.token} (Hiệu lực đến: {new Date(req.expires_at).toLocaleTimeString('vi-VN')})
@@ -331,18 +317,14 @@ const PasswordResetRequests = () => {
                   </span>
                 )}
               </div>
-
-              {/* (SỬA v10.1) Bọc các nút trong 1 div */}
               <div className="flex items-center gap-2 flex-shrink-0">
                 <button
-                  onClick={() => handleGenerateResetCode(req.id)} // (SỬA v10)
+                  onClick={() => handleGenerateResetCode(req.id)} 
                   className="px-4 py-2 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors shadow-md flex items-center gap-2"
                 >
                   <Sparkle/> 
                   {hasValidToken ? "Tạo Lại Mã" : "Tạo Mã OTP"}
                 </button>
-                
-                {/* (SỬA v10.1) Nút giải quyết/xóa (Đánh dấu is_resolved = true) */}
                 <button
                   onClick={() => handleResolveRequest(req.id, req.email)}
                   title="Đánh dấu là đã giải quyết"
@@ -358,12 +340,11 @@ const PasswordResetRequests = () => {
     </motion.div>
   );
 };
-// --- (*** KẾT THÚC SỬA COMPONENT MỚI v10.1 ***) ---
 
 
 // --- Component Modal Xem Chi Tiết Đơn Hàng ---
 const CustomerBookingsModal = ({ customer, onClose }) => {
-// ... (Giữ nguyên logic)
+  // ... (Giữ nguyên code CustomerBookingsModal)
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -408,7 +389,6 @@ const CustomerBookingsModal = ({ customer, onClose }) => {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
-      {/* === (SỬA UI) Thêm viền màu === */}
       <motion.div
         className="bg-white dark:bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 p-8 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-gray-200 dark:border-slate-700 border-t-4 border-sky-500"
         initial={{ opacity: 0, scale: 0.95 }}
@@ -419,7 +399,6 @@ const CustomerBookingsModal = ({ customer, onClose }) => {
         <div className="flex justify-between items-center mb-6 pb-6 border-b dark:border-slate-700">
           <h3 className="text-2xl font-bold flex items-center gap-3">
             <Receipt size={30} className="text-sky-600 dark:text-sky-400" />
-            {/* (SỬA v11) Thêm customer_code vào tiêu đề Modal */}
             <span>Đơn hàng của: <span className="text-sky-600 dark:text-sky-400">{customer.full_name || customer.email}</span>
               {customer.customer_code && (
                 <span className="text-base font-medium text-gray-500 dark:text-gray-400 ml-2">({customer.customer_code})</span>
@@ -472,6 +451,199 @@ const CustomerBookingsModal = ({ customer, onClose }) => {
     </motion.div>
   );
 };
+
+// --- (*** THÊM v12: MODAL XÁC THỰC CMND/CCCD ***) ---
+const IdentityModal = ({ customer, onClose, onSuccess }) => {
+    const [identity, setIdentity] = useState(null);
+    const [formData, setFormData] = useState({ id_number: '', full_name: '', dob: '', issue_date: '', issue_place: '' });
+    const [frontImageUrl, setFrontImageUrl] = useState(null);
+    const [backImageUrl, setBackImageUrl] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Hàm tạo Signed URL
+    const createSignedUrl = async (filePath) => {
+        if (!filePath) return null;
+        try {
+            const { data, error } = await supabase.storage
+                .from('id-scans')
+                .createSignedUrl(filePath, 3600); // Hợp lệ trong 1 giờ
+            if (error) throw error;
+            return data.signedUrl;
+        } catch (error) {
+            console.error('Lỗi tạo signed URL:', error);
+            return null;
+        }
+    };
+
+    // Fetch dữ liệu và tạo signed URLs
+    useEffect(() => {
+        const fetchIdentityData = async () => {
+            if (!customer) return;
+            setLoading(true);
+            try {
+                // 1. Fetch bản ghi identity
+                const { data, error } = await supabase
+                    .from('user_identity')
+                    .select('*')
+                    .eq('id', customer.id)
+                    .single();
+                
+                if (error && error.code !== 'PGRST116') throw error; // Bỏ qua lỗi "không tìm thấy"
+
+                if (data) {
+                    setIdentity(data);
+                    setFormData({
+                        id_number: data.id_number || '',
+                        full_name: data.full_name || customer.full_name || '',
+                        dob: data.dob ? data.dob.split('T')[0] : (customer.ngay_sinh ? customer.ngay_sinh.split('T')[0] : ''),
+                        issue_date: data.issue_date ? data.issue_date.split('T')[0] : '',
+                        issue_place: data.issue_place || '',
+                    });
+
+                    // 2. Tạo Signed URLs
+                    const [frontUrl, backUrl] = await Promise.all([
+                        createSignedUrl(data.front_image_url),
+                        createSignedUrl(data.back_image_url)
+                    ]);
+                    setFrontImageUrl(frontUrl);
+                    setBackImageUrl(backUrl);
+                }
+            } catch (err) {
+                console.error("Lỗi fetch identity:", err);
+                toast.error("Không thể tải thông tin xác thực.");
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchIdentityData();
+    }, [customer]);
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    // Xử lý Duyệt / Từ chối
+    const handleDecision = async (decision) => {
+        setIsSaving(true);
+        try {
+            let updates = { status: decision };
+            
+            // Nếu "Duyệt", lưu cả thông tin admin đã nhập
+            if (decision === 'approved') {
+                if (!formData.id_number || !formData.full_name || !formData.dob) {
+                    throw new Error("Phải nhập Số CMND, Họ Tên và Ngày sinh trước khi duyệt.");
+                }
+                updates = { ...updates, ...formData };
+            }
+
+            const { error } = await supabase
+                .from('user_identity')
+                .update(updates)
+                .eq('id', customer.id);
+            
+            if (error) throw error;
+
+            toast.success(`Đã ${decision === 'approved' ? 'Duyệt' : 'Từ chối'} hồ sơ.`);
+            onSuccess(); // Gọi hàm refresh bảng
+            onClose();
+
+        } catch (error) {
+            toast.error(`Lỗi: ${error.message}`);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <motion.div
+            className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex justify-center items-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+        >
+            <motion.div
+                className="bg-white dark:bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-gray-200 dark:border-slate-700 border-t-4 border-violet-500"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+            >
+                <div className="flex justify-between items-center mb-6 p-6 border-b dark:border-slate-700">
+                    <h3 className="text-2xl font-bold flex items-center gap-3">
+                        <IdentificationCard size={30} className="text-violet-600 dark:text-violet-400" />
+                        <span>Duyệt Thông Tin Xác Thực</span>
+                    </h3>
+                    <button onClick={onClose} disabled={isSaving} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                        <X size={24} weight="bold" />
+                    </button>
+                </div>
+                
+                <div className="overflow-y-auto px-6 pb-6 simple-scrollbar">
+                    {loading && ( <div className="flex justify-center items-center p-20"> <CircleNotch size={40} className="animate-spin text-violet-500" /> </div> )}
+                    
+                    {!loading && !identity && ( <p className="text-center text-gray-500 p-20 italic text-lg">Khách hàng này chưa gửi thông tin xác thực.</p> )}
+                    
+                    {!loading && identity && (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Cột 1: Ảnh Scan */}
+                            <div className="space-y-4">
+                                <h4 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Ảnh Scan</h4>
+                                <div className="space-y-3">
+                                    <label className="text-sm font-medium dark:text-gray-400">Mặt trước</label>
+                                    {frontImageUrl ? (
+                                        <a href={frontImageUrl} target="_blank" rel="noopener noreferrer"><img src={frontImageUrl} alt="Mặt trước CMND" className="w-full rounded-lg border dark:border-slate-600" /></a>
+                                    ) : (<p className="text-sm italic text-gray-500">Chưa tải lên</p>)}
+                                </div>
+                                <div className="space-y-3">
+                                    <label className="text-sm font-medium dark:text-gray-400">Mặt sau</label>
+                                    {backImageUrl ? (
+                                        <a href={backImageUrl} target="_blank" rel="noopener noreferrer"><img src={backImageUrl} alt="Mặt sau CMND" className="w-full rounded-lg border dark:border-slate-600" /></a>
+                                    ) : (<p className="text-sm italic text-gray-500">Chưa tải lên</p>)}
+                                </div>
+                            </div>
+
+                            {/* Cột 2: Form Nhập liệu của Admin */}
+                            <div className="space-y-4">
+                                <h4 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Thông tin (Admin nhập)</h4>
+                                <InputWrapper label="Số CMND/CCCD" icon={<IdentificationCard size={18} className="mr-2" />}>
+                                    <input type="text" name="id_number" value={formData.id_number} onChange={handleChange} className="form-input-style" placeholder="Nhập số từ ảnh..." />
+                                </InputWrapper>
+                                <InputWrapper label="Họ và Tên" icon={<User size={18} className="mr-2" />}>
+                                    <input type="text" name="full_name" value={formData.full_name} onChange={handleChange} className="form-input-style" placeholder="Nhập tên từ ảnh..." />
+                                </InputWrapper>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <InputWrapper label="Ngày sinh" icon={<CalendarBlank size={18} className="mr-2" />}>
+                                        <input type="date" name="dob" value={formData.dob} onChange={handleChange} className="form-input-style" />
+                                    </InputWrapper>
+                                    <InputWrapper label="Ngày cấp" icon={<CalendarBlank size={18} className="mr-2" />}>
+                                        <input type="date" name="issue_date" value={formData.issue_date} onChange={handleChange} className="form-input-style" />
+                                    </InputWrapper>
+                                </div>
+                                <InputWrapper label="Nơi cấp" icon={<House size={18} className="mr-2" />}>
+                                    <input type="text" name="issue_place" value={formData.issue_place} onChange={handleChange} className="form-input-style" placeholder="Nhập nơi cấp từ ảnh..." />
+                                </InputWrapper>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {!loading && identity && (
+                    <div className="p-6 flex justify-end gap-4 border-t dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 rounded-b-2xl">
+                        <button type="button" onClick={() => handleDecision('rejected')} disabled={isSaving} className="modal-button-danger min-w-[120px]">
+                            {isSaving ? <CircleNotch className="animate-spin" /> : 'Từ chối'}
+                        </button>
+                        <button type="button" onClick={() => handleDecision('approved')} disabled={isSaving} className="modal-button-primary min-w-[120px]">
+                            {isSaving ? <CircleNotch className="animate-spin" /> : 'Duyệt Hồ Sơ'}
+                        </button>
+                    </div>
+                )}
+            </motion.div>
+        </motion.div>
+    );
+};
+// --- (*** KẾT THÚC v12 ***) ---
 
 // --- (*** FIX v7.7 ***) Component InputWrapper (Đã di chuyển ra ngoài) ---
 const InputWrapper = ({ label, icon, children }) => (
@@ -559,7 +731,6 @@ const FormModal = ({ title, onClose, children }) => (
     animate={{ opacity: 1 }}
     exit={{ opacity: 0 }}
   >
-    {/* === (SỬA UI) Thêm viền màu === */}
     <motion.div
       className="bg-white dark:bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 p-8 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col border border-gray-200 dark:border-slate-700 border-t-4 border-sky-500"
       initial={{ opacity: 0, scale: 0.95 }}
@@ -598,38 +769,46 @@ export default function ManageCustomersSupabase() {
   const [editingCustomer, setEditingCustomer] = useState(null); 
   
   const [viewingBookingsCustomer, setViewingBookingsCustomer] = useState(null);
+  const [viewingIdentity, setViewingIdentity] = useState(null); // <<< THÊM v12
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
-  // --- Fetch customers (SỬA v11) ---
+  // --- (SỬA v12) Fetch customers (Join user_identity) ---
   const fetchCustomers = useCallback(async (isInitialLoad = false) => {
     if (!isInitialLoad) setIsFetchingPage(true);
     setError(null);
     try {
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
+      
       let countQuery = supabase.from("Users").select("id", { count: "exact", head: true }).eq("role", "user");
-      // (SỬA v11) Thêm customer_code vào select
-      let dataQuery = supabase.from("Users").select("*, customer_tier, ngay_sinh, customer_code").eq("role", "user");
+      
+      // (SỬA v12) Thêm join với user_identity (lấy id và status)
+      let dataQuery = supabase.from("Users")
+          .select("*, customer_tier, ngay_sinh, customer_code, user_identity(id, status)")
+          .eq("role", "user");
       
       if (debouncedSearch.trim() !== "") {
         const searchTerm = `%${debouncedSearch.trim()}%`;
-        // (SỬA v11) Thêm customer_code vào tìm kiếm
         const searchQuery = `customer_code.ilike.${searchTerm},full_name.ilike.${searchTerm},email.ilike.${searchTerm},address.ilike.${searchTerm},phone_number.ilike.${searchTerm}`;
         countQuery = countQuery.or(searchQuery);
         dataQuery = dataQuery.or(searchQuery);
       }
       
       dataQuery = dataQuery.order("full_name", { ascending: true }).range(from, to);
+      
       const { count, error: countError } = await countQuery;
       if (countError) throw countError;
+      
       const { data: usersData, error: usersError } = await dataQuery;
       if (usersError) throw usersError;
+      
       if (!usersData || usersData.length === 0) {
         setCustomers([]); setTotalItems(count || 0);
         if (!isInitialLoad && count > 0 && currentPage > 1) { setCurrentPage(1); }
         return;
       }
+      
       const userIds = usersData.map((u) => u.id);
       const { data: bookingsData } = await supabase.from("Bookings").select("user_id, total_price").in("user_id", userIds).eq("status", "confirmed");
       const statsMap = (bookingsData || []).reduce((acc, booking) => {
@@ -639,6 +818,7 @@ export default function ManageCustomersSupabase() {
         acc[userId].total_spend += booking.total_price || 0;
         return acc;
       }, {});
+      
       const combinedData = usersData.map((user) => {
         const order_count = statsMap[user.id]?.order_count || 0;
         const total_spend = statsMap[user.id]?.total_spend || 0;
@@ -650,8 +830,20 @@ export default function ManageCustomersSupabase() {
         } else if (order_count > 2) {
             dynamic_tier = 'Thường xuyên';
         }
-        return { ...user, order_count: order_count, total_spend: total_spend, customer_tier: dynamic_tier, ngay_sinh: user.ngay_sinh ? user.ngay_sinh.split('T')[0] : '', };
+        
+        // (SỬA v12) Xử lý user_identity: nó là một mảng (do join), ta chỉ cần phần tử đầu tiên (hoặc null)
+        const identity = Array.isArray(user.user_identity) ? user.user_identity[0] : user.user_identity;
+
+        return { 
+            ...user, 
+            user_identity: identity, // Ghi đè lại thành object hoặc null
+            order_count: order_count, 
+            total_spend: total_spend, 
+            customer_tier: dynamic_tier, 
+            ngay_sinh: user.ngay_sinh ? user.ngay_sinh.split('T')[0] : '', 
+        };
       });
+      
       setCustomers(combinedData);
       setTotalItems(count || 0);
     } catch (err) {
@@ -662,6 +854,7 @@ export default function ManageCustomersSupabase() {
       setIsFetchingPage(false);
     }
   }, [currentPage, debouncedSearch]);
+  // --- KẾT THÚC SỬA v12 ---
 
   useEffect(() => {
     const isInitial = customers.length === 0 && loading;
@@ -718,6 +911,7 @@ export default function ManageCustomersSupabase() {
   const handleCloseAddModal = useCallback(() => { setIsAddingCustomer(false); }, []);
   const handleCloseEditModal = useCallback(() => { setEditingCustomer(null); }, []);
   const handleCloseBookingsModal = useCallback(() => { setViewingBookingsCustomer(null); }, []);
+  const handleCloseIdentityModal = useCallback(() => { setViewingIdentity(null); }, []); // <<< THÊM v12
 
   // --- Delete Handlers (Bọc useCallback) ---
   const openDeleteConfirm = useCallback((c) => { setSelectedCustomer(c); setShowDeleteConfirm(true); }, []);
@@ -725,6 +919,8 @@ export default function ManageCustomersSupabase() {
   const handleDelete = useCallback(async () => {
     if (!selectedCustomer) return;
     try {
+      // (SỬA v12) Sửa: Lỗi này chỉ xóa hồ sơ, không xóa auth. 
+      // (Ghi chú: Giữ nguyên logic cũ theo yêu cầu, chỉ xóa hồ sơ Users, không xóa auth)
       const { error } = await supabase.from("Users").delete().eq("id", selectedCustomer.id);
       if (error) throw error;
       toast.success(`Đã xóa hồ sơ "${selectedCustomer.full_name || selectedCustomer.email}"!`);
@@ -814,11 +1010,12 @@ export default function ManageCustomersSupabase() {
                 <th className="th-style">Mã KH</th>
                 <th className="th-style">Họ và tên</th>
                 <th className="th-style">Liên hệ</th>
-                <th className="th-style">Địa chỉ</th>
                 <th className="th-style">Ngày sinh</th>
                 <th className="th-style text-center">Đơn</th>
                 <th className="th-style text-right">Tổng chi</th>
                 <th className="th-style text-center">Loại (Tự động)</th>
+                {/* (SỬA v12) Thêm cột Xác thực */}
+                <th className="th-style text-center">Xác thực</th>
                 <th className="th-style text-center">Thao tác</th>
               </tr>
             </thead>
@@ -828,11 +1025,11 @@ export default function ManageCustomersSupabase() {
               animate="visible"
               variants={{ visible: { transition: { staggerChildren: 0.05 } } }}
             >
-              {/* (SỬA v11) Sửa colSpan="9" */}
+              {/* (SỬA v12) Sửa colSpan="9" */}
               {error && !isFetchingPage && ( <tr><td colSpan="9" className="p-10 text-center text-red-500">{error}</td></tr> )}
               {!error && !loading && !isFetchingPage && customers.length === 0 && ( 
                 <tr>
-                  {/* (SỬA v11) Sửa colSpan="9" */}
+                  {/* (SỬA v12) Sửa colSpan="9" */}
                   <td colSpan="9" className="p-16 text-center text-gray-500">
                     <UserList size={48} className="mx-auto text-gray-400" />
                     <span className="mt-4 text-lg font-medium">{debouncedSearch ? "Không tìm thấy khách hàng." : "Chưa có dữ liệu."}</span>
@@ -842,6 +1039,20 @@ export default function ManageCustomersSupabase() {
               
               {!error && customers.map((c) => {
                 const tierStyle = getCustomerTierStyle(c.customer_tier); 
+                
+                // (SỬA v12) Lấy thông tin xác thực
+                const identityStatus = c.user_identity?.status;
+                let statusBadge;
+                if (identityStatus === 'approved') {
+                    statusBadge = <span className="badge-status-pro bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"><CheckCircle size={14} weight="bold"/>Đã xác thực</span>;
+                } else if (identityStatus === 'pending') {
+                    statusBadge = <span className="badge-status-pro bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300"><WarningCircle size={14} weight="bold"/>Chờ duyệt</span>;
+                } else if (identityStatus === 'rejected') {
+                    statusBadge = <span className="badge-status-pro bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"><XCircle size={14} weight="bold"/>Bị từ chối</span>;
+                } else {
+                    statusBadge = <span className="badge-status-pro bg-gray-100 dark:bg-gray-700/30 text-gray-600 dark:text-gray-300"><XCircle size={14} weight="bold"/>Chưa gửi</span>;
+                }
+
                 return (
                   <motion.tr
                     key={c.id}
@@ -862,9 +1073,6 @@ export default function ManageCustomersSupabase() {
                         <span className="text-sm text-gray-500 dark:text-gray-400">{c.phone_number || "..."}</span>
                       </div>
                     </td>
-                    <td className="td-style max-w-sm">
-                      <span className="truncate block text-sm">{c.address || <span className="italic text-gray-400">...</span>}</span>
-                    </td>
                     <td className="td-style">
                       <span className="text-sm whitespace-nowrap">
                         {c.ngay_sinh ? new Date(c.ngay_sinh).toLocaleDateString('vi-VN') : <span className="italic text-gray-400">...</span>}
@@ -879,12 +1087,17 @@ export default function ManageCustomersSupabase() {
                         {c.customer_tier}
                       </span>
                     </td>
-                    <td className="td-style text-center whitespace-nowrap space-x-2">
-                        {/* (Ghi chú: Các nút này đã có sẵn hover màu từ v11) */}
+                    {/* (SỬA v12) Thêm ô Xác thực */}
+                    <td className="td-style text-center">
+                        {statusBadge}
+                    </td>
+                    <td className="td-style text-center whitespace-nowrap space-x-1">
                         <>
                           <button onClick={() => setViewingBookingsCustomer(c)} disabled={isFetchingPage || !!editingCustomer || isAddingCustomer} className="action-button text-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/30" title="Xem các đơn hàng"><List size={20} weight="bold" /></button>
+                          {/* (SỬA v12) Thêm nút xem CMND */}
+                          <button onClick={() => setViewingIdentity(c)} disabled={isFetchingPage || !!editingCustomer || isAddingCustomer || !c.user_identity} className="action-button text-violet-500 hover:bg-violet-100 dark:hover:bg-violet-900/30 disabled:opacity-30" title="Xem Xác thực CMND"><IdentificationCard size={20} weight="bold" /></button>
                           <button onClick={() => setEditingCustomer(c)} disabled={isFetchingPage || !!editingCustomer || isAddingCustomer} className="action-button text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa thông tin"><PencilSimple size={20} weight="bold" /></button>
-                          <button onClick={() => openDeleteConfirm(c)} disabled={isFetchingPage || !!editingCustomer || isAddingCustomer} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/3D" title="Xóa hồ sơ"><FaTrash size={18} /></button>
+                          <button onClick={() => openDeleteConfirm(c)} disabled={isFetchingPage || !!editingCustomer || isAddingCustomer} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa hồ sơ"><FaTrash size={18} /></button>
                         </>
                     </td>
                   </motion.tr>
@@ -917,10 +1130,23 @@ export default function ManageCustomersSupabase() {
           />
         )}
       </AnimatePresence>
+      
+      {/* <<< THÊM v12: Modal Xác thực CMND >>> */}
+      <AnimatePresence>
+        {viewingIdentity && (
+            <IdentityModal
+                customer={viewingIdentity}
+                onClose={handleCloseIdentityModal}
+                onSuccess={() => {
+                    fetchCustomers(false); // Refresh lại bảng
+                }}
+            />
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {showDeleteConfirm && selectedCustomer && (
           <motion.div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex justify-center items-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            {/* === (SỬA UI) Thêm viền màu (danger) === */}
             <motion.div 
               className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border border-gray-200 dark:border-slate-700 border-t-4 border-red-500"
               initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
@@ -928,7 +1154,6 @@ export default function ManageCustomersSupabase() {
               <h4 className="text-xl font-bold text-red-600 dark:text-red-500 mb-4"> Xác nhận xóa hồ sơ </h4>
               <p className="mb-8 text-base text-gray-700 dark:text-gray-300">
                 Bạn có chắc muốn xóa hồ sơ của{" "} 
-                {/* (SỬA v11) Thêm customer_code vào xác nhận xóa */}
                 <b className="text-gray-900 dark:text-white">{selectedCustomer.full_name || selectedCustomer.email} ({selectedCustomer.customer_code})</b>?
                 <br/>
                 <span className="text-sm font-medium text-orange-600 dark:text-orange-400">(Hành động này không xóa tài khoản đăng nhập.)</span>
@@ -987,6 +1212,11 @@ export default function ManageCustomersSupabase() {
         .simple-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .simple-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
         .dark .simple-scrollbar::-webkit-scrollbar-thumb { background: #4b5563; }
+        
+        /* (SỬA v12) Thêm style cho badge xác thực */
+        .badge-status-pro {
+            @apply px-3 py-1 text-xs font-semibold rounded-md inline-flex items-center gap-1.5;
+        }
       `}</style>
     </motion.div>
   );

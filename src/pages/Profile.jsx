@@ -1,11 +1,13 @@
 // src/pages/Profile.jsx
-// (NÂNG CẤP v22) "ĐỈNH NÓC ULTRA" - Nâng cấp giao diện inputs giống như trong Login.jsx
-// 1. Thay đổi cấu trúc InputGroup để icon absolute bên trong input
-// 2. Áp dụng style input-field tương tự Login: bg rgba(255,255,255,0.1), border rgba(255,255,255,0.3), padding-left 2.75rem, etc.
-// 3. Update content panel: bg-white/10 backdrop-blur-xl border white/20 rounded-3xl
-// 4. Điều chỉnh colors cho dark mode, giữ gradients và icons đa sắc
-// 5. Update toggle eye cho passwords giống Login
-// 6. Update upload labels để giống input-field style
+// (SỬA THEO YÊU CẦU) NÂNG CẤP v23 (Bỏ Tự Nhập CMND)
+// 1. Ghi chú: Chức năng "Tự động Scan" (OCR) là một công nghệ AI backend
+//    phức tạp, không thể thực hiện chỉ bằng React.
+// 2. (Thực hiện) Xóa các trường tự nhập (id_number, full_name, dob...)
+//    khỏi form `IdentityForm`.
+// 3. (Thực hiện) `IdentityForm` giờ CHỈ CÓ 2 nút Upload ảnh.
+// 4. (Thực hiện) `handleSubmit` chỉ upload ảnh và set status 'pending'.
+// 5. (Thực hiện) Chế độ View (`!isEditing`) chỉ hiển thị trạng thái (Chờ, Duyệt, Từ chối).
+// 6. (Giữ nguyên) Giữ toàn bộ giao diện v22 "bo góc mượt mà".
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -15,7 +17,7 @@ import toast from 'react-hot-toast';
 import { 
     User, Envelope, Phone, House, CalendarBlank, Key, IdentificationCard, 
     UploadSimple, CircleNotch, PaperPlaneRight, Lock, Eye, EyeSlash, CheckCircle, 
-    WarningCircle, ShieldCheck, FileArrowUp, XCircle, Info, Sparkle, Palette // Thêm icon mới
+    WarningCircle, ShieldCheck, FileArrowUp, XCircle, Info, Sparkle, Palette 
 } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -128,6 +130,7 @@ const ProfileInfoForm = ({ user, onProfileUpdate }) => {
 // --- (v22) Component con: Đổi Mật khẩu ---
 // (v22) Update inputs và toggle eye giống Login
 const ChangePasswordForm = ({ user }) => {
+    // ... (Giữ nguyên code ChangePasswordForm)
     const [isOtpSent, setIsOtpSent] = useState(false);
     const [form, setForm] = useState({ otp: '', password: '', confirm: '' });
     const [loading, setLoading] = useState(false);
@@ -272,17 +275,15 @@ const ChangePasswordForm = ({ user }) => {
     );
 };
 
-// --- (v22) Component con: Xác thực CMND/CCCD ---
-// (v22) Update inputs giống Login, update upload để giống input-field
+// --- (v23) Component con: Xác thực CMND/CCCD (ĐÃ SỬA) ---
+// (v23) Xóa các trường tự nhập. Chỉ giữ lại Upload ảnh.
 const IdentityForm = ({ user }) => {
     const [identity, setIdentity] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
 
-    const [formData, setFormData] = useState({
-        id_number: '', full_name: '', dob: '', issue_date: '', issue_place: ''
-    });
+    // (SỬA v23) Xóa state formData
     const [frontImage, setFrontImage] = useState(null);
     const [backImage, setBackImage] = useState(null);
     
@@ -298,24 +299,10 @@ const IdentityForm = ({ user }) => {
             
             if (data) {
                 setIdentity(data);
-                setFormData({
-                    id_number: data.id_number || '',
-                    full_name: data.full_name || user.full_name || '',
-                    dob: data.dob ? data.dob.split('T')[0] : (user.ngay_sinh ? user.ngay_sinh.split('T')[0] : ''),
-                    issue_date: data.issue_date ? data.issue_date.split('T')[0] : '',
-                    issue_place: data.issue_place || '',
-                });
                 setIsEditing(false); // Bắt đầu ở chế độ xem
             } else {
                 setIdentity(null);
-                setFormData({
-                    id_number: '', 
-                    full_name: user.full_name || '', 
-                    dob: user.ngay_sinh ? user.ngay_sinh.split('T')[0] : '', 
-                    issue_date: '', 
-                    issue_place: ''
-                });
-                setIsEditing(true); 
+                setIsEditing(true); // Nếu chưa có, mở form chỉnh sửa (upload)
             }
             if (error && error.code !== 'PGRST116') throw error;
         } catch (error) {
@@ -337,6 +324,7 @@ const IdentityForm = ({ user }) => {
         }
     };
 
+    // (Giữ nguyên) Hàm Upload
     const uploadFile = async (file, type) => {
         if (!file) return null;
         
@@ -350,37 +338,41 @@ const IdentityForm = ({ user }) => {
 
         if (uploadError) throw uploadError;
         
-        // Trả về đường dẫn để lưu vào DB (dùng để tạo signedURL sau)
         return filePath;
     };
 
+    // (SỬA v23) handleSubmit đã được đơn giản hóa
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        if (!frontImage || !backImage) {
+            toast.error("Vui lòng tải lên cả ảnh mặt trước và mặt sau.");
+            return;
+        }
+        
         setIsUploading(true);
         try {
-            // 1. Upload ảnh (nếu có)
-            let front_image_url = identity?.front_image_url || null;
-            if (frontImage) {
-                front_image_url = await uploadFile(frontImage, 'front');
-            }
+            // 1. Upload ảnh
+            const front_image_url = await uploadFile(frontImage, 'front');
+            const back_image_url = await uploadFile(backImage, 'back');
 
-            let back_image_url = identity?.back_image_url || null;
-            if (backImage) {
-                back_image_url = await uploadFile(backImage, 'back');
-            }
-            
             const updates = {
-                ...formData,
                 id: user.id,
                 status: 'pending', // Luôn đặt là pending khi cập nhật
                 front_image_url: front_image_url,
                 back_image_url: back_image_url,
+                // (SỬA v23) Xóa các trường tự nhập, admin sẽ điền sau
+                id_number: null,
+                full_name: null,
+                dob: null,
+                issue_date: null,
+                issue_place: null,
             };
 
             // 2. Upsert (Insert hoặc Update) thông tin
             const { error } = await supabase
                 .from('user_identity')
-                .upsert(updates, { onConflict: 'id' });
+                .upsert(updates, { onConflict: 'id', ignoreDuplicates: false, defaultToNull: false });
             
             if (error) throw error;
 
@@ -388,7 +380,7 @@ const IdentityForm = ({ user }) => {
             setFrontImage(null);
             setBackImage(null);
             fetchIdentity(); // Tải lại dữ liệu
-            setIsEditing(false);
+            setIsEditing(false); // Quay về chế độ View
 
         } catch (error) {
             toast.error(`Lỗi gửi thông tin: ${error.message}`);
@@ -401,7 +393,8 @@ const IdentityForm = ({ user }) => {
         return <div className="flex justify-center mt-10"><CircleNotch size={32} className="animate-spin text-sky-500" /></div>;
     }
 
-    // (v22) Giao diện khi đã gửi và đang chờ duyệt
+    // (SỬA v23) Giao diện khi đã gửi (chế độ View)
+    // Đã xóa phần hiển thị text (số cmnd, tên...) vì user không nhập
     if (identity && !isEditing) {
         let statusBadge;
         switch (identity.status) {
@@ -434,9 +427,11 @@ const IdentityForm = ({ user }) => {
                 </h3>
                 <div className="bg-gradient-to-br from-slate-50 to-violet-50 dark:from-slate-800/60 to-violet-900/30 p-5 rounded-2xl border dark:border-slate-700 space-y-3">
                     {statusBadge}
-                    <p className="text-sm text-slate-600 dark:text-slate-300 pt-2"><strong>Số CMND/CCCD:</strong> {identity.id_number}</p>
-                    <p className="text-sm text-slate-600 dark:text-slate-300"><strong>Họ và tên:</strong> {identity.full_name}</p>
-                    <p className="text-sm text-slate-600 dark:text-slate-300"><strong>Ngày sinh:</strong> {new Date(identity.dob).toLocaleDateString('vi-VN')}</p>
+                    
+                    {/* (SỬA v23) Xóa hiển thị thông tin chi tiết */}
+                    <p className="text-sm text-slate-600 dark:text-slate-300 pt-2">
+                        Trạng thái hồ sơ của bạn. Bạn có thể gửi lại thông tin nếu bị từ chối hoặc cần cập nhật.
+                    </p>
                     
                     <motion.button 
                         onClick={() => setIsEditing(true)}
@@ -450,45 +445,27 @@ const IdentityForm = ({ user }) => {
         );
     }
 
-    // (v22) Giao diện Form với inputs mới
+    // (SỬA v23) Giao diện Form (chỉ còn Upload)
     return (
         <form onSubmit={handleSubmit} className="space-y-5">
             <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
                 <Palette size={24} className="text-violet-600" /> {identity ? 'Cập nhật Thông tin Xác thực' : 'Bổ sung Thông tin Xác thực (CMND/CCCD)'}
             </h3>
             
-            <InputGroup label="Số CMND/CCCD">
-                <IdentificationCard className="input-icon text-lime-600" size={18} />
-                <input type="text" name="id_number" value={formData.id_number} onChange={(e) => setFormData({...formData, id_number: e.target.value})} className="input-field" required />
-            </InputGroup>
+            <p className="text-sm text-slate-600 dark:text-slate-300 -mt-2">
+                Vui lòng tải lên ảnh scan 2 mặt CMND/CCCD của bạn. Admin sẽ xem xét và điền thông tin giúp bạn.
+            </p>
 
-            <InputGroup label="Họ và Tên (Trên CMND)">
-                <User className="input-icon text-fuchsia-600" size={18} />
-                <input type="text" name="full_name" value={formData.full_name} onChange={(e) => setFormData({...formData, full_name: e.target.value})} className="input-field" required />
-            </InputGroup>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <InputGroup label="Ngày sinh (Trên CMND)">
-                    <CalendarBlank className="input-icon text-amber-600" size={18} />
-                    <input type="date" name="dob" value={formData.dob} onChange={(e) => setFormData({...formData, dob: e.target.value})} className="input-field" required />
-                </InputGroup>
-                <InputGroup label="Ngày cấp">
-                    <CalendarBlank className="input-icon text-rose-600" size={18} />
-                    <input type="date" name="issue_date" value={formData.issue_date} onChange={(e) => setFormData({...formData, issue_date: e.target.value})} className="input-field" required />
-                </InputGroup>
-            </div>
-
-            <InputGroup label="Nơi cấp">
-                <House className="input-icon text-indigo-600" size={18} />
-                <input type="text" name="issue_place" value={formData.issue_place} onChange={(e) => setFormData({...formData, issue_place: e.target.value})} className="input-field" required />
-            </InputGroup>
+            {/* (SỬA v23) Xóa các trường tự nhập */}
 
             {/* (v22) Upload Ảnh giống input-field */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <InputGroup label="Ảnh Scan Mặt trước CMND/CCCD">
                     <label htmlFor="front-image-upload" className="input-file-label-pro relative flex items-center gap-2 cursor-pointer">
                         <FileArrowUp className="input-icon text-sky-600" size={18} />
-                        <span className="w-full input-field flex items-center">{frontImage ? frontImage.name : 'Nhấp để tải lên'}</span>
+                        <span className="w-full input-field flex items-center truncate">
+                            {frontImage ? frontImage.name : 'Nhấp để tải lên'}
+                        </span>
                     </label>
                     <input id="front-image-upload" type="file" onChange={(e) => handleFileChange(e, 'front')} className="hidden" accept="image/*" />
                 </InputGroup>
@@ -496,7 +473,9 @@ const IdentityForm = ({ user }) => {
                 <InputGroup label="Ảnh Scan Mặt sau CMND/CCCD">
                     <label htmlFor="back-image-upload" className="input-file-label-pro relative flex items-center gap-2 cursor-pointer">
                         <FileArrowUp className="input-icon text-pink-600" size={18} />
-                        <span className="w-full input-field flex items-center">{backImage ? backImage.name : 'Nhấp để tải lên'}</span>
+                        <span className="w-full input-field flex items-center truncate">
+                            {backImage ? backImage.name : 'Nhấp để tải lên'}
+                        </span>
                     </label>
                     <input id="back-image-upload" type="file" onChange={(e) => handleFileChange(e, 'back')} className="hidden" accept="image/*" />
                 </InputGroup>
@@ -673,19 +652,34 @@ export default function Profile() {
                 .label-style { @apply block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5; }
                 
                 .input-field { 
-                    @apply w-full pl-11 py-3 border border-white/30 rounded-xl bg-white/10 dark:bg-slate-800/10 text-slate-800 dark:text-white 
-                           focus:border-sky-400 focus:bg-white/15 dark:focus:bg-slate-900/15 focus:ring-0 outline-none transition text-sm disabled:opacity-60 disabled:cursor-not-allowed backdrop-blur-sm;
+                    @apply w-full pl-11 py-3 border border-white/30 dark:border-slate-700/50 rounded-xl bg-white/10 dark:bg-slate-800/30 text-slate-800 dark:text-white 
+                           focus:border-sky-400 focus:bg-white/15 dark:focus:bg-slate-900/30 focus:ring-0 outline-none transition text-sm disabled:opacity-60 disabled:cursor-not-allowed backdrop-blur-sm;
                 }
                 .input-field::placeholder {
                     @apply text-slate-400 dark:text-slate-500;
                 }
                 
+                /* (v22) Sửa lại cho khớp v22 */
+                input[type="date"].input-field {
+                    position: relative;
+                    color-scheme: dark;
+                }
+                input[type="date"].input-field::-webkit-datetime-edit-text,
+                input[type="date"].input-field::-webkit-datetime-edit-month-field,
+                input[type="date"].input-field::-webkit-datetime-edit-day-field,
+                input[type="date"].input-field::-webkit-datetime-edit-year-field {
+                   color: rgba(255, 255, 255, 0.6);
+                }
+                input[type="date"].input-field:valid {
+                   color: #FFFFFF;
+                }
+
                 .input-icon {
-                    @apply absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 pointer-events-none;
+                    @apply absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 pointer-events-none z-10;
                 }
                 
                 .password-toggle-btn {
-                    @apply absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300 transition-colors;
+                    @apply absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300 transition-colors z-10;
                 }
 
                 /* (v22) Nút Tab Sidebar */
@@ -696,19 +690,26 @@ export default function Profile() {
                            transition-colors duration-200;
                 }
                 .tab-button-active {
-                    @apply bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-400 font-semibold;
+                    @apply bg-white dark:bg-slate-700/50 text-sky-700 dark:text-sky-400 font-semibold shadow-sm;
                 }
 
                 /* (v22) Trạng thái xác thực (Badge) */
                 .badge-status-pro {
-                    @apply px-4 py-2 text-sm font-semibold rounded-2xl inline-flex items-center gap-2;
+                    @apply px-4 py-2 text-sm font-semibold rounded-2xl inline-flex items-center gap-2 border border-black/5 dark:border-white/5;
                 }
 
                 /* (v22) Upload "Giống input-field" */
                 .input-file-label-pro {
-                    @apply flex items-center justify-start gap-2 w-full py-3 pl-11 pr-3 border border-white/30 rounded-xl bg-white/10 dark:bg-slate-800/10 text-slate-800 dark:text-white 
-                           hover:border-sky-400 hover:bg-white/15 dark:hover:bg-slate-900/15 transition-all duration-300 cursor-pointer backdrop-blur-sm;
+                    @apply flex items-center justify-start gap-2 w-full py-3 pl-11 pr-3 border border-white/30 dark:border-slate-700/50 rounded-xl bg-white/10 dark:bg-slate-800/30 text-slate-500 dark:text-slate-400 
+                           hover:border-sky-400 hover:bg-white/15 dark:hover:bg-slate-900/30 transition-all duration-300 cursor-pointer backdrop-blur-sm;
                 }
+                .input-file-label-pro .input-field {
+                    @apply border-none bg-transparent p-0 m-0 backdrop-blur-none;
+                }
+                .input-file-label-pro .input-icon {
+                    @apply top-[1.1rem]; /* Căn chỉnh lại icon */
+                }
+
 
                 .modal-button-secondary-pro { 
                     @apply px-5 py-2.5 bg-slate-100 hover:bg-slate-200 
