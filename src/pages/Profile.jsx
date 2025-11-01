@@ -16,7 +16,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Dialog } from '@headlessui/react';
 import Cropper from 'react-easy-crop';
-import { getCroppedImg } from './_cropUtils'; // helper implemented below (in-file)
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getSupabase } from '../lib/supabaseClient';
