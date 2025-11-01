@@ -148,77 +148,78 @@ if (user) {
                         throw new Error("Không tìm thấy hồ sơ người dùng.");
                     }
                 }
-            } else if (mode === 'forgot') { // SỬA v10: Luồng Quên Mật Khẩu (Admin OTP)
-                if (!form.email) throw new Error("Vui lòng nhập email của bạn.");
-                
-                if (!isOtpSent) {
-                    // --- BƯỚC 1: TẠO YÊU CẦU CHO ADMIN ---
-                    
-                    // 1. Kiểm tra email có tồn tại trong hệ thống không
-                    const { data: user, error: findError } = await supabase
-                        .from('Users')
-                        .select('id')
-                        .eq('email', form.email)
-                        .single();
+            } else if (mode === 'forgot') {
+  if (!form.email) throw new Error("Vui lòng nhập email của bạn.");
 
-                    if (findError || !user) {
-                        throw new Error("Email không tồn tại trong hệ thống.");
-                    }
-                    
-                    // 2. Tạo bản ghi yêu cầu trong bảng password_reset_requests
-                    const { error: insertError } = await supabase
-                        .from('password_reset_requests')
-                        .insert({ 
-                            email: form.email, 
-                            is_resolved: false, // Đánh dấu là chưa giải quyết
-                            requested_at: new Date().toISOString()
-                        });
-                        
-                    if (insertError) {
-                        // Bắt lỗi nếu RLS (Row Level Security) chặn
-                        console.error("Lỗi insert password_reset_requests:", insertError);
-                        throw new Error(`Lỗi gửi yêu cầu: ${insertError.message}. Vui lòng thử lại sau.`);
-                    }
-                    
-                    setSuccess(`Yêu cầu đã gửi! Vui lòng liên hệ Admin (SĐT: ${ADMIN_PHONE}) để nhận mã OTP.`);
-                    setIsOtpSent(true); // Chuyển sang bước nhập mã
-                } else {
-                    // --- BƯỚC 2: NHẬP MÃ OTP TỪ ADMIN VÀ MẬT KHẨU MỚI ---
-                    if (!form.otp || form.otp.length !== 6) {
-                        throw new Error("Vui lòng nhập Mã OTP 6 số (do Admin cung cấp).");
-                    }
-                    if (!form.password || form.password.length < 6) {
-                        throw new Error("Vui lòng nhập Mật khẩu mới (tối thiểu 6 ký tự).");
-                    }
-                    if (form.password !== form.confirm) {
-                        throw new Error("Mật khẩu không khớp.");
-                    }
-                    
-                    // 3. GỌI SUPABASE EDGE FUNCTION
-                    const { data, error: functionError } = await supabase.functions.invoke('reset-password-with-admin-otp', {
-                        body: {
-                            email: form.email,
-                            otp: form.otp,
-                            newPassword: form.password
-                        }
-                    });
+  if (!isOtpSent) {
+    // Bước 1: Gửi yêu cầu hỗ trợ
+    const { data: user, error: findError } = await supabase
+      .from('Users')
+      .select('id')
+      .eq('email', form.email)
+      .single();
 
-                    if (functionError) {
-                         throw new Error(`Lỗi thực thi server: ${functionError.message}`);
-                    }
-                    
-                    // Bắt lỗi logic từ bên trong function (nếu có)
-                    if (data && data.error) {
-                         throw new Error(data.error);
-                    }
-                    
-                    // 4. Thành công
-                    setSuccess("Đổi mật khẩu thành công! 🎉 Vui lòng đăng nhập lại.");
-                    setForm(initialFormState);
-                    setIsOtpSent(false);
-                    setMode('login'); // Quay lại mode login sau khi thành công
-                }
-            }
+    if (findError || !user) throw new Error("Email không tồn tại.");
+
+    // Tạo yêu cầu reset
+    const { error: insertError } = await supabase
+      .from('password_reset_requests')
+      .insert({
+        email: form.email,
+        otp: null,
+        is_resolved: false,
+      });
+
+    if (insertError) throw new Error("Không thể gửi yêu cầu. Vui lòng thử lại sau.");
+
+    setSuccess(`Yêu cầu đã gửi! Liên hệ Admin (${ADMIN_PHONE}) để nhận mã OTP.`);
+    setIsOtpSent(true);
+  } else {
+    // Bước 2: Admin đã gửi mã OTP, người dùng nhập OTP + mật khẩu mới
+    if (!form.otp || form.otp.length !== 6)
+      throw new Error("Vui lòng nhập Mã OTP 6 số.");
+
+    if (!form.password || form.password.length < 6)
+      throw new Error("Mật khẩu mới phải có ít nhất 6 ký tự.");
+
+    if (form.password !== form.confirm)
+      throw new Error("Mật khẩu không khớp.");
+
+    // Xác thực OTP trong bảng password_reset_requests
+    const { data: req } = await supabase
+      .from('password_reset_requests')
+      .select('*')
+      .eq('email', form.email)
+      .eq('otp', form.otp)
+      .eq('is_resolved', false)
+      .single();
+
+    if (!req) throw new Error("Mã OTP không hợp lệ hoặc đã hết hạn.");
+
+    // Mã hóa mật khẩu mới
+    const hashedPassword = btoa(form.password);
+
+    // Cập nhật mật khẩu trong bảng Users
+    const { error: updateError } = await supabase
+      .from('Users')
+      .update({ password: hashedPassword })
+      .eq('email', form.email);
+
+    if (updateError) throw new Error("Không thể đổi mật khẩu.");
+
+    // Đánh dấu yêu cầu đã xử lý
+    await supabase
+      .from('password_reset_requests')
+      .update({ is_resolved: true })
+      .eq('id', req.id);
+
+    setSuccess("Đổi mật khẩu thành công! 🎉");
+    setForm(initialFormState);
+    setIsOtpSent(false);
+    setMode('login');
+  }
+}
+
         } catch (err) { setError(err.message || "Đã có lỗi xảy ra."); }
         finally { setLoading(false); }
     };
