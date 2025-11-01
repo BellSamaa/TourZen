@@ -1,17 +1,19 @@
 // ManageAccounts.jsx
-/* *** (SỬA LỖI v19) Sửa lỗi Logic + Yêu cầu UI ***
-  1. (Logic) Xóa TẤT CẢ các tham chiếu đến 'username' (vì nó không tồn tại
-     trong CSDL 'Users' của bạn). Đã xóa khỏi:
-     - State
-     - Hàm handleSubmit (Thêm mới & Sửa)
-     - Hàm fetchAccounts (selectQuery & searchQuery)
-  2. (UI) Xóa dòng "ID: {account.username}" (ví dụ: "ID: default_user")
-     khỏi cột "Họ và Tên" trong bảng (đáp ứng v17).
+/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v18 (Thêm Chức Năng Xóa) ***
+  1. (UI) Thêm nút Xóa (Trash icon) vào bảng.
+  2. (UI) Thêm Modal Xác nhận Xóa (màu đỏ) để cảnh báo.
+  3. (Logic) Thêm state `deletingAccount` và `isDeleting`.
+  4. (Logic) Thêm hàm `handleDeleteAccount` để gọi Edge Function 'admin-delete-user'.
+     (LƯU Ý: Bạn cần tự tạo Edge Function tên 'admin-delete-user' trong Supabase
+     để code này hoạt động).
 */
-/* *** (Nâng cấp v18 - Giữ lại) ***
-  1. (UI/Logic) Giữ lại Nút Xóa, Modal Xóa, và hàm handleDeleteAccount.
+/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v17 (Sửa Lỗi Ẩn Vai Trò & UI) ***
+  1. (Logic) Sửa `fetchAccounts` để lấy TẤT CẢ các vai trò.
+  2. (UI) Xóa dòng "ID: {account.username}" khỏi bảng.
+  3. (LƯU Ý) Nếu vai trò Admin/Supplier vẫn bị ẩn, BẠN PHẢI KIỂM TRA RLS
+     (ROW LEVEL SECURITY) TRÊN BẢNG 'Users' TRONG SUPABASE.
 */
-/* *** (Nâng cấp v14, v13 - Giữ lại) *** */
+/* *** (Nâng cấp v14, v13 - Giữ nguyên) *** */
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { getSupabase } from "../lib/supabaseClient";
@@ -20,7 +22,7 @@ import {
     UsersThree, CaretLeft, CaretRight, CircleNotch, X, MagnifyingGlass,
     PencilLine, ArrowsClockwise, WarningCircle, UserPlus, UserCircleMinus, UserCircleCheck,
     Eye, EyeSlash, CheckCircle, XCircle, User, At, ShieldCheck, CalendarBlank, Hourglass,
-    Archive, Key, IdentificationBadge, Trash // Giữ v18: Icon Trash
+    Archive, Key, IdentificationBadge, Trash // <<< THÊM v18: Icon Trash
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -87,9 +89,9 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
         email: isEdit ? account.email : '',
         password: '', 
         confirm_password: '', 
-        // username: isEdit ? (account.username || '') : '', // <<< SỬA v19: Xóa username
+        username: isEdit ? (account.username || '') : '',
         full_name: isEdit ? account.full_name : '',
-        role: isEdit ? account.role : 'admin', 
+        role: isEdit ? account.role : 'admin', // (SỬA v14) Đổi default từ 'staff' -> 'admin'
         is_active: isEdit ? account.is_active : true,
     });
     const [loading, setLoading] = useState(false);
@@ -128,11 +130,11 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                 const { data, error: functionError } = await supabase.functions.invoke('admin-update-user', {
                     body: {
                         user_id: account.id,
-                        // username: formData.username, // <<< SỬA v19: Xóa username
+                        username: formData.username,
                         full_name: formData.full_name,
                         role: formData.role,
                         is_active: formData.is_active,
-                        password: formData.password || null 
+                        password: formData.password || null // Gửi null nếu không đổi
                     }
                 });
                 
@@ -146,14 +148,6 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                 const { data: authData, error: authError } = await supabase.auth.signUp({
                     email: formData.email,
                     password: formData.password,
-                    // (SỬA v19) Thêm full_name vào meta_data khi đăng ký
-                    // (Mặc dù admin-create-user có thể không dùng trigger,
-                    // nhưng đây là best practice)
-                    options: {
-                        data: {
-                            full_name: formData.full_name
-                        }
-                    }
                 });
                 if (authError) throw authError;
                 if (!authData.user) throw new Error('Không thể tạo user trong Auth.');
@@ -163,7 +157,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                     .insert({
                         id: authData.user.id,
                         email: formData.email,
-                        // username: formData.username, // <<< SỬA v19: Xóa username
+                        username: formData.username,
                         full_name: formData.full_name,
                         role: formData.role,
                         is_active: formData.is_active,
@@ -191,6 +185,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
         >
+            {/* === (SỬA v13) Tăng bo góc === */}
             <motion.div
                 className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col font-inter"
                 initial={{ scale: 0.9, opacity: 0 }} 
@@ -221,6 +216,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                     >
                         {/* Email */}
                         <motion.div variants={fieldVariant}>
+                            {/* === (SỬA v13) Thêm icon === */}
                             <label className="label-style flex items-center gap-2" htmlFor="email">
                                 <At size={18} className="text-indigo-500" />
                                 <span>Email *</span>
@@ -236,6 +232,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
 
                         {/* --- Mật khẩu mới --- */}
                         <motion.div variants={fieldVariant}>
+                            {/* === (SỬA v13) Thêm icon === */}
                             <label className="label-style flex items-center gap-2" htmlFor="password">
                                 <Key size={18} className="text-indigo-500" />
                                 <span>{isEdit ? 'Mật khẩu mới (Bỏ trống nếu không đổi)' : 'Mật khẩu *'}</span>
@@ -264,6 +261,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                         {/* --- Xác nhận Mật khẩu --- */}
                         {(formData.password || !isEdit) && (
                             <motion.div variants={fieldVariant}>
+                                {/* === (SỬA v13) Thêm icon === */}
                                 <label className="label-style flex items-center gap-2" htmlFor="confirm_password">
                                     <Key size={18} className="text-indigo-500" />
                                     <span>Xác nhận Mật khẩu {isEdit ? '' : '*'}</span>
@@ -289,21 +287,38 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                             </motion.div>
                         )}
                         
-                        {/* (SỬA v19) Xóa Username, chỉ còn Full Name */}
-                        <motion.div variants={fieldVariant}>
-                            <label className="label-style flex items-center gap-2" htmlFor="full_name">
-                                <User size={18} className="text-indigo-500" />
-                                <span>Họ và Tên *</span>
-                            </label>
-                            <input 
-                                id="full_name"
-                                type="text" name="full_name" value={formData.full_name} onChange={handleChange} 
-                                required className="input-style-pro" placeholder="Nguyễn Văn An"
-                            />
-                        </motion.div>
+                        {/* Username & Full Name */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <motion.div variants={fieldVariant}>
+                                {/* === (SỬA v13) Thêm icon === */}
+                                <label className="label-style flex items-center gap-2" htmlFor="username">
+                                    <IdentificationBadge size={18} className="text-indigo-500" />
+                                    <span>Tên đăng nhập *</span>
+                                </label>
+                                <input 
+                                    id="username"
+                                    type="text" name="username" value={formData.username} onChange={handleChange} 
+                                    required className="input-style-pro" placeholder="admin01"
+                                />
+                            </motion.div>
+
+                            <motion.div variants={fieldVariant}>
+                                {/* === (SỬA v13) Thêm icon === */}
+                                <label className="label-style flex items-center gap-2" htmlFor="full_name">
+                                    <User size={18} className="text-indigo-500" />
+                                    <span>Họ và Tên *</span>
+                                </label>
+                                <input 
+                                    id="full_name"
+                                    type="text" name="full_name" value={formData.full_name} onChange={handleChange} 
+                                    required className="input-style-pro" placeholder="Nguyễn Văn An"
+                                />
+                            </motion.div>
+                        </div>
 
                         {/* Role */}
                         <motion.div variants={fieldVariant}>
+                             {/* === (SỬA v13) Thêm icon === */}
                             <label className="label-style flex items-center gap-2" htmlFor="role">
                                 <ShieldCheck size={18} className="text-indigo-500" />
                                 <span>Vai trò *</span>
@@ -315,6 +330,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                                     required 
                                     className="input-style-pro appearance-none"
                                 >
+                                    {/* (SỬA v14) Mảng này đã được lọc */}
                                     {ROLES.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                                 </select>
                                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
@@ -329,6 +345,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                         {/* Status (Edit only) */}
                         {isEdit && (
                             <motion.div variants={fieldVariant}>
+                                {/* === (SỬA v13) Thêm icon === */}
                                 <label className="label-style flex items-center gap-2">
                                     <CheckCircle size={18} className="text-indigo-500" />
                                     <span>Trạng thái</span>
@@ -349,6 +366,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                     </motion.div>
                     
                     {/* Modal Footer Buttons */}
+                    {/* === (SỬA v13) Tăng bo góc footer === */}
                     <div className="p-5 border-t border-slate-200/80 dark:border-slate-700/50 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-b-2xl">
                         <motion.button 
                             type="button" onClick={onClose} disabled={loading} 
@@ -373,15 +391,34 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
     );
 };
 
-// --- Component chính: Quản lý Tài Khoản ---
+
+// --- (Giữ nguyên phần còn lại của file) ---
+// --- Variants cho Stagger (Giữ nguyên) ---
+const pageVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+};
+const itemVariant = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100 } }
+};
+
+
+// --- (STYLE UPGRADE) Component chính: Quản lý Tài Khoản ---
 export default function AdminManageAccounts() {
+    // ... (States giữ nguyên) ...
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isFetchingPage, setIsFetchingPage] = useState(false);
     const [error, setError] = useState(null);
     const [modalAccount, setModalAccount] = useState(null);
-    const [deletingAccount, setDeletingAccount] = useState(null); 
-    const [isDeleting, setIsDeleting] = useState(false); 
+    const [deletingAccount, setDeletingAccount] = useState(null); // <<< THÊM v18: State cho modal xóa
+    const [isDeleting, setIsDeleting] = useState(false); // <<< THÊM v18: State loading cho nút xóa
     const [searchTerm, setSearchTerm] = useState("");
     const debouncedSearch = useDebounce(searchTerm, 400);
     const ITEMS_PER_PAGE = 10;
@@ -389,7 +426,8 @@ export default function AdminManageAccounts() {
     const [totalItems, setTotalItems] = useState(0);
     const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
 
-    // --- (SỬA v19) Fetch data (Đã xóa 'username') ---
+    // --- (SỬA v17) Fetch data (Đảm bảo không lọc vai trò) ---
+    // HÀM NÀY LÀ QUAN TRỌNG NHẤT
     const fetchAccounts = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         setError(null);
@@ -397,39 +435,46 @@ export default function AdminManageAccounts() {
             const from = (currentPage - 1) * ITEMS_PER_PAGE;
             const to = from + ITEMS_PER_PAGE - 1;
             
-            // (SỬA v19) Xóa 'username' khỏi select
-            const selectQuery = `id, full_name, email, role, is_active, created_at, customer_code, account_code`;
+            const selectQuery = `id, username, full_name, email, role, is_active, created_at, customer_code, account_code`;
             
+            // Bắt đầu query. Lấy TẤT CẢ users.
             let query = supabase.from("Users").select(selectQuery, { count: 'exact' });
 
+            // (SỬA LỖI v17) Đảm bảo không có bộ lọc vai trò nào ở đây
+            // Bất kỳ dòng nào như .eq('role', 'user') PHẢI BỊ XÓA
+            // query = query.eq('role', 'user'); // <-- DÒNG NÀY GÂY LỖI (ĐÃ XÓA)
+
+            // Thêm tìm kiếm (nếu có)
             if (debouncedSearch.trim() !== "") {
                 const searchStr = `%${debouncedSearch.trim()}%`;
-                // (SỬA v19) Xóa 'username' khỏi search
-                const searchQuery = `customer_code.ilike.${searchStr},account_code.ilike.${searchStr},full_name.ilike.${searchStr},email.ilike.${searchStr}`;
+                const searchQuery = `customer_code.ilike.${searchStr},account_code.ilike.${searchStr},full_name.ilike.${searchStr},email.ilike.${searchStr},username.ilike.${searchStr}`;
                 query = query.or(searchQuery);
             }
             
+            // Sắp xếp và phân trang
             query = query.order("created_at", { ascending: false }).range(from, to);
             
+            // Chạy query
             const { data, count, error: fetchError } = await query;
 
             if (fetchError) {
+                // (SỬA v17) Thêm cảnh báo về RLS
                 if (fetchError.message.includes("policy")) {
                     throw new Error(`Lỗi RLS (Row Level Security): ${fetchError.message}. Hãy kiểm tra RLS trên bảng Users.`);
                 }
                 throw fetchError;
             }
             
-            // (SỬA v19) Không cần map 'username' nữa
-            setAccounts(data || []);
+            const processedData = data.map(acc => ({...acc, username: acc.username || 'N/A'}));
+            setAccounts(processedData || []);
             setTotalItems(count || 0);
             
             if (!isInitialLoad && data.length === 0 && count > 0 && currentPage > 1) {
-                setCurrentPage(1); 
+                setCurrentPage(1); // Reset về trang 1 nếu trang hiện tại trống
             }
         } catch (err) {
             console.error("Lỗi fetch accounts:", err);
-            setError(err); 
+            setError(err); // Hiển thị lỗi ra UI (bao gồm cả lỗi RLS)
         } finally {
             if (isInitialLoad) setLoading(false);
             setIsFetchingPage(false);
@@ -449,11 +494,10 @@ export default function AdminManageAccounts() {
     
     // --- (SỬA v12) Sửa logic handleSuspend để gọi Edge Function ---
     const handleSuspend = (account) => {
-        // (SỬA v19) Dùng 'full_name' thay 'username'
         toast((t) => (
             <div className="flex flex-col items-center p-1">
                  <span className="text-center font-inter">
-                    Ngừng hoạt động tài khoản <b className="font-sora">{account.full_name || account.email}</b>?<br/>
+                    Ngừng hoạt động tài khoản <b className="font-sora">{account.username}</b>?<br/>
                     <span className="text-xs text-orange-600">Tài khoản sẽ không thể đăng nhập.</span>
                  </span>
                 <div className="mt-3 flex gap-2">
@@ -464,12 +508,13 @@ export default function AdminManageAccounts() {
                         toast.dismiss(t.id);
                         setIsFetchingPage(true);
                         
+                        // --- (SỬA v12) Gọi Edge Function để ngừng ---
                         const { data, error: functionError } = await supabase.functions.invoke('admin-update-user', {
                             body: {
                                 user_id: account.id,
-                                is_active: false, 
-                                // (SỬA v19) Xóa 'username'
-                                // username: undefined,
+                                is_active: false, // Chỉ cập nhật trạng thái
+                                // Gửi các giá trị còn lại là 'undefined' để function bỏ qua
+                                username: undefined,
                                 full_name: undefined,
                                 role: undefined,
                                 password: null
@@ -500,9 +545,11 @@ export default function AdminManageAccounts() {
         if (!deletingAccount || isDeleting) return;
 
         setIsDeleting(true);
-        setIsFetchingPage(true); 
+        setIsFetchingPage(true); // Dùng state fetching chung để làm mờ bảng
         
         try {
+            // Gọi Edge Function để xóa user. 
+            // Cần tạo function 'admin-delete-user' trong Supabase.
             const { data, error: functionError } = await supabase.functions.invoke('admin-delete-user', {
                 body: {
                     user_id: deletingAccount.id
@@ -543,9 +590,13 @@ export default function AdminManageAccounts() {
     const getRoleInfo = (roleId) => {
         const rolesMap = { 
             admin: { name: 'Admin', color: 'bg-purple-500' }, 
+            // manager: { name: 'Manager', color: 'bg-blue-500' }, // (SỬA v14) Bỏ
+            // staff: { name: 'Staff', color: 'bg-cyan-500' }, // (SỬA v14) Bỏ
             supplier: { name: 'Supplier', color: 'bg-orange-500' }, 
             user: { name: 'User', color: 'bg-slate-500' }
         };
+        // (SỬA v15) Nếu vai trò là 'manager' hoặc 'staff' (còn sót lại trong DB)
+        // nó sẽ hiển thị tên vai trò (roleId) với màu xám
         return rolesMap[roleId] || { name: roleId, color: 'bg-gray-400' };
     };
 
@@ -578,6 +629,7 @@ export default function AdminManageAccounts() {
                             Quản lý Tài khoản
                         </h1>
                         <p className="mt-2 text-base text-slate-600 dark:text-slate-400">
+                            {/* (SỬA v16) Cập nhật mô tả */}
                             Quản lý tài khoản người dùng hệ thống (Bao gồm Admin, Supplier, User).
                         </p>
                     </div>
@@ -593,6 +645,7 @@ export default function AdminManageAccounts() {
                 </motion.div>
 
                 {/* Bảng */}
+                {/* === (SỬA v13) Tăng bo góc bảng === */}
                 <motion.div
                     variants={itemVariant}
                     className="bg-white dark:bg-slate-800 shadow-2xl rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-700/50"
@@ -608,7 +661,7 @@ export default function AdminManageAccounts() {
                                     type="text" 
                                     value={searchTerm} 
                                     onChange={(e) => setSearchTerm(e.target.value)} 
-                                    placeholder="Tìm Mã, Tên, Email..." // (SỬA v19) Xóa Username
+                                    placeholder="Tìm Mã, Tên, Email, Username..." 
                                     className="search-input-pro"
                                 />
                             </div>
@@ -628,6 +681,7 @@ export default function AdminManageAccounts() {
                         <table className="min-w-full">
                             <thead className="border-b-2 border-slate-100 dark:border-slate-700">
                                 <tr>
+                                    {/* === (SỬA v11) Thêm cột Mã ID, điều chỉnh độ rộng === */}
                                     <th className="th-style-pro w-[10%]"><div className="flex items-center gap-1.5"><Archive size={14}/>Mã ID</div></th>
                                     <th className="th-style-pro w-[25%]"><div className="flex items-center gap-1.5"><User size={14}/>Họ và Tên</div></th>
                                     <th className="th-style-pro w-[20%]"><div className="flex items-center gap-1.5"><At size={14}/>Email</div></th>
@@ -639,13 +693,16 @@ export default function AdminManageAccounts() {
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
                                 <AnimatePresence>
+                                    {/* (SỬA v11) Sửa colSpan="7" */}
                                     {error && !isFetchingPage && ( 
                                         <tr><td colSpan="7" className="td-center py-20 text-red-500">
+                                            {/* (SỬA v17) Hiển thị lỗi (quan trọng cho debug RLS) */}
                                             {`Lỗi: ${error.message}`}
                                         </td></tr> 
                                     )}
                                     
                                     {!error && !loading && !isFetchingPage && accounts.length === 0 && ( 
+                                        /* (SỬA v11) Sửa colSpan="7" */
                                         <tr><td colSpan="7" className="td-center py-20 text-slate-500">
                                             <div className="flex flex-col items-center">
                                                 <Archive size={48} className="text-slate-400 mb-4" weight="light" />
@@ -655,8 +712,10 @@ export default function AdminManageAccounts() {
                                         </td></tr> 
                                     )}
                                     
+                                    {/* (SỬA v16) Dữ liệu giờ đã hiển thị đầy đủ Admin, Supplier... */}
                                     {!error && accounts.map((account) => {
                                         const roleInfo = getRoleInfo(account.role);
+                                        // (SỬA v11) Logic chọn mã để hiển thị
                                         const displayCode = account.role === 'user' ? account.customer_code : account.account_code;
                                         
                                         return (
@@ -668,15 +727,17 @@ export default function AdminManageAccounts() {
                                             exit={{ opacity: 0, x: -50, transition: { duration: 0.2 } }}
                                             className="hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
                                         >
+                                            {/* === (SỬA v11) Thêm ô Mã ID === */}
                                             <td className="td-style-pro">
                                                 <span className="font-sora font-semibold text-sm text-indigo-600 dark:text-indigo-400">
                                                     {displayCode || <span className="italic text-slate-400">N/A</span>}
                                                 </span>
                                             </td>
 
-                                            {/* === (SỬA v19) Xóa "ID: {username}" === */}
+                                            {/* === (SỬA v17) Xóa "ID: default_user" === */}
                                             <td className="td-style-pro">
                                                 <div className="font-sora font-semibold text-slate-800 dark:text-slate-100">{account.full_name}</div>
+                                                {/* <div className="font-inter text-sm text-slate-500 dark:text-slate-400">ID: {account.username}</div> (SỬA v17) ĐÃ XÓA DÒNG NÀY */}
                                             </td>
                                             
                                             <td className="td-style-pro font-inter text-slate-600 dark:text-slate-400">{account.email}</td>
@@ -694,6 +755,7 @@ export default function AdminManageAccounts() {
                                             <td className="td-style-pro font-inter text-slate-500 text-sm">{formatDate(account.created_at)}</td>
                                             <td className="td-style-pro text-center">
                                                 <div className="flex justify-center gap-1">
+                                                    {/* === (SỬA UI) Thêm hover màu === */}
                                                     <motion.button 
                                                         whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }}
                                                         onClick={() => setModalAccount(account)} 
@@ -703,6 +765,7 @@ export default function AdminManageAccounts() {
                                                     > <PencilLine size={18}/> </motion.button>
                                                     
                                                     {account.is_active ? (
+                                                        /* === (SỬA UI) Thêm hover màu === */
                                                         <motion.button
                                                             whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }}
                                                             onClick={() => handleSuspend(account)} 
@@ -711,6 +774,7 @@ export default function AdminManageAccounts() {
                                                             title="Ngừng tài khoản"
                                                         > <UserCircleMinus size={18}/> </motion.button>
                                                     ) : (
+                                                        /* === (SỬA UI) Thêm hover màu === */
                                                         <motion.button
                                                             whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }}
                                                             onClick={() => setModalAccount(account)}
