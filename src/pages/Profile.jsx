@@ -1,10 +1,11 @@
 // src/pages/Profile.jsx
-/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v24 (Sửa Lỗi Upload 400) ***
+/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v25 (Sửa Lỗi Object Not Found) ***
   1. (Logic) Sửa hàm `uploadFile` trong `IdentityForm`.
-  2. (Logic) Thêm tham số thứ 3 (fileOptions) vào lệnh `supabase.storage.upload()`.
-  3. (Logic) Thêm `{ contentType: file.type }` để fix lỗi "Missing a Content-Type header".
+  2. (Logic) Hàm này phải `return filePath;` (tên file, ví dụ: "abc.jpg")
+     CHỨ KHÔNG PHẢI `return data.publicUrl;` (link https://...).
+  3. (Lý do) Điều này để fix lỗi "Object not found" khi Admin tạo Signed URL.
 */
-/* (Nâng cấp v23, v22 - Giữ nguyên) */
+/* (Nâng cấp v24, v23, v22 - Giữ nguyên) */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -21,7 +22,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 const supabase = getSupabase();
 
 // --- (v22) Component con: Cập nhật Thông tin ---
+// (v22) Update inputs giống Login
 const ProfileInfoForm = ({ user, onProfileUpdate }) => {
+    // ... (Giữ nguyên code ProfileInfoForm)
     const [formData, setFormData] = useState({
         full_name: '', phone_number: '', address: '', ngay_sinh: '', 
     });
@@ -317,34 +320,33 @@ const IdentityForm = ({ user }) => {
         }
     };
 
-    // --- (SỬA v24) HÀM UPLOAD ĐÃ SỬA ---
+    // --- (SỬA LỖI v25) HÀM UPLOAD ĐÃ SỬA ---
+    // Sửa lỗi: Trả về `filePath` (tên file) thay vì `data.publicUrl` (link http)
     const uploadFile = async (file, type) => {
         if (!file) return null;
         
         const fileExt = file.name.split('.').pop();
         const fileName = `${user.id}-${type}-${Date.now()}.${fileExt}`;
-        const filePath = `${fileName}`;
+        const filePath = `${fileName}`; // Đây là tên file, ví dụ: "user-id-front-123.jpg"
 
-        // (SỬA v24) Thêm fileOptions (tham số thứ 3)
         const fileOptions = {
-            contentType: file.type || 'image/png' // Lấy MIME type của file
+            contentType: file.type || 'image/png' // Fix lỗi 400
         };
 
         const { error: uploadError } = await supabase.storage
             .from('id-scans')
-            .upload(filePath, file, fileOptions); // <<< ĐÃ THÊM fileOptions
+            .upload(filePath, file, fileOptions); 
 
         if (uploadError) throw uploadError;
         
-        return filePath;
+        return filePath; // <<< SỬA LỖI v25: Trả về "path", KHÔNG "publicUrl"
     };
-    // --- KẾT THÚC SỬA v24 ---
+    // --- KẾT THÚC SỬA v25 ---
 
-    // (SỬA v23) handleSubmit đã được đơn giản hóa
+    // (v23) handleSubmit
     const handleSubmit = async (e) => {
         e.preventDefault();
         
-        // (SỬA v23) Chỉ kiểm tra file, không cần kiểm tra formData
         if (!frontImage && !identity?.front_image_url) {
             toast.error("Vui lòng tải lên ảnh mặt trước.");
             return;
@@ -362,14 +364,10 @@ const IdentityForm = ({ user }) => {
 
             const updates = {
                 id: user.id,
-                status: 'pending', // Luôn đặt là pending khi cập nhật
-                // Chỉ cập nhật nếu có file mới
+                status: 'pending', 
                 ...(front_image_path && { front_image_url: front_image_path }),
                 ...(back_image_path && { back_image_url: back_image_path }),
-                
-                // (SỬA v23) Xóa các trường tự nhập, admin sẽ điền sau
-                // (SỬA v24) Set là null KHI lần đầu gửi, KHÔNG set là null khi CẬP NHẬT
-                ...(!identity && { // Chỉ set là null nếu đây là lần đầu (chưa có identity)
+                ...(!identity && { 
                     id_number: null,
                     full_name: null,
                     dob: null,
@@ -378,7 +376,7 @@ const IdentityForm = ({ user }) => {
                 })
             };
 
-            // 2. Upsert (Insert hoặc Update) thông tin
+            // 2. Upsert
             const { error } = await supabase
                 .from('user_identity')
                 .upsert(updates, { onConflict: 'id' });
@@ -388,8 +386,8 @@ const IdentityForm = ({ user }) => {
             toast.success('Đã gửi thông tin xác thực! Vui lòng chờ Admin duyệt.');
             setFrontImage(null);
             setBackImage(null);
-            fetchIdentity(); // Tải lại dữ liệu
-            setIsEditing(false); // Quay về chế độ View
+            fetchIdentity(); 
+            setIsEditing(false); 
 
         } catch (error) {
             toast.error(`Lỗi gửi thông tin: ${error.message}`);
@@ -402,7 +400,7 @@ const IdentityForm = ({ user }) => {
         return <div className="flex justify-center mt-10"><CircleNotch size={32} className="animate-spin text-sky-500" /></div>;
     }
 
-    // (SỬA v23) Giao diện khi đã gửi (chế độ View)
+    // (v23) Giao diện khi đã gửi (chế độ View)
     if (identity && !isEditing) {
         let statusBadge;
         switch (identity.status) {
@@ -452,7 +450,7 @@ const IdentityForm = ({ user }) => {
         );
     }
 
-    // (SỬA v23) Giao diện Form (chỉ còn Upload)
+    // (v23) Giao diện Form (chỉ còn Upload)
     return (
         <form onSubmit={handleSubmit} className="space-y-5">
             <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
