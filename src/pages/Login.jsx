@@ -75,40 +75,49 @@ export default function Login() {
                 if (signUpError) throw signUpError;
                 
 if (user) {
-                    // Insert profile thủ công (do trigger bị lỗi)
+                    // Insert profile thủ công
                     try {
-                        // Tạo account_code unique
-                        const accountCode = 'TK' + Date.now().toString().slice(-8) + Math.floor(Math.random() * 100).toString().padStart(2, '0');
-                        
-                        const { error: insertError } = await supabase
+                        // Kiểm tra user đã có profile chưa
+                        const { data: existingProfile } = await supabase
                             .from('Users')
-                            .insert({
-                                id: user.id,
-                                email: form.email,
-                                full_name: form.name,
-                                address: form.address,
-                                phone_number: form.phone_number || null,
-                                ngay_sinh: form.ngay_sinh || null,
-                                role: 'customer',
-                                account_code: accountCode // Thêm account_code
-                            });
+                            .select('id')
+                            .eq('id', user.id)
+                            .single();
                         
-                        if (insertError) {
-                            console.error("Insert profile error:", insertError);
-                            // Bỏ qua lỗi duplicate key
-                            if (insertError.code !== '23505') {
-                                throw insertError;
+                        if (!existingProfile) {
+                            // Chỉ insert nếu chưa có profile
+                            const accountCode = 'TK' + Date.now().toString().slice(-8) + Math.floor(Math.random() * 100).toString().padStart(2, '0');
+                            
+                            const { error: insertError } = await supabase
+                                .from('Users')
+                                .insert({
+                                    id: user.id,
+                                    email: form.email,
+                                    full_name: form.name,
+                                    address: form.address,
+                                    phone_number: form.phone_number || null,
+                                    ngay_sinh: form.ngay_sinh || null,
+                                    role: 'user', // Đổi từ 'customer' thành 'user'
+                                    account_code: accountCode
+                                });
+                            
+                            if (insertError) {
+                                console.error("Insert profile error:", insertError);
+                                // Nếu vẫn lỗi duplicate, bỏ qua
+                                if (insertError.code !== '23505') {
+                                    throw insertError;
+                                }
                             }
+                        } else {
+                            console.log("Profile already exists, skipping insert");
                         }
                     } catch (profileError) {
                         console.warn("Profile creation warning:", profileError);
-                        // Không throw để không chặn signup
                     }
                     
                     setSuccess("Đăng ký thành công! 🎉 Bạn có thể đăng nhập ngay.");
                     setForm(initialFormState);
                     
-                    // Tự động chuyển sang trang đăng nhập sau 2 giây
                     setTimeout(() => {
                         setMode('login');
                         setSuccess('');
