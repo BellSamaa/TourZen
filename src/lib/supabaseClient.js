@@ -1,20 +1,19 @@
 // src/lib/supabaseClient.js
 import { createClient } from "@supabase/supabase-js";
 
+// URL ĐÚNG (với chữ 'w', không có dấu \ ở cuối)
+const supabaseUrl = "https://zdvwpjgpysxxqpvhovct.supabase.co"; 
+
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkdndwamdweXN4eHFwdmhvdmN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2NjQzODUsImV4cCI6MjA3NjI0MDM4NX0.tmFvQDXSUdJlJKBuYoqvuJArZ5apYpb-eNQ90uYBJf0";
+
 let supabaseClient;
 
 export function getSupabase() {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-  // Kiểm tra debug: Nếu thiếu biến, log lỗi
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('Supabase URL hoặc Anon Key bị thiếu! Kiểm tra biến môi trường VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY trong Vercel hoặc file .env.local.');
-    throw new Error('Cấu hình Supabase không đầy đủ.');
-  }
-
+  // Bạn có thể xóa các dòng console.log này đi nếu muốn
+  // console.log("--- Loading supabaseClient.js (Singleton Pattern) ---");
   if (!supabaseClient) {
     supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+    // console.log("--- Supabase client instance created (Singleton) ---");
   }
   return supabaseClient;
 }
