@@ -458,19 +458,37 @@ const IdentityModal = ({ customer, onClose, onSuccess }) => {
     const [isSaving, setIsSaving] = useState(false);
 
     // Hàm tạo Signed URL
-    const createSignedUrl = async (filePath) => {
-        if (!filePath) return null;
-        try {
-            const { data, error } = await supabase.storage
-                .from('id-scans')
-                .createSignedUrl(filePath, 3600); // Hợp lệ trong 1 giờ
-            if (error) throw error;
-            return data.signedUrl;
-        } catch (error) {
-            console.error('Lỗi tạo signed URL:', error);
-            return null;
-        }
-    };
+// --- SỬA HÀM createSignedUrl ---
+const createSignedUrl = async (filePath) => {
+  if (!filePath) {
+    console.warn("⚠️ Thiếu filePath khi tạo signed URL");
+    return null;
+  }
+  try {
+    // Kiểm tra file tồn tại
+    const { data: list, error: listError } = await supabase.storage
+      .from("id-scans")
+      .list("", { search: filePath });
+    if (listError) console.warn("Không thể kiểm tra file:", listError.message);
+
+    if (!list || list.length === 0) {
+      console.warn(`❌ File ${filePath} không tồn tại trong bucket id-scans`);
+      return null;
+    }
+
+    // Tạo signed URL hợp lệ 1 giờ
+    const { data, error } = await supabase.storage
+      .from("id-scans")
+      .createSignedUrl(filePath, 3600);
+    if (error) throw error;
+
+    return data.signedUrl;
+  } catch (error) {
+    console.error("Lỗi tạo signed URL:", error.message);
+    return null;
+  }
+};
+
 
     // Fetch dữ liệu và tạo signed URLs
     useEffect(() => {
