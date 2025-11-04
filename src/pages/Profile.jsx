@@ -1,30 +1,28 @@
 // src/pages/Profile.jsx
-/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v28 (Sửa Lỗi 400 Bad Request) ***
-  1. (Lý do) Lỗi 400 là do 'NOT NULL constraint violation'.
-  2. (Logic) Cột 'otp' trong CSDL yêu cầu phải có giá trị (kể cả null).
-  3. (SỬA) Thêm `otp: null` vào lệnh insert của `handleSendRequest`.
+/* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v29 ***
+  1. (Fix 406) Sửa logic `ChangePasswordForm` từ `otp` sang `token` để khớp DB.
+  2. (Feature) Thêm "gating" - người dùng phải xác thực CMND (approved) mới thấy tab đổi mật khẩu.
+  3. (Ghi chú) Lỗi 406 (user_identity) và lỗi Avatar/Banner được sửa bằng RLS Policy (SQL).
 */
-/* (Nâng cấp v27, v25, v24, v23, v22 - Giữ nguyên) */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Dialog } from '@headlessui/react';
 import Cropper from 'react-easy-crop';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext'; // (QUAN TRỌNG: Phải dùng AuthContext đã sửa)
 import { getSupabase } from '../lib/supabaseClient';
 import toast from 'react-hot-toast';
 import {
   User, Envelope, Phone, House, CalendarBlank, Key, IdentificationCard,
   UploadSimple, CircleNotch, PaperPlaneRight, Lock, Eye, EyeSlash, CheckCircle,
   WarningCircle, ShieldCheck, FileArrowUp, XCircle, Info, Sparkle, Palette,
-  Camera, Image, PaintBrush, TrashSimple, MagnifyingGlassPlus
+  Camera, Image, PaintBrush, TrashSimple, MagnifyingGlassPlus, Warning
 } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const supabase = getSupabase();
 
 /* ------------------ Helper: getPublicUrlSafe ------------------ */
-// ... (Giữ nguyên code)
 const getPublicUrlSafe = (bucket, path) => {
   if (!path) return null;
   try {
@@ -36,7 +34,6 @@ const getPublicUrlSafe = (bucket, path) => {
 };
 
 /* ------------------ Crop Utility (in-file) ------------------ */
-// ... (Giữ nguyên code)
 async function createImage(url) {
   return new Promise((resolve, reject) => {
     const image = new Image();
@@ -71,7 +68,6 @@ async function getCroppedImg(imageSrc, pixelCrop) {
 }
 
 /* ------------------ UI Helpers ------------------ */
-// ... (Giữ nguyên code)
 const InputGroup = ({ label, children }) => (
   <div className="space-y-1">
     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{label}</label>
@@ -79,23 +75,24 @@ const InputGroup = ({ label, children }) => (
   </div>
 );
 
-const TabButton = ({ label, icon, isActive, onClick, colorClass }) => (
+const TabButton = ({ label, icon, isActive, onClick, disabled = false }) => (
   <motion.button
     onClick={onClick}
+    disabled={disabled}
     className={`flex items-center gap-3 w-full p-3 rounded-2xl text-base font-medium
                 ${isActive ? 'bg-white dark:bg-slate-700/50 text-sky-700 dark:text-sky-400 font-semibold shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}
-                transition-colors duration-200`}
-    whileHover={{ scale: 1.02, y: -2 }}
-    whileTap={{ scale: 0.98 }}
+                transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed`}
+    whileHover={{ scale: disabled ? 1 : 1.02, y: disabled ? 0 : -2 }}
+    whileTap={{ scale: disabled ? 1 : 0.98 }}
   >
     {React.cloneElement(icon, { size: 18 })}
     <span className="ml-2">{label}</span>
   </motion.button>
 );
 
-/* ------------------ ProfileInfoForm (unchanged logic) ------------------ */
+/* ------------------ ProfileInfoForm ------------------ */
+// (Logic này đã đúng, nhưng nó sẽ hoạt động sau khi bạn chạy SQL RLS Policy)
 const ProfileInfoForm = ({ user, onProfileUpdate }) => {
-  // ... (Giữ nguyên code ProfileInfoForm)
   const [formData, setFormData] = useState({
     full_name: '', phone_number: '', address: '', ngay_sinh: '',
   });
@@ -128,20 +125,32 @@ const ProfileInfoForm = ({ user, onProfileUpdate }) => {
         ngay_sinh: formData.ngay_sinh || null,
       };
 
+      // (Yêu cầu RLS Policy UPDATE trên 'Users' - Đã cung cấp SQL)
       const { error: updateError } = await supabase
         .from('Users')
         .update(updates)
         .eq('id', user.id);
       if (updateError) throw updateError;
-
-      const { data: { user: authUser }, error: authUpdateError } = await supabase.auth.updateUser({
-        data: updates
-      });
-      if (authUpdateError) throw authUpdateError;
+      
+      // Cập nhật cả metadata (nếu là user 'Auth')
+      // (AuthContext đã sửa của tôi sẽ cung cấp 'session' nếu là Admin)
+      const { session } = useAuth(); 
+      if (session) {
+         const { data: { user: authUser }, error: authUpdateError } = await supabase.auth.updateUser({
+            data: updates
+         });
+         if (authUpdateError) throw authUpdateError;
+         if (onProfileUpdate) onProfileUpdate(authUser);
+      } else {
+         // Cập nhật localStorage cho user 'ảo'
+         const localUser = JSON.parse(localStorage.getItem('user'));
+         const updatedLocalUser = { ...localUser, ...updates };
+         localStorage.setItem('user', JSON.stringify(updatedLocalUser));
+         if (onProfileUpdate) onProfileUpdate(updatedLocalUser); // Cập nhật context state
+      }
 
       toast.success('Cập nhật thông tin thành công!');
-      if (onProfileUpdate) onProfileUpdate(authUser);
-
+      
     } catch (error) {
       toast.error(`Lỗi cập nhật: ${error.message}`);
     } finally {
@@ -156,27 +165,24 @@ const ProfileInfoForm = ({ user, onProfileUpdate }) => {
       <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
         <Info size={22} className="text-sky-600" /> Thông tin Cơ bản
       </h3>
-
+      
+      {/* (Phần Form giữ nguyên) */}
       <InputGroup label="Email (Không thể đổi)">
         <Envelope className="absolute left-3.5 top-1/2 -translate-y-1/2 text-pink-600" size={18} />
         <input type="email" value={user.email || ''} className="w-full pl-11 py-3 border rounded-xl bg-white/5 text-slate-800 dark:text-white focus:ring-0 text-sm" disabled />
       </InputGroup>
-
       <InputGroup label="Họ và Tên">
         <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-green-600" size={18} />
         <input type="text" name="full_name" value={formData.full_name} onChange={handleChange} className="w-full pl-11 py-3 border rounded-xl bg-white/5 text-slate-800 dark:text-white focus:ring-0 text-sm" required />
       </InputGroup>
-
       <InputGroup label="Số điện thoại">
         <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-yellow-600" size={18} />
         <input type="tel" name="phone_number" value={formData.phone_number} onChange={handleChange} className="w-full pl-11 py-3 border rounded-xl bg-white/5 text-slate-800 dark:text-white focus:ring-0 text-sm" />
       </InputGroup>
-
       <InputGroup label="Địa chỉ">
         <House className="absolute left-3.5 top-1/2 -translate-y-1/2 text-purple-600" size={18} />
         <input type="text" name="address" value={formData.address} onChange={handleChange} className="w-full pl-11 py-3 border rounded-xl bg-white/5 text-slate-800 dark:text-white focus:ring-0 text-sm" required minLength={10} />
       </InputGroup>
-
       <InputGroup label="Ngày sinh">
         <CalendarBlank className="absolute left-3.5 top-1/2 -translate-y-1/2 text-red-600" size={18} />
         <input type="date" name="ngay_sinh" value={formData.ngay_sinh} onChange={handleChange} className="w-full pl-11 py-3 border rounded-xl bg-white/5 text-slate-800 dark:text-white focus:ring-0 text-sm" />
@@ -196,8 +202,9 @@ const ProfileInfoForm = ({ user, onProfileUpdate }) => {
   );
 };
 
-/* ------------------ ChangePasswordForm (SỬA v28) ------------------ */
-const ChangePasswordForm = ({ user }) => {
+/* ------------------ ChangePasswordForm (SỬA v29) ------------------ */
+// <<< SỬA: Thêm `identityStatus` và logic "gating"
+const ChangePasswordForm = ({ user, identityStatus }) => {
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [form, setForm] = useState({ otp: '', password: '', confirm: '' });
   const [loading, setLoading] = useState(false);
@@ -210,7 +217,7 @@ const ChangePasswordForm = ({ user }) => {
     setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  // --- (SỬA v28) Thêm 'otp: null' ---
+  // (SỬA v28 - Giữ nguyên) Thêm 'otp: null'
   const handleSendRequest = async () => {
     setLoading(true);
     try {
@@ -220,7 +227,7 @@ const ChangePasswordForm = ({ user }) => {
           email: user.email,
           is_resolved: false,
           requested_at: new Date().toISOString(),
-          otp: null // <<< SỬA v28: Thêm (Fix lỗi 400)
+          otp: null 
         });
       if (insertError) throw insertError;
 
@@ -241,13 +248,13 @@ const ChangePasswordForm = ({ user }) => {
       if (form.password.length < 6) throw new Error("Vui lòng nhập Mật khẩu mới (tối thiểu 6 ký tự).");
       if (form.password !== form.confirm) throw new Error("Mật khẩu không khớp.");
 
-      // (SỬA v28) Dùng logic "ảo" (giống file Login.jsx của bạn)
       // 1. Xác thực OTP
+      // <<< SỬA LỖI 406: Thay 'otp' bằng 'token' để khớp DB >>>
       const { data: req } = await supabase
         .from('password_reset_requests')
         .select('*')
         .eq('email', user.email)
-        .eq('otp', form.otp) // Admin phải tự nhập OTP vào bảng này
+        .eq('token', form.otp) // <-- SỬA LỖI TẠI ĐÂY
         .eq('is_resolved', false)
         .single();
       if (!req) throw new Error("Mã OTP không hợp lệ hoặc đã hết hạn.");
@@ -256,10 +263,11 @@ const ChangePasswordForm = ({ user }) => {
       const hashedPassword = btoa(form.password);
 
       // 3. Cập nhật mật khẩu trong bảng Users
+      // (LƯU Ý: Điều này chỉ hoạt động nếu `user.id` là INT - tức là user "ảo")
       const { error: updateError } = await supabase
         .from('Users')
-        .update({ password: hashedPassword }) // Giả sử bạn có cột 'password'
-        .eq('email', user.email);
+        .update({ password: hashedPassword })
+        .eq('id', user.id); // <-- Dùng ID của user "ảo"
       if (updateError) throw new Error("Không thể đổi mật khẩu.");
 
       // 4. Đánh dấu yêu cầu đã xử lý
@@ -285,7 +293,22 @@ const ChangePasswordForm = ({ user }) => {
         <ShieldCheck size={22} className="text-orange-600" /> Bảo mật & Đăng nhập
       </h3>
 
-      {!isOtpSent ? (
+      {/* <<< SỬA: Thêm logic "Gating" theo yêu cầu >>> */}
+      {identityStatus !== 'approved' ? (
+        <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/40 p-5 rounded-2xl border border-yellow-300 dark:border-yellow-700">
+          <div className="flex items-center gap-3">
+            <Warning size={24} className="text-yellow-600" />
+            <h4 className="font-semibold text-lg text-yellow-800 dark:text-yellow-200">Yêu cầu xác thực</h4>
+          </div>
+          <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-2 ml-9">
+            Bạn phải <strong className="font-semibold">xác thực CMND/CCCD</strong> (và được Admin duyệt)
+            trước khi có thể sử dụng chức năng đổi mật khẩu.
+            <br />
+            Vui lòng chuyển sang tab "Xác thực CMND/CCCD" để bổ sung.
+          </p>
+        </div>
+      ) : !isOtpSent ? (
+      // (Code cũ)
         <div className="bg-gradient-to-br from-white/60 to-slate-50 dark:from-slate-800/60 p-5 rounded-2xl border dark:border-slate-700">
           <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">
             Để đổi mật khẩu, bạn cần yêu cầu một mã OTP từ Admin (Quản trị viên) để xác thực.
@@ -301,6 +324,7 @@ const ChangePasswordForm = ({ user }) => {
           </motion.button>
         </div>
       ) : (
+      // (Code cũ - đã fix 'token')
         <form onSubmit={handleChangePassword} className="space-y-4 bg-gradient-to-br from-white/60 to-slate-50 dark:from-slate-800/60 p-5 rounded-2xl border dark:border-slate-700">
           <p className="text-sm text-slate-600 dark:text-slate-300">
             Vui lòng liên hệ Admin (SĐT: <strong className="text-slate-800 dark:text-white">{ADMIN_PHONE}</strong>) để nhận Mã OTP.
@@ -361,9 +385,9 @@ const ChangePasswordForm = ({ user }) => {
   );
 };
 
-/* ------------------ IdentityForm (v25 - Giữ nguyên) ------------------ */
+/* ------------------ IdentityForm (Sửa lỗi 406 bằng SQL) ------------------ */
+// (Logic này đã đúng, nó sẽ hoạt động sau khi bạn chạy SQL RLS Policy)
 const IdentityForm = ({ user }) => {
-  // ... (Giữ nguyên code IdentityForm v25)
   const [identity, setIdentity] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -376,10 +400,11 @@ const IdentityForm = ({ user }) => {
     if (!user) return;
     setLoading(true);
     try {
+      // (Yêu cầu RLS Policy SELECT - Đã cung cấp SQL)
       const { data, error } = await supabase
         .from('user_identity')
         .select('*')
-        .eq('id', user.id)
+        .eq('id', user.id) // user.id (từ AuthContext) sẽ là INT (ảo) hoặc UUID (admin)
         .single();
 
       if (data) {
@@ -426,7 +451,6 @@ const IdentityForm = ({ user }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!frontImage && !identity?.front_image_url) {
       toast.error("Vui lòng tải lên ảnh mặt trước.");
       return;
@@ -435,12 +459,10 @@ const IdentityForm = ({ user }) => {
       toast.error("Vui lòng tải lên ảnh mặt sau.");
       return;
     }
-
     setIsUploading(true);
     try {
       const front_image_path = frontImage ? await uploadFile(frontImage, 'front') : null;
       const back_image_path = backImage ? await uploadFile(backImage, 'back') : null;
-
       const updates = {
         id: user.id,
         status: 'pending',
@@ -454,30 +476,26 @@ const IdentityForm = ({ user }) => {
           issue_place: null,
         })
       };
-
       const { error } = await supabase
         .from('user_identity')
         .upsert(updates, { onConflict: 'id' });
-
       if (error) throw error;
-
       toast.success('Đã gửi thông tin xác thực! Vui lòng chờ Admin duyệt.');
       setFrontImage(null);
       setBackImage(null);
       fetchIdentity();
       setIsEditing(false);
-
     } catch (error) {
       toast.error(`Lỗi gửi thông tin: ${error.message}`);
     } finally {
       setIsUploading(false);
     }
   };
-
+  
+  // ... (Phần JSX của IdentityForm giữ nguyên) ...
   if (loading) {
     return <div className="flex justify-center mt-10"><CircleNotch size={32} className="animate-spin text-sky-500" /></div>;
   }
-
   if (identity && !isEditing) {
     let statusBadge;
     switch (identity.status) {
@@ -502,7 +520,6 @@ const IdentityForm = ({ user }) => {
           </div>
         );
     }
-
     return (
       <div className="">
         <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
@@ -513,7 +530,6 @@ const IdentityForm = ({ user }) => {
           <p className="text-sm text-slate-600 dark:text-slate-300 pt-2">
             Trạng thái hồ sơ của bạn. Bạn có thể gửi lại thông tin nếu bị từ chối hoặc cần cập nhật.
           </p>
-
           <motion.button
             onClick={() => setIsEditing(true)}
             className="px-4 py-2 bg-gradient-to-r from-[#6366f1] to-[#22d3ee] text-white rounded-2xl inline-flex items-center gap-2"
@@ -525,18 +541,14 @@ const IdentityForm = ({ user }) => {
       </div>
     );
   }
-
-  // Form upload
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
         <Palette size={22} className="text-violet-600" /> {identity ? 'Cập nhật Thông tin Xác thực' : 'Bổ sung Thông tin Xác thực (CMND/CCCD)'}
       </h3>
-
       <p className="text-sm text-slate-600 dark:text-slate-300 -mt-2">
         Vui lòng tải lên ảnh scan 2 mặt CMND/CCCD của bạn. Admin sẽ xem xét và điền thông tin giúp bạn.
       </p>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <InputGroup label="Ảnh Scan Mặt trước CMND/CCCD">
           <label htmlFor="front-image-upload" className="flex items-center gap-2 w-full py-3 pl-11 pr-3 border rounded-xl bg-white/5 text-slate-500 cursor-pointer">
@@ -545,7 +557,6 @@ const IdentityForm = ({ user }) => {
           </label>
           <input id="front-image-upload" type="file" onChange={(e) => handleFileChange(e, 'front')} className="hidden" accept="image/*" />
         </InputGroup>
-
         <InputGroup label="Ảnh Scan Mặt sau CMND/CCCD">
           <label htmlFor="back-image-upload" className="flex items-center gap-2 w-full py-3 pl-11 pr-3 border rounded-xl bg-white/5 text-slate-500 cursor-pointer">
             <FileArrowUp className="text-pink-600" size={18} />
@@ -554,7 +565,6 @@ const IdentityForm = ({ user }) => {
           <input id="back-image-upload" type="file" onChange={(e) => handleFileChange(e, 'back')} className="hidden" accept="image/*" />
         </InputGroup>
       </div>
-
       <div className="flex justify-end pt-4 border-t dark:border-slate-700 gap-3">
         {identity && (
           <motion.button
@@ -581,32 +591,26 @@ const IdentityForm = ({ user }) => {
   );
 };
 
-/* ------------------ AvatarBannerManager (crop, preview, delete) ------------------ */
-// ... (Giữ nguyên code AvatarBannerManager)
-const AvatarBannerManager = ({ user, refreshUser }) => {
+/* ------------------ AvatarBannerManager (SỬA v29) ------------------ */
+// <<< SỬA: Thêm `session` để xử lý logic "hybrid"
+const AvatarBannerManager = ({ user, refreshUser, session }) => {
   const [avatarPath, setAvatarPath] = useState(null);
   const [bannerPath, setBannerPath] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [bannerPreview, setBannerPreview] = useState(null);
-
-  // modal state
   const [isAvatarCropOpen, setIsAvatarCropOpen] = useState(false);
   const [isBannerCropOpen, setIsBannerCropOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewSrc, setPreviewSrc] = useState(null);
-
-  // crop states
   const [imageSrc, setImageSrc] = useState(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
-  const [currentUploadType, setCurrentUploadType] = useState(null); // 'avatar' | 'banner'
+  const [currentUploadType, setCurrentUploadType] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
-
   const avatarInputRef = useRef(null);
   const bannerInputRef = useRef(null);
 
-  // load existing values from Users table (prefer db)
   useEffect(() => {
     if (!user) return;
     (async () => {
@@ -616,17 +620,11 @@ const AvatarBannerManager = ({ user, refreshUser }) => {
           .select('avatar_url, banner_url')
           .eq('id', user.id)
           .single();
-
         if (!error) {
-          setAvatarPath(data?.avatar_url || user?.avatar_url || null);
-          setBannerPath(data?.banner_url || user?.banner_url || null);
-        } else {
-          setAvatarPath(user?.avatar_url || null);
-          setBannerPath(user?.banner_url || null);
+          setAvatarPath(data?.avatar_url || null);
+          setBannerPath(data?.banner_url || null);
         }
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) { /* ignore */ }
     })();
   }, [user]);
 
@@ -638,7 +636,6 @@ const AvatarBannerManager = ({ user, refreshUser }) => {
     setBannerPreview(getPublicUrlSafe('banners', bannerPath));
   }, [bannerPath]);
 
-  // read file to dataUrl
   const readFileAsDataURL = (file) => new Promise((res, rej) => {
     const reader = new FileReader();
     reader.addEventListener('load', () => res(reader.result));
@@ -672,17 +669,22 @@ const AvatarBannerManager = ({ user, refreshUser }) => {
       const fileName = `${user.id}-${currentUploadType}-${Date.now()}.jpg`;
       const file = new File([blob], fileName, { type: 'image/jpeg' });
       const bucket = currentUploadType === 'avatar' ? 'avatars' : 'banners';
-      // upload
+      
       const { error: uploadError } = await supabase.storage.from(bucket).upload(fileName, file, { contentType: 'image/jpeg' });
       if (uploadError) throw uploadError;
-      // save path to Users and auth metadata
+
       const updates = currentUploadType === 'avatar' ? { avatar_url: fileName } : { banner_url: fileName };
+      
+      // (Yêu cầu RLS Policy UPDATE trên 'Users' - Đã cung cấp SQL)
       const { error: dbErr } = await supabase.from('Users').update(updates).eq('id', user.id);
       if (dbErr) throw dbErr;
-      const { error: authErr } = await supabase.auth.updateUser({ data: updates });
-      if (authErr) throw authErr;
 
-      // update local state
+      // <<< SỬA LỖI: Chỉ update auth metadata nếu là user "thật" (Admin) >>>
+      if (session) {
+        const { error: authErr } = await supabase.auth.updateUser({ data: updates });
+        if (authErr) throw authErr;
+      }
+      
       if (currentUploadType === 'avatar') {
         setAvatarPath(fileName);
         setAvatarPreview(getPublicUrlSafe('avatars', fileName));
@@ -691,7 +693,7 @@ const AvatarBannerManager = ({ user, refreshUser }) => {
         setBannerPreview(getPublicUrlSafe('banners', fileName));
       }
       toast.success('Tải ảnh thành công!');
-      // close modals
+      
       setIsAvatarCropOpen(false);
       setIsBannerCropOpen(false);
       setImageSrc(null);
@@ -704,7 +706,6 @@ const AvatarBannerManager = ({ user, refreshUser }) => {
     }
   };
 
-  // handle raw file input events
   const handleAvatarFileSelected = async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -717,17 +718,23 @@ const AvatarBannerManager = ({ user, refreshUser }) => {
     await openCropForFile(f, 'banner');
   };
 
-  // Delete functions (remove path from Users + auth metadata)
   const handleDelete = async (type) => {
     if (!user) return;
     const confirm = window.confirm(`Bạn có chắc muốn xóa ${type === 'avatar' ? 'ảnh đại diện' : 'banner'}?`);
     if (!confirm) return;
     try {
       const updates = type === 'avatar' ? { avatar_url: null } : { banner_url: null };
+      
+      // (Yêu cầu RLS Policy UPDATE trên 'Users' - Đã cung cấp SQL)
       const { error: dbErr } = await supabase.from('Users').update(updates).eq('id', user.id);
       if (dbErr) throw dbErr;
-      const { error: authErr } = await supabase.auth.updateUser({ data: updates });
-      if (authErr) throw authErr;
+
+      // <<< SỬA LỖI: Chỉ update auth metadata nếu là user "thật" (Admin) >>>
+      if (session) {
+        const { error: authErr } = await supabase.auth.updateUser({ data: updates });
+        if (authErr) throw authErr;
+      }
+
       if (type === 'avatar') {
         setAvatarPath(null);
         setAvatarPreview(null);
@@ -742,15 +749,14 @@ const AvatarBannerManager = ({ user, refreshUser }) => {
     }
   };
 
-  // preview modal
   const openPreview = (src) => {
     setPreviewSrc(src);
     setIsPreviewOpen(true);
   };
 
+  // ... (Phần JSX của AvatarBannerManager giữ nguyên) ...
   return (
     <div className="mb-6">
-      {/* Banner */}
       <div className="relative rounded-2xl overflow-hidden shadow-lg">
         {bannerPreview ? (
           <img src={bannerPreview} alt="banner" className="w-full h-44 object-cover" onClick={() => openPreview(bannerPreview)} style={{ cursor: 'zoom-in' }} />
@@ -759,8 +765,6 @@ const AvatarBannerManager = ({ user, refreshUser }) => {
             <PaintBrush size={20} /> <span className="ml-2 font-semibold">Your Banner</span>
           </div>
         )}
-
-        {/* banner actions */}
         <div className="absolute top-3 right-3 flex gap-2">
           <label className="inline-flex items-center gap-2 bg-white/90 dark:bg-slate-800/80 p-2 rounded-xl cursor-pointer">
             <Image size={18} /> <span className="hidden md:inline">Thay banner</span>
@@ -773,8 +777,6 @@ const AvatarBannerManager = ({ user, refreshUser }) => {
           )}
         </div>
       </div>
-
-      {/* Avatar + name */}
       <div className="flex items-end gap-4 mt- -12">
         <div className="relative -mt-12">
           <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-white dark:border-slate-900 shadow-lg" onClick={() => avatarPreview && openPreview(avatarPreview)} style={{ cursor: avatarPreview ? 'zoom-in' : 'default' }}>
@@ -786,32 +788,26 @@ const AvatarBannerManager = ({ user, refreshUser }) => {
               </div>
             )}
           </div>
-
           <div className="absolute -right-1 -bottom-1 bg-white/90 dark:bg-slate-800/80 rounded-full p-1 cursor-pointer border border-white/40">
-            <Camera size={16} className="text-slate-700" />
+            <label className="cursor-pointer"><Camera size={16} className="text-slate-700" /></label>
             <input ref={avatarInputRef} type="file" accept="image/*" onChange={handleAvatarFileSelected} className="hidden" />
           </div>
         </div>
-
         <div className="flex-1">
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{user.full_name || user.email}</h2>
           <p className="text-sm text-slate-500 dark:text-slate-300">{user?.role || 'Người dùng'}</p>
         </div>
-
         <div className="ml-auto flex items-center gap-2">
           {avatarPreview && (
             <button onClick={() => handleDelete('avatar')} className="px-3 py-2 bg-white/90 dark:bg-slate-800/80 rounded-2xl inline-flex items-center gap-2">
               <TrashSimple size={16} /> <span className="hidden md:inline">Xóa avatar</span>
             </button>
           )}
-
           <button onClick={() => avatarPreview && openPreview(avatarPreview)} className="px-3 py-2 bg-white/90 dark:bg-slate-800/80 rounded-2xl inline-flex items-center gap-2">
             <MagnifyingGlassPlus size={16} /> <span className="hidden md:inline">Xem ảnh</span>
           </button>
         </div>
       </div>
-
-      {/* Crop Modal */}
       <Dialog open={isAvatarCropOpen || isBannerCropOpen} onClose={() => { setIsAvatarCropOpen(false); setIsBannerCropOpen(false); setImageSrc(null); }}>
         <div className="fixed inset-0 bg-black/50" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
@@ -830,7 +826,6 @@ const AvatarBannerManager = ({ user, refreshUser }) => {
                 />
               )}
             </div>
-
             <div className="mt-4 flex items-center gap-3">
               <input type="range" min={1} max={3} step={0.01} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="w-full" />
               <button onClick={uploadCropped} className="px-4 py-2 bg-gradient-to-r from-[#22d3ee] to-[#6366f1] text-white rounded-2xl inline-flex items-center gap-2" disabled={isUploading}>
@@ -841,8 +836,6 @@ const AvatarBannerManager = ({ user, refreshUser }) => {
           </Dialog.Panel>
         </div>
       </Dialog>
-
-      {/* Preview Modal */}
       <Dialog open={isPreviewOpen} onClose={() => setIsPreviewOpen(false)}>
         <div className="fixed inset-0 bg-black/70" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
@@ -860,21 +853,64 @@ const AvatarBannerManager = ({ user, refreshUser }) => {
   );
 };
 
-/* ------------------ Main Profile Component ------------------ */
+/* ------------------ Main Profile Component (SỬA v29) ------------------ */
 export default function Profile() {
-  const { user, loading, refreshUser } = useAuth();
+  // <<< SỬA: Lấy thêm `session` từ useAuth() >>>
+  const { user, loading, refreshUser, session } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('profile');
+  
+  // <<< SỬA: Thêm state cho status CMND >>>
+  const [identityStatus, setIdentityStatus] = useState(null); // 'approved', 'pending', 'rejected', null
+  const [loadingIdentity, setLoadingIdentity] = useState(true);
 
   useEffect(() => {
     if (!loading && !user) navigate('/login');
   }, [user, loading, navigate]);
-
-  const handleProfileUpdate = (updatedAuthUser) => {
-    refreshUser(updatedAuthUser);
+  
+  // <<< SỬA: Thêm useEffect để fetch status CMND cho logic "gating" >>>
+  useEffect(() => {
+    if (!user) return;
+    
+    setLoadingIdentity(true);
+    const fetchIdentityStatus = async () => {
+      try {
+        // (Yêu cầu RLS Policy SELECT - Đã cung cấp SQL)
+        const { data, error } = await supabase
+          .from('user_identity')
+          .select('status')
+          .eq('id', user.id)
+          .single();
+          
+        if (data) {
+          setIdentityStatus(data.status);
+        } else {
+          setIdentityStatus(null);
+        }
+        if (error && error.code !== 'PGRST116') throw error;
+      } catch (error) {
+        console.error("Lỗi fetch identity status:", error.message);
+        // Không báo toast ở đây để tránh làm phiền
+      } finally {
+        setLoadingIdentity(false);
+      }
+    };
+    fetchIdentityStatus();
+  }, [user]);
+  
+  // <<< SỬA: (Hệ thống Hybrid) Quyết định xem refresh ntn >>>
+  const handleProfileUpdate = (updatedData) => {
+    if (session) {
+      // Admin (SupaAuth)
+      refreshUser(updatedData); // Hàm này từ AuthContext, (nếu bạn có)
+    } else {
+      // User "ảo" (localStorage)
+      setUser(updatedData); // Cập nhật state nội bộ
+    }
   };
 
-  if (loading || !user) {
+  // <<< SỬA: Thêm `loadingIdentity` vào check >>>
+  if (loading || !user || loadingIdentity) {
     return (
       <div className="p-6 flex justify-center items-center min-h-screen bg-slate-100 dark:bg-slate-900">
         <CircleNotch size={40} className="animate-spin text-sky-500" />
@@ -898,8 +934,9 @@ export default function Profile() {
         <div className="md:flex md:gap-8">
           <aside className="md:w-1/4 mb-6 md:mb-0">
             <div className="sticky top-24">
+              {/* <<< SỬA: Truyền `session` xuống >>> */}
               <div className="bg-white/70 dark:bg-slate-800/50 backdrop-blur rounded-2xl p-4 mb-4">
-                <AvatarBannerWrapper user={user} refreshUser={refreshUser} />
+                <AvatarBannerWrapper user={user} refreshUser={refreshUser} session={session} />
               </div>
 
               <nav className="bg-white/60 dark:bg-slate-800/50 backdrop-blur rounded-2xl p-3">
@@ -914,6 +951,8 @@ export default function Profile() {
                   icon={<ShieldCheck className="text-orange-600" />}
                   isActive={activeTab === 'password'}
                   onClick={() => setActiveTab('password')}
+                  // <<< SỬA: Vô hiệu hóa nếu chưa xác thực >>>
+                  disabled={identityStatus !== 'approved'} 
                 />
                 <TabButton
                   label="Xác thực CMND/CCCD"
@@ -922,6 +961,13 @@ export default function Profile() {
                   onClick={() => setActiveTab('identity')}
                 />
               </nav>
+              {/* <<< SỬA: Thêm cảnh báo nếu chưa xác thực >>> */}
+              {identityStatus !== 'approved' && (
+                 <div className="mt-4 p-3 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded-2xl text-xs font-medium text-center">
+                    <Warning size={16} className="inline mr-1" />
+                    Bạn phải xác thực CMND/CCCD để mở khóa tab "Bảo mật".
+                 </div>
+              )}
             </div>
           </aside>
 
@@ -942,7 +988,8 @@ export default function Profile() {
                   className="text-slate-800 dark:text-white"
                 >
                   {activeTab === 'profile' && <ProfileInfoForm user={user} onProfileUpdate={handleProfileUpdate} />}
-                  {activeTab === 'password' && <ChangePasswordForm user={user} />}
+                  {/* <<< SỬA: Truyền `identityStatus` xuống >>> */}
+                  {activeTab === 'password' && <ChangePasswordForm user={user} identityStatus={identityStatus} />}
                   {activeTab === 'identity' && <IdentityForm user={user} />}
                 </motion.div>
               </AnimatePresence>
@@ -951,17 +998,15 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* Inline styles / small utils */}
       <style jsx>{`
-        /* Palette primary: #22d3ee, #0ea5e9, #6366f1 */
         .font-sora { font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue"; }
       `}</style>
     </div>
   );
 }
 
-/* ------------------ AvatarBannerWrapper: small wrapper to use AvatarBannerManager ------------------ */
-function AvatarBannerWrapper({ user, refreshUser }) {
-  // The AvatarBannerManager is heavy (contains modals), but to keep layout small we show AvatarBannerManager directly.
-  return <AvatarBannerManager user={user} refreshUser={refreshUser} />;
+/* ------------------ AvatarBannerWrapper (SỬA v29) ------------------ */
+// <<< SỬA: Nhận và truyền `session` >>>
+function AvatarBannerWrapper({ user, refreshUser, session }) {
+  return <AvatarBannerManager user={user} refreshUser={refreshUser} session={session} />;
 }
