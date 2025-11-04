@@ -682,11 +682,10 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
     try {
       const blob = await getCroppedImg(imageSrc, croppedAreaPixels);
       const fileName = `${user.id}-${currentUploadType}-${Date.now()}.jpg`;
-      // const file = new File([blob], fileName, { type: 'image/jpeg' }); // <-- *** SỬA LỖI TẠI ĐÂY (1/2): Xóa dòng này ***
+      const file = new File([blob], fileName, { type: 'image/jpeg' });
       const bucket = currentUploadType === 'avatar' ? 'avatars' : 'banners';
       
-      // *** SỬA LỖI TẠI ĐÂY (2/2): Đổi 'file' thành 'blob' ***
-      const { error: uploadError } = await supabase.storage.from(bucket).upload(fileName, blob, { contentType: 'image/jpeg' });
+      const { error: uploadError } = await supabase.storage.from(bucket).upload(fileName, file, { contentType: 'image/jpeg' });
       if (uploadError) throw uploadError;
 
       const updates = currentUploadType === 'avatar' ? { avatar_url: fileName } : { banner_url: fileName };
