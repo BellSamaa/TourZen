@@ -324,11 +324,29 @@ const IdentityForm = ({ user, session }) => {
     }
   };
 
-  const uploadFile = async (file, type) => {
-    if (!file) return null;
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${user.id}-${type}-${Date.now()}.${fileExt}`;
-    const filePath = `${fileName}`;
+// --- SỬA HÀM uploadFile ---
+const uploadFile = async (file, type) => {
+  if (!file) return null;
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${user.id}-${type}-${Date.now()}.${fileExt}`;
+  const filePath = fileName;
+
+  try {
+    const { data, error } = await supabase.storage
+      .from("id-scans")
+      .upload(filePath, file, { contentType: file.type || "image/jpeg", upsert: false });
+
+    if (error) throw error;
+
+    console.log(`[UPLOAD OK] ${filePath}`);
+    return filePath;
+  } catch (err) {
+    console.error(`[UPLOAD ERROR] ${filePath}:`, err.message);
+    toast.error(`Không thể tải ảnh ${type === "front" ? "mặt trước" : "mặt sau"}: ${err.message}`);
+    return null; // Trả về null để tránh ghi sai DB
+  }
+};
+  const uploadFileOld = async (file, type) => {
     
     // (Lệnh này giờ sẽ chạy được nhờ RLS mới)
     const { error: uploadError } = await supabase.storage
