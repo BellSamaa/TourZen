@@ -13,24 +13,39 @@ export function useAuth() {
 
 // --- AuthProvider: Bọc toàn bộ ứng dụng ---
 export function AuthProvider({ children }) {
-  const [session, setSession] = useState(null);  // Phiên đăng nhập Supabase
-  const [user, setUser] = useState(null);        // Thông tin người dùng (full_name, role, email)
+  const [session, setSession] = useState(null);  // Phiên đăng nhập Supabase (cho Admin)
+  const [user, setUser] = useState(null);        // Thông tin người dùng (cho cả Admin và User)
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isSupplier, setIsSupplier] = useState(false); // ✅ Thêm cho supplier
+  const [isSupplier, setIsSupplier] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1️⃣ Lấy session hiện tại khi tải trang
+    // 1️⃣ Lấy session hiện tại khi tải trang (Kiểm tra cả 2 hệ thống)
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) {
+        // --- HỆ THỐNG 1: TÌM THẤY ADMIN (SUPABASE AUTH) ---
         getUserDetails(session.user.id);
       } else {
-        setLoading(false);
+        // --- HỆ THỐNG 2: KHÔNG THẤY ADMIN, KIỂM TRA USER "ẢO" ---
+        try {
+          const localUser = localStorage.getItem('user');
+          if (localUser) {
+            const userData = JSON.parse(localUser);
+            setUser(userData);
+            setIsAdmin(userData.role === 'admin'); // (Sẽ là false, nhưng kiểm tra cho chắc)
+            setIsSupplier(userData.role === 'supplier');
+          }
+        } catch (e) {
+          console.error("Lỗi parse user 'ảo' từ localStorage:", e);
+          localStorage.removeItem('user'); // Xóa data "ảo" bị hỏng
+        } finally {
+          setLoading(false); // Xong, vì không cần fetch gì thêm
+        }
       }
     });
 
-    // 2️⃣ Lắng nghe thay đổi đăng nhập / đăng xuất
+    // 2️⃣ Lắng nghe thay đổi đăng nhập / đăng xuất (Chỉ dành cho Supabase Auth - Admin)
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setSession(session);
@@ -40,6 +55,7 @@ export function AuthProvider({ children }) {
           setUser(null);
           setIsAdmin(false);
           setIsSupplier(false);
+          localStorage.removeItem('user'); // Đảm bảo xóa cả "ảo" khi Admin đăng xuất
         }
       }
     );
@@ -51,19 +67,21 @@ export function AuthProvider({ children }) {
   }, []);
 
   /**
-   * 🔍 Lấy thông tin người dùng từ bảng "Users" (hoặc "profiles")
+   * 🔍 Lấy thông tin người dùng từ bảng "Users" (chỉ dùng cho Admin)
    */
   const getUserDetails = async (userId) => {
-    setLoading(true);
-
+    // Đã set loading=true ở đầu useEffect, không cần set lại
+    
+    // (LƯU Ý: Nếu dùng hệ thống "hybrid", ID Admin phải là UUID
+    // và ID User "ảo" phải là INT. Database của bạn phải hỗ trợ cả hai)
     const { data, error } = await supabase
-      .from("Users") // 👈 Đảm bảo bảng của bạn là "Users" hoặc "profiles"
+      .from("Users")
       .select("*")
-      .eq("id", userId)
+      .eq("id", userId) // userId này là UUID từ Supabase Auth
       .single();
 
     if (error) {
-      console.error("Lỗi khi lấy thông tin người dùng:", error);
+      console.error("Lỗi khi lấy thông tin người dùng (Admin):", error);
       setLoading(false);
       return;
     }
@@ -80,10 +98,13 @@ export function AuthProvider({ children }) {
   };
 
   /**
-   * 🔒 Hàm đăng xuất
+   * 🔒 Hàm đăng xuất (Sửa để xóa cả 2 hệ thống)
    */
   const logout = async () => {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut(); // 1. Đăng xuất Supabase Auth (Admin)
+    localStorage.removeItem('user'); // 2. Xóa session "ảo" (User)
+    
+    // Reset state
     setUser(null);
     setIsAdmin(false);
     setIsSupplier(false);
@@ -95,7 +116,7 @@ export function AuthProvider({ children }) {
     session,
     user,
     isAdmin,
-    isSupplier, // ✅ Thêm biến này để Navbar, SupplierDashboard nhận biết
+    isSupplier,
     loading,
     logout,
   };
