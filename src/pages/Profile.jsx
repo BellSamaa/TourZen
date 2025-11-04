@@ -1,12 +1,10 @@
 // src/pages/Profile.jsx
-/* *** (SỬA LỖI v34 - HỢP NHẤT STATE) ***
-  1. (Fix) Nâng state 'identity' và 'loadingIdentity' lên component cha (Profile).
-  2. (Fix) Xóa state trùng lặp trong IdentityForm.
-  3. (Fix) IdentityForm giờ sẽ nhận 'identity' và 'loading' từ props.
-  4. (Fix) IdentityForm gọi hàm 'onRefresh' (do cha cung cấp) sau khi submit
-     để cập nhật trạng thái của TOÀN BỘ trang, mở khóa tab Bảo mật.
-  5. (Giữ nguyên v32) Kích hoạt Tab "Xác thực" cho "User ảo".
-  6. (Giữ nguyên v31) Ẩn nút Upload/Delete Avatar/Banner cho "User ảo".
+/* *** (SỬA LỖI v35 - REALTIME UNLOCK) ***
+  1. (Mới) Thêm Supabase Realtime Subscription vào component 'Profile'.
+  2. (Mới) Trang sẽ lắng nghe thay đổi trên bảng 'user_identity' cho user hiện tại.
+  3. (Mới) Khi Admin duyệt/từ chối, listener sẽ tự động gọi 'fetchIdentity' 
+     để cập nhật state và mở khóa Tab 'Bảo mật' mà không cần F5.
+  4. (Giữ nguyên v34) Hợp nhất state 'identity' và 'loadingIdentity'.
 */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -201,9 +199,9 @@ const ProfileInfoForm = ({ user, onProfileUpdate }) => {
   );
 };
 
-/* ------------------ ChangePasswordForm (SỬA v34) ------------------ */
+/* ------------------ ChangePasswordForm (v34) ------------------ */
 // (Logic này đã đúng - chỉ hiển thị cho Admin "thật" và đã xác thực)
-const ChangePasswordForm = ({ user, identity }) => { // <<< SỬA: Nhận 'identity' (object)
+const ChangePasswordForm = ({ user, identity }) => { // <<< Nhận 'identity' (object)
   const [loading, setLoading] = useState(false);
   const { session } = useAuth(); 
 
@@ -224,7 +222,7 @@ const ChangePasswordForm = ({ user, identity }) => { // <<< SỬA: Nhận 'ident
   };
   
   const isHybridUser = !session;
-  // <<< SỬA: Dùng 'identity.status'
+  // <<< Dùng 'identity.status'
   if (isHybridUser || identity?.status !== 'approved') {
     return (
       <div className="">
@@ -272,18 +270,18 @@ const ChangePasswordForm = ({ user, identity }) => { // <<< SỬA: Nhận 'ident
   );
 };
 
-/* ------------------ IdentityForm (SỬA v34) ------------------ */
+/* ------------------ IdentityForm (v34) ------------------ */
 // (Nhận state từ cha, không tự fetch/load)
 const IdentityForm = ({ user, session, identity, loading, onRefresh }) => { 
-  // <<< SỬA: Xóa state 'identity', 'loading'
+  // <<< Xóa state 'identity', 'loading'
   const [isEditing, setIsEditing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [frontImage, setFrontImage] = useState(null);
   const [backImage, setBackImage] = useState(null);
 
-  // <<< SỬA: Xóa hàm 'fetchIdentity' (useCallback)
+  // <<< Xóa hàm 'fetchIdentity' (useCallback)
   
-  // <<< SỬA: Logic 'useEffect' mới để xử lý khi 'identity' prop thay đổi
+  // <<< Logic 'useEffect' mới để xử lý khi 'identity' prop thay đổi
   useEffect(() => {
     if (!loading) {
       if (identity) {
@@ -334,9 +332,10 @@ const IdentityForm = ({ user, session, identity, loading, onRefresh }) => {
       
       const updates = {
         id: user.id, 
-        status: 'pending', 
+        status: 'pending', // Luôn set là pending khi submit/resubmit
         front_image_url: front_image_path || identity?.front_image_url,
         back_image_url: back_image_path || identity?.back_image_url,
+        // Giữ lại thông tin cũ nếu admin đã điền, hoặc set null nếu chưa có
         id_number: identity?.id_number || null,
         full_name: identity?.full_name || null,
         dob: identity?.dob || null,
@@ -354,7 +353,7 @@ const IdentityForm = ({ user, session, identity, loading, onRefresh }) => {
       setFrontImage(null);
       setBackImage(null);
       
-      // <<< SỬA: Gọi hàm 'onRefresh' của cha để cập nhật toàn bộ trang
+      // <<< Gọi hàm 'onRefresh' của cha để cập nhật toàn bộ trang
       if (onRefresh) {
         onRefresh();
       }
@@ -406,6 +405,11 @@ const IdentityForm = ({ user, session, identity, loading, onRefresh }) => {
         </h3>
         <div className="bg-gradient-to-br from-white/60 to-slate-50 dark:from-slate-800/60 p-5 rounded-2xl border dark:border-slate-700 space-y-3">
           {statusBadge}
+          {identity.status === 'rejected' && identity.reject_reason && (
+            <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg text-sm text-red-800 dark:text-red-200">
+              <strong>Lý do từ chối:</strong> {identity.reject_reason}
+            </div>
+          )}
           <p className="text-sm text-slate-600 dark:text-slate-300 pt-2">
             Trạng thái hồ sơ của bạn. Bạn có thể gửi lại thông tin nếu bị từ chối hoặc cần cập nhật.
           </p>
@@ -472,7 +476,7 @@ const IdentityForm = ({ user, session, identity, loading, onRefresh }) => {
   );
 };
 
-/* ------------------ AvatarBannerManager (Giữ nguyên v31) ------------------ */
+/* ------------------ AvatarBannerManager (v31) ------------------ */
 // (Logic này đã đúng: Vô hiệu hóa cho "User ảo")
 const AvatarBannerManager = ({ user, refreshUser, session }) => {
   const [avatarPath, setAvatarPath] = useState(null);
@@ -761,13 +765,13 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
   );
 };
 
-/* ------------------ Main Profile Component (SỬA v34) ------------------ */
+/* ------------------ Main Profile Component (SỬA v35) ------------------ */
 export default function Profile() {
   const { user, loading, refreshUser, session } = useAuth(); // 'session' rất quan trọng
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('profile');
   
-  // <<< SỬA: Hợp nhất state >>>
+  // <<< (v34) Hợp nhất state >>>
   const [identity, setIdentity] = useState(null); // Giờ là object
   const [loadingIdentity, setLoadingIdentity] = useState(true);
 
@@ -775,7 +779,7 @@ export default function Profile() {
     if (!loading && !user) navigate('/login');
   }, [user, loading, navigate]);
   
-  // <<< SỬA: Tách hàm fetch ra ngoài để có thể gọi lại >>>
+  // <<< (v34) Tách hàm fetch ra ngoài để có thể gọi lại >>>
   const fetchIdentity = useCallback(async () => {
     if (!user) return;
 
@@ -825,10 +829,39 @@ export default function Profile() {
     }
   }, [user, session]); // Thêm 'session' vào dependency array
   
-  // <<< SỬA: useEffect giờ chỉ gọi hàm fetch >>>
+  // <<< SỬA v35: Thêm REALTIME SUBSCRIPTION >>>
   useEffect(() => {
+    // 1. Fetch dữ liệu ban đầu khi component mount
     fetchIdentity();
-  }, [fetchIdentity]);
+
+    // 2. Chỉ thiết lập listener nếu có user
+    if (!user) return;
+
+    // 3. Tạo kênh (channel) lắng nghe
+    const channel = supabase
+      .channel(`user_identity_changes_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Lắng nghe INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'user_identity',
+          filter: `id=eq.${user.id}`, // Chỉ lắng nghe thay đổi của CHÍNH user này
+        },
+        (payload) => {
+          // 4. Khi có thay đổi, fetch lại dữ liệu
+          console.log('Realtime: Trạng thái user_identity đã thay đổi!', payload);
+          toast.success('Trạng thái xác thực của bạn vừa được cập nhật!');
+          fetchIdentity();
+        }
+      )
+      .subscribe();
+
+    // 5. Hàm dọn dẹp: Hủy đăng ký kênh khi component unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchIdentity, user]); // Thêm 'user' vào dependency array
 
   const handleProfileUpdate = (updatedData) => {
     if(refreshUser) refreshUser();
@@ -843,7 +876,7 @@ export default function Profile() {
   }
 
   const isHybridUser = !session;
-  // <<< SỬA: Lấy status từ object 'identity' >>>
+  // <<< (v34) Lấy status từ object 'identity' >>>
   const identityStatus = identity?.status || null;
 
   return (
@@ -878,18 +911,18 @@ export default function Profile() {
                   icon={<ShieldCheck className="text-orange-600" />}
                   isActive={activeTab === 'password'}
                   onClick={() => setActiveTab('password')}
-                  disabled={isHybridUser || identityStatus !== 'approved'} // <<< SỬA: Logic này giờ đã ĐÚNG
+                  disabled={isHybridUser || identityStatus !== 'approved'} // <<< (v34) Logic này giờ đã ĐÚNG
                 />
                 <TabButton
                   label="Xác thực CMND/CCCD"
                   icon={<IdentificationCard className="text-violet-600" />}
                   isActive={activeTab === 'identity'}
                   onClick={() => setActiveTab('identity')}
-                  disabled={false} // (Giữ nguyên v32)
+                  disabled={false} // (v32)
                 />
               </nav>
-              {/* (Giữ nguyên v32) */}
-              {(isHybridUser || identityStatus !== 'approved') && !isHybridUser && (
+              {/* (v32) */}
+              {(!isHybridUser && identityStatus !== 'approved') && (
                  <div className="mt-4 p-3 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded-2xl text-xs font-medium text-center">
                     <Warning size={16} className="inline mr-1" />
                     {isHybridUser 
@@ -919,10 +952,10 @@ export default function Profile() {
                 >
                   {activeTab === 'profile' && <ProfileInfoForm user={user} onProfileUpdate={handleProfileUpdate} />}
                   
-                  {/* <<< SỬA: Truyền 'identity' (object) xuống >>> */}
+                  {/* <<< (v34) Truyền 'identity' (object) xuống >>> */}
                   {activeTab === 'password' && <ChangePasswordForm user={user} identity={identity} />}
                   
-                  {/* <<< SỬA: Truyền 'identity', 'loading' và 'onRefresh' xuống >>> */}
+                  {/* <<< (v34) Truyền 'identity', 'loading' và 'onRefresh' xuống >>> */}
                   {activeTab === 'identity' && (
                     <IdentityForm 
                       user={user} 
@@ -946,7 +979,7 @@ export default function Profile() {
   );
 }
 
-/* ------------------ AvatarBannerWrapper (SỬA v30) ------------------ */
+/* ------------------ AvatarBannerWrapper (v30) ------------------ */
 function AvatarBannerWrapper({ user, refreshUser, session }) {
   return <AvatarBannerManager user={user} refreshUser={refreshUser} session={session} />;
 }

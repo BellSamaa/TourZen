@@ -40,12 +40,33 @@ export default function Login() {
                 // ========== ĐĂNG KÝ (Chỉ dành cho Khách hàng - Hệ thống "Ảo") ==========
                 if (form.password !== form.confirm) throw new Error("Mật khẩu không khớp.");
                 if (form.password.length < 6) throw new Error("Mật khẩu phải có ít nhất 6 ký tự.");
-                if (form.phone_number && !phoneRegex.test(form.phone_number)) {
-                    throw new Error("Số điện thoại không hợp lệ.");
+
+                // ========== CẬP NHẬT VALIDATION (SĐT & ĐỊA CHỈ) ==========
+
+                // 1. Yêu cầu SĐT (nếu có nhập) phải đúng 10 số VÀ hợp lệ
+                if (form.phone_number) { // Chỉ kiểm tra nếu SĐT được cung cấp
+                    if (form.phone_number.length !== 10) {
+                        throw new Error("Số điện thoại phải có đúng 10 chữ số.");
+                    }
+                    if (!phoneRegex.test(form.phone_number)) {
+                        // Regex cũ của bạn đã bao gồm kiểm tra 10 số, nhưng ta thêm SĐT không hợp lệ
+                        throw new Error("Số điện thoại không hợp lệ (Sai đầu số hoặc định dạng).");
+                    }
                 }
-                if (form.address.length < 10) {
-                    throw new Error("Địa chỉ không hợp lệ.");
+
+                // 2. Yêu cầu Địa chỉ (Tỉnh/Thành phố)
+                if (form.address.length < 5) { // Giảm yêu cầu tối thiểu (ví dụ: "Hà Nội", "Đà Nẵng")
+                    throw new Error("Địa chỉ (Tỉnh/Thành phố) có vẻ quá ngắn.");
                 }
+                if (!/[a-zA-Z]/.test(form.address)) { // Phải chứa ít nhất 1 ký tự chữ
+                    throw new Error("Địa chỉ (Tỉnh/Thành phố) phải chứa ký tự chữ (không chỉ số hoặc ký tự đặc biệt).");
+                }
+                // (Bạn có thể thêm regex kiểm tra ký tự đặc biệt không mong muốn nếu cần)
+                if (/[!@#$%^&*()_+\=\[\]{};':"\\|<>?~]/.test(form.address)) {
+                     throw new Error("Địa chỉ (Tỉnh/Thành phố) chứa ký tự đặc biệt không hợp lệ.");
+                }
+                
+                // ========== KẾT THÚC CẬP NHẬT ==========
 
                 // Kiểm tra email đã tồn tại chưa
                 const { data: existingUser } = await supabase
@@ -241,7 +262,7 @@ export default function Login() {
                     setSuccess("Đổi mật khẩu thành công! 🎉");
                     setForm(initialFormState);
                     setIsOtpSent(false);
-                    setTimeout(() => setMode('login'), 2000);
+_                    setTimeout(() => setMode('login'), 2000);
                 }
             }
         } catch (err) {
