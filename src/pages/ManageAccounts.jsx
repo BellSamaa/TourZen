@@ -1,17 +1,7 @@
 // ManageAccounts.jsx
-/* *** (SỬA LỖI v20) Sửa lỗi Logic + Crash ***
-  1. (Logic) Xóa TẤT CẢ các tham chiếu đến 'username' (vì nó không tồn tại
-     trong CSDL 'Users' của bạn). Đã xóa khỏi:
-     - State
-     - Hàm handleSubmit (Thêm mới & Sửa)
-     - Hàm fetchAccounts (selectQuery & searchQuery)
-  2. (Logic) ĐỊNH NGHĨA LẠI 'pageVariants' và 'itemVariant' để fix lỗi crash
-     "pageVariants is not defined".
-  3. (UI) Xóa dòng "ID: {account.username}" (ví dụ: "ID: default_user")
-     khỏi cột "Họ và Tên" trong bảng (đáp ứng v17).
-*/
-/* *** (Nâng cấp v18 - Giữ lại) ***
-  1. (UI/Logic) Giữ lại Nút Xóa, Modal Xóa, và hàm handleDeleteAccount.
+/* *** (SỬA LỖI v22) Sửa lỗi Logic hiển thị Mã ID ***
+  1. (Logic) Sửa logic cột "Mã ID" để LUÔN hiển thị 'account_code'
+     thay vì 'customer_code' (đáp ứng yêu cầu của user).
 */
 /* *** (DI CHUYỂN v21) ***
   1. (Logic) Chuyển component `PasswordResetRequests` từ ManageCustomers
@@ -20,6 +10,15 @@
   3. (UI) Thêm CSS `.simple-scrollbar` để hỗ trợ component mới.
   4. (UI) Thay thế `FaBell` bằng `Bell` của Phosphor.
 */
+/* *** (SỬA LỖI v20) Sửa lỗi Logic + Crash ***
+  1. (Logic) Xóa TẤT CẢ các tham chiếu đến 'username'.
+  2. (Logic) ĐỊNH NGHĨA LẠI 'pageVariants' và 'itemVariant'.
+  3. (UI) Xóa dòng "ID: {account.username}"
+*/
+/* *** (Nâng cấp v18 - Giữ lại) ***
+  1. (UI/Logic) Giữ lại Nút Xóa, Modal Xóa, và hàm handleDeleteAccount.
+*/
+
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { getSupabase } from "../lib/supabaseClient";
@@ -872,7 +871,10 @@ export default function AdminManageAccounts() {
                                     
                                     {!error && accounts.map((account) => {
                                         const roleInfo = getRoleInfo(account.role);
-                                        const displayCode = account.role === 'user' ? account.customer_code : account.account_code;
+                                        
+                                        // <<< *** (SỬA v22) *** >>>
+                                        // Luôn hiển thị account_code trên trang Quản lý Tài khoản
+                                        const displayCode = account.account_code;
                                         
                                         return (
                                         <motion.tr
