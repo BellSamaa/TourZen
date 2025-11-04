@@ -1,11 +1,9 @@
 // src/pages/Profile.jsx
-/* *** (SỬA LỖI v31) ***
-  1. (Fix RLS 400/500) Vô hiệu hóa Tab "Xác thực" & chặn submit
-     nếu là "User ảo" (không có session).
-  2. (Fix RLS 400/500) Ẩn nút Upload/Delete Avatar/Banner
-     nếu là "User ảo" (không có session).
-  3. (Fix Logic DB) Trỏ các truy vấn Avatar/Banner đến bảng
-     `user_identity` thay vì `Users`.
+/* *** (SỬA LỖI v32) ***
+  1. (Fix RLS 400) Kích hoạt lại Tab "Xác thực" cho "User ảo" (theo yêu cầu).
+  2. (Fix RLS 400) Xóa bỏ logic chặn 'handleSubmit' của IdentityForm.
+  3. (Giữ nguyên v31) Ẩn nút Upload/Delete Avatar/Banner cho "User ảo".
+  4. (Giữ nguyên v31) Trỏ truy vấn Avatar/Banner đến `user_identity`.
 */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -270,26 +268,30 @@ const ChangePasswordForm = ({ user, identityStatus }) => {
   );
 };
 
-/* ------------------ IdentityForm (Đã fix lỗi RLS) ------------------ */
-// (Code này giờ sẽ chạy được nếu là Admin "thật", User "ảo" sẽ không thấy)
-const IdentityForm = ({ user, session }) => { // <<< SỬA LỖI: Nhận 'session'
+/* ------------------ IdentityForm (SỬA v32) ------------------ */
+// (Code này giờ sẽ chạy được cho cả Admin "thật" VÀ User "ảo")
+const IdentityForm = ({ user, session }) => { 
   const [identity, setIdentity] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [frontImage, setFrontImage] = useState(null);
   const [backImage, setBackImage] = useState(null);
-  // (Đã xóa 'session' khỏi đây vì nó được truyền qua prop)
 
   const fetchIdentity = useCallback(async () => {
-    if (!user || !session) { // Chỉ fetch nếu là user "thật"
+    if (!user) return; // Dừng nếu không có user
+    
+    // "User ảo" (isHybridUser = !session) sẽ không có bản ghi identity
+    // nên chúng ta chỉ fetch nếu là user "thật" (có session)
+    if (!session) { 
       setLoading(false);
       setIsEditing(true); // User "ảo" sẽ luôn ở màn hình upload
       return;
     }
+
     setLoading(true);
     try {
-      // (Lệnh này giờ sẽ chạy được)
+      // (Lệnh này giờ sẽ chạy được cho user "thật")
       const { data, error } = await supabase
         .from('user_identity')
         .select('*')
@@ -327,6 +329,8 @@ const IdentityForm = ({ user, session }) => { // <<< SỬA LỖI: Nhận 'sessio
     const fileExt = file.name.split('.').pop();
     const fileName = `${user.id}-${type}-${Date.now()}.${fileExt}`;
     const filePath = `${fileName}`;
+    
+    // (Lệnh này giờ sẽ chạy được nhờ RLS mới)
     const { error: uploadError } = await supabase.storage
       .from('id-scans')
       .upload(filePath, file, { contentType: file.type || 'image/png' });
@@ -337,12 +341,8 @@ const IdentityForm = ({ user, session }) => { // <<< SỬA LỖI: Nhận 'sessio
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // <<< SỬA LỖI v31: Chặn "User ảo" (anon) gửi form >>>
-    if (!session) {
-      toast.error("Chức năng này chỉ dành cho tài khoản Admin/Supplier đã đăng nhập.");
-      return;
-    }
-    // <<< KẾT THÚC SỬA LỖI v31 >>>
+    // <<< SỬA LỖI v32: Xóa bỏ logic chặn "User ảo" (anon) >>>
+    // (if (!session) { ... return; }) // ĐÃ XÓA
 
     if (!frontImage && !identity?.front_image_url) {
       toast.error("Vui lòng tải lên ảnh mặt trước.");
@@ -356,29 +356,65 @@ const IdentityForm = ({ user, session }) => { // <<< SỬA LỖI: Nhận 'sessio
     try {
       const front_image_path = frontImage ? await uploadFile(frontImage, 'front') : null;
       const back_image_path = backImage ? await uploadFile(backImage, 'back') : null;
+      
+      // "User ảo" sẽ không có bản ghi identity, nên chúng ta cần upsert
+      // cho cả "user ảo" (tài khoản thường) và "user thật" (admin/supplier)
       const updates = {
-        id: user.id,
-        status: 'pending',
-        ...(front_image_path && { front_image_url: front_image_path }),
-        ...(back_image_path && { back_image_url: back_image_path }),
-        ...(!identity && {
-          id_number: null,
-          full_name: null,
-          dob: null,
-          issue_date: null,
-          issue_place: null,
-        })
+        id: user.id, // ID này là UUID (cả ảo và thật)
+        status: 'pending', // Luôn chờ duyệt
+        front_image_url: front_image_path || identity?.front_image_url,
+        back_image_url: back_image_path || identity?.back_image_url,
+        // Giữ lại thông tin cũ nếu là "user thật" đang cập nhật
+        id_number: identity?.id_number || null,
+        full_name: identity?.full_name || null,
+        dob: identity?.dob || null,
+        issue_date: identity?.issue_date || null,
+        issue_place: identity?.issue_place || null,
       };
-      // (Lệnh này giờ sẽ chạy được)
+      
+      // (Lệnh này cần RLS cho phép 'upsert' hoặc 'insert' và 'update')
+      // (Chúng ta đã có policy RLS cho 'user thật' ở các bước trước)
+      // (User ảo không có record ở đây, nên họ không thể 'update' - LỖI TIỀM TÀNG)
+      
+      // SỬA LOGIC: "User ảo" phải luôn 'INSERT'. "User thật" mới 'UPSERT'.
+      // Cách đơn giản nhất là 'upsert'
+      
       const { error } = await supabase
         .from('user_identity')
-        .upsert(updates, { onConflict: 'id' });
-      if (error) throw error;
+        .upsert(updates, { onConflict: 'id' }); // Cần RLS cho 'INSERT' và 'UPDATE'
+
+      if (error) {
+         // Nếu "user ảo" bị lỗi RLS 'UPDATE', chúng ta thử 'INSERT'
+         if (error.message.includes('policy') && !session) {
+            // "User ảo" (không session) bị lỗi RLS -> thử insert
+            const insertData = { ...updates };
+            delete insertData.id_number; // Xóa các trường null để insert
+            delete insertData.full_name;
+            delete insertData.dob;
+            delete insertData.issue_date;
+            delete insertData.issue_place;
+            
+            const { error: insertError } = await supabase
+              .from('user_identity')
+              .insert(insertData);
+             if (insertError) throw insertError; // Nếu vẫn lỗi thì báo
+         } else {
+            throw error; // Báo lỗi RLS gốc
+         }
+      }
+
       toast.success('Đã gửi thông tin xác thực! Vui lòng chờ Admin duyệt.');
       setFrontImage(null);
       setBackImage(null);
-      fetchIdentity();
-      setIsEditing(false);
+      fetchIdentity(); // Tải lại (chỉ user thật mới thấy thay đổi)
+      setIsEditing(false); // Ẩn form (chỉ user thật mới thấy)
+      
+      // User ảo sẽ vẫn thấy form (vì fetchIdentity không chạy)
+      if (!session) {
+         setIsEditing(true); 
+         setIdentity(null); // Reset
+      }
+
     } catch (error) {
       toast.error(`Lỗi gửi thông tin: ${error.message}`);
     } finally {
@@ -486,8 +522,8 @@ const IdentityForm = ({ user, session }) => { // <<< SỬA LỖI: Nhận 'sessio
   );
 };
 
-/* ------------------ AvatarBannerManager (SỬA v31) ------------------ */
-// (SỬA LỖI v31: Ẩn nút Upload/Delete nếu là "User ảo" - không có session)
+/* ------------------ AvatarBannerManager (Giữ nguyên v31) ------------------ */
+// (Logic này đã đúng: Vô hiệu hóa cho "User ảo")
 const AvatarBannerManager = ({ user, refreshUser, session }) => {
   const [avatarPath, setAvatarPath] = useState(null);
   const [bannerPath, setBannerPath] = useState(null);
@@ -508,7 +544,6 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
     if (!user || !session) return; // User "ảo" không fetch
     (async () => {
       try {
-        // <<< SỬA LỖI: Đổi 'Users' thành 'user_identity' >>>
         const { data, error } = await supabase
           .from('user_identity') 
           .select('avatar_url, banner_url')
@@ -569,7 +604,6 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
 
       const updates = currentUploadType === 'avatar' ? { avatar_url: fileName } : { banner_url: fileName };
       
-      // <<< SỬA LỖI: Đổi 'Users' thành 'user_identity' >>>
       const { error: dbErr } = await supabase.from('user_identity').update(updates).eq('id', user.id);
       if (dbErr) throw dbErr;
 
@@ -618,7 +652,6 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
     try {
       const updates = type === 'avatar' ? { avatar_url: null } : { banner_url: null };
       
-      // <<< SỬA LỖI: Đổi 'Users' thành 'user_identity' >>>
       const { error: dbErr } = await supabase.from('user_identity').update(updates).eq('id', user.id);
       if (dbErr) throw dbErr;
 
@@ -658,7 +691,7 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
           </div>
         )}
 
-        {/* <<< SỬA LỖI v31: Chỉ hiển thị nút cho user "thật" (có session) >>> */}
+        {/* (v31) Chỉ hiển thị nút cho user "thật" (có session) */}
         {session && (
           <div className="absolute top-3 right-3 flex gap-2">
             <label htmlFor="banner-upload-input" className="inline-flex items-center gap-2 bg-white/90 dark:bg-slate-800/80 p-2 rounded-xl cursor-pointer">
@@ -693,7 +726,7 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
             )}
           </div>
 
-          {/* <<< SỬA LỖI v31: Chỉ hiển thị nút cho user "thật" (có session) >>> */}
+          {/* (v31) Chỉ hiển thị nút cho user "thật" (có session) */}
           {session && (
             <>
               <label htmlFor="avatar-upload-input" className="absolute -right-1 -bottom-1 bg-white/90 dark:bg-slate-800/80 rounded-full p-1 cursor-pointer border border-white/40">
@@ -716,7 +749,7 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          {/* <<< SỬA LỖI v31: Chỉ hiển thị nút cho user "thật" (có session) >>> */}
+          {/* (v31) Chỉ hiển thị nút cho user "thật" (có session) */}
           {session && avatarPreview && (
             <button onClick={() => handleDelete('avatar')} className="px-3 py-2 bg-white/90 dark:bg-slate-800/80 rounded-2xl inline-flex items-center gap-2">
               <TrashSimple size={16} /> <span className="hidden md:inline">Xóa avatar</span>
@@ -778,7 +811,7 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
   );
 };
 
-/* ------------------ Main Profile Component (SỬA v31) ------------------ */
+/* ------------------ Main Profile Component (SỬA v32) ------------------ */
 export default function Profile() {
   const { user, loading, refreshUser, session } = useAuth(); // 'session' rất quan trọng
   const navigate = useNavigate();
@@ -880,15 +913,15 @@ export default function Profile() {
                   icon={<IdentificationCard className="text-violet-600" />}
                   isActive={activeTab === 'identity'}
                   onClick={() => setActiveTab('identity')}
-                  disabled={isHybridUser} // <<< SỬA LỖI v31: Vô hiệu hóa cho "User ảo"
+                  disabled={false} // <<< SỬA LỖI v32: Kích hoạt lại cho "User ảo"
                 />
               </nav>
-              {/* <<< SỬA LỖI v31: Cập nhật thông báo lỗi >>> */}
-              {(isHybridUser || identityStatus !== 'approved') && (
+              {/* <<< SỬA LỖI v32: Cập nhật thông báo lỗi >>> */}
+              {(isHybridUser || identityStatus !== 'approved') && !isHybridUser && (
                  <div className="mt-4 p-3 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded-2xl text-xs font-medium text-center">
                     <Warning size={16} className="inline mr-1" />
                     {isHybridUser 
-                      ? "Tab 'Bảo mật' & 'Xác thực' chỉ dành cho tài khoản Admin/Supplier." 
+                      ? "Tab 'Bảo mật' chỉ dành cho tài khoản Admin/Supplier." // (Thông báo này giờ sẽ không hiển thị, nhưng giữ lại cho an toàn)
                       : "Bạn phải xác thực CMND/CCCD để mở khóa tab 'Bảo mật'."
                     }
                  </div>
@@ -914,7 +947,6 @@ export default function Profile() {
                 >
                   {activeTab === 'profile' && <ProfileInfoForm user={user} onProfileUpdate={handleProfileUpdate} />}
                   {activeTab === 'password' && <ChangePasswordForm user={user} identityStatus={identityStatus} />}
-                  {/* <<< SỬA LỖI v31: Truyền 'session' vào >>> */}
                   {activeTab === 'identity' && <IdentityForm user={user} session={session} />}
                 </motion.div>
               </AnimatePresence>

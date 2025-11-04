@@ -40,7 +40,12 @@ export default function Login() {
                 // ========== ĐĂNG KÝ (Chỉ dành cho Khách hàng - Hệ thống "Ảo") ==========
                 if (form.password !== form.confirm) throw new Error("Mật khẩu không khớp.");
                 if (form.password.length < 6) throw new Error("Mật khẩu phải có ít nhất 6 ký tự.");
-                // ... (Các kiểm tra khác của bạn) ...
+                if (form.phone_number && !phoneRegex.test(form.phone_number)) {
+                    throw new Error("Số điện thoại không hợp lệ.");
+                }
+                if (form.address.length < 10) {
+                    throw new Error("Địa chỉ không hợp lệ.");
+                }
 
                 // Kiểm tra email đã tồn tại chưa
                 const { data: existingUser } = await supabase
@@ -53,21 +58,19 @@ export default function Login() {
                     throw new Error("Email đã được sử dụng. Vui lòng dùng email khác.");
                 }
 
-                // Mã hóa mật khẩu (sử dụng Base64 đơn giản)
                 const hashedPassword = btoa(form.password);
                 const customerCode = 'KH' + Date.now().toString().slice(-6);
 
-                // Insert vào bảng Users (TÀI KHOẢN ẢO)
                 const { error: insertError } = await supabase
                     .from('Users')
                     .insert({
                         email: form.email,
-                        password: hashedPassword, // Lưu mật khẩu đã mã hóa Base64
+                        password: hashedPassword, // Lưu mật khẩu Base64
                         full_name: form.name,
                         address: form.address,
                         phone_number: form.phone_number || null,
                         ngay_sinh: form.ngay_sinh || null,
-                        role: 'user', // Luôn đăng ký là 'user'
+                        role: 'user', 
                         customer_code: customerCode,
                         is_active: true
                     });
@@ -76,11 +79,13 @@ export default function Login() {
                     throw new Error(`Không thể tạo tài khoản: ${insertError.message}`);
                 }
 
-                // (YÊU CẦU 1) - Đăng ký xong không đăng nhập
+                // (YÊU CẦU 2 - ĐANG CHẠY ĐÚNG) 
+                // Chỉ báo thành công và chuyển sang login, không tự đăng nhập
                 setSuccess("Đăng ký thành công! 🎉 Bạn có thể đăng nhập ngay.");
                 setForm(initialFormState);
+                
                 setTimeout(() => {
-                    setMode('login');
+                    setMode('login'); // <-- Chỉ đổi form, không đăng nhập
                     setSuccess('');
                 }, 2000);
 
@@ -98,7 +103,6 @@ export default function Login() {
                     throw new Error("Email hoặc mật khẩu không đúng.");
                 }
 
-                // Kiểm tra tài khoản bị khóa (chung cho cả hai hệ thống)
                 if (userProfile.is_active === false) {
                     throw new Error("Tài khoản của bạn đã bị khóa. 🔒");
                 }
@@ -121,8 +125,9 @@ export default function Login() {
                          throw new Error("Đăng nhập Admin thất bại, không nhận được session.");
                     }
                     
-                    // (YÊU CẦU 2) - Admin vào dashboard
-                    from = "/admin"; 
+                    // <<< SỬA ĐỔI THEO YÊU CẦU 1 >>>
+                    // Admin sẽ ở lại trang Home (hoặc trang trước đó)
+                    from = location.state?.from?.pathname || "/";
                     
                 } else {
                     // --- (HỆ THỐNG 2: USER DÙNG TÀI KHOẢN ẢO) ---
@@ -155,13 +160,12 @@ export default function Login() {
                 setSuccess("Đăng nhập thành công! 🎉");
                 
                 // (FIX LỖI NAVBAR) - Dùng window.location.href để BUỘC TẢI LẠI TRANG
-                // Giúp Navbar đọc được session (cho Admin) hoặc localStorage (cho User)
                 setTimeout(() => {
                     window.location.href = from;
                 }, 1000);
 
             } else if (mode === 'forgot') {
-                // (YÊU CẦU 3) - Giữ nguyên hệ thống "Admin OTP" (Chỉ dành cho User)
+                // (YÊU CẦU 3) - Giữ nguyên hệ thống "Admin OTP"
                 if (!form.email) throw new Error("Vui lòng nhập email của bạn.");
 
                 if (!isOtpSent) {
@@ -177,7 +181,7 @@ export default function Login() {
                     }
                     
                     if (user.role === 'admin') {
-                         throw new Error("Không thể dùng chức năng này cho tài khoản Admin. Vui lòng dùng chức năng 'Quên mật khẩu' của Supabase.");
+                         throw new Error("Không thể dùng chức năng này cho tài khoản Admin.");
                     }
 
                     const expiresAt = new Date();
@@ -256,7 +260,7 @@ export default function Login() {
         setIsOtpSent(false); 
     };
 
-    // ... (Phần JSX còn lại của bạn giữ nguyên, nó đã đúng với logic "Admin OTP")
+    // ... (Toàn bộ phần JSX return giữ nguyên như file "hybrid" trước đó) ...
     const backdropVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { duration: 0.8 } } };
     const formContainerVariants = {
         hidden: { opacity: 0, y: 30, scale: 0.98 },
