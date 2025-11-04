@@ -1,369 +1,441 @@
-// src/components/Navbar.jsx (ĐÃ SỬA)
-// (SỬA LỖI v19.1) Sửa tên icon 'IdentificationCard' -> 'IdCard'
-// (SỬA v19) Thêm link "Thông tin cá nhân" (/profile) vào dropdown
+// HỆ THỐNG TÀI KHOẢN ẢO - KHÔNG DÙNG SUPABASE AUTH
 
-import React, { useState, useEffect } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
-import {
-  ShoppingCart,
-  Plane,
-  Users, // Đã thay đổi từ Hotel
-  Percent,
-  User,
-  LogOut,
-  LayoutDashboard,
-  Truck,
-  Menu,
-  X,
-  Sun,
-  Moon,
-  ShoppingBag, // Thêm icon cho đơn hàng
-  IdCard // <<< SỬA LỖI v19.1: Đổi tên icon từ IdentificationCard -> IdCard
-} from "lucide-react";
+import React, { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAuth } from "../context/AuthContext";
-// import { useCart } from "../context/CartContext";
+import {
+    FaLock, FaEye, FaEyeSlash, FaUser, FaEnvelope, FaSignInAlt,
+    FaMapMarkerAlt, FaPhone, FaInfoCircle, FaCheckCircle,
+    FaCalendarAlt, FaPaperPlane, FaKey 
+} from "react-icons/fa";
+import { getSupabase } from "../lib/supabaseClient";
 
-// 🌙 Theme Toggle
-const ThemeToggle = () => {
-  const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
+const supabase = getSupabase();
+const phoneRegex = /^(0(3[2-9]|5[6|8|9]|7[0|6-9]|8[1-6|8|9]|9[0-4|6-9]))\d{7}$/;
 
-  useEffect(() => {
-    if (theme === "dark") {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-    }
-  }, [theme]);
+export default function Login() {
+    const navigate = useNavigate();
+    const location = useLocation();
+    const [mode, setMode] = useState('login');
+    const initialFormState = { name: "", email: "", password: "", confirm: "", address: "", phone_number: "", ngay_sinh: "", otp: "" };
+    const [form, setForm] = useState(initialFormState);
+    const [error, setError] = useState("");
+    const [success, setSuccess] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [isOtpSent, setIsOtpSent] = useState(false);
+    const ADMIN_PHONE = "0912345678";
 
-  return (
-    <button
-      onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-      className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700"
-    >
-      {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
-    </button>
-  );
-};
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError("");
+        setSuccess("");
+        setLoading(true);
+        
+        try {
+            if (mode === 'register') {
+                // ========== ĐĂNG KÝ TÀI KHOẢN ẢO ==========
+                if (form.password !== form.confirm) throw new Error("Mật khẩu không khớp.");
+                if (form.password.length < 6) throw new Error("Mật khẩu phải có ít nhất 6 ký tự.");
+                if (form.phone_number && !phoneRegex.test(form.phone_number)) {
+                    throw new Error("Số điện thoại không hợp lệ. Phải đủ 10 số và đúng đầu số (03, 05, 07, 08, 09).");
+                }
+                if (form.address.length < 10) {
+                    throw new Error("Địa chỉ không hợp lệ. Vui lòng nhập địa chỉ đầy đủ (ít nhất 10 ký tự).");
+                }
 
-// 👤 Profile Dropdown Menu
-const ProfileMenu = ({ user }) => {
-  const { logout } = useAuth();
-  const navigate = useNavigate();
-  const [isOpen, setIsOpen] = useState(false);
+                // Kiểm tra email đã tồn tại chưa
+                const { data: existingUser } = await supabase
+                    .from('Users')
+                    .select('email')
+                    .eq('email', form.email)
+                    .single();
 
-  const handleLogout = async () => {
-    // Sửa đổi logout để xóa cả localStorage
-    await logout();
-    localStorage.removeItem("user"); // Xóa user "ảo" khỏi localStorage
-    window.location.href = "/"; // Tải lại trang
-  };
+                if (existingUser) {
+                    throw new Error("Email đã được sử dụng. Vui lòng dùng email khác.");
+                }
 
-  const goToDashboard = () => {
-    if (user.role === "admin") navigate("/admin");
-    else if (user.role === "supplier") navigate("/supplier");
-  };
+                // Mã hóa mật khẩu (sử dụng Base64 đơn giản)
+                const hashedPassword = btoa(form.password);
 
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-white hover:text-sky-600 dark:hover:text-sky-400"
-      >
-        <User size={18} />
-        <span className="hidden md:inline">Chào, {user.full_name}!</span>
-      </button>
+                // Tạo mã khách hàng tự động
+                const customerCode = 'KH' + Date.now().toString().slice(-6);
 
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="absolute right-0 mt-3 w-56 bg-white dark:bg-neutral-800 rounded-lg shadow-xl border dark:border-neutral-700 overflow-hidden z-50"
-          >
-            <div className="p-3 border-b dark:border-neutral-700">
-              <p className="font-semibold text-gray-800 dark:text-white truncate">{user.full_name}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
-            </div>
-            <nav className="p-2">
-              {user.role === "admin" && (
-                <button
-                  onClick={() => {
-                    goToDashboard();
-                    setIsOpen(false);
-                  }}
-                  className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-md text-sm text-gray-700 dark:text-gray-200 hover:bg-sky-500 hover:text-white"
-                >
-                  <LayoutDashboard size={16} />
-                  Trang Quản trị
-                </button>
-              )}
+                // Insert vào bảng Users (TÀI KHOẢN ẢO)
+                const { data: newUser, error: insertError } = await supabase
+                    .from('Users')
+                    .insert({
+                        email: form.email,
+                        password: hashedPassword, // Lưu mật khẩu đã mã hóa
+                        full_name: form.name,
+                        address: form.address,
+                        phone_number: form.phone_number || null,
+                        ngay_sinh: form.ngay_sinh || null,
+                        role: 'user',
+                        customer_code: customerCode,
+                        is_active: true
+                    })
+                    .select()
+                    .single();
 
-              {user.role === "supplier" && (
-                <button
-                  onClick={() => {
-                    goToDashboard();
-                    setIsOpen(false);
-                  }}
-                  className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-md text-sm text-gray-700 dark:text-gray-200 hover:bg-sky-500 hover:text-white"
-                >
-                  <Truck size={16} />
-                  Suppliers Dashboard
-                </button>
-              )}
+                if (insertError) {
+                    console.error("❌ Insert error:", insertError);
+                    throw new Error(`Không thể tạo tài khoản: ${insertError.message}`);
+                }
 
-              {user.role !== "admin" && user.role !== "supplier" && (
-                <>
-                  <button
-                    onClick={() => {
-                      navigate("/my-bookings");
-                      setIsOpen(false);
-                    }}
-                    className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-md text-sm text-gray-700 dark:text-gray-200 hover:bg-sky-500 hover:text-white"
-                  >
-                    <ShoppingBag size={16} />
-                    Đơn hàng của tôi
-                  </button>
-                  
-                  {/* <<< THÊM v19: Link Thông tin cá nhân >>> */}
-                  <button
-                    onClick={() => {
-                      navigate("/profile");
-                      setIsOpen(false);
-                    }}
-                    className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-md text-sm text-gray-700 dark:text-gray-200 hover:bg-sky-500 hover:text-white"
-                  >
-                    {/* <<< SỬA LỖI v19.1: Đổi tên icon >>> */}
-                    <IdCard size={16} /> 
-                    Thông tin cá nhân
-                  </button>
-                </>
-              )}
+                console.log("✅ User created:", newUser);
+                setSuccess("Đăng ký thành công! 🎉 Bạn có thể đăng nhập ngay.");
+                setForm(initialFormState);
+                
+                setTimeout(() => {
+                    setMode('login');
+                    setSuccess('');
+                }, 2000);
 
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-md text-sm text-red-600 dark:text-red-400 hover:bg-red-500 hover:text-white"
-              >
-                <LogOut size={16} />
-                Đăng xuất
-              </button>
-            </nav>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-};
+            } else if (mode === 'login') {
+                // ========== ĐĂNG NHẬP TÀI KHOẢN ẢO ==========
+                const { data: user, error: loginError } = await supabase
+                    .from('Users')
+                    .select('*')
+                    .eq('email', form.email)
+                    .single();
 
-// 🌍 Navbar Chính
-export default function Navbar() {
-  const { session, user, loading } = useAuth();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  // const { cart } = useCart();
-  const cartItemCount = 0;
+                if (loginError || !user) {
+                    throw new Error("Email hoặc mật khẩu không đúng.");
+                }
 
-  const navLinks = [
-    { name: "Du lịch", path: "/tours", icon: <Plane size={18} /> },
-    { name: "Về Chúng Tôi", path: "/about", icon: <Users size={18} /> }, // Đã thay đổi
-    { name: "Khuyến mãi", path: "/promotions", icon: <Percent size={18} /> },
-  ];
+                // Giải mã và kiểm tra mật khẩu
+                try {
+                    const decodedPassword = atob(user.password);
+                    if (decodedPassword !== form.password) {
+                        throw new Error("Email hoặc mật khẩu không đúng.");
+                    }
+                } catch (e) {
+                    throw new Error("Email hoặc mật khẩu không đúng.");
+                }
 
-  const renderAuthSection = () => {
-    if (loading)
-      return <div className="w-24 h-8 bg-gray-200 dark:bg-neutral-700 rounded-full animate-pulse"></div>;
-    
-    // <<< SỬA ĐỔI QUAN TRỌNG TẠI ĐÂY >>>
-    // Thay vì (session && user), chúng ta chỉ cần kiểm tra (user)
-    // vì hệ thống "ảo" của bạn chỉ cung cấp 'user' (từ localStorage).
-    if (user) return <ProfileMenu user={user} />;
-    // <<< KẾT THÚC SỬA ĐỔI >>>
+                // Kiểm tra tài khoản có bị khóa không
+                if (user.is_active === false) {
+                    throw new Error("Tài khoản của bạn đã bị khóa. 🔒");
+                }
+
+                // Lưu thông tin user vào localStorage (Giả lập session)
+                localStorage.setItem('user', JSON.stringify({
+                    id: user.id,
+                    email: user.email,
+                    full_name: user.full_name,
+                    role: user.role,
+                    customer_code: user.customer_code
+                }));
+
+                setSuccess("Đăng nhập thành công! 🎉");
+                
+                // Chuyển hướng theo role
+                const from = location.state?.from?.pathname || (user.role === 'admin' ? "/admin" : "/");
+                
+                // <<< SỬA LỖI QUAN TRỌNG >>>
+                // Thay thế navigate() bằng window.location.href
+                // để BUỘC TẢI LẠI TRANG. Việc này sẽ ép AuthContext
+                // đọc lại 'user' từ localStorage và Navbar sẽ cập nhật.
+                setTimeout(() => {
+                    window.location.href = from;
+                }, 1000);
+                // <<< KẾT THÚC SỬA LỖI >>>
+
+            } else if (mode === 'forgot') {
+                // ========== QUÊN MẬT KHẨU ==========
+                if (!form.email) throw new Error("Vui lòng nhập email của bạn.");
+
+                if (!isOtpSent) {
+                    // BƯỚC 1: Gửi yêu cầu hỗ trợ
+                    const { data: user, error: findError } = await supabase
+                        .from('Users')
+                        .select('id')
+                        .eq('email', form.email)
+                        .single();
+
+                    if (findError || !user) {
+                        throw new Error("Email không tồn tại trong hệ thống.");
+                    }
+
+                    // Tạo yêu cầu reset password
+                    const expiresAt = new Date();
+                    expiresAt.setHours(expiresAt.getHours() + 24); // Hết hạn sau 24 giờ
+
+                    const { error: insertError } = await supabase
+                        .from('password_reset_requests')
+                        .insert({
+                            email: form.email,
+                            otp: null, // Admin sẽ điền OTP sau
+                            is_resolved: false,
+                            requested_at: new Date().toISOString(),
+                            expires_at: expiresAt.toISOString()
+                        });
+
+                    if (insertError) {
+                        console.error("❌ Insert request error:", insertError);
+                        throw new Error(`Không thể gửi yêu cầu: ${insertError.message}`);
+                    }
+
+                    setSuccess(`Yêu cầu đã gửi! Vui lòng liên hệ Admin (SĐT: ${ADMIN_PHONE}) để nhận mã OTP.`);
+                    setIsOtpSent(true);
+
+                } else {
+                    // BƯỚC 2: Xác thực OTP và đổi mật khẩu
+                    if (!form.otp || form.otp.length !== 6) {
+                        throw new Error("Vui lòng nhập Mã OTP 6 số (do Admin cung cấp).");
+                    }
+                    if (!form.password || form.password.length < 6) {
+                        throw new Error("Mật khẩu mới phải có ít nhất 6 ký tự.");
+                    }
+                    if (form.password !== form.confirm) {
+                        throw new Error("Mật khẩu không khớp.");
+                    }
+
+                    // Xác thực OTP trong bảng password_reset_requests
+                    const { data: req, error: reqError } = await supabase
+                        .from('password_reset_requests')
+                        .select('*')
+                        .eq('email', form.email)
+                        .eq('otp', form.otp)
+                        .eq('is_resolved', false)
+                        .gt('expires_at', new Date().toISOString())
+                        .single();
+
+                    if (reqError || !req) {
+                        throw new Error("Mã OTP không hợp lệ hoặc đã hết hạn.");
+                    }
+
+                    // <<< SỬA LỖI LOGIC (từ file bạn dán) >>>
+                    // Mã hóa mật khẩu mới (dòng này đã bị thiếu)
+                    const hashedPassword = btoa(form.password);
+
+                    // Cập nhật mật khẩu trong bảng Users
+                    const { error: updateError } = await supabase
+                        .from('Users')
+                        .update({ password: hashedPassword }) // Dùng hashedPassword
+                        .eq('email', form.email);
+
+                    if (updateError) {
+                        throw new Error("Không thể đổi mật khẩu.");
+                    }
+
+                    // Đánh dấu yêu cầu đã xử lý
+                    await supabase
+                        .from('password_reset_requests')
+                        .update({ is_resolved: true })
+                        .eq('id', req.id);
+
+                    setSuccess("Đổi mật khẩu thành công! 🎉");
+                    setForm(initialFormState);
+                    setIsOtpSent(false);
+                    setTimeout(() => setMode('login'), 2000);
+                }
+            }
+        } catch (err) {
+            console.error("Error:", err);
+            setError(err.message || "Đã có lỗi xảy ra.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleModeChange = (newMode) => {
+        setMode(newMode);
+        setError('');
+        setSuccess('');
+        setForm(initialFormState);
+        setIsOtpSent(false);
+    };
+
+    const backdropVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { duration: 0.8 } } };
+    const formContainerVariants = {
+        hidden: { opacity: 0, y: 30, scale: 0.98 },
+        visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.5, ease: [0.6, -0.05, 0.01, 0.99], staggerChildren: 0.05 } }
+    };
+    const inputGroupVariants = {
+        hidden: { opacity: 0, x: -20 },
+        visible: { opacity: 1, x: 0, transition: { duration: 0.4, ease: "easeOut" } },
+        exit: { opacity: 0, x: 20, transition: { duration: 0.2 } }
+    };
+    const messageVariants = {
+        hidden: { opacity: 0, y: -10, scale: 0.95 },
+        visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.3 } },
+        exit: { opacity: 0, y: 10, scale: 0.95, transition: { duration: 0.2 } }
+    };
 
     return (
-      <Link
-        to="/login"
-        className="hidden md:flex items-center gap-2 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white text-sm font-semibold px-5 py-2 rounded-full shadow-md transition-all"
-      >
-        <User size={16} />
-        Đăng nhập
-      </Link>
-    );
-  };
+        <div className="min-h-screen w-full flex items-center justify-center p-4 overflow-hidden bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/images/login-background.jpg')" }}>
+            <motion.div className="absolute inset-0 bg-gradient-to-br from-black/60 via-black/40 to-black/70" variants={backdropVariants} initial="hidden" animate="visible" />
 
-  return (
-    <header className="fixed top-0 left-0 w-full z-50 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-md shadow-sm border-b border-gray-200 dark:border-neutral-800">
-      <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-3">
-        {/* Logo */}
-        <Link to="/" className="flex flex-col items-start leading-none group">
-          <div className="flex items-center gap-2">
-            <span className="text-3xl font-extrabold bg-gradient-to-r from-sky-500 to-blue-700 bg-clip-text text-transparent tracking-tight group-hover:scale-105 transition-transform duration-300">
-              TourZen
-            </span>
-            <img
-              src="/logo-icon.png"
-              alt="TourZen Logo"
-              className="w-7 h-7 opacity-90 group-hover:opacity-100 transition"
-              onError={(e) => (e.target.style.display = "none")}
-            />
-          </div>
-          <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium mt-0.5">
-            Managed by Nhóm 4
-          </span>
-        </Link>
+            <motion.div key={mode + (isOtpSent ? '-otp' : '')} className="w-full max-w-md p-8 sm:p-10 relative z-10 bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl text-white" variants={formContainerVariants} initial="hidden" animate="visible">
+                <motion.div className="text-center mb-8" variants={inputGroupVariants}>
+                    <h2 className="text-4xl font-bold text-white tracking-tight drop-shadow-lg">TourZen</h2>
+                    <p className="text-sm text-sky-300 mt-1">
+                        {mode === 'forgot' ? (isOtpSent ? 'Nhập Mã & Mật Khẩu Mới' : 'Yêu cầu Hỗ trợ Mật khẩu') : 'Khám phá thế giới trong tầm tay'}
+                    </p>
+                </motion.div>
 
-        {/* Nav Links */}
-        <nav className="hidden md:flex items-center gap-6">
-          {navLinks.map((link) => (
-            <NavLink
-              key={link.name}
-              to={link.path}
-              className={({ isActive }) =>
-                `flex items-center gap-2 text-sm font-medium transition-all duration-300 ${
-                  isActive
-                    ? "text-sky-600 dark:text-sky-400 font-semibold border-b-2 border-sky-600 pb-1"
-                    : "text-gray-700 dark:text-gray-300 hover:text-sky-500 dark:hover:text-sky-400"
-                }`
-              }
-            >
-              {link.icon}
-              {link.name}
-            </NavLink>
-          ))}
-        </nav>
+                {mode !== 'forgot' && (
+                    <motion.div className="flex justify-center mb-8" variants={inputGroupVariants}>
+                        <div className="inline-flex rounded-full bg-white/10 p-1 border border-white/20 shadow-inner">
+                            <button onClick={() => handleModeChange('login')} className={`px-5 py-2 text-sm font-medium rounded-full transition-all duration-300 ${mode === 'login' ? 'bg-sky-500 text-white shadow-md' : 'text-gray-200 hover:text-white'}`}>Đăng nhập</button>
+                            <button onClick={() => handleModeChange('register')} className={`px-5 py-2 text-sm font-medium rounded-full transition-all duration-300 ${mode === 'register' ? 'bg-purple-500 text-white shadow-md' : 'text-gray-200 hover:text-white'}`}>Đăng ký</button>
+                        </div>
+                    </motion.div>
+                )}
 
-        {/* Right Section */}
-        <div className="flex items-center gap-3">
-          <ThemeToggle />
-          <Link
-            to="/cart"
-            className="relative p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700"
-          >
-            <ShoppingCart size={18} />
-            {cartItemCount > 0 && (
-              <span className="absolute -top-1 -right-1 block h-4 w-4 rounded-full bg-red-500 text-white text-[10px] font-bold text-center leading-4">
-                {cartItemCount}
-              </span>
-            )}
-          </Link>
+                <AnimatePresence mode="wait">
+                    {error && (
+                        <motion.div key="error-message" className="bg-red-500/80 border border-red-400 text-white p-3 mb-4 rounded-xl text-sm font-semibold text-center flex items-center justify-center gap-2 shadow-lg" variants={messageVariants} initial="hidden" animate="visible" exit="exit">
+                            <FaInfoCircle /> {error}
+                        </motion.div>
+                    )}
+                    {success && (
+                        <motion.div key="success-message" className="bg-green-500/80 border border-green-400 text-white p-3 mb-4 rounded-xl text-sm font-semibold text-center flex items-center justify-center gap-2 shadow-lg" variants={messageVariants} initial="hidden" animate="visible" exit="exit">
+                            <FaCheckCircle /> {success}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
-          <div className="hidden md:block">{renderAuthSection()}</div>
+                <motion.form onSubmit={handleSubmit} className="space-y-5" variants={inputGroupVariants}>
+                    <AnimatePresence mode="popLayout">
+                        {mode === 'register' && (
+                            <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
+                                <FaUser className="input-icon" />
+                                <input type="text" placeholder="Họ và tên" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field" required />
+                            </motion.div>
+                        )}
 
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700"
-          >
-            {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
+                        <motion.div className="relative" variants={inputGroupVariants} layout>
+                            <FaEnvelope className="input-icon" />
+                            <input type="email" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={`input-field ${mode === 'forgot' && isOtpSent ? 'bg-white/5 cursor-not-allowed' : ''}`} required disabled={mode === 'forgot' && isOtpSent} />
+                        </motion.div>
+
+                        {mode === 'register' && (
+                            <>
+                                <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
+                                    <FaMapMarkerAlt className="input-icon" />
+                                    <input type="text" placeholder="Địa chỉ (Tỉnh/Thành phố)" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="input-field" required minLength={10} />
+                                </motion.div>
+                                <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
+                                    <FaPhone className="input-icon" />
+                                    <input type="tel" placeholder="Số điện thoại" value={form.phone_number} onChange={(e) => setForm({ ...form, phone_number: e.target.value })} className="input-field" />
+                                </motion.div>
+                                <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
+                                    <FaCalendarAlt className="input-icon" />
+                                    <input type="date" title="Ngày sinh" value={form.ngay_sinh} onChange={(e) => setForm({ ...form, ngay_sinh: e.target.value })} className="input-field" />
+                                </motion.div>
+                            </>
+                        )}
+
+                        {mode === 'forgot' && isOtpSent && (
+                            <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
+                                <FaKey className="input-icon" />
+                                <input type="text" placeholder="Mã OTP 6 số (từ Admin)" value={form.otp} onChange={(e) => setForm({ ...form, otp: e.target.value })} className="input-field" required />
+                            </motion.div>
+                        )}
+
+                        {(mode !== 'forgot' || isOtpSent) && (
+                            <>
+                                <motion.div className="relative" variants={inputGroupVariants} layout>
+                                    <FaLock className="input-icon" />
+                                    <input type={showPassword ? "text" : "password"} placeholder={mode === 'forgot' ? "Mật khẩu mới (Tối thiểu 6 ký tự)" : "Mật khẩu"} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="input-field pr-10" required />
+                                    <span className="absolute top-1/2 transform -translate-y-1/2 right-3 cursor-pointer text-gray-400 hover:text-white transition-colors" onClick={() => setShowPassword(!showPassword)}>
+                                        {showPassword ? <FaEyeSlash /> : <FaEye />}
+                                    </span>
+                                </motion.div>
+
+                                {(mode === 'register' || (mode === 'forgot' && isOtpSent)) && (
+                                    <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
+                                        <FaLock className="input-icon" />
+                                        <input type={showConfirm ? "text" : "password"} placeholder="Nhập lại mật khẩu" value={form.confirm} onChange={(e) => setForm({ ...form, confirm: e.target.value })} className="input-field pr-10" required />
+                                        <span className="absolute top-1/2 transform -translate-y-1/2 right-3 cursor-pointer text-gray-400 hover:text-white transition-colors" onClick={() => setShowConfirm(!showConfirm)}>
+                                            {showConfirm ? <FaEyeSlash /> : <FaEye />}
+                                        </span>
+                                    </motion.div>
+                                )}
+                            </>
+                        )}
+                    </AnimatePresence>
+
+                    {mode === 'forgot' && (
+                        <motion.p className="text-sm text-center text-gray-200" variants={inputGroupVariants}>
+                            {!isOtpSent ? "Nhập email của bạn để gửi yêu cầu hỗ trợ đến Admin." : (
+                                <>Vui lòng liên hệ Admin (SĐT: <strong className="text-white">{ADMIN_PHONE}</strong>)<br /> để nhận Mã OTP và điền vào ô bên trên.</>
+                            )}
+                        </motion.p>
+                    )}
+
+                    <motion.button type="submit" disabled={loading} className={`w-full bg-gradient-to-r ${mode === 'login' ? 'from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700' : mode === 'register' ? 'from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700' : isOtpSent ? 'from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700' : 'from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700'} text-white py-3.5 rounded-xl font-bold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center space-x-2 mt-8 transform active:scale-[0.97]`} whileHover={{ scale: 1.03, y: -3, transition: { type: 'spring', stiffness: 300 } }} variants={inputGroupVariants}>
+                        {loading ? (
+                            <>
+                                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span>Đang xử lý...</span>
+                            </>
+                        ) : (
+                            <>
+                                {mode === 'login' ? <FaSignInAlt /> : mode === 'register' ? <FaUser /> : (isOtpSent ? <FaLock /> : <FaPaperPlane />)}
+                                <span>{mode === 'login' ? 'Đăng nhập' : mode === 'register' ? 'Tạo tài khoản' : (isOtpSent ? 'Đổi mật khẩu' : 'Gửi yêu cầu hỗ trợ')}</span>
+                            </>
+                        )}
+                    </motion.button>
+
+                    <motion.div className="text-center pt-2" variants={inputGroupVariants}>
+                        <button type="button" onClick={() => mode === 'forgot' ? handleModeChange('login') : handleModeChange('forgot')} className="text-sm text-sky-300 hover:text-white transition-colors">
+                            {mode === 'forgot' ? 'Quay lại trang Đăng nhập' : (mode === 'login' ? 'Quên mật khẩu?' : '')}
+                        </button>
+                    </motion.div>
+                </motion.form>
+            </motion.div>
+
+            <style>{`
+                .input-field {
+                    width: 100%;
+                    padding-left: 2.75rem;
+                    padding-top: 0.8rem;
+                    padding-bottom: 0.8rem;
+                    border: 1px solid rgba(255, 255, 255, 0.3);
+                    border-radius: 0.75rem;
+                    background-color: rgba(255, 255, 255, 0.1);
+                    color: #FFFFFF;
+                    transition: border-color 0.3s, box-shadow 0.3s, background-color 0.3s;
+                    font-size: 0.9rem;
+                    backdrop-filter: blur(2px);
+                }
+                .input-field:focus {
+                    outline: none;
+                    border-color: #38BDF8;
+                    background-color: rgba(255, 255, 255, 0.15);
+                    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.3);
+                }
+                .input-field::placeholder { color: rgba(255, 255, 255, 0.6); }
+                .input-icon {
+                    position: absolute;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    left: 0.9rem;
+                    color: rgba(255, 255, 255, 0.5);
+                    pointer-events: none;
+                }
+                input[type="date"].input-field { position: relative; color-scheme: dark; }
+                input[type="date"].input-field::before {
+                    content: 'Ngày sinh';
+                    position: absolute;
+                    left: 2.75rem;
+                    top: 0.8rem;
+                    color: rgba(255, 255, 255, 0.6);
+                    display: block;
+                    pointer-events: none;
+                }
+                input[type="date"].input-field:focus::before,
+                input[type="date"].input-field:valid::before { display: none; }
+                input[type="date"].input-field:valid { color: #FFFFFF; }
+            `}</style>
         </div>
-      </div>
-
-      {/* Mobile Menu */}
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-white dark:bg-neutral-900 border-t border-gray-200 dark:border-neutral-800"
-          >
-            <nav className="flex flex-col px-6 py-5 gap-4">
-              {navLinks.map((link) => (
-                <NavLink
-                  key={link.name}
-                  to={link.path}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 text-base font-medium ${
-                      isActive ? "text-sky-600" : "text-gray-700 dark:text-gray-200"
-                    }`
-                  }
-                >
-                  {link.icon}
-                  {link.name}
-                </NavLink>
-              ))}
-
-              <hr className="dark:border-neutral-700" />
-
-              {loading ? (
-                <div className="w-full h-10 bg-gray-200 dark:bg-neutral-700 rounded-lg animate-pulse"></div>
-              ) : 
-              
-              // <<< SỬA ĐỔI QUAN TRỌNG TẠI ĐÂY >>>
-              // Thay (session && user) thành (user)
-              user ? (
-              // <<< KẾT THÚC SỬA ĐỔI >>>
-                <>
-                  <p className="font-semibold dark:text-white px-1">Chào, {user.full_name}!</p>
-                  {user.role === "admin" && (
-                    <Link
-                      to="/admin"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="flex items-center gap-3 font-medium text-sky-600 dark:text-sky-400 px-1"
-                    >
-                      <LayoutDashboard size={18} /> Trang Quản trị
-                    </Link>
-                  )}
-                  {user.role === "supplier" && (
-                    <Link
-                      to="/supplier"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="flex items-center gap-3 font-medium text-sky-600 dark:text-sky-400 px-1"
-                    >
-                      <Truck size={18} /> Bảng điều khiển Nhà cung cấp
-                    </Link>
-                  )}
-                  {user.role !== "admin" && user.role !== "supplier" && (
-                    <>
-                      <Link
-                        to="/my-bookings"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className="flex items-center gap-3 font-medium text-sky-600 dark:text-sky-400 px-1"
-                      >
-                        <ShoppingBag size={18} /> Đơn hàng của tôi
-                      </Link>
-                      
-                      {/* <<< THÊM v19: Link Thông tin cá nhân >>> */}
-                      <Link
-                        to="/profile"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className="flex items-center gap-3 font-medium text-sky-600 dark:text-sky-400 px-1"
-                      >
-                         {/* <<< SỬA LỖI v19.1: Đổi tên icon >>> */}
-                        <IdCard size={18} /> 
-                        Thông tin cá nhân
-                      </Link>
-                    </>
-                  )}
-                  <button
-                    onClick={() => {
-                      const { logout } = useAuth();
-                      logout(); // Hàm logout từ context
-                      localStorage.removeItem("user"); // Xóa user "ảo"
-                      window.location.href = "/"; // Tải lại trang
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className="flex items-center gap-3 font-medium text-red-600 dark:text-red-400 px-1"
-                  >
-                    <LogOut size={18} /> Đăng xuất
-                  </button>
-                </>
-              ) : (
-                <Link
-                  to="/login"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex items-center justify-center gap-2 bg-gradient-to-r from-sky-500 to-blue-600 text-white font-semibold px-5 py-2.5 rounded-lg shadow-md"
-                >
-                  <User size={16} />
-                  Đăng nhập
-                </Link>
-              )}
-            </nav>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </header>
-  );
+    );
 }

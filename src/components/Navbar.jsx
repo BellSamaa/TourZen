@@ -55,8 +55,13 @@ const ProfileMenu = ({ user }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLogout = async () => {
-    await logout();
-    navigate("/");
+    // <<< SỬA LỖI QUAN TRỌNG >>>
+    // Phải xóa cả 'user' trong localStorage của hệ thống "ảo"
+    // và tải lại trang.
+    await logout(); // Chạy hàm logout gốc (xóa session nếu có)
+    localStorage.removeItem("user"); // Xóa user "ảo"
+    window.location.href = "/"; // Tải lại trang để navbar cập nhật
+    // <<< KẾT THÚC SỬA LỖI >>>
   };
 
   const goToDashboard = () => {
@@ -172,7 +177,13 @@ export default function Navbar() {
   const renderAuthSection = () => {
     if (loading)
       return <div className="w-24 h-8 bg-gray-200 dark:bg-neutral-700 rounded-full animate-pulse"></div>;
-    if (session && user) return <ProfileMenu user={user} />;
+    
+    // <<< SỬA LỖI QUAN TRỌNG >>>
+    // Thay vì `if (session && user)`, chỉ cần kiểm tra `if (user)`
+    // vì hệ thống "ảo" của bạn chỉ cung cấp 'user' (từ localStorage)
+    // mà không cung cấp 'session'.
+    if (user) return <ProfileMenu user={user} />;
+    // <<< KẾT THÚC SỬA LỖI >>>
 
     return (
       <Link
@@ -282,7 +293,12 @@ export default function Navbar() {
 
               {loading ? (
                 <div className="w-full h-10 bg-gray-200 dark:bg-neutral-700 rounded-lg animate-pulse"></div>
-              ) : session && user ? (
+              ) : 
+              
+              // <<< SỬA LỖI QUAN TRỌNG (Giống như trên) >>>
+              // Thay `session && user` thành `user`
+              user ? (
+              // <<< KẾT THÚC SỬA LỖI >>>
                 <>
                   <p className="font-semibold dark:text-white px-1">Chào, {user.full_name}!</p>
                   {user.role === "admin" && (
@@ -326,11 +342,16 @@ export default function Navbar() {
                     </>
                   )}
                   <button
+                    // <<< SỬA LỖI QUAN TRỌNG >>>
+                    // Thêm localStorage.removeItem và tải lại trang
                     onClick={() => {
                       const { logout } = useAuth();
                       logout();
+                      localStorage.removeItem("user"); // Xóa user "ảo"
+                      window.location.href = "/"; // Tải lại trang
                       setIsMobileMenuOpen(false);
                     }}
+                    // <<< KẾT THÚC SỬA LỖI >>>
                     className="flex items-center gap-3 font-medium text-red-600 dark:text-red-400 px-1"
                   >
                     <LogOut size={18} /> Đăng xuất
