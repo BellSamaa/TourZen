@@ -734,7 +734,7 @@ export default function ManageTour() {
             const from = (currentPage - 1) * ITEMS_PER_PAGE;
             const to = from + ITEMS_PER_PAGE - 1;
             
-            // SỬA V18: Cú pháp select 1 dòng, loại bỏ ký tự thừa và dùng alias an toàn
+
             const selectQuery = `
                 id,created_at,departure_date,status,total_price,quantity,
                 num_adult,num_child,num_elder,num_infant,departure_id,
@@ -745,7 +745,7 @@ export default function ManageTour() {
                 flight:flight_product_id(id,name,price,product_type,details),
                 voucher_code,voucher_discount,notes,payment_method,
                 Invoices(id),
-                Reviews(id,rating,comment,reviewer:user_id(full_name,email)) 
+                Reviews!booking_id(id,rating,comment,reviewer:user_id(full_name,email)) 
             `.replace(/\s+/g, ''); // Loại bỏ tất cả khoảng trắng, tab, newline
             
             let query = supabase
