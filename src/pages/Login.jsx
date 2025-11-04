@@ -105,6 +105,13 @@ export default function Login() {
                     throw new Error("Email hoặc mật khẩu không đúng.");
                 }
 
+                // <<< SỬA LỖI QUAN TRỌNG (Xử lý `NULL` password) >>>
+                // Kiểm tra xem mật khẩu có tồn tại trong DB không
+                if (!user.password) {
+                    throw new Error("Tài khoản này không có mật khẩu hoặc đã bị lỗi. Vui lòng liên hệ Admin.");
+                }
+                // <<< KẾT THÚC SỬA LỖI >>>
+
                 // Giải mã và kiểm tra mật khẩu
                 try {
                     const decodedPassword = atob(user.password);
@@ -112,7 +119,9 @@ export default function Login() {
                         throw new Error("Email hoặc mật khẩu không đúng.");
                     }
                 } catch (e) {
-                    throw new Error("Email hoặc mật khẩu không đúng.");
+                    // Lỗi này xảy ra nếu `user.password` không phải là Base64 hợp lệ
+                    console.error("Lỗi giải mã Base64:", e);
+                    throw new Error("Đã xảy ra lỗi khi kiểm tra mật khẩu.");
                 }
 
                 // Kiểm tra tài khoản có bị khóa không
@@ -134,14 +143,11 @@ export default function Login() {
                 // Chuyển hướng theo role
                 const from = location.state?.from?.pathname || (user.role === 'admin' ? "/admin" : "/");
                 
-                // <<< SỬA LỖI QUAN TRỌNG >>>
-                // Thay thế navigate() bằng window.location.href
-                // để BUỘC TẢI LẠI TRANG. Việc này sẽ ép AuthContext
-                // đọc lại 'user' từ localStorage và Navbar sẽ cập nhật.
+                // Dùng window.location.href để BUỘC TẢI LẠI TRANG.
+                // Điều này buộc AuthContext phải khởi tạo lại và đọc 'user' từ localStorage.
                 setTimeout(() => {
                     window.location.href = from;
                 }, 1000);
-                // <<< KẾT THÚC SỬA LỖI >>>
 
             } else if (mode === 'forgot') {
                 // ========== QUÊN MẬT KHẨU ==========
@@ -206,9 +212,8 @@ export default function Login() {
                     if (reqError || !req) {
                         throw new Error("Mã OTP không hợp lệ hoặc đã hết hạn.");
                     }
-
-                    // <<< SỬA LỖI LOGIC (từ file bạn dán) >>>
-                    // Mã hóa mật khẩu mới (dòng này đã bị thiếu)
+                    
+                    // Mã hóa mật khẩu mới
                     const hashedPassword = btoa(form.password);
 
                     // Cập nhật mật khẩu trong bảng Users

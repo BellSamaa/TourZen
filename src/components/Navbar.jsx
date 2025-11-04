@@ -55,13 +55,11 @@ const ProfileMenu = ({ user }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLogout = async () => {
-    // <<< SỬA LỖI QUAN TRỌNG >>>
     // Phải xóa cả 'user' trong localStorage của hệ thống "ảo"
     // và tải lại trang.
     await logout(); // Chạy hàm logout gốc (xóa session nếu có)
     localStorage.removeItem("user"); // Xóa user "ảo"
     window.location.href = "/"; // Tải lại trang để navbar cập nhật
-    // <<< KẾT THÚC SỬA LỖI >>>
   };
 
   const goToDashboard = () => {
