@@ -130,7 +130,7 @@ function Sidebar() {
                 </SidebarLink>
                 <SidebarLink to="/admin/accounts" icon={<UserCircleGear size={24} />}>
                     Quản lý Tài Khoản
-                </S_idebarLink>
+                </SidebarLink>
             </motion.nav>
 
             {/* (NÂNG CẤP) User Profile - Thêm hover effect và options */}
