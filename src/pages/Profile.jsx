@@ -1,16 +1,18 @@
 // src/pages/Profile.jsx
-/* *** (SỬA LỖI v30.1) ***
-  1. (Fix Nút Bấm) Liên kết <label htmlFor> với <input id> cho Avatar và Banner.
-  2. (Fix Logic Mật Khẩu) Xóa bỏ hệ thống "Admin OTP" (không còn tương thích).
-  3. (Nâng Cấp) Thay thế bằng hệ thống `resetPasswordForEmail` của Supabase Auth.
-  4. (Nâng Cấp) Thêm "gating" - phải xác thực CMND (status: 'approved') mới thấy tab Bảo mật.
+/* *** (SỬA LỖI v31) ***
+  1. (Fix RLS 400/500) Vô hiệu hóa Tab "Xác thực" & chặn submit
+     nếu là "User ảo" (không có session).
+  2. (Fix RLS 400/500) Ẩn nút Upload/Delete Avatar/Banner
+     nếu là "User ảo" (không có session).
+  3. (Fix Logic DB) Trỏ các truy vấn Avatar/Banner đến bảng
+     `user_identity` thay vì `Users`.
 */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Dialog } from '@headlessui/react';
 import Cropper from 'react-easy-crop';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext'; // (QUAN TRỌNG: Phải dùng AuthContext đã sửa)
+import { useAuth } from '../context/AuthContext'; 
 import { getSupabase } from '../lib/supabaseClient';
 import toast from 'react-hot-toast';
 import {
@@ -270,17 +272,17 @@ const ChangePasswordForm = ({ user, identityStatus }) => {
 
 /* ------------------ IdentityForm (Đã fix lỗi RLS) ------------------ */
 // (Code này giờ sẽ chạy được nếu là Admin "thật", User "ảo" sẽ không thấy)
-const IdentityForm = ({ user }) => {
+const IdentityForm = ({ user, session }) => { // <<< SỬA LỖI: Nhận 'session'
   const [identity, setIdentity] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [frontImage, setFrontImage] = useState(null);
   const [backImage, setBackImage] = useState(null);
-  const { session } = useAuth(); // Lấy session
+  // (Đã xóa 'session' khỏi đây vì nó được truyền qua prop)
 
   const fetchIdentity = useCallback(async () => {
-    if (!user || !session) { // <<< SỬA LỖI: Chỉ fetch nếu là user "thật"
+    if (!user || !session) { // Chỉ fetch nếu là user "thật"
       setLoading(false);
       setIsEditing(true); // User "ảo" sẽ luôn ở màn hình upload
       return;
@@ -334,6 +336,14 @@ const IdentityForm = ({ user }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // <<< SỬA LỖI v31: Chặn "User ảo" (anon) gửi form >>>
+    if (!session) {
+      toast.error("Chức năng này chỉ dành cho tài khoản Admin/Supplier đã đăng nhập.");
+      return;
+    }
+    // <<< KẾT THÚC SỬA LỖI v31 >>>
+
     if (!frontImage && !identity?.front_image_url) {
       toast.error("Vui lòng tải lên ảnh mặt trước.");
       return;
@@ -380,7 +390,7 @@ const IdentityForm = ({ user }) => {
     return <div className="flex justify-center mt-10"><CircleNotch size={32} className="animate-spin text-sky-500" /></div>;
   }
 
-  // User "ảo" sẽ không bao giờ thấy phần này, họ sẽ luôn thấy form upload
+  // User "ảo" sẽ không bao giờ thấy phần này (vì isEditing luôn là true)
   if (identity && !isEditing) {
     let statusBadge;
     switch (identity.status) {
@@ -476,7 +486,8 @@ const IdentityForm = ({ user }) => {
   );
 };
 
-/* ------------------ AvatarBannerManager (SỬA v30.1 - Fix Nút Bấm) ------------------ */
+/* ------------------ AvatarBannerManager (SỬA v31) ------------------ */
+// (SỬA LỖI v31: Ẩn nút Upload/Delete nếu là "User ảo" - không có session)
 const AvatarBannerManager = ({ user, refreshUser, session }) => {
   const [avatarPath, setAvatarPath] = useState(null);
   const [bannerPath, setBannerPath] = useState(null);
@@ -492,13 +503,12 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [currentUploadType, setCurrentUploadType] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
-  // (Đã xóa Refs)
 
   useEffect(() => {
-    if (!user || !session) return; // <<< SỬA LỖI: User "ảo" không có session, không fetch
+    if (!user || !session) return; // User "ảo" không fetch
     (async () => {
       try {
-        // <<< SỬA LỖI 2: Đổi 'Users' thành 'user_identity' >>>
+        // <<< SỬA LỖI: Đổi 'Users' thành 'user_identity' >>>
         const { data, error } = await supabase
           .from('user_identity') 
           .select('avatar_url, banner_url')
@@ -559,12 +569,11 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
 
       const updates = currentUploadType === 'avatar' ? { avatar_url: fileName } : { banner_url: fileName };
       
-      // <<< SỬA LỖI 2: Đổi 'Users' thành 'user_identity' >>>
+      // <<< SỬA LỖI: Đổi 'Users' thành 'user_identity' >>>
       const { error: dbErr } = await supabase.from('user_identity').update(updates).eq('id', user.id);
       if (dbErr) throw dbErr;
 
       if (session) {
-        // Chỉ cập nhật auth nếu là user "thật"
         const { error: authErr } = await supabase.auth.updateUser({ data: updates });
         if (authErr) throw authErr;
       }
@@ -609,12 +618,11 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
     try {
       const updates = type === 'avatar' ? { avatar_url: null } : { banner_url: null };
       
-      // <<< SỬA LỖI 2: Đổi 'Users' thành 'user_identity' >>>
+      // <<< SỬA LỖI: Đổi 'Users' thành 'user_identity' >>>
       const { error: dbErr } = await supabase.from('user_identity').update(updates).eq('id', user.id);
       if (dbErr) throw dbErr;
 
       if (session) {
-        // Chỉ cập nhật auth nếu là user "thật"
         const { error: authErr } = await supabase.auth.updateUser({ data: updates });
         if (authErr) throw authErr;
       }
@@ -650,26 +658,26 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
           </div>
         )}
 
-        {/* <<< SỬA LỖI NÚT BẤM BANNER >>> */}
-        <div className="absolute top-3 right-3 flex gap-2">
-          {/* 1. Thêm 'htmlFor' vào label */}
-          <label htmlFor="banner-upload-input" className="inline-flex items-center gap-2 bg-white/90 dark:bg-slate-800/80 p-2 rounded-xl cursor-pointer">
-            <Image size={18} /> <span className="hidden md:inline">Thay banner</span>
-          </label>
-          {/* 2. Thêm 'id' và 'onChange' vào input */}
-          <input 
-            id="banner-upload-input" 
-            type="file" 
-            accept="image/*" 
-            onChange={handleBannerFileSelected} 
-            className="hidden" 
-          />
-          {bannerPreview && (
-            <button onClick={() => handleDelete('banner')} className="inline-flex items-center gap-2 bg-white/90 dark:bg-slate-800/80 p-2 rounded-xl hover:bg-rose-100">
-              <TrashSimple size={18} /> <span className="hidden md:inline">Xóa</span>
-            </button>
-          )}
-        </div>
+        {/* <<< SỬA LỖI v31: Chỉ hiển thị nút cho user "thật" (có session) >>> */}
+        {session && (
+          <div className="absolute top-3 right-3 flex gap-2">
+            <label htmlFor="banner-upload-input" className="inline-flex items-center gap-2 bg-white/90 dark:bg-slate-800/80 p-2 rounded-xl cursor-pointer">
+              <Image size={18} /> <span className="hidden md:inline">Thay banner</span>
+            </label>
+            <input 
+              id="banner-upload-input" 
+              type="file" 
+              accept="image/*" 
+              onChange={handleBannerFileSelected} 
+              className="hidden" 
+            />
+            {bannerPreview && (
+              <button onClick={() => handleDelete('banner')} className="inline-flex items-center gap-2 bg-white/90 dark:bg-slate-800/80 p-2 rounded-xl hover:bg-rose-100">
+                <TrashSimple size={18} /> <span className="hidden md:inline">Xóa</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Avatar + name */}
@@ -685,19 +693,21 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
             )}
           </div>
 
-          {/* <<< SỬA LỖI NÚT BẤM AVATAR >>> */}
-          {/* 1. Thay 'div' bằng 'label' và thêm 'htmlFor' */}
-          <label htmlFor="avatar-upload-input" className="absolute -right-1 -bottom-1 bg-white/90 dark:bg-slate-800/80 rounded-full p-1 cursor-pointer border border-white/40">
-            <Camera size={16} className="text-slate-700" />
-          </label>
-          {/* 2. Thêm 'id' và 'onChange' vào input */}
-          <input 
-            id="avatar-upload-input" 
-            type="file" 
-            accept="image/*" 
-            onChange={handleAvatarFileSelected} 
-            className="hidden" 
-          />
+          {/* <<< SỬA LỖI v31: Chỉ hiển thị nút cho user "thật" (có session) >>> */}
+          {session && (
+            <>
+              <label htmlFor="avatar-upload-input" className="absolute -right-1 -bottom-1 bg-white/90 dark:bg-slate-800/80 rounded-full p-1 cursor-pointer border border-white/40">
+                <Camera size={16} className="text-slate-700" />
+              </label>
+              <input 
+                id="avatar-upload-input" 
+                type="file" 
+                accept="image/*" 
+                onChange={handleAvatarFileSelected} 
+                className="hidden" 
+              />
+            </>
+          )}
         </div>
 
         <div className="flex-1">
@@ -706,14 +716,17 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          {avatarPreview && (
+          {/* <<< SỬA LỖI v31: Chỉ hiển thị nút cho user "thật" (có session) >>> */}
+          {session && avatarPreview && (
             <button onClick={() => handleDelete('avatar')} className="px-3 py-2 bg-white/90 dark:bg-slate-800/80 rounded-2xl inline-flex items-center gap-2">
               <TrashSimple size={16} /> <span className="hidden md:inline">Xóa avatar</span>
             </button>
           )}
-          <button onClick={() => avatarPreview && openPreview(avatarPreview)} className="px-3 py-2 bg-white/90 dark:bg-slate-800/80 rounded-2xl inline-flex items-center gap-2">
-            <MagnifyingGlassPlus size={16} /> <span className="hidden md:inline">Xem ảnh</span>
-          </button>
+          {avatarPreview && (
+            <button onClick={() => avatarPreview && openPreview(avatarPreview)} className="px-3 py-2 bg-white/90 dark:bg-slate-800/80 rounded-2xl inline-flex items-center gap-2">
+              <MagnifyingGlassPlus size={16} /> <span className="hidden md:inline">Xem ảnh</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -765,7 +778,7 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
   );
 };
 
-/* ------------------ Main Profile Component (SỬA v30) ------------------ */
+/* ------------------ Main Profile Component (SỬA v31) ------------------ */
 export default function Profile() {
   const { user, loading, refreshUser, session } = useAuth(); // 'session' rất quan trọng
   const navigate = useNavigate();
@@ -780,16 +793,14 @@ export default function Profile() {
   useEffect(() => {
     if (!user) return;
 
-    // <<< SỬA LỖI 1: LỖI 406 RLS DO "USER ẢO" >>>
+    // (FIX v30) Lỗi 406 RLS do "User ảo"
     const isHybridUser = !session;
     if (isHybridUser) {
       // Nếu là "User ảo" (không có session), không được gọi API
-      // vì sẽ bị RLS chặn (lỗi 406)
       setIdentityStatus(null);
       setLoadingIdentity(false); // Dừng loading
       return; // Dừng không fetch
     }
-    // <<< KẾT THÚC SỬA LỖI 1 >>>
 
     setLoadingIdentity(true);
     const fetchIdentityStatus = async () => {
@@ -814,10 +825,9 @@ export default function Profile() {
       }
     };
     fetchIdentityStatus();
-  }, [user, session]); // <<< SỬA LỖI 1: Thêm 'session' vào dependency array
+  }, [user, session]); // Thêm 'session' vào dependency array
   
   const handleProfileUpdate = (updatedData) => {
-    // (AuthContext đã sửa sẽ tự cập nhật)
     if(refreshUser) refreshUser();
   };
 
@@ -870,13 +880,15 @@ export default function Profile() {
                   icon={<IdentificationCard className="text-violet-600" />}
                   isActive={activeTab === 'identity'}
                   onClick={() => setActiveTab('identity')}
+                  disabled={isHybridUser} // <<< SỬA LỖI v31: Vô hiệu hóa cho "User ảo"
                 />
               </nav>
+              {/* <<< SỬA LỖI v31: Cập nhật thông báo lỗi >>> */}
               {(isHybridUser || identityStatus !== 'approved') && (
                  <div className="mt-4 p-3 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded-2xl text-xs font-medium text-center">
                     <Warning size={16} className="inline mr-1" />
                     {isHybridUser 
-                      ? "Tab 'Bảo mật' chỉ dành cho tài khoản Admin." 
+                      ? "Tab 'Bảo mật' & 'Xác thực' chỉ dành cho tài khoản Admin/Supplier." 
                       : "Bạn phải xác thực CMND/CCCD để mở khóa tab 'Bảo mật'."
                     }
                  </div>
@@ -902,7 +914,8 @@ export default function Profile() {
                 >
                   {activeTab === 'profile' && <ProfileInfoForm user={user} onProfileUpdate={handleProfileUpdate} />}
                   {activeTab === 'password' && <ChangePasswordForm user={user} identityStatus={identityStatus} />}
-                  {activeTab === 'identity' && <IdentityForm user={user} />}
+                  {/* <<< SỬA LỖI v31: Truyền 'session' vào >>> */}
+                  {activeTab === 'identity' && <IdentityForm user={user} session={session} />}
                 </motion.div>
               </AnimatePresence>
             </motion.div>
