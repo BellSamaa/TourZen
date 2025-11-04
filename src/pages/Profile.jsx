@@ -606,7 +606,7 @@ const IdentityForm = ({ user, session, identity, loading, onRefresh }) => {
   );
 };
 
-/* ------------------ AvatarBannerManager (ĐÃ SỬA LỖI UPLOAD) ------------------ */
+/* ------------------ AvatarBannerManager (SỬA LỖI THEO YÊU CẦU) ------------------ */
 // 1. (Fix) Trỏ đến bảng 'Users' thay vì 'user_identity' (dựa theo ảnh Supabase)
 // 2. (Fix) Gỡ bỏ check 'session' để "User ảo" (không có session) có thể fetch và upload
 const AvatarBannerManager = ({ user, refreshUser, session }) => {
@@ -682,11 +682,10 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
     try {
       const blob = await getCroppedImg(imageSrc, croppedAreaPixels);
       const fileName = `${user.id}-${currentUploadType}-${Date.now()}.jpg`;
-      // const file = new File([blob], fileName, { type: 'image/jpeg' }); // <-- *** SỬA LỖI TẠI ĐÂY (1/2): Xóa dòng này ***
+      const file = new File([blob], fileName, { type: 'image/jpeg' });
       const bucket = currentUploadType === 'avatar' ? 'avatars' : 'banners';
       
-      // *** SỬA LỖI TẠI ĐÂY (2/2): Đổi 'file' thành 'blob' ***
-      const { error: uploadError } = await supabase.storage.from(bucket).upload(fileName, blob, { contentType: 'image/jpeg' });
+      const { error: uploadError } = await supabase.storage.from(bucket).upload(fileName, file, { contentType: 'image/jpeg' });
       if (uploadError) throw uploadError;
 
       const updates = currentUploadType === 'avatar' ? { avatar_url: fileName } : { banner_url: fileName };
@@ -936,9 +935,9 @@ export default function Profile() {
       } else {
         setIdentity(null);
       }
-      if (error && error.code !== 'PGRST116') throw error; // 'PGRST116' là lỗi 'không tìm thấy hàng', không phải lỗi 406
+      if (error && error.code !== 'PGRST116') throw error;
     } catch (error) {
-      console.error("Lỗi fetch identity:", error.message); // Lỗi 406 sẽ bị bắt ở đây
+      console.error("Lỗi fetch identity:", error.message);
        setIdentity(null);
     } finally {
       setLoadingIdentity(false);
