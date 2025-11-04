@@ -1,4 +1,5 @@
 // HỆ THỐNG ĐA XÁC THỰC (HYBRID: Auth cho Admin, Ảo cho User)
+// (SỬA LỖI: Đã thêm 'supplier' vào hệ thống xác thực Auth)
 
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -132,26 +133,33 @@ export default function Login() {
 
                 // Bước 2: Dựa vào role để chọn hệ thống đăng nhập
                 
-                if (userProfile.role === 'admin') {
-                    // --- (HỆ THỐNG 1: ADMIN DÙNG SUPABASE AUTH) ---
+                // <<< SỬA LỖI TẠI ĐÂY: Thêm '|| userProfile.role === 'supplier'' >>>
+                if (userProfile.role === 'admin' || userProfile.role === 'supplier') {
+                    // --- (HỆ THỐNG 1: ADMIN VÀ SUPPLIER DÙNG SUPABASE AUTH) ---
                     const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
                         email: form.email,
                         password: form.password,
                     });
 
                     if (loginError) {
-                        throw new Error("Email hoặc mật khẩu (Admin) không đúng.");
+                        // (Sửa câu báo lỗi cho chung chung)
+                        throw new Error("Email hoặc mật khẩu không đúng.");
                     }
                     if (!loginData.session) {
-                         throw new Error("Đăng nhập Admin thất bại, không nhận được session.");
+                         throw new Error("Đăng nhập thất bại, không nhận được session.");
                     }
                     
-                    // <<< SỬA ĐỔI THEO YÊU CẦU 1 >>>
-                    // Admin sẽ ở lại trang Home (hoặc trang trước đó)
-                    from = location.state?.from?.pathname || "/";
+                    // (SỬA) Phân luồng điều hướng
+                    if(userProfile.role === 'admin') {
+                        // Admin sẽ ở lại trang Home (hoặc trang trước đó)
+                        from = location.state?.from?.pathname || "/";
+                    } else if (userProfile.role === 'supplier') {
+                        // Supplier thì điều hướng thẳng vào trang supplier
+                        from = "/supplier"; 
+                    }
                     
                 } else {
-                    // --- (HỆ THỐNG 2: USER DÙNG TÀI KHOẢN ẢO) ---
+                    // --- (HỆ THỐNG 2: USER 'user' DÙNG TÀI KHOẢN ẢO) ---
                     if (!userProfile.password) {
                         throw new Error("Tài khoản này không có mật khẩu (Lỗi NULL). Vui lòng liên hệ Admin.");
                     }
@@ -201,8 +209,9 @@ export default function Login() {
                         throw new Error("Email không tồn tại trong hệ thống.");
                     }
                     
-                    if (user.role === 'admin') {
-                         throw new Error("Không thể dùng chức năng này cho tài khoản Admin.");
+                    // <<< SỬA LỖI TẠI ĐÂY: Thêm '|| user.role === 'supplier'' >>>
+                    if (user.role === 'admin' || user.role === 'supplier') {
+                         throw new Error("Không thể dùng chức năng này cho tài khoản Quản trị/NCC.");
                     }
 
                     const expiresAt = new Date();
@@ -212,7 +221,7 @@ export default function Login() {
                         .from('password_reset_requests')
                         .insert({
                             email: form.email,
-                            otp: null, 
+                            otp: null, // (Tên cột này có thể là 'token' tùy CSDL của bạn)
                             is_resolved: false,
                             requested_at: new Date().toISOString(),
                             expires_at: expiresAt.toISOString()
@@ -230,11 +239,12 @@ export default function Login() {
                     if (form.password !== form.confirm) throw new Error("Mật khẩu không khớp.");
 
                     // (FIX) Sửa 'otp' thành 'token' cho khớp với ảnh database của bạn
+                    // (Giữ nguyên code cũ của bạn vì nó đã được sửa)
                     const { data: req, error: reqError } = await supabase
                         .from('password_reset_requests')
                         .select('*')
                         .eq('email', form.email)
-                        .eq('token', form.otp) // <-- SỬA LẠI THÀNH 'token'
+                        .eq('token', form.otp) // <-- SỬA LẠI THÀNH 'token' (Đã giữ)
                         .eq('is_resolved', false)
                         .gt('expires_at', new Date().toISOString())
                         .single();
@@ -350,7 +360,8 @@ export default function Login() {
                             <>
                                 <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
                                     <FaMapMarkerAlt className="input-icon" />
-                                    <input type="text" placeholder="Địa chỉ (Tỉnh/Thành phố)" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="input-field" required minLength={10} />
+                                    <input type="text" placeholder="Địa chỉ (Tỉnh/Thành phố)" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="input-field" required minLength={5} /> 
+                                    {/* (Sửa) Giảm minLength xuống 5 để khớp logic validate */}
                                 </motion.div>
                                 <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
                                     <FaPhone className="input-icon" />

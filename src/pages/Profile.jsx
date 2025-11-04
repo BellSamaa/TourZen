@@ -1,12 +1,12 @@
 // src/pages/Profile.jsx
-/* *** (SỬA LỖI v35 - THEO YÊU CẦU) ***
-  1. (Fix) Xóa logic 'isHybridUser' khỏi Tab "Bảo mật".
-     Tab này giờ CHỈ bị khóa khi 'identityStatus !== 'approved''.
-  2. (CẢNH BÁO) Chức năng bên trong tab này (ChangePasswordForm)
-     vẫn sẽ không hoạt động cho "Tài khoản ảo".
-  3. (Giữ nguyên v34) Hợp nhất state 'identity'.
-  4. (Giữ nguyên v33) Cho phép "User ảo" fetch trạng thái.
-  5. (Giữ nguyên v31) Ẩn nút Upload/Delete Avatar/Banner cho "User ảo".
+/* *** (SỬA LỖI v36 - THEO YÊU CẦU) ***
+  1. (Fix) VIẾT LẠI HOÀN TOÀN 'ChangePasswordForm' để dùng
+     logic "Admin OTP" (giống file Login.jsx) cho "Tài khoản ảo".
+  2. (Fix) 'ChangePasswordForm' giờ sẽ có 2 chế độ:
+     - "Tài khoản thật" (Admin/có session): Dùng email reset (như cũ).
+     - "Tài khoản ảo" (User/không session): Dùng Admin OTP (mới).
+  3. (Giữ nguyên v35) Mở khóa Tab "Bảo mật" (chỉ khóa khi chưa duyệt).
+  4. (Giữ nguyên v34) Hợp nhất state 'identity'.
 */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -25,6 +25,8 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 
 const supabase = getSupabase();
+// (Thêm SĐT Admin từ Login.jsx)
+const ADMIN_PHONE = "0912345678"; 
 
 /* ------------------ Helper: getPublicUrlSafe ------------------ */
 const getPublicUrlSafe = (bucket, path) => {
@@ -201,14 +203,28 @@ const ProfileInfoForm = ({ user, onProfileUpdate }) => {
   );
 };
 
-/* ------------------ ChangePasswordForm (SỬA v34) ------------------ */
-// (Logic này đã đúng - chỉ hiển thị cho Admin "thật" và đã xác thực)
-const ChangePasswordForm = ({ user, identity }) => { // <<< SỬA: Nhận 'identity' (object)
+/* ------------------ ChangePasswordForm (SỬA v36) ------------------ */
+// (VIẾT LẠI HOÀN TOÀN: Giờ hỗ trợ cả "User ảo" và "User thật")
+const ChangePasswordForm = ({ user, identity }) => {
   const [loading, setLoading] = useState(false);
   const { session } = useAuth(); 
+  const isHybridUser = !session;
 
+  // State cho "User thật" (Admin/Supabase Auth)
+  const [emailSent, setEmailSent] = useState(false);
+  
+  // State cho "User ảo" (Admin OTP)
+  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  // --- HÀM CHO "USER THẬT" (ADMIN) ---
   const handleSendResetEmail = async () => {
     setLoading(true);
+    setEmailSent(false);
     try {
       const redirectTo = `${window.location.origin}/update-password`;
       const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
@@ -216,6 +232,7 @@ const ChangePasswordForm = ({ user, identity }) => { // <<< SỬA: Nhận 'ident
       });
       if (error) throw error;
       toast.success("Đã gửi email khôi phục. Vui lòng kiểm tra hộp thư của bạn.");
+      setEmailSent(true);
     } catch (error) {
       toast.error(`Lỗi gửi email: ${error.message}`);
     } finally {
@@ -223,67 +240,191 @@ const ChangePasswordForm = ({ user, identity }) => { // <<< SỬA: Nhận 'ident
     }
   };
   
-  const isHybridUser = !session;
-  // <<< SỬA: Dùng 'identity.status'
-  if (isHybridUser || identity?.status !== 'approved') {
-    return (
-      <div className="">
-        <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
-          <ShieldCheck size={22} className="text-orange-600" /> Bảo mật & Đăng nhập
-        </h3>
-        <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/40 p-5 rounded-2xl border border-yellow-300 dark:border-yellow-700">
-          <div className="flex items-center gap-3">
-            <Warning size={24} className="text-yellow-600" />
-            <h4 className="font-semibold text-lg text-yellow-800 dark:text-yellow-200">
-              {isHybridUser ? "Chức năng không hỗ trợ" : "Yêu cầu xác thực"}
-            </h4>
-          </div>
-          <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-2 ml-9">
-            {isHybridUser
-              ? "Tài khoản của bạn (User) được quản lý bằng hệ thống 'Admin OTP'. Vui lòng sử dụng chức năng 'Quên mật khẩu' ở trang Đăng nhập."
-              : "Bạn phải xác thực CMND/CCCD (và được Admin duyệt) trước khi có thể sử dụng chức năng đổi mật khẩu."
-            }
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // --- HÀM CHO "USER ẢO" (USER) ---
+  const handleSendOtpRequest = async () => {
+    setLoading(true);
+    try {
+      // 1. Gửi yêu cầu hỗ trợ (tạo bản ghi)
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 24);
+      const { error: insertError } = await supabase
+        .from('password_reset_requests')
+        .insert({
+            email: user.email,
+            is_resolved: false,
+            requested_at: new Date().toISOString(),
+            expires_at: expiresAt.toISOString()
+        });
+      if (insertError) throw insertError;
 
+      toast.success(`Yêu cầu đã gửi! Vui lòng liên hệ Admin (SĐT: ${ADMIN_PHONE}) để nhận mã OTP.`);
+      setIsOtpSent(true);
+    } catch (err) {
+      toast.error(`Lỗi gửi yêu cầu: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOtpPasswordChange = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      // 2. Xác thực OTP và đổi mật khẩu
+      if (!otp || otp.length !== 6) throw new Error("Vui lòng nhập Mã OTP 6 số.");
+      if (!password || password.length < 6) throw new Error("Mật khẩu mới phải có ít nhất 6 ký tự.");
+      if (password !== confirm) throw new Error("Mật khẩu không khớp.");
+
+      const { data: req, error: reqError } = await supabase
+        .from('password_reset_requests')
+        .select('*')
+        .eq('email', user.email)
+        .eq('token', otp) // 'token' là cột chứa OTP
+        .eq('is_resolved', false)
+        .gt('expires_at', new Date().toISOString())
+        .single();
+
+      if (reqError || !req) {
+        throw new Error("Mã OTP không hợp lệ hoặc đã hết hạn.");
+      }
+      
+      const hashedPassword = btoa(password); // Mã hóa Base64
+
+      // Cập nhật mật khẩu trong bảng Users
+      const { error: updateError } = await supabase
+        .from('Users')
+        .update({ password: hashedPassword }) 
+        .eq('email', user.email);
+      if (updateError) throw updateError;
+
+      // Đánh dấu yêu cầu đã xử lý
+      await supabase
+        .from('password_reset_requests')
+        .update({ is_resolved: true })
+        .eq('id', req.id);
+
+      toast.success("Đổi mật khẩu thành công!");
+      setOtp("");
+      setPassword("");
+      setConfirm("");
+      setIsOtpSent(false);
+    } catch (err) {
+      toast.error(`Lỗi đổi mật khẩu: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- RENDER ---
   return (
     <div className="">
       <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
         <ShieldCheck size={22} className="text-orange-600" /> Bảo mật & Đăng nhập
       </h3>
-      <div className="bg-gradient-to-br from-white/60 to-slate-50 dark:from-slate-800/60 p-5 rounded-2xl border dark:border-slate-700">
-        <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">
-          Nhấn nút dưới đây để gửi một email khôi phục mật khẩu đến <strong>{user.email}</strong>.
-        </p>
-        <motion.button
-          onClick={handleSendResetEmail}
-          disabled={loading}
-          className="px-4 py-2.5 bg-gradient-to-r from-[#0ea5e9] to-[#6366f1] text-white rounded-2xl font-semibold inline-flex items-center gap-2"
-          whileHover={{ scale: 1.03 }}
-        >
-          {loading ? <CircleNotch size={18} className="animate-spin" /> : <PaperPlaneRight size={18} />}
-          Gửi Email Đổi Mật Khẩu
-        </motion.button>
-      </div>
+      
+      {/* <<< SỬA v36: Chọn chế độ dựa trên 'isHybridUser' >>> */}
+      
+      {isHybridUser ? (
+        /* ----- CHẾ ĐỘ "USER ẢO" (ADMIN OTP) ----- */
+        <form onSubmit={handleOtpPasswordChange} className="space-y-4">
+          {!isOtpSent ? (
+            /* --- Giai đoạn 1: Gửi yêu cầu --- */
+            <div className="bg-gradient-to-br from-white/60 to-slate-50 dark:from-slate-800/60 p-5 rounded-2xl border dark:border-slate-700">
+              <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">
+                Nhấn nút dưới đây để gửi yêu cầu hỗ trợ đổi mật khẩu cho tài khoản <strong>{user.email}</strong>.
+              </p>
+              <motion.button
+                type="button"
+                onClick={handleSendOtpRequest}
+                disabled={loading}
+                className="px-4 py-2.5 bg-gradient-to-r from-[#fb923c] to-[#f97316] text-white rounded-2xl font-semibold inline-flex items-center gap-2"
+                whileHover={{ scale: 1.03 }}
+              >
+                {loading ? <CircleNotch size={18} className="animate-spin" /> : <PaperPlaneRight size={18} />}
+                Gửi Yêu Cầu Hỗ Trợ
+              </motion.button>
+            </div>
+          ) : (
+            /* --- Giai đoạn 2: Nhập OTP & Mật khẩu mới --- */
+            <div className="bg-gradient-to-br from-white/60 to-slate-50 dark:from-slate-800/60 p-5 rounded-2xl border dark:border-slate-700 space-y-4">
+              <p className="text-sm text-slate-600 dark:text-slate-300 -mt-1">
+                Yêu cầu đã gửi! Vui lòng liên hệ Admin (SĐT: <strong>{ADMIN_PHONE}</strong>) để nhận Mã OTP.
+              </p>
+              
+              <InputGroup label="Mã OTP 6 số (từ Admin)">
+                <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 text-yellow-600" size={18} />
+                <input type="text" value={otp} onChange={(e) => setOtp(e.target.value)} className="w-full pl-11 py-3 border rounded-xl bg-white/5 text-slate-800 dark:text-white focus:ring-0 text-sm" required />
+              </InputGroup>
+
+              <InputGroup label="Mật khẩu mới (Tối thiểu 6 ký tự)">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sky-600" size={18} />
+                <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-11 py-3 border rounded-xl bg-white/5 text-slate-800 dark:text-white focus:ring-0 text-sm" required />
+                <span className="absolute top-1/2 transform -translate-y-1/2 right-3 cursor-pointer text-gray-400 hover:text-white" onClick={() => setShowPassword(!showPassword)}>
+                  {showPassword ? <EyeSlash /> : <Eye />}
+                </span>
+              </InputGroup>
+              
+              <InputGroup label="Nhập lại mật khẩu mới">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sky-600" size={18} />
+                <input type={showConfirm ? "text" : "password"} value={confirm} onChange={(e) => setConfirm(e.target.value)} className="w-full pl-11 py-3 border rounded-xl bg-white/5 text-slate-800 dark:text-white focus:ring-0 text-sm" required />
+                <span className="absolute top-1/2 transform -translate-y-1/2 right-3 cursor-pointer text-gray-400 hover:text-white" onClick={() => setShowConfirm(!showConfirm)}>
+                  {showConfirm ? <EyeSlash /> : <Eye />}
+                </span>
+              </InputGroup>
+
+              <div className="flex justify-end gap-3 pt-3">
+                 <motion.button
+                  type="button"
+                  onClick={() => setIsOtpSent(false)}
+                  disabled={loading}
+                  className="px-4 py-2.5 bg-slate-200 text-slate-700 rounded-2xl font-semibold"
+                >
+                  Hủy
+                </motion.button>
+                 <motion.button
+                  type="submit"
+                  disabled={loading}
+                  className="px-4 py-2.5 bg-gradient-to-r from-[#16a34a] to-[#15803d] text-white rounded-2xl font-semibold inline-flex items-center gap-2"
+                  whileHover={{ scale: 1.03 }}
+                >
+                  {loading ? <CircleNotch size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
+                  Xác nhận Đổi Mật Khẩu
+                </motion.button>
+              </div>
+            </div>
+          )}
+        </form>
+      ) : (
+        /* ----- CHẾ ĐỘ "USER THẬT" (ADMIN/SUPABASE AUTH) ----- */
+        <div className="bg-gradient-to-br from-white/60 to-slate-50 dark:from-slate-800/60 p-5 rounded-2xl border dark:border-slate-700">
+          <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">
+            Nhấn nút dưới đây để gửi một email khôi phục mật khẩu đến <strong>{user.email}</strong>.
+          </p>
+          <motion.button
+            onClick={handleSendResetEmail}
+            disabled={loading || emailSent}
+            className="px-4 py-2.5 bg-gradient-to-r from-[#0ea5e9] to-[#6366f1] text-white rounded-2xl font-semibold inline-flex items-center gap-2 disabled:opacity-60"
+            whileHover={{ scale: (loading || emailSent) ? 1 : 1.03 }}
+          >
+            {loading ? <CircleNotch size={18} className="animate-spin" /> : <PaperPlaneRight size={18} />}
+            {emailSent ? "Email đã được gửi" : "Gửi Email Đổi Mật Khẩu"}
+          </motion.button>
+        </div>
+      )}
     </div>
   );
 };
+/* ------------------ KẾT THÚC SỬA v36 ------------------ */
+
 
 /* ------------------ IdentityForm (SỬA v34) ------------------ */
 // (Nhận state từ cha, không tự fetch/load)
 const IdentityForm = ({ user, session, identity, loading, onRefresh }) => { 
-  // <<< SỬA: Xóa state 'identity', 'loading'
   const [isEditing, setIsEditing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [frontImage, setFrontImage] = useState(null);
   const [backImage, setBackImage] = useState(null);
-
-  // <<< SỬA: Xóa hàm 'fetchIdentity' (useCallback)
   
-  // <<< SỬA: Logic 'useEffect' mới để xử lý khi 'identity' prop thay đổi
   useEffect(() => {
     if (!loading) {
       if (identity) {
@@ -308,7 +449,6 @@ const IdentityForm = ({ user, session, identity, loading, onRefresh }) => {
     const fileName = `${user.id}-${type}-${Date.now()}.${fileExt}`;
     const filePath = `${fileName}`;
     
-    // (Lệnh này giờ sẽ chạy được nhờ RLS mới cho anon)
     const { error: uploadError } = await supabase.storage
       .from('id-scans')
       .upload(filePath, file, { contentType: file.type || 'image/png' });
@@ -354,14 +494,10 @@ const IdentityForm = ({ user, session, identity, loading, onRefresh }) => {
       setFrontImage(null);
       setBackImage(null);
       
-      // <<< SỬA: Gọi hàm 'onRefresh' của cha để cập nhật toàn bộ trang
       if (onRefresh) {
         onRefresh();
       }
       
-      // (Không cần logic 'setIsEditing' ở đây nữa,
-      //  useEffect (dòng 301) sẽ tự động xử lý khi prop 'identity' thay đổi)
-
     } catch (error) {
       toast.error(`Lỗi gửi thông tin: ${error.message}`);
     } finally {
@@ -373,8 +509,6 @@ const IdentityForm = ({ user, session, identity, loading, onRefresh }) => {
     return <div className="flex justify-center mt-10"><CircleNotch size={32} className="animate-spin text-sky-500" /></div>;
   }
 
-  // (Giờ logic này sẽ chạy cho TẤT CẢ user,
-  //  miễn là 'identity' tồn tại và 'isEditing' là false)
   if (identity && !isEditing) {
     let statusBadge;
     switch (identity.status) {
