@@ -1,9 +1,9 @@
 // src/pages/Profile.jsx
-/* *** (SỬA LỖI v32) ***
-  1. (Fix RLS 400) Kích hoạt lại Tab "Xác thực" cho "User ảo" (theo yêu cầu).
-  2. (Fix RLS 400) Xóa bỏ logic chặn 'handleSubmit' của IdentityForm.
+/* *** (SỬA LỖI v33 - THEO YÊU CẦU) ***
+  1. (Bỏ qua RLS) Xóa bỏ logic chặn fetchIdentity cho "User ảo".
+     (YÊU CẦU SQL POLICY "INSECURE" ĐỂ CHẠY)
+  2. (Giữ nguyên v32) Kích hoạt Tab "Xác thực" cho "User ảo".
   3. (Giữ nguyên v31) Ẩn nút Upload/Delete Avatar/Banner cho "User ảo".
-  4. (Giữ nguyên v31) Trỏ truy vấn Avatar/Banner đến `user_identity`.
 */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -268,8 +268,8 @@ const ChangePasswordForm = ({ user, identityStatus }) => {
   );
 };
 
-/* ------------------ IdentityForm (SỬA v32) ------------------ */
-// (Code này giờ sẽ chạy được cho cả Admin "thật" VÀ User "ảo")
+/* ------------------ IdentityForm (SỬA v33) ------------------ */
+// (Code này giờ sẽ fetch trạng thái cho TẤT CẢ user)
 const IdentityForm = ({ user, session }) => { 
   const [identity, setIdentity] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -281,17 +281,14 @@ const IdentityForm = ({ user, session }) => {
   const fetchIdentity = useCallback(async () => {
     if (!user) return; // Dừng nếu không có user
     
-    // "User ảo" (isHybridUser = !session) sẽ không có bản ghi identity
-    // nên chúng ta chỉ fetch nếu là user "thật" (có session)
-    if (!session) { 
-      setLoading(false);
-      setIsEditing(true); // User "ảo" sẽ luôn ở màn hình upload
-      return;
-    }
+    // <<< SỬA LỖI v33: Xóa bỏ logic chặn "User ảo" (anon) >>>
+    // (if (!session) { ... return; }) // ĐÃ XÓA
+    // Giờ code sẽ chạy cho cả "tài khoản ảo"
 
     setLoading(true);
     try {
-      // (Lệnh này giờ sẽ chạy được cho user "thật")
+      // (Lệnh này giờ sẽ chạy cho TẤT CẢ user)
+      // (NÓ SẼ THẤT BẠI nếu không có RLS Policy "INSECURE" public SELECT)
       const { data, error } = await supabase
         .from('user_identity')
         .select('*')
@@ -299,18 +296,19 @@ const IdentityForm = ({ user, session }) => {
         .single();
       if (data) {
         setIdentity(data);
-        setIsEditing(false);
+        setIsEditing(false); // Hiển thị trạng thái
       } else {
         setIdentity(null);
-        setIsEditing(true);
+        setIsEditing(true); // Hiển thị form upload
       }
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error && error.code !== 'PGRST116') throw error; // Bỏ qua lỗi "không tìm thấy"
     } catch (error) {
       toast.error(`Lỗi tải thông tin CMND: ${error.message}`);
+      setIsEditing(true); // Nếu lỗi, hiển thị form upload
     } finally {
       setLoading(false);
     }
-  }, [user, session]); // Thêm session vào dependency
+  }, [user, session]); // Giữ 'session' ở đây không ảnh hưởng
 
   useEffect(() => {
     fetchIdentity();
@@ -324,7 +322,7 @@ const IdentityForm = ({ user, session }) => {
     }
   };
 
-// --- SỬA HÀM uploadFile ---
+  // --- SỬA HÀM uploadFile ---
 const uploadFile = async (file, type) => {
   if (!file) return null;
   const fileExt = file.name.split('.').pop();
@@ -348,7 +346,7 @@ const uploadFile = async (file, type) => {
 };
   const uploadFileOld = async (file, type) => {
     
-    // (Lệnh này giờ sẽ chạy được nhờ RLS mới)
+    // (Lệnh này giờ sẽ chạy được nhờ RLS mới cho anon)
     const { error: uploadError } = await supabase.storage
       .from('id-scans')
       .upload(filePath, file, { contentType: file.type || 'image/png' });
@@ -358,9 +356,6 @@ const uploadFile = async (file, type) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // <<< SỬA LỖI v32: Xóa bỏ logic chặn "User ảo" (anon) >>>
-    // (if (!session) { ... return; }) // ĐÃ XÓA
 
     if (!frontImage && !identity?.front_image_url) {
       toast.error("Vui lòng tải lên ảnh mặt trước.");
@@ -375,8 +370,6 @@ const uploadFile = async (file, type) => {
       const front_image_path = frontImage ? await uploadFile(frontImage, 'front') : null;
       const back_image_path = backImage ? await uploadFile(backImage, 'back') : null;
       
-      // "User ảo" sẽ không có bản ghi identity, nên chúng ta cần upsert
-      // cho cả "user ảo" (tài khoản thường) và "user thật" (admin/supplier)
       const updates = {
         id: user.id, // ID này là UUID (cả ảo và thật)
         status: 'pending', // Luôn chờ duyệt
@@ -390,47 +383,24 @@ const uploadFile = async (file, type) => {
         issue_place: identity?.issue_place || null,
       };
       
-      // (Lệnh này cần RLS cho phép 'upsert' hoặc 'insert' và 'update')
-      // (Chúng ta đã có policy RLS cho 'user thật' ở các bước trước)
-      // (User ảo không có record ở đây, nên họ không thể 'update' - LỖI TIỀM TÀNG)
-      
-      // SỬA LOGIC: "User ảo" phải luôn 'INSERT'. "User thật" mới 'UPSERT'.
-      // Cách đơn giản nhất là 'upsert'
-      
+      // (Lệnh này giờ sẽ chạy được cho cả 'anon' và 'auth'
+      //  nhờ các RLS policy 'INSERT' và 'UPDATE' chúng ta đã thêm)
       const { error } = await supabase
         .from('user_identity')
-        .upsert(updates, { onConflict: 'id' }); // Cần RLS cho 'INSERT' và 'UPDATE'
+        .upsert(updates, { onConflict: 'id' }); 
 
-      if (error) {
-         // Nếu "user ảo" bị lỗi RLS 'UPDATE', chúng ta thử 'INSERT'
-         if (error.message.includes('policy') && !session) {
-            // "User ảo" (không session) bị lỗi RLS -> thử insert
-            const insertData = { ...updates };
-            delete insertData.id_number; // Xóa các trường null để insert
-            delete insertData.full_name;
-            delete insertData.dob;
-            delete insertData.issue_date;
-            delete insertData.issue_place;
-            
-            const { error: insertError } = await supabase
-              .from('user_identity')
-              .insert(insertData);
-             if (insertError) throw insertError; // Nếu vẫn lỗi thì báo
-         } else {
-            throw error; // Báo lỗi RLS gốc
-         }
-      }
+      if (error) throw error; 
 
       toast.success('Đã gửi thông tin xác thực! Vui lòng chờ Admin duyệt.');
       setFrontImage(null);
       setBackImage(null);
-      fetchIdentity(); // Tải lại (chỉ user thật mới thấy thay đổi)
-      setIsEditing(false); // Ẩn form (chỉ user thật mới thấy)
       
-      // User ảo sẽ vẫn thấy form (vì fetchIdentity không chạy)
-      if (!session) {
-         setIsEditing(true); 
-         setIdentity(null); // Reset
+      // <<< SỬA LỖI v33: Tải lại trạng thái (giờ sẽ hoạt động) >>>
+      fetchIdentity(); 
+      
+      // (Giữ lại logic này cho user thật)
+      if (session) {
+         setIsEditing(false); 
       }
 
     } catch (error) {
@@ -444,7 +414,7 @@ const uploadFile = async (file, type) => {
     return <div className="flex justify-center mt-10"><CircleNotch size={32} className="animate-spin text-sky-500" /></div>;
   }
 
-  // User "ảo" sẽ không bao giờ thấy phần này (vì isEditing luôn là true)
+  // <<< SỬA LỖI v33: Giờ "User ảo" có thể thấy phần này >>>
   if (identity && !isEditing) {
     let statusBadge;
     switch (identity.status) {
@@ -462,7 +432,7 @@ const uploadFile = async (file, type) => {
           </div>
         );
         break;
-      default:
+      default: // 'pending'
         statusBadge = (
           <div className="px-4 py-2 text-sm font-semibold rounded-2xl inline-flex items-center gap-2 bg-yellow-100 text-yellow-800">
             <WarningCircle weight="bold" className="text-yellow-600" /> Đang Chờ Duyệt
@@ -490,6 +460,8 @@ const uploadFile = async (file, type) => {
       </div>
     );
   }
+
+  // (User sẽ thấy Form này nếu 'identity' là null hoặc 'isEditing' là true)
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
@@ -829,7 +801,7 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
   );
 };
 
-/* ------------------ Main Profile Component (SỬA v32) ------------------ */
+/* ------------------ Main Profile Component (SỬA v33) ------------------ */
 export default function Profile() {
   const { user, loading, refreshUser, session } = useAuth(); // 'session' rất quan trọng
   const navigate = useNavigate();
@@ -841,25 +813,20 @@ export default function Profile() {
     if (!loading && !user) navigate('/login');
   }, [user, loading, navigate]);
   
+  // <<< SỬA LỖI v33: fetchIdentityStatus giờ sẽ chạy cho cả "User ảo" >>>
   useEffect(() => {
     if (!user) return;
 
-    // (FIX v30) Lỗi 406 RLS do "User ảo"
-    const isHybridUser = !session;
-    if (isHybridUser) {
-      // Nếu là "User ảo" (không có session), không được gọi API
-      setIdentityStatus(null);
-      setLoadingIdentity(false); // Dừng loading
-      return; // Dừng không fetch
-    }
+    // (Logic chặn 'session' đã bị xóa)
+    // (Giờ hàm này sẽ chạy cho TẤT CẢ user)
+    // (Sẽ gây lỗi nếu không có RLS "INSECURE" public SELECT)
 
     setLoadingIdentity(true);
     const fetchIdentityStatus = async () => {
       try {
-        // (Giờ chỉ có user "thật" mới chạy lệnh này)
         const { data, error } = await supabase
           .from('user_identity')
-          .select('status')
+          .select('status') // Chỉ chọn 'status' để giảm rủi ro
           .eq('id', user.id)
           .single();
           
@@ -876,7 +843,7 @@ export default function Profile() {
       }
     };
     fetchIdentityStatus();
-  }, [user, session]); // Thêm 'session' vào dependency array
+  }, [user, session]); // Giữ 'session' ở đây không ảnh hưởng
   
   const handleProfileUpdate = (updatedData) => {
     if(refreshUser) refreshUser();
@@ -931,15 +898,15 @@ export default function Profile() {
                   icon={<IdentificationCard className="text-violet-600" />}
                   isActive={activeTab === 'identity'}
                   onClick={() => setActiveTab('identity')}
-                  disabled={false} // <<< SỬA LỖI v32: Kích hoạt lại cho "User ảo"
+                  disabled={false} // (Giữ nguyên v32)
                 />
               </nav>
-              {/* <<< SỬA LỖI v32: Cập nhật thông báo lỗi >>> */}
+              {/* (Giữ nguyên v32) */}
               {(isHybridUser || identityStatus !== 'approved') && !isHybridUser && (
                  <div className="mt-4 p-3 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded-2xl text-xs font-medium text-center">
                     <Warning size={16} className="inline mr-1" />
                     {isHybridUser 
-                      ? "Tab 'Bảo mật' chỉ dành cho tài khoản Admin/Supplier." // (Thông báo này giờ sẽ không hiển thị, nhưng giữ lại cho an toàn)
+                      ? "Tab 'Bảo mật' chỉ dành cho tài khoản Admin/Supplier." 
                       : "Bạn phải xác thực CMND/CCCD để mở khóa tab 'Bảo mật'."
                     }
                  </div>
