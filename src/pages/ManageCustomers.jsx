@@ -7,9 +7,15 @@
      mà không cần cuộn nhiều.
 */
 /* NÂNG CẤP v7, v10, v11, v12 (Giữ nguyên) */
+/* *** (DI CHUYỂN v21) ***
+  1. (Logic) Xóa component `PasswordResetRequests`.
+  2. (UI) Xóa `<PasswordResetRequests />` khỏi layout.
+  3. (Logic) Xóa import `FaBell` (không còn dùng).
+*/
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { FaSpinner, FaSearch, FaTrash, FaBell } from "react-icons/fa"; 
+// (XÓA v21) Xóa FaBell
+import { FaSpinner, FaSearch, FaTrash } from "react-icons/fa"; 
 import {
   UserList, CaretLeft, CaretRight, CircleNotch, X, Plus, UsersThree, Crown, Sparkle, Wallet,
   PencilSimple, List, Package, Bed, Airplane, Receipt, Info,
@@ -162,181 +168,8 @@ const CustomerStats = () => {
   );
 };
 
-// --- (*** ĐÃ SỬA: COMPONENT YÊU CẦU RESET MẬT KHẨU SỬ DỤNG REALTIME ***) ---
-const PasswordResetRequests = () => {
-  // ... (Giữ nguyên code PasswordResetRequests)
-  const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  // Hàm fetch data
-  const fetchRequests = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("password_reset_requests")
-        .select("id, email, requested_at, token, expires_at") 
-        .eq("is_resolved", false) 
-        .order("requested_at", { ascending: true });
-      if (error) throw error;
-      setRequests(data || []);
-    } catch (err) {
-      console.error("Lỗi tải yêu cầu reset pass:", err);
-      toast.error("Lỗi tải yêu cầu reset pass: " + err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Thay thế setInterval bằng Realtime Listener
-  useEffect(() => {
-    fetchRequests(); // Tải lần đầu
-
-    const channel = supabase.channel('password_reset_channel')
-      .on(
-        'postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'password_reset_requests' 
-        },
-        (payload) => {
-          console.log('Realtime update received:', payload.eventType);
-          fetchRequests(); 
-
-          if (payload.eventType === 'INSERT') {
-             toast(`🔔 Yêu cầu hỗ trợ mật khẩu mới từ: ${payload.new.email}!`, { duration: 5000 });
-          }
-        }
-      )
-      .subscribe(); 
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [fetchRequests]);
-
-  // (SỬA v10): Hàm xử lý Tạo Mã OTP 6 Số
-  const handleGenerateResetCode = async (id) => {
-    try {
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      const expires_at = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-
-      const { error: updateError } = await supabase
-        .from("password_reset_requests")
-        .update({ 
-          token: otp, 
-          expires_at: expires_at,
-          is_resolved: false 
-        })
-        .eq("id", id);
-        
-      if (updateError) throw updateError;
-      
-      toast.success(`Đã tạo mã OTP: ${otp}. Vui lòng cung cấp mã này cho khách hàng.`);
-      fetchRequests(); 
-    } catch (err) {
-      console.error("Lỗi tạo mã OTP:", err);
-      toast.error("Lỗi tạo mã OTP: " + err.message);
-    }
-  };
-
-  // (SỬA v10.1): Hàm xử lý Đánh Dấu Đã Giải Quyết (Xóa khỏi danh sách)
-  const handleResolveRequest = async (id, email) => {
-    try {
-      const { error } = await supabase
-        .from("password_reset_requests")
-        .update({ 
-          is_resolved: true
-        })
-        .eq("id", id);
-        
-      if (error) throw error;
-      
-      toast.success(`Đã giải quyết yêu cầu của: ${email}.`);
-      fetchRequests(); // Tải lại danh sách
-    } catch (err)
-    {
-      console.error("Lỗi giải quyết yêu cầu:", err);
-      toast.error("Lỗi giải quyết yêu cầu: " + err.message);
-    }
-  };
-
-
-  if (loading && requests.length === 0) {
-    return (
-      <div className="p-4 bg-yellow-50 dark:bg-slate-700/50 rounded-lg text-center text-gray-600 dark:text-gray-300 font-medium">
-        <CircleNotch size={18} className="animate-spin inline-block mr-2" /> Đang kiểm tra yêu cầu...
-      </div>
-    );
-  }
-
-  // Nếu không có yêu cầu nào thì không hiển thị gì
-  if (!loading && requests.length === 0) {
-    return null;
-  }
-
-  return (
-    <motion.div 
-      className="bg-gradient-to-r from-orange-500 to-red-600 p-6 rounded-2xl shadow-xl text-white"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-    >
-      <h3 className="text-2xl font-bold mb-4 flex items-center gap-3">
-        <FaBell className="animate-pulse" />
-        Yêu Cầu Hỗ Trợ Đổi Mật Khẩu ({requests.length})
-      </h3>
-      <div className="space-y-3 max-h-60 overflow-y-auto simple-scrollbar pr-2">
-        {requests.map((req) => {
-          const isExpired = req.expires_at && new Date(req.expires_at) < new Date();
-          const hasValidToken = req.token && !isExpired;
-
-          return (
-            <motion.div 
-              key={req.id} 
-              className="flex flex-wrap justify-between items-center bg-white/20 p-4 rounded-lg gap-3"
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-            >
-              <div>
-                <span className="font-bold text-lg">{req.email}</span>
-                <span className="block text-sm opacity-90">
-                  Yêu cầu lúc: {new Date(req.requested_at).toLocaleString('vi-VN')}
-                </span>
-                {hasValidToken && (
-                  <span className="block text-sm font-bold text-green-200 mt-1">
-                    Mã OTP: {req.token} (Hiệu lực đến: {new Date(req.expires_at).toLocaleTimeString('vi-VN')})
-                  </span>
-                )}
-                {req.token && isExpired && (
-                  <span className="block text-sm font-bold text-yellow-200 mt-1">
-                    Mã OTP ({req.token}) đã hết hạn.
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <button
-                  onClick={() => handleGenerateResetCode(req.id)} 
-                  className="px-4 py-2 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors shadow-md flex items-center gap-2"
-                >
-                  <Sparkle/> 
-                  {hasValidToken ? "Tạo Lại Mã" : "Tạo Mã OTP"}
-                </button>
-                <button
-                  onClick={() => handleResolveRequest(req.id, req.email)}
-                  title="Đánh dấu là đã giải quyết"
-                  className="p-2.5 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors shadow-md flex items-center justify-center"
-                >
-                  <X size={18} weight="bold" />
-                </button>
-              </div>
-            </motion.div>
-          );
-        })}
-      </div>
-    </motion.div>
-  );
-};
-
+// --- (XÓA v21) XÓA COMPONENT PasswordResetRequests ---
+// ... Component đã bị xóa ...
 
 // --- Component Modal Xem Chi Tiết Đơn Hàng ---
 const CustomerBookingsModal = ({ customer, onClose }) => {
@@ -997,9 +830,8 @@ export default function ManageCustomersSupabase() {
 
       <CustomerStats />
 
-      {/* --- (*** SỬA v10.1: COMPONENT YÊU CẦU RESET MẬT KHẨU ***) --- */}
-      <PasswordResetRequests />
-      {/* --- (*** KẾT THÚC SỬA v10.1 ***) --- */}
+      {/* --- (XÓA v21) XÓA COMPONENT YÊU CẦU RESET MẬT KHẨU --- */}
+      {/* --- (*** KẾT THÚC XÓA v21 ***) --- */}
 
       {/* (Ghi chú: Bảng này đã có sẵn rounded-2xl và shadow-2xl từ v11) */}
       <div className="bg-white dark:bg-slate-800 shadow-2xl shadow-gray-200/50 dark:shadow-black/30 rounded-2xl overflow-hidden border border-gray-200 dark:border-slate-700">

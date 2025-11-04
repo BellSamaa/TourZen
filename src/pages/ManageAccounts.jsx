@@ -13,6 +13,13 @@
 /* *** (Nâng cấp v18 - Giữ lại) ***
   1. (UI/Logic) Giữ lại Nút Xóa, Modal Xóa, và hàm handleDeleteAccount.
 */
+/* *** (DI CHUYỂN v21) ***
+  1. (Logic) Chuyển component `PasswordResetRequests` từ ManageCustomers
+     sang ManageAccounts.
+  2. (UI) Thêm `<PasswordResetRequests />` vào layout.
+  3. (UI) Thêm CSS `.simple-scrollbar` để hỗ trợ component mới.
+  4. (UI) Thay thế `FaBell` bằng `Bell` của Phosphor.
+*/
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { getSupabase } from "../lib/supabaseClient";
@@ -21,7 +28,8 @@ import {
     UsersThree, CaretLeft, CaretRight, CircleNotch, X, MagnifyingGlass,
     PencilLine, ArrowsClockwise, WarningCircle, UserPlus, UserCircleMinus, UserCircleCheck,
     Eye, EyeSlash, CheckCircle, XCircle, User, At, ShieldCheck, CalendarBlank, Hourglass,
-    Archive, Key, IdentificationBadge, Trash 
+    Archive, Key, IdentificationBadge, Trash,
+    Bell, Sparkle // <<< THÊM v21: Imports cho PasswordResetRequests
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -375,6 +383,182 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
     );
 };
 
+// <<< THÊM v21: COMPONENT YÊU CẦU RESET MẬT KHẨU (Từ ManageCustomers) >>>
+const PasswordResetRequests = () => {
+    const [requests, setRequests] = useState([]);
+    const [loading, setLoading] = useState(true);
+  
+    // Hàm fetch data
+    const fetchRequests = useCallback(async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("password_reset_requests")
+          .select("id, email, requested_at, token, expires_at") 
+          .eq("is_resolved", false) 
+          .order("requested_at", { ascending: true });
+        if (error) throw error;
+        setRequests(data || []);
+      } catch (err) {
+        console.error("Lỗi tải yêu cầu reset pass:", err);
+        toast.error("Lỗi tải yêu cầu reset pass: " + err.message);
+      } finally {
+        setLoading(false);
+      }
+    }, []);
+  
+    // Thay thế setInterval bằng Realtime Listener
+    useEffect(() => {
+      fetchRequests(); // Tải lần đầu
+  
+      const channel = supabase.channel('password_reset_channel')
+        .on(
+          'postgres_changes',
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'password_reset_requests' 
+          },
+          (payload) => {
+            console.log('Realtime update received:', payload.eventType);
+            fetchRequests(); 
+  
+            if (payload.eventType === 'INSERT') {
+               toast(`🔔 Yêu cầu hỗ trợ mật khẩu mới từ: ${payload.new.email}!`, { duration: 5000 });
+            }
+          }
+        )
+        .subscribe(); 
+  
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }, [fetchRequests]);
+  
+    // Hàm xử lý Tạo Mã OTP 6 Số
+    const handleGenerateResetCode = async (id) => {
+      try {
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expires_at = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  
+        const { error: updateError } = await supabase
+          .from("password_reset_requests")
+          .update({ 
+            token: otp, 
+            expires_at: expires_at,
+            is_resolved: false 
+          })
+          .eq("id", id);
+          
+        if (updateError) throw updateError;
+        
+        toast.success(`Đã tạo mã OTP: ${otp}. Vui lòng cung cấp mã này cho khách hàng.`);
+        fetchRequests(); 
+      } catch (err) {
+        console.error("Lỗi tạo mã OTP:", err);
+        toast.error("Lỗi tạo mã OTP: " + err.message);
+      }
+    };
+  
+    // Hàm xử lý Đánh Dấu Đã Giải Quyết
+    const handleResolveRequest = async (id, email) => {
+      try {
+        const { error } = await supabase
+          .from("password_reset_requests")
+          .update({ 
+            is_resolved: true
+          })
+          .eq("id", id);
+          
+        if (error) throw error;
+        
+        toast.success(`Đã giải quyết yêu cầu của: ${email}.`);
+        fetchRequests(); // Tải lại danh sách
+      } catch (err)
+      {
+        console.error("Lỗi giải quyết yêu cầu:", err);
+        toast.error("Lỗi giải quyết yêu cầu: " + err.message);
+      }
+    };
+  
+  
+    if (loading && requests.length === 0) {
+      return (
+        <div className="p-4 bg-yellow-50 dark:bg-slate-700/50 rounded-lg text-center text-slate-600 dark:text-slate-300 font-medium font-inter">
+          <CircleNotch size={18} className="animate-spin inline-block mr-2" /> Đang kiểm tra yêu cầu...
+        </div>
+      );
+    }
+  
+    // Nếu không có yêu cầu nào thì không hiển thị gì
+    if (!loading && requests.length === 0) {
+      return null;
+    }
+  
+    return (
+      <motion.div 
+        className="bg-gradient-to-r from-orange-500 to-red-600 p-6 rounded-2xl shadow-xl text-white font-inter"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <h3 className="text-2xl font-sora font-bold mb-4 flex items-center gap-3">
+          {/* (SỬA v21) Thay thế FaBell bằng Bell của Phosphor */}
+          <Bell className="animate-pulse" size={24} />
+          Yêu Cầu Hỗ Trợ Đổi Mật Khẩu ({requests.length})
+        </h3>
+        <div className="space-y-3 max-h-60 overflow-y-auto simple-scrollbar pr-2">
+          {requests.map((req) => {
+            const isExpired = req.expires_at && new Date(req.expires_at) < new Date();
+            const hasValidToken = req.token && !isExpired;
+  
+            return (
+              <motion.div 
+                key={req.id} 
+                className="flex flex-wrap justify-between items-center bg-white/20 p-4 rounded-lg gap-3"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+              >
+                <div>
+                  <span className="font-bold font-sora text-lg">{req.email}</span>
+                  <span className="block text-sm opacity-90">
+                    Yêu cầu lúc: {new Date(req.requested_at).toLocaleString('vi-VN')}
+                  </span>
+                  {hasValidToken && (
+                    <span className="block text-sm font-bold text-green-200 mt-1">
+                      Mã OTP: {req.token} (Hiệu lực đến: {new Date(req.expires_at).toLocaleTimeString('vi-VN')})
+                    </span>
+                  )}
+                  {req.token && isExpired && (
+                    <span className="block text-sm font-bold text-yellow-200 mt-1">
+                      Mã OTP ({req.token}) đã hết hạn.
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => handleGenerateResetCode(req.id)} 
+                    className="px-4 py-2 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors shadow-md flex items-center gap-2"
+                  >
+                    <Sparkle/> 
+                    {hasValidToken ? "Tạo Lại Mã" : "Tạo Mã OTP"}
+                  </button>
+                  <button
+                    onClick={() => handleResolveRequest(req.id, req.email)}
+                    title="Đánh dấu là đã giải quyết"
+                    className="p-2.5 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors shadow-md flex items-center justify-center"
+                  >
+                    <X size={18} weight="bold" />
+                  </button>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      </motion.div>
+    );
+};
+// <<< KẾT THÚC v21 >>>
+
 
 // --- (SỬA v20) ĐỊNH NGHĨA LẠI CÁC BIẾN BỊ MẤT ---
 // Các biến này phải được định nghĩa ở ngoài component
@@ -613,6 +797,12 @@ export default function AdminManageAccounts() {
                         Thêm Tài Khoản
                     </motion.button>
                 </motion.div>
+
+                {/* <<< THÊM v21: COMPONENT YÊU CẦU RESET MẬT KHẨU >>> */}
+                <motion.div variants={itemVariant}>
+                  <PasswordResetRequests />
+                </motion.div>
+                {/* <<< KẾT THÚC THÊM v21 >>> */}
 
                 {/* Bảng */}
                 {/* (SỬA v19) Sử dụng 'itemVariant' */}
@@ -1004,6 +1194,12 @@ export default function AdminManageAccounts() {
                 .password-toggle-btn {
                     @apply absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors;
                 }
+                
+                /* <<< THÊM v21: CSS cho Scrollbar của component mới >>> */
+                .simple-scrollbar::-webkit-scrollbar { width: 8px; }
+                .simple-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .simple-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+                .dark .simple-scrollbar::-webkit-scrollbar-thumb { background: #4b5563; }
             `}</style>
         </motion.div>
     );
