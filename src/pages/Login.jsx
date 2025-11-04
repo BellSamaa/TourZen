@@ -133,7 +133,9 @@ export default function Login() {
                 
                 // Chuyển hướng theo role
                 const from = location.state?.from?.pathname || (user.role === 'admin' ? "/admin" : "/");
-                setTimeout(() => navigate(from, { replace: true }), 1000);
+setTimeout(() => {
+    window.location.href = from;
+}, 1000);
 
             } else if (mode === 'forgot') {
                 // ========== QUÊN MẬT KHẨU ==========
@@ -199,8 +201,7 @@ export default function Login() {
                         throw new Error("Mã OTP không hợp lệ hoặc đã hết hạn.");
                     }
 
-                    // Mã hóa mật khẩu mới
-                    const hashedPassword = btoa(form.password);
+const decodedPassword = atob(user.password);
 
                     // Cập nhật mật khẩu trong bảng Users
                     const { error: updateError } = await supabase
