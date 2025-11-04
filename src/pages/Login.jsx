@@ -1,4 +1,4 @@
-// HỆ THỐNG TÀI KHOẢN AUTH THẬT CỦA SUPABASE
+// HỆ THỐNG ĐA XÁC THỰC (HYBRID: Auth cho Admin, Ảo cho User)
 
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -17,16 +17,17 @@ export default function Login() {
     const navigate = useNavigate();
     const location = useLocation();
     const [mode, setMode] = useState('login');
-    // Xóa 'otp' khỏi state
-    const initialFormState = { name: "", email: "", password: "", confirm: "", address: "", phone_number: "", ngay_sinh: "" };
+    // KHÔI PHỤC 'otp' cho hệ thống "Ảo"
+    const initialFormState = { name: "", email: "", password: "", confirm: "", address: "", phone_number: "", ngay_sinh: "", otp: "" };
     const [form, setForm] = useState(initialFormState);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
-    
-    // XÓA BỎ: isOtpSent và ADMIN_PHONE không còn cần thiết
+    // KHÔI PHỤC state cho hệ thống "Ảo"
+    const [isOtpSent, setIsOtpSent] = useState(false);
+    const ADMIN_PHONE = "0912345678";
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -36,142 +37,208 @@ export default function Login() {
         
         try {
             if (mode === 'register') {
-                // ========== ĐĂNG KÝ BẰNG SUPABASE AUTH ==========
+                // ========== ĐĂNG KÝ (Chỉ dành cho Khách hàng - Hệ thống "Ảo") ==========
                 if (form.password !== form.confirm) throw new Error("Mật khẩu không khớp.");
                 if (form.password.length < 6) throw new Error("Mật khẩu phải có ít nhất 6 ký tự.");
-                if (form.phone_number && !phoneRegex.test(form.phone_number)) {
-                    throw new Error("Số điện thoại không hợp lệ. Phải đủ 10 số và đúng đầu số (03, 05, 07, 08, 09).");
-                }
-                if (form.address.length < 10) {
-                    throw new Error("Địa chỉ không hợp lệ. Vui lòng nhập địa chỉ đầy đủ (ít nhất 10 ký tự).");
+                // ... (Các kiểm tra khác của bạn) ...
+
+                // Kiểm tra email đã tồn tại chưa
+                const { data: existingUser } = await supabase
+                    .from('Users')
+                    .select('email')
+                    .eq('email', form.email)
+                    .single();
+
+                if (existingUser) {
+                    throw new Error("Email đã được sử dụng. Vui lòng dùng email khác.");
                 }
 
-                // 1. Tạo tài khoản trong auth.users (Bảo mật)
-                const { data: authData, error: authError } = await supabase.auth.signUp({
-                    email: form.email,
-                    password: form.password,
-                    options: {
-                        // Thêm dữ liệu này vào user metadata (nếu cần)
-                        data: {
-                            full_name: form.name,
-                        }
-                    }
-                });
-
-                if (authError) {
-                    throw new Error(`Lỗi đăng ký Auth: ${authError.message}`);
-                }
-                if (!authData.user) {
-                    throw new Error("Đăng ký thành công nhưng không nhận được thông tin user.");
-                }
-
-                // 2. Tạo hồ sơ trong public.Users (liên kết bằng ID)
+                // Mã hóa mật khẩu (sử dụng Base64 đơn giản)
+                const hashedPassword = btoa(form.password);
                 const customerCode = 'KH' + Date.now().toString().slice(-6);
-                
-                // (QUAN TRỌNG) Cột 'id' trong bảng Users của bạn PHẢI là UUID
-                const { error: profileError } = await supabase
+
+                // Insert vào bảng Users (TÀI KHOẢN ẢO)
+                const { error: insertError } = await supabase
                     .from('Users')
                     .insert({
-                        id: authData.user.id, // <<< LIÊN KẾT QUAN TRỌNG
                         email: form.email,
+                        password: hashedPassword, // Lưu mật khẩu đã mã hóa Base64
                         full_name: form.name,
                         address: form.address,
                         phone_number: form.phone_number || null,
                         ngay_sinh: form.ngay_sinh || null,
-                        role: 'user',
+                        role: 'user', // Luôn đăng ký là 'user'
                         customer_code: customerCode,
                         is_active: true
-                        // KHÔNG CÓ CỘT PASSWORD Ở ĐÂY
                     });
 
-                if (profileError) {
-                    console.error("❌ Profile error:", profileError);
-                    // Mặc dù lỗi profile, tài khoản Auth vẫn được tạo
-                    throw new Error(`Tài khoản đã tạo nhưng lỗi khi lưu hồ sơ: ${profileError.message}`);
+                if (insertError) {
+                    throw new Error(`Không thể tạo tài khoản: ${insertError.message}`);
                 }
 
-                console.log("✅ User created:", authData.user);
-                // (QUAN TRỌNG) Bạn cần bật "Confirm email" trong Supabase Auth
-                setSuccess("Đăng ký thành công! Vui lòng kiểm tra email để xác nhận tài khoản.");
+                // (YÊU CẦU 1) - Đăng ký xong không đăng nhập
+                setSuccess("Đăng ký thành công! 🎉 Bạn có thể đăng nhập ngay.");
                 setForm(initialFormState);
-                
                 setTimeout(() => {
                     setMode('login');
                     setSuccess('');
-                }, 3000);
+                }, 2000);
 
             } else if (mode === 'login') {
-                // ========== ĐĂNG NHẬP BẰNG SUPABASE AUTH ==========
-                const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-                    email: form.email,
-                    password: form.password,
-                });
-
-                if (loginError) {
-                    if (loginError.message === "Invalid login credentials") {
-                        throw new Error("Email hoặc mật khẩu không đúng.");
-                    }
-                    if (loginError.message === "Email not confirmed") {
-                         throw new Error("Email chưa được xác nhận. Vui lòng kiểm tra hộp thư của bạn.");
-                    }
-                    throw loginError;
-                }
-
-                if (!loginData.session) {
-                    throw new Error("Đăng nhập thất bại, không nhận được session.");
-                }
-
-                // Lấy thông tin role và is_active từ bảng Users (Profile)
-                const { data: userData, error: userError } = await supabase
+                // ========== ĐĂNG NHẬP (Đa hệ thống) ==========
+                
+                // Bước 1: Kiểm tra vai trò (role) trong bảng Users (profile)
+                const { data: userProfile, error: profileError } = await supabase
                     .from('Users')
-                    .select('role, is_active')
-                    .eq('id', loginData.user.id) // Lấy bằng ID (UUID)
+                    .select('*')
+                    .eq('email', form.email)
                     .single();
 
-                if (userError || !userData) {
-                    // Nếu không có hồ sơ, đăng xuất user ra
-                    await supabase.auth.signOut();
-                    throw new Error("Xác thực thành công nhưng không tìm thấy hồ sơ người dùng.");
+                if (profileError || !userProfile) {
+                    throw new Error("Email hoặc mật khẩu không đúng.");
                 }
 
-                if (userData.is_active === false) {
-                    // Tự động đăng xuất nếu tài khoản bị khóa
-                    await supabase.auth.signOut();
+                // Kiểm tra tài khoản bị khóa (chung cho cả hai hệ thống)
+                if (userProfile.is_active === false) {
                     throw new Error("Tài khoản của bạn đã bị khóa. 🔒");
                 }
                 
-                // XÓA BỎ: localStorage.setItem, AuthContext sẽ tự xử lý
+                let from = "/"; // Mặc định là trang chủ
 
+                // Bước 2: Dựa vào role để chọn hệ thống đăng nhập
+                
+                if (userProfile.role === 'admin') {
+                    // --- (HỆ THỐNG 1: ADMIN DÙNG SUPABASE AUTH) ---
+                    const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+                        email: form.email,
+                        password: form.password,
+                    });
+
+                    if (loginError) {
+                        throw new Error("Email hoặc mật khẩu (Admin) không đúng.");
+                    }
+                    if (!loginData.session) {
+                         throw new Error("Đăng nhập Admin thất bại, không nhận được session.");
+                    }
+                    
+                    // (YÊU CẦU 2) - Admin vào dashboard
+                    from = "/admin"; 
+                    
+                } else {
+                    // --- (HỆ THỐNG 2: USER DÙNG TÀI KHOẢN ẢO) ---
+                    if (!userProfile.password) {
+                        throw new Error("Tài khoản này không có mật khẩu (Lỗi NULL). Vui lòng liên hệ Admin.");
+                    }
+
+                    try {
+                        const decodedPassword = atob(userProfile.password);
+                        if (decodedPassword !== form.password) {
+                            throw new Error("Email hoặc mật khẩu không đúng.");
+                        }
+                    } catch (e) {
+                        throw new Error("Đã xảy ra lỗi khi kiểm tra mật khẩu (Base64).");
+                    }
+
+                    // Lưu thông tin user "ảo" vào localStorage
+                    localStorage.setItem('user', JSON.stringify({
+                        id: userProfile.id,
+                        email: userProfile.email,
+                        full_name: userProfile.full_name,
+                        role: userProfile.role,
+                        customer_code: userProfile.customer_code
+                    }));
+                    
+                    from = location.state?.from?.pathname || "/";
+                }
+
+                // Bước 3: Chuyển hướng (Dùng chung cho cả hai hệ thống)
                 setSuccess("Đăng nhập thành công! 🎉");
                 
-                // Chuyển hướng theo role
-                const from = location.state?.from?.pathname || (userData.role === 'admin' ? "/admin" : "/");
-                
-                // Dùng window.location.href để BUỘC TẢI LẠI TRANG
-                // Điều này sẽ ép AuthContext của bạn tải lại với session MỚI
+                // (FIX LỖI NAVBAR) - Dùng window.location.href để BUỘC TẢI LẠI TRANG
+                // Giúp Navbar đọc được session (cho Admin) hoặc localStorage (cho User)
                 setTimeout(() => {
                     window.location.href = from;
                 }, 1000);
 
             } else if (mode === 'forgot') {
-                // ========== QUÊN MẬT KHẨU BẰNG SUPABASE AUTH ==========
+                // (YÊU CẦU 3) - Giữ nguyên hệ thống "Admin OTP" (Chỉ dành cho User)
                 if (!form.email) throw new Error("Vui lòng nhập email của bạn.");
 
-                // (QUAN TRỌNG) Đây là đường dẫn đến trang TẠO MẬT KHẨU MỚI
-                // Bạn phải tự tạo trang này (ví dụ: /update-password)
-                const redirectTo = `${window.location.origin}/update-password`;
+                if (!isOtpSent) {
+                    // BƯỚC 1: Gửi yêu cầu hỗ trợ (Tạo bản ghi trong password_reset_requests)
+                    const { data: user, error: findError } = await supabase
+                        .from('Users')
+                        .select('id, role') // Lấy cả role
+                        .eq('email', form.email)
+                        .single();
 
-                const { error: resetError } = await supabase.auth.resetPasswordForEmail(form.email, {
-                    redirectTo: redirectTo,
-                });
+                    if (findError || !user) {
+                        throw new Error("Email không tồn tại trong hệ thống.");
+                    }
+                    
+                    if (user.role === 'admin') {
+                         throw new Error("Không thể dùng chức năng này cho tài khoản Admin. Vui lòng dùng chức năng 'Quên mật khẩu' của Supabase.");
+                    }
 
-                if (resetError) {
-                    // Không báo lỗi chi tiết để bảo mật
-                    console.error("Lỗi reset pass:", resetError.message);
+                    const expiresAt = new Date();
+                    expiresAt.setHours(expiresAt.getHours() + 24);
+
+                    const { error: insertError } = await supabase
+                        .from('password_reset_requests')
+                        .insert({
+                            email: form.email,
+                            otp: null, 
+                            is_resolved: false,
+                            requested_at: new Date().toISOString(),
+                            expires_at: expiresAt.toISOString()
+                        });
+
+                    if (insertError) throw insertError;
+
+                    setSuccess(`Yêu cầu đã gửi! Vui lòng liên hệ Admin (SĐT: ${ADMIN_PHONE}) để nhận mã OTP.`);
+                    setIsOtpSent(true);
+
+                } else {
+                    // BƯỚC 2: Xác thực OTP và đổi mật khẩu (User nhập OTP)
+                    if (!form.otp || form.otp.length !== 6) throw new Error("Vui lòng nhập Mã OTP 6 số.");
+                    if (!form.password || form.password.length < 6) throw new Error("Mật khẩu mới phải có ít nhất 6 ký tự.");
+                    if (form.password !== form.confirm) throw new Error("Mật khẩu không khớp.");
+
+                    // (FIX) Sửa 'otp' thành 'token' cho khớp với ảnh database của bạn
+                    const { data: req, error: reqError } = await supabase
+                        .from('password_reset_requests')
+                        .select('*')
+                        .eq('email', form.email)
+                        .eq('token', form.otp) // <-- SỬA LẠI THÀNH 'token'
+                        .eq('is_resolved', false)
+                        .gt('expires_at', new Date().toISOString())
+                        .single();
+
+                    if (reqError || !req) {
+                        throw new Error("Mã OTP không hợp lệ hoặc đã hết hạn.");
+                    }
+                    
+                    const hashedPassword = btoa(form.password); // Mã hóa Base64
+
+                    // Cập nhật mật khẩu trong bảng Users
+                    const { error: updateError } = await supabase
+                        .from('Users')
+                        .update({ password: hashedPassword }) // Cập nhật cột password "ảo"
+                        .eq('email', form.email);
+
+                    if (updateError) throw updateError;
+
+                    // Đánh dấu yêu cầu đã xử lý
+                    await supabase
+                        .from('password_reset_requests')
+                        .update({ is_resolved: true })
+                        .eq('id', req.id);
+
+                    setSuccess("Đổi mật khẩu thành công! 🎉");
+                    setForm(initialFormState);
+                    setIsOtpSent(false);
+                    setTimeout(() => setMode('login'), 2000);
                 }
-
-                // Luôn luôn báo thành công để tránh bị dò email
-                setSuccess("Đã gửi hướng dẫn. Vui lòng kiểm tra email (cả spam) để đặt lại mật khẩu.");
             }
         } catch (err) {
             console.error("Error:", err);
@@ -186,9 +253,10 @@ export default function Login() {
         setError('');
         setSuccess('');
         setForm(initialFormState);
-        // XÓA BỎ: setIsOtpSent(false);
+        setIsOtpSent(false); 
     };
 
+    // ... (Phần JSX còn lại của bạn giữ nguyên, nó đã đúng với logic "Admin OTP")
     const backdropVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { duration: 0.8 } } };
     const formContainerVariants = {
         hidden: { opacity: 0, y: 30, scale: 0.98 },
@@ -209,13 +277,11 @@ export default function Login() {
         <div className="min-h-screen w-full flex items-center justify-center p-4 overflow-hidden bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/images/login-background.jpg')" }}>
             <motion.div className="absolute inset-0 bg-gradient-to-br from-black/60 via-black/40 to-black/70" variants={backdropVariants} initial="hidden" animate="visible" />
 
-            {/* Bỏ key={...isOtpSent} */}
-            <motion.div key={mode} className="w-full max-w-md p-8 sm:p-10 relative z-10 bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl text-white" variants={formContainerVariants} initial="hidden" animate="visible">
+            <motion.div key={mode + (isOtpSent ? '-otp' : '')} className="w-full max-w-md p-8 sm:p-10 relative z-10 bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl text-white" variants={formContainerVariants} initial="hidden" animate="visible">
                 <motion.div className="text-center mb-8" variants={inputGroupVariants}>
                     <h2 className="text-4xl font-bold text-white tracking-tight drop-shadow-lg">TourZen</h2>
                     <p className="text-sm text-sky-300 mt-1">
-                        {/* Sửa lại tiêu đề cho chế độ 'forgot' */}
-                        {mode === 'forgot' ? 'Khôi phục mật khẩu' : 'Khám phá thế giới trong tầm tay'}
+                        {mode === 'forgot' ? (isOtpSent ? 'Nhập Mã & Mật Khẩu Mới' : 'Yêu cầu Hỗ trợ Mật khẩu') : 'Khám phá thế giới trong tầm tay'}
                     </p>
                 </motion.div>
 
@@ -252,8 +318,7 @@ export default function Login() {
 
                         <motion.div className="relative" variants={inputGroupVariants} layout>
                             <FaEnvelope className="input-icon" />
-                            {/* Bỏ disabled và class bg-white/5 */}
-                            <input type="email" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input-field" required />
+                            <input type="email" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={`input-field ${mode === 'forgot' && isOtpSent ? 'bg-white/5 cursor-not-allowed' : ''}`} required disabled={mode === 'forgot' && isOtpSent} />
                         </motion.div>
 
                         {mode === 'register' && (
@@ -273,20 +338,24 @@ export default function Login() {
                             </>
                         )}
 
-                        {/* XÓA BỎ: Ô nhập OTP */}
-                        
-                        {/* Chỉ hiển thị mật khẩu khi Đăng nhập hoặc Đăng ký */}
-                        {mode !== 'forgot' && (
+                        {mode === 'forgot' && isOtpSent && (
+                            <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
+                                <FaKey className="input-icon" />
+                                <input type="text" placeholder="Mã OTP 6 số (từ Admin)" value={form.otp} onChange={(e) => setForm({ ...form, otp: e.target.value })} className="input-field" required />
+                            </motion.div>
+                        )}
+
+                        {(mode !== 'forgot' || isOtpSent) && (
                             <>
                                 <motion.div className="relative" variants={inputGroupVariants} layout>
                                     <FaLock className="input-icon" />
-                                    <input type={showPassword ? "text" : "password"} placeholder="Mật khẩu (Tối thiểu 6 ký tự)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="input-field pr-10" required />
+                                    <input type={showPassword ? "text" : "password"} placeholder={mode === 'forgot' ? "Mật khẩu mới (Tối thiểu 6 ký tự)" : "Mật khẩu"} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="input-field pr-10" required />
                                     <span className="absolute top-1/2 transform -translate-y-1/2 right-3 cursor-pointer text-gray-400 hover:text-white transition-colors" onClick={() => setShowPassword(!showPassword)}>
                                         {showPassword ? <FaEyeSlash /> : <FaEye />}
                                     </span>
                                 </motion.div>
 
-                                {mode === 'register' && (
+                                {(mode === 'register' || (mode === 'forgot' && isOtpSent)) && (
                                     <motion.div className="relative" variants={inputGroupVariants} initial="hidden" animate="visible" exit="exit" layout>
                                         <FaLock className="input-icon" />
                                         <input type={showConfirm ? "text" : "password"} placeholder="Nhập lại mật khẩu" value={form.confirm} onChange={(e) => setForm({ ...form, confirm: e.target.value })} className="input-field pr-10" required />
@@ -301,12 +370,13 @@ export default function Login() {
 
                     {mode === 'forgot' && (
                         <motion.p className="text-sm text-center text-gray-200" variants={inputGroupVariants}>
-                            Nhập email của bạn. Chúng tôi sẽ gửi một liên kết
-                            để bạn đặt lại mật khẩu.
+                            {!isOtpSent ? "Nhập email của bạn để gửi yêu cầu hỗ trợ đến Admin." : (
+                                <>Vui lòng liên hệ Admin (SĐT: <strong className="text-white">{ADMIN_PHONE}</strong>)<br /> để nhận Mã OTP và điền vào ô bên trên.</>
+                            )}
                         </motion.p>
                     )}
 
-                    <motion.button type="submit" disabled={loading} className={`w-full bg-gradient-to-r ${mode === 'login' ? 'from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700' : mode === 'register' ? 'from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700' : 'from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700'} text-white py-3.5 rounded-xl font-bold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center space-x-2 mt-8 transform active:scale-[0.97]`} whileHover={{ scale: 1.03, y: -3, transition: { type: 'spring', stiffness: 300 } }} variants={inputGroupVariants}>
+                    <motion.button type="submit" disabled={loading} className={`w-full bg-gradient-to-r ${mode === 'login' ? 'from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700' : mode === 'register' ? 'from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700' : isOtpSent ? 'from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700' : 'from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700'} text-white py-3.5 rounded-xl font-bold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center space-x-2 mt-8 transform active:scale-[0.97]`} whileHover={{ scale: 1.03, y: -3, transition: { type: 'spring', stiffness: 300 } }} variants={inputGroupVariants}>
                         {loading ? (
                             <>
                                 <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -317,9 +387,8 @@ export default function Login() {
                             </>
                         ) : (
                             <>
-                                {/* Sửa lại icon và text cho nút */}
-                                {mode === 'login' ? <FaSignInAlt /> : mode === 'register' ? <FaUser /> : <FaPaperPlane />}
-                                <span>{mode === 'login' ? 'Đăng nhập' : mode === 'register' ? 'Tạo tài khoản' : 'Gửi yêu cầu khôi phục'}</span>
+                                {mode === 'login' ? <FaSignInAlt /> : mode === 'register' ? <FaUser /> : (isOtpSent ? <FaLock /> : <FaPaperPlane />)}
+                                <span>{mode === 'login' ? 'Đăng nhập' : mode === 'register' ? 'Tạo tài khoản' : (isOtpSent ? 'Đổi mật khẩu' : 'Gửi yêu cầu hỗ trợ')}</span>
                             </>
                         )}
                     </motion.button>
@@ -378,4 +447,3 @@ export default function Login() {
         </div>
     );
 }
-

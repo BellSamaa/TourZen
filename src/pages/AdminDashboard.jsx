@@ -74,10 +74,14 @@ function Sidebar() {
         },
     };
 
+    // <<< SỬA LỖI QUAN TRỌNG TẠI ĐÂY >>>
     const handleLogout = async () => {
-        await logout();
-        navigate("/");
+        await logout(); // 1. Đăng xuất khỏi Supabase Auth (cho Admin)
+        localStorage.removeItem("user"); // 2. Xóa session "ảo" (cho User)
+        window.location.href = "/"; // 3. Tải lại trang để Navbar cập nhật
+        // navigate("/"); // (Không dùng navigate vì nó không tải lại trang)
     };
+    // <<< KẾT THÚC SỬA LỖI >>>
 
     return (
         <motion.div 
@@ -126,7 +130,7 @@ function Sidebar() {
                 </SidebarLink>
                 <SidebarLink to="/admin/accounts" icon={<UserCircleGear size={24} />}>
                     Quản lý Tài Khoản
-                </SidebarLink>
+                </S_idebarLink>
             </motion.nav>
 
             {/* (NÂNG CẤP) User Profile - Thêm hover effect và options */}
@@ -139,7 +143,10 @@ function Sidebar() {
                 <div className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 cursor-pointer transition-all duration-300 group">
                     <UserCircle size={48} weight="light" className="flex-shrink-0 text-blue-200 group-hover:text-white" />
                     <div className="flex-1 min-w-0">
-                        <p className="text-base font-bold truncate text-white">Admin</p>
+                        {/* Hiển thị tên Admin từ AuthContext */}
+                        <p className="text-base font-bold truncate text-white">
+                            {user?.user_metadata?.full_name || user?.email || "Admin"}
+                        </p>
                     </div>
                     <Gear size={24} className="text-blue-200 group-hover:rotate-90 transition-transform duration-300" />
                 </div>
