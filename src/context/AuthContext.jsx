@@ -1,4 +1,6 @@
 // src/context/AuthContext.jsx
+// (KHÔNG THAY ĐỔI - Code này đã xử lý đúng yêu cầu của bạn)
+
 import React, { createContext, useState, useEffect, useContext } from "react";
 import { getSupabase } from "../lib/supabaseClient";
 

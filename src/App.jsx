@@ -2,6 +2,7 @@
 // (SỬA v19) Thêm import và route cho trang Profile.jsx
 // (ĐÃ SỬA: Sửa lỗi useLocation, lỗi layout 'position: absolute' và sai path route)
 // (SỬA v3: Thêm VNPAYPage và sửa sai route VirtualPayment)
+// (SỬA THEO YÊU CẦU: Thêm logic bảo vệ route cho Admin và Supplier)
 
 import React from "react";
 // SỬA 1: Thêm 'useLocation'
@@ -47,7 +48,8 @@ import ManageAccounts from './pages/ManageAccounts.jsx';
 
 // Context Providers
 import { CartProvider } from "./context/CartContext.jsx";
-import { AuthProvider } from "./context/AuthContext.jsx";
+// --- (THÊM) Import useAuth để bảo vệ route ---
+import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 
 // CSS Imports
 import "swiper/css";
@@ -83,11 +85,39 @@ const SiteLayout = () => {
                     >
                         <Outlet /> {/* Outlet render trang con */}
                     </motion.div>
-                </AnimatePresence>
+               D</AnimatePresence>
             </main>
             <Footer />
         </div>
     );
+};
+
+
+// --- (THÊM) Component bảo vệ cho Admin ---
+const AdminRoute = () => {
+  const { isAdmin, loading } = useAuth();
+
+  if (loading) {
+    // Quan trọng: Chờ AuthContext load xong để tránh bị điều hướng sai
+    return <div>Đang tải trang xác thực...</div>; // (Nên thay bằng component LoadingSpinner)
+  }
+
+  // Nếu đã load xong, kiểm tra quyền Admin
+  return isAdmin ? <Outlet /> : <Navigate to="/" replace />;
+};
+
+// --- (THÊM) Component bảo vệ cho Supplier (đáp ứng yêu cầu) ---
+const SupplierRoute = () => {
+  const { isSupplier, loading } = useAuth();
+
+  if (loading) {
+    // Quan trọng: Chờ AuthContext load xong (kiểm tra cả "ảo" và "thật")
+    return <div>Đang tải trang xác thực...</div>; // (Nên thay bằng component LoadingSpinner)
+  }
+
+  // Nếu đã load xong, kiểm tra quyền Supplier
+  // Biến 'isSupplier' đã được AuthContext tính toán đúng cho cả 2 loại tài khoản
+  return isSupplier ? <Outlet /> : <Navigate to="/" replace />;
 };
 
 
@@ -100,7 +130,7 @@ export default function App() {
                 <Routes>
                     {/* === Public Routes (Sử dụng SiteLayout) === */}
                     <Route path="/" element={<SiteLayout />}>
-             _            <Route index element={<Home />} />
+                        <Route index element={<Home />} />
                         <Route path="about" element={<About />} />
                         <Route path="tours" element={<TourList />} />
                         <Route path="tour/:id" element={<TourDetail />} />
@@ -128,36 +158,40 @@ export default function App() {
 
                     {/* === Private Dashboards (Layout riêng + Route con) === */}
 
-                    {/* 1. Admin Dashboard Routes */}
-                    <Route path="/admin/*" element={<AdminDashboard />}> {/* Vẫn giữ /* */}
-                        {/* ====> KHÔI PHỤC CÁC ROUTE CON ADMIN Ở ĐÂY <==== */}
-                        <Route index element={<Navigate to="dashboard" replace />} />
-                        <Route path="dashboard" element={<DashboardHome />} />
-                        <Route path="reports" element={<Reports />} />
-                        <Route path="tours" element={<AdminManageProducts />} />
-                        <Route path="bookings" element={<ManageTour />} />
-                        <Route path="customers" element={<ManageCustomers />} />
-                        <Route path="suppliers" element={<ManageSuppliers />} />
-                        <Route path="accounts" element={<ManageAccounts />} />
-                        <Route path="*" element={<AdminNotFound />} />
-                         {/* ====> KẾT THÚC KHÔI PHỤC <==== */}
-                    </Route>
+                    {/* 1. Admin Dashboard Routes (SỬA: Bọc bằng AdminRoute) */}
+                    <Route element={<AdminRoute />}>
+                        <Route path="/admin/*" element={<AdminDashboard />}> {/* Vẫn giữ /* */}
+                            {/* ====> KHÔI PHỤC CÁC ROUTE CON ADMIN Ở ĐÂY <==== */}
+                            <Route index element={<Navigate to="dashboard" replace />} />
+                            <Route path="dashboard" element={<DashboardHome />} />
+                            <Route path="reports" element={<Reports />} />
+                            <Route path="tours" element={<AdminManageProducts />} />
+                            <Route path="bookings" element={<ManageTour />} />
+                            <Route path="customers" element={<ManageCustomers />} />
+                            <Route path="suppliers" element={<ManageSuppliers />} />
+                            <Route path="accounts" element={<ManageAccounts />} />
+                            <Route path="*" element={<AdminNotFound />} />
+                             {/* ====> KẾT THÚC KHÔI PHỤC <==== */}
+                        </Route>
+                    </Route>
 
-                    {/* 2. Supplier Dashboard Routes */}
-                    <Route path="/supplier/*" element={<SupplierDashboard />}> {/* Vẫn giữ /* */}
-                         {/* Các route con của supplier sẽ nằm trong SupplierDashboard.jsx (thông qua Outlet) */}
-                         {/* Ví dụ:
+                    {/* 2. Supplier Dashboard Routes (SỬA: Bọc bằng SupplierRoute) */}
+                    <Route element={<SupplierRoute />}>
+                        <Route path="/supplier/*" element={<SupplierDashboard />}> {/* Vẫn giữ /* */}
+                             {/* Các route con của supplier sẽ nằm trong SupplierDashboard.jsx (thông qua Outlet) */}
+                             {/* Ví dụ:
                          <Route index element={<Navigate to="dashboard" replace />} />
                          <Route path="dashboard" element={<SupplierHome />} />
                          <Route path="tours" element={<SupplierManageProducts />} />
-                         <Route path="transport" element={<ManageTransport />} />
+ci                      <Route path="transport" element={<ManageTransport />} />
                          <Route path="flights" element={<ManageFlights />} />
-á                      <Route path="add-quick-tour" element={<SupplierAddQuickTour />} />
+                         <Route path="add-quick-tour" element={<SupplierAddQuickTour />} />
                          <Route path="*" element={<SupplierNotFound />} /> // Tạo component SupplierNotFound nếu cần
                          */}
-                    </Route>
+                        </Route>
+                    </Route>
 
-D                   {/* Route 404 chung nếu không khớp các path trên */}
+                   {/* Route 404 chung nếu không khớp các path trên */}
                     {/* Đã được xử lý bên trong SiteLayout và các Dashboard */}
 
                 </Routes>
@@ -180,24 +214,24 @@ function AdminNotFound() {
         >
             404
         </motion.h2>
-CH       <motion.p
+        <motion.p
             className="text-neutral-500 dark:text-neutral-400 mt-2 text-lg"
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.2 }}
         >
             Trang quản trị này không tồn tại.
-s       </motion.p>
+        </motion.p>
          <motion.div
               initial={{ y: 20, opacity: 0 }}
-s             animate={{ y: 0, opacity: 1 }}
+              animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.5, delay: 0.4 }}
               className="mt-6"
           >
- S            <Link to="/admin/dashboard" className="px-6 py-2 bg-sky-600 text-white rounded-md hover:bg-sky-700 transition-colors">
+             <Link to="/admin/dashboard" className="px-6 py-2 bg-sky-600 text-white rounded-md hover:bg-sky-700 transition-colors">
                   Về Tổng quan
               </Link>
-          </motion.div>
+   D        </motion.div>
       </div>
     </div>
   );
