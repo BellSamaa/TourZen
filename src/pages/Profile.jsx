@@ -1,5 +1,5 @@
 // src/pages/Profile.jsx
-/* *** (SỬA LỖI v30) ***
+/* *** (SỬA LỖI v30.1) ***
   1. (Fix Nút Bấm) Liên kết <label htmlFor> với <input id> cho Avatar và Banner.
   2. (Fix Logic Mật Khẩu) Xóa bỏ hệ thống "Admin OTP" (không còn tương thích).
   3. (Nâng Cấp) Thay thế bằng hệ thống `resetPasswordForEmail` của Supabase Auth.
@@ -278,7 +278,6 @@ const ChangePasswordForm = ({ user, identityStatus }) => {
 };
 
 /* ------------------ IdentityForm (Đã fix lỗi RLS) ------------------ */
-// (Logic này đã đúng, nó sẽ hoạt động sau khi bạn chạy SQL RLS Policy)
 const IdentityForm = ({ user }) => {
   const [identity, setIdentity] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -478,8 +477,7 @@ const IdentityForm = ({ user }) => {
   );
 };
 
-/* ------------------ AvatarBannerManager (SỬA v30 - Fix Nút Bấm) ------------------ */
-// <<< SỬA: Thêm `session` để xử lý logic "hybrid"
+/* ------------------ AvatarBannerManager (SỬA v30.1 - Fix Nút Bấm) ------------------ */
 const AvatarBannerManager = ({ user, refreshUser, session }) => {
   const [avatarPath, setAvatarPath] = useState(null);
   const [bannerPath, setBannerPath] = useState(null);
@@ -496,15 +494,15 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
   const [currentUploadType, setCurrentUploadType] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  // <<< SỬA: Xóa bỏ Refs, chúng ta sẽ dùng ID và Label
+  // Xóa bỏ Refs
   // const avatarInputRef = useRef(null);
   // const bannerInputRef = useRef(null);
 
-  // load existing values from Users table
   useEffect(() => {
     if (!user) return;
     (async () => {
       try {
+        // (Đã fix bằng SQL RLS)
         const { data, error } = await supabase
           .from('Users')
           .select('avatar_url, banner_url')
@@ -569,7 +567,6 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
       const { error: dbErr } = await supabase.from('Users').update(updates).eq('id', user.id);
       if (dbErr) throw dbErr;
 
-      // Cập nhật auth metadata nếu là user "thật" (Admin)
       if (session) {
         const { error: authErr } = await supabase.auth.updateUser({ data: updates });
         if (authErr) throw authErr;
@@ -657,11 +654,9 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
 
         {/* <<< SỬA LỖI NÚT BẤM BANNER >>> */}
         <div className="absolute top-3 right-3 flex gap-2">
-          {/* 1. Thêm 'htmlFor' vào label */}
           <label htmlFor="banner-upload-input" className="inline-flex items-center gap-2 bg-white/90 dark:bg-slate-800/80 p-2 rounded-xl cursor-pointer">
             <Image size={18} /> <span className="hidden md:inline">Thay banner</span>
           </label>
-          {/* 2. Thêm 'id' và 'onChange' vào input */}
           <input 
             id="banner-upload-input" 
             type="file" 
@@ -675,7 +670,6 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
             </button>
           )}
         </div>
-        {/* <<< KẾT THÚC SỬA BANNER >>> */}
       </div>
 
       {/* Avatar + name */}
@@ -692,11 +686,9 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
           </div>
 
           {/* <<< SỬA LỖI NÚT BẤM AVATAR >>> */}
-          {/* 1. Thay 'div' bằng 'label' và thêm 'htmlFor' */}
           <label htmlFor="avatar-upload-input" className="absolute -right-1 -bottom-1 bg-white/90 dark:bg-slate-800/80 rounded-full p-1 cursor-pointer border border-white/40">
             <Camera size={16} className="text-slate-700" />
           </label>
-          {/* 2. Thêm 'id' và 'onChange' vào input */}
           <input 
             id="avatar-upload-input" 
             type="file" 
@@ -704,7 +696,6 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
             onChange={handleAvatarFileSelected} 
             className="hidden" 
           />
-          {/* <<< KẾT THÚC SỬA AVATAR >>> */}
         </div>
 
         <div className="flex-1">
@@ -818,9 +809,9 @@ export default function Profile() {
   
   // (Hệ thống Hybrid) Quyết định xem refresh ntn
   const handleProfileUpdate = (updatedData) => {
-    // Tự động refresh user trong context
-    // (AuthContext đã sửa của tôi sẽ tự xử lý việc này)
-    if (refreshUser) refreshUser(updatedData); 
+     // Lấy user mới từ context, vì context (đã sửa) sẽ tự cập nhật
+     // state nội bộ của nó (cho cả "ảo" và "thật")
+     if(refreshUser) refreshUser();
   };
 
   if (loading || !user || loadingIdentity) {
@@ -831,7 +822,6 @@ export default function Profile() {
     );
   }
 
-  // <<< SỬA: Kiểm tra xem user có phải "ảo" không >>>
   // User "ảo" (hệ thống cũ) sẽ không có session
   const isHybridUser = !session;
 
@@ -926,7 +916,5 @@ export default function Profile() {
 
 /* ------------------ AvatarBannerWrapper (SỬA v30) ------------------ */
 function AvatarBannerWrapper({ user, refreshUser, session }) {
-  // refreshUser: (data) => setUser(data) (từ AuthContext)
-  // session: Lấy từ AuthContext
   return <AvatarBannerManager user={user} refreshUser={refreshUser} session={session} />;
 }
