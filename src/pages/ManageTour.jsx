@@ -876,12 +876,13 @@ export default function ManageTour() {
         try {
             // (MỚI v9) Xóa Reviews trước (nếu có)
              if (booking.review_data) {
-                 const { error: reviewError } = await supabase
-                     .from('Reviews')
+                 const { data, error } = await supabase
+  .from('Reviews')
+  .select('*, Users(*)')
                      .delete()
                      .eq('booking_id', booking.id); // Xóa theo booking_id
-                 if (reviewError) {
-                      console.warn(`Lỗi xóa review liên kết: ${reviewError.message}`);
+                 if (error) {
+                     console.warn(`Lỗi xóa review liên kết: ${error.message}`);
                  }
              }
 
