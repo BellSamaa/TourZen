@@ -606,8 +606,9 @@ const IdentityForm = ({ user, session, identity, loading, onRefresh }) => {
   );
 };
 
-/* ------------------ AvatarBannerManager (Giữ nguyên v31) ------------------ */
-// (Logic này đã đúng: Vô hiệu hóa cho "User ảo")
+/* ------------------ AvatarBannerManager (SỬA LỖI THEO YÊU CẦU) ------------------ */
+// 1. (Fix) Trỏ đến bảng 'Users' thay vì 'user_identity' (dựa theo ảnh Supabase)
+// 2. (Fix) Gỡ bỏ check 'session' để "User ảo" (không có session) có thể fetch và upload
 const AvatarBannerManager = ({ user, refreshUser, session }) => {
   const [avatarPath, setAvatarPath] = useState(null);
   const [bannerPath, setBannerPath] = useState(null);
@@ -625,11 +626,12 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
   const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
-    if (!user || !session) return; // User "ảo" không fetch
+    // SỬA: Bỏ check '!session' để user "ảo" cũng có thể fetch
+    if (!user) return; 
     (async () => {
       try {
         const { data, error } = await supabase
-          .from('user_identity') 
+          .from('Users') // SỬA: Đổi từ 'user_identity' sang 'Users'
           .select('avatar_url, banner_url')
           .eq('id', user.id)
           .single();
@@ -639,7 +641,7 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
         }
       } catch (e) { /* ignore */ }
     })();
-  }, [user, session]); // Thêm session
+  }, [user]); // SỬA: Bỏ 'session' khỏi dependency
 
   useEffect(() => {
     setAvatarPreview(getPublicUrlSafe('avatars', avatarPath));
@@ -688,9 +690,11 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
 
       const updates = currentUploadType === 'avatar' ? { avatar_url: fileName } : { banner_url: fileName };
       
-      const { error: dbErr } = await supabase.from('user_identity').update(updates).eq('id', user.id);
+      // SỬA: Đổi từ 'user_identity' sang 'Users'
+      const { error: dbErr } = await supabase.from('Users').update(updates).eq('id', user.id);
       if (dbErr) throw dbErr;
 
+      // (Giữ nguyên) Chỉ update auth nếu là user "thật" (có session)
       if (session) {
         const { error: authErr } = await supabase.auth.updateUser({ data: updates });
         if (authErr) throw authErr;
@@ -721,12 +725,14 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
     const f = e.target.files?.[0];
     if (!f) return;
     await openCropForFile(f, 'avatar');
+    e.target.value = null; // Reset input để có thể chọn lại file cũ
   };
 
   const handleBannerFileSelected = async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
     await openCropForFile(f, 'banner');
+    e.target.value = null; // Reset input
   };
 
   const handleDelete = async (type) => {
@@ -736,9 +742,11 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
     try {
       const updates = type === 'avatar' ? { avatar_url: null } : { banner_url: null };
       
-      const { error: dbErr } = await supabase.from('user_identity').update(updates).eq('id', user.id);
+      // SỬA: Đổi từ 'user_identity' sang 'Users'
+      const { error: dbErr } = await supabase.from('Users').update(updates).eq('id', user.id);
       if (dbErr) throw dbErr;
 
+      // (Giğ nguyên) Chỉ update auth nếu là user "thật" (có session)
       if (session) {
         const { error: authErr } = await supabase.auth.updateUser({ data: updates });
         if (authErr) throw authErr;
@@ -775,26 +783,25 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
           </div>
         )}
 
-        {/* (v31) Chỉ hiển thị nút cho user "thật" (có session) */}
-        {session && (
-          <div className="absolute top-3 right-3 flex gap-2">
-            <label htmlFor="banner-upload-input" className="inline-flex items-center gap-2 bg-white/90 dark:bg-slate-800/80 p-2 rounded-xl cursor-pointer">
-              <Image size={18} /> <span className="hidden md:inline">Thay banner</span>
-            </label>
-            <input 
-              id="banner-upload-input" 
-              type="file" 
-              accept="image/*" 
-              onChange={handleBannerFileSelected} 
-              className="hidden" 
-            />
-            {bannerPreview && (
-              <button onClick={() => handleDelete('banner')} className="inline-flex items-center gap-2 bg-white/90 dark:bg-slate-800/80 p-2 rounded-xl hover:bg-rose-100">
-                <TrashSimple size={18} /> <span className="hidden md:inline">Xóa</span>
-              </button>
-            )}
-          </div>
-        )}
+        {/* SỬA: Gỡ bỏ check 'session' để ai cũng thấy nút */}
+        <div className="absolute top-3 right-3 flex gap-2">
+          <label htmlFor="banner-upload-input" className="inline-flex items-center gap-2 bg-white/90 dark:bg-slate-800/80 p-2 rounded-xl cursor-pointer">
+            <Image size={18} /> <span className="hidden md:inline">Thay banner</span>
+          </label>
+          <input 
+            id="banner-upload-input" 
+            type="file" 
+            accept="image/*" 
+            onChange={handleBannerFileSelected} 
+            className="hidden" 
+            disabled={isUploading}
+          />
+          {bannerPreview && (
+            <button onClick={() => handleDelete('banner')} className="inline-flex items-center gap-2 bg-white/90 dark:bg-slate-800/80 p-2 rounded-xl hover:bg-rose-100" disabled={isUploading}>
+              <TrashSimple size={18} /> <span className="hidden md:inline">Xóa</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Avatar + name */}
@@ -810,21 +817,20 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
             )}
           </div>
 
-          {/* (v31) Chỉ hiển thị nút cho user "thật" (có session) */}
-          {session && (
-            <>
-              <label htmlFor="avatar-upload-input" className="absolute -right-1 -bottom-1 bg-white/90 dark:bg-slate-800/80 rounded-full p-1 cursor-pointer border border-white/40">
-                <Camera size={16} className="text-slate-700" />
-              </label>
-              <input 
-                id="avatar-upload-input" 
-                type="file" 
-                accept="image/*" 
-                onChange={handleAvatarFileSelected} 
-                className="hidden" 
-              />
-            </>
-          )}
+          {/* SỬA: Gỡ bỏ check 'session' */}
+          <>
+            <label htmlFor="avatar-upload-input" className="absolute -right-1 -bottom-1 bg-white/90 dark:bg-slate-800/80 rounded-full p-1 cursor-pointer border border-white/40">
+              <Camera size={16} className="text-slate-700" />
+            </label>
+            <input 
+              id="avatar-upload-input" 
+              type="file" 
+              accept="image/*" 
+              onChange={handleAvatarFileSelected} 
+              className="hidden" 
+              disabled={isUploading}
+            />
+          </>
         </div>
 
         <div className="flex-1">
@@ -833,9 +839,9 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          {/* (v31) Chỉ hiển thị nút cho user "thật" (có session) */}
-          {session && avatarPreview && (
-            <button onClick={() => handleDelete('avatar')} className="px-3 py-2 bg-white/90 dark:bg-slate-800/80 rounded-2xl inline-flex items-center gap-2">
+          {/* SỬA: Gỡ bỏ check 'session', chỉ check 'avatarPreview' */}
+          {avatarPreview && (
+            <button onClick={() => handleDelete('avatar')} className="px-3 py-2 bg-white/90 dark:bg-slate-800/80 rounded-2xl inline-flex items-center gap-2" disabled={isUploading}>
               <TrashSimple size={16} /> <span className="hidden md:inline">Xóa avatar</span>
             </button>
           )}
@@ -847,7 +853,7 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
         </div>
       </div>
 
-      {/* Crop Modal */}
+      {/* Crop Modal (Giữ nguyên) */}
       <Dialog open={isAvatarCropOpen || isBannerCropOpen} onClose={() => { setIsAvatarCropOpen(false); setIsBannerCropOpen(false); setImageSrc(null); }}>
         <div className="fixed inset-0 bg-black/50" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
@@ -877,7 +883,7 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
         </div>
       </Dialog>
 
-      {/* Preview Modal */}
+      {/* Preview Modal (Giữ nguyên) */}
       <Dialog open={isPreviewOpen} onClose={() => setIsPreviewOpen(false)}>
         <div className="fixed inset-0 bg-black/70" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
@@ -1060,7 +1066,7 @@ export default function Profile() {
   );
 }
 
-/* ------------------ AvatarBannerWrapper (SỬA v30) ------------------ */
+/* ------------------ AvatarBannerWrapper (SỬA THEO YÊU CẦU) ------------------ */
 function AvatarBannerWrapper({ user, refreshUser, session }) {
   return <AvatarBannerManager user={user} refreshUser={refreshUser} session={session} />;
 }
