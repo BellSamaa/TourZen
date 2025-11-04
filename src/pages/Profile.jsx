@@ -269,7 +269,7 @@ const ChangePasswordForm = ({ user, identityStatus }) => {
 };
 
 /* ------------------ IdentityForm (Đã fix lỗi RLS) ------------------ */
-// (Tắt RLS thì code này sẽ chạy được)
+// (Code này giờ sẽ chạy được nếu là Admin "thật", User "ảo" sẽ không thấy)
 const IdentityForm = ({ user }) => {
   const [identity, setIdentity] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -277,12 +277,17 @@ const IdentityForm = ({ user }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [frontImage, setFrontImage] = useState(null);
   const [backImage, setBackImage] = useState(null);
+  const { session } = useAuth(); // Lấy session
 
   const fetchIdentity = useCallback(async () => {
-    if (!user) return;
+    if (!user || !session) { // <<< SỬA LỖI: Chỉ fetch nếu là user "thật"
+      setLoading(false);
+      setIsEditing(true); // User "ảo" sẽ luôn ở màn hình upload
+      return;
+    }
     setLoading(true);
     try {
-      // (Tắt RLS thì lệnh này sẽ chạy được)
+      // (Lệnh này giờ sẽ chạy được)
       const { data, error } = await supabase
         .from('user_identity')
         .select('*')
@@ -301,7 +306,7 @@ const IdentityForm = ({ user }) => {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, session]); // Thêm session vào dependency
 
   useEffect(() => {
     fetchIdentity();
@@ -354,7 +359,7 @@ const IdentityForm = ({ user }) => {
           issue_place: null,
         })
       };
-      // (Tắt RLS thì lệnh này sẽ chạy được)
+      // (Lệnh này giờ sẽ chạy được)
       const { error } = await supabase
         .from('user_identity')
         .upsert(updates, { onConflict: 'id' });
@@ -374,6 +379,8 @@ const IdentityForm = ({ user }) => {
   if (loading) {
     return <div className="flex justify-center mt-10"><CircleNotch size={32} className="animate-spin text-sky-500" /></div>;
   }
+
+  // User "ảo" sẽ không bao giờ thấy phần này, họ sẽ luôn thấy form upload
   if (identity && !isEditing) {
     let statusBadge;
     switch (identity.status) {
@@ -488,12 +495,12 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
   // (Đã xóa Refs)
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !session) return; // <<< SỬA LỖI: User "ảo" không có session, không fetch
     (async () => {
       try {
-        // (Tắt RLS thì lệnh này sẽ chạy được)
+        // <<< SỬA LỖI 2: Đổi 'Users' thành 'user_identity' >>>
         const { data, error } = await supabase
-          .from('Users')
+          .from('user_identity') 
           .select('avatar_url, banner_url')
           .eq('id', user.id)
           .single();
@@ -503,7 +510,7 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
         }
       } catch (e) { /* ignore */ }
     })();
-  }, [user]);
+  }, [user, session]); // Thêm session
 
   useEffect(() => {
     setAvatarPreview(getPublicUrlSafe('avatars', avatarPath));
@@ -552,11 +559,12 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
 
       const updates = currentUploadType === 'avatar' ? { avatar_url: fileName } : { banner_url: fileName };
       
-      // (Tắt RLS thì lệnh này sẽ chạy được)
-      const { error: dbErr } = await supabase.from('Users').update(updates).eq('id', user.id);
+      // <<< SỬA LỖI 2: Đổi 'Users' thành 'user_identity' >>>
+      const { error: dbErr } = await supabase.from('user_identity').update(updates).eq('id', user.id);
       if (dbErr) throw dbErr;
 
       if (session) {
+        // Chỉ cập nhật auth nếu là user "thật"
         const { error: authErr } = await supabase.auth.updateUser({ data: updates });
         if (authErr) throw authErr;
       }
@@ -601,11 +609,12 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
     try {
       const updates = type === 'avatar' ? { avatar_url: null } : { banner_url: null };
       
-      // (Tắt RLS thì lệnh này sẽ chạy được)
-      const { error: dbErr } = await supabase.from('Users').update(updates).eq('id', user.id);
+      // <<< SỬA LỖI 2: Đổi 'Users' thành 'user_identity' >>>
+      const { error: dbErr } = await supabase.from('user_identity').update(updates).eq('id', user.id);
       if (dbErr) throw dbErr;
 
       if (session) {
+        // Chỉ cập nhật auth nếu là user "thật"
         const { error: authErr } = await supabase.auth.updateUser({ data: updates });
         if (authErr) throw authErr;
       }
@@ -758,7 +767,7 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
 
 /* ------------------ Main Profile Component (SỬA v30) ------------------ */
 export default function Profile() {
-  const { user, loading, refreshUser, session } = useAuth();
+  const { user, loading, refreshUser, session } = useAuth(); // 'session' rất quan trọng
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('profile');
   const [identityStatus, setIdentityStatus] = useState(null);
@@ -770,10 +779,22 @@ export default function Profile() {
   
   useEffect(() => {
     if (!user) return;
+
+    // <<< SỬA LỖI 1: LỖI 406 RLS DO "USER ẢO" >>>
+    const isHybridUser = !session;
+    if (isHybridUser) {
+      // Nếu là "User ảo" (không có session), không được gọi API
+      // vì sẽ bị RLS chặn (lỗi 406)
+      setIdentityStatus(null);
+      setLoadingIdentity(false); // Dừng loading
+      return; // Dừng không fetch
+    }
+    // <<< KẾT THÚC SỬA LỖI 1 >>>
+
     setLoadingIdentity(true);
     const fetchIdentityStatus = async () => {
       try {
-        // (Tắt RLS thì lệnh này sẽ chạy được)
+        // (Giờ chỉ có user "thật" mới chạy lệnh này)
         const { data, error } = await supabase
           .from('user_identity')
           .select('status')
@@ -793,7 +814,7 @@ export default function Profile() {
       }
     };
     fetchIdentityStatus();
-  }, [user]);
+  }, [user, session]); // <<< SỬA LỖI 1: Thêm 'session' vào dependency array
   
   const handleProfileUpdate = (updatedData) => {
     // (AuthContext đã sửa sẽ tự cập nhật)
