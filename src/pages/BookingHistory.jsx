@@ -1,19 +1,19 @@
 // src/pages/BookingHistory.jsx
-// (Đây là trang "Đơn hàng của tôi" có chức năng Đánh giá/Review)
-// (SỬA LỖI v3: Thêm 'booking_id' vào ReviewModal)
-// (CẬP NHẬT: Thêm truy vấn và hiển thị 'payment_method' VÀ chi tiết tour)
+// (SỬA LỖI: Thay thế `supabase.auth.getUser()` bằng `useAuth()` để hỗ trợ "Tài khoản ảo")
 
 import React, { useState, useEffect, useCallback } from "react";
 import { getSupabase } from "../lib/supabaseClient";
+import { useAuth } from "../context/AuthContext"; // <<< BƯỚC 1: IMPORT useAuth
 import { FaSpinner, FaBoxOpen, FaStar, FaRegStar, FaMoneyBillWave, FaClock, FaMapMarkerAlt } from "react-icons/fa";
-import { CircleNotch } from "@phosphor-icons/react"; // Thêm icon
+import { CircleNotch } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
-import toast from "react-hot-toast"; // Thêm toast
+import toast from "react-hot-toast";
 
 const supabase = getSupabase();
 
-// Hàm format tiền tệ
+// (Các hàm formatCurrency, formatDate, StatusBadge, ReviewModal giữ nguyên...)
+// ... (Giữ nguyên các hàm helper) ...
 const formatCurrency = (number) => {
   if (typeof number !== "number" || isNaN(number)) return "0 ₫";
   return new Intl.NumberFormat("vi-VN", {
@@ -21,14 +21,10 @@ const formatCurrency = (number) => {
     currency: "VND",
   }).format(number);
 };
-
-// Hàm format ngày
 const formatDate = (dateString) => {
   const options = { year: "numeric", month: "2-digit", day: "2-digit" };
   return new Date(dateString).toLocaleDateString("vi-VN", options);
 };
-
-// Component con để hiển thị Trạng thái
 const StatusBadge = ({ status }) => {
   const getStatusStyle = () => {
     switch (status) {
@@ -46,21 +42,17 @@ const StatusBadge = ({ status }) => {
     confirmed: 'Đã xác nhận',
     cancelled: 'Đã hủy',
   };
-
   return (
     <span className={`px-3 py-1.5 text-xs font-semibold rounded-full ${getStatusStyle()}`}>
       {statusText[status] || 'Không rõ'}
     </span>
   );
 };
-
-// Component con cho Modal Đánh giá
 const ReviewModal = ({ booking, onClose, onSubmitSuccess }) => {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (rating === 0) {
@@ -71,13 +63,9 @@ const ReviewModal = ({ booking, onClose, onSubmitSuccess }) => {
       setError("Vui lòng nhập nội dung đánh giá.");
       return;
     }
-
     setIsSubmitting(true);
     setError("");
-
-    // Lấy user_id, product_id, VÀ id (chính là booking_id) từ booking
     const { user_id, product_id, id: booking_id } = booking; 
-
     const { error: insertError } = await supabase.from("Reviews").insert({
       user_id: user_id,
       product_id: product_id,
@@ -85,17 +73,14 @@ const ReviewModal = ({ booking, onClose, onSubmitSuccess }) => {
       comment: comment.trim(),
       booking_id: booking_id 
     });
-
     setIsSubmitting(false);
-
     if (insertError) {
       console.error("Lỗi gửi đánh giá:", insertError);
       setError(`Lỗi: ${insertError.message}. (Có thể bạn đã đánh giá tour này rồi)`);
     } else {
-      onSubmitSuccess(); // Gọi hàm callback để tải lại dữ liệu
+      onSubmitSuccess();
     }
   };
-
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -109,7 +94,7 @@ const ReviewModal = ({ booking, onClose, onSubmitSuccess }) => {
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
         className="bg-white dark:bg-neutral-800 rounded-2xl shadow-xl w-full max-w-lg p-6"
-        onClick={(e) => e.stopPropagation()} // Ngăn click xuyên thấu
+        onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-xl font-bold mb-2 dark:text-white">
           Đánh giá tour:
@@ -169,12 +154,16 @@ const ReviewModal = ({ booking, onClose, onSubmitSuccess }) => {
     </motion.div>
   );
 };
+// ... (Giữ nguyên các hàm helper) ...
+
 
 export default function BookingHistory() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
+  
+  // <<< BƯỚC 2: LẤY USER TỪ CONTEXT (ĐÃ SỬA) >>>
+  const { user } = useAuth(); // 'user' này có thể là Admin (thật) hoặc User (ảo)
 
   // State cho Modal
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -185,15 +174,13 @@ export default function BookingHistory() {
     setLoading(true);
     setError(null);
 
-    const { data: { user } } = await supabase.auth.getUser();
-
+    // <<< BƯỚC 3: KIỂM TRA USER TỪ CONTEXT >>>
     if (!user) {
       setError("Vui lòng đăng nhập để xem lịch sử đặt tour.");
       setLoading(false);
       return;
     }
-
-    setCurrentUser(user);
+    // (Không cần setCurrentUser nữa, vì 'user' từ context đã là state)
 
     // Truy vấn thêm các trường chi tiết tour cần thiết
     const { data, error: fetchError } = await supabase
@@ -206,11 +193,10 @@ export default function BookingHistory() {
         user_id,
         product_id,
         payment_method, 
-        // Cập nhật truy vấn Products để lấy thêm thông tin chi tiết tour
         Products:Products!product_id ( id, name, image_url, location, duration, price ), 
         Reviews ( id ) 
       `)
-      .eq("user_id", user.id) // Chỉ lấy của user hiện tại
+      .eq("user_id", user.id) // <<< BƯỚC 4: SỬ DỤNG user.id TỪ CONTEXT
       .order('created_at', { ascending: false });
 
     if (fetchError) {
@@ -220,15 +206,14 @@ export default function BookingHistory() {
       setBookings(data || []);
     }
     setLoading(false);
-  }, []);
+  }, [user]); // <<< BƯỚC 5: THÊM 'user' VÀO DEPENDENCY ARRAY
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Mở modal
+  // (Các hàm handler modal giữ nguyên...)
   const handleOpenReviewModal = (booking) => {
-    // Chỉ mở nếu có product_id
     if (!booking.product_id || !booking.Products) {
         toast.error("Không thể đánh giá tour đã bị xóa.");
         return;
@@ -236,14 +221,10 @@ export default function BookingHistory() {
     setSelectedBooking(booking);
     setShowReviewModal(true);
   };
-
-  // Đóng modal
   const handleCloseModal = () => {
     setShowReviewModal(false);
     setSelectedBooking(null);
   };
-
-  // Callback khi gửi review thành công
   const handleReviewSuccess = () => {
     toast.success("Cảm ơn bạn đã đánh giá!");
     handleCloseModal();
@@ -263,7 +244,8 @@ export default function BookingHistory() {
     return <div className="text-red-500 text-center p-8 text-lg">{error}</div>;
   }
 
-  if (!currentUser) {
+  // <<< BƯỚC 6: SỬA LẠI KIỂM TRA 'user' (thay vì currentUser) >>>
+  if (!user) {
     return (
       <div className="text-center p-8">
         <p className="text-xl dark:text-white">Bạn cần đăng nhập.</p>
@@ -289,7 +271,7 @@ export default function BookingHistory() {
               Hãy khám phá các tour du lịch tuyệt vời của chúng tôi!
             </p>
             <Link
-              to="/tours" // Giả sử đây là trang danh sách tour
+              to="/tours" 
               className="px-5 py-2.5 bg-sky-600 text-white font-semibold rounded-lg hover:bg-sky-700 shadow-md transition-all"
             >
               Khám phá Tour
@@ -297,6 +279,7 @@ export default function BookingHistory() {
           </div>
         ) : (
           <div className="space-y-6">
+            {/* (Phần JSX map qua booking giữ nguyên) */}
             {bookings.map((booking) => {
               const tour = booking.Products;
               const hasReview = booking.Reviews && booking.Reviews.length > 0;
@@ -309,7 +292,6 @@ export default function BookingHistory() {
                   animate={{ opacity: 1, y: 0 }}
                   className="bg-white dark:bg-neutral-800 shadow-lg rounded-xl overflow-hidden flex flex-col"
                 >
-                    {/* Hàng 1: Hình ảnh, Tên Tour & Chi tiết tóm tắt */}
                     <div className="flex flex-col md:flex-row p-4 md:p-6 border-b dark:border-neutral-700">
                         <img
                             src={tour?.image_url || "/images/default-placeholder.jpg"}
@@ -327,8 +309,6 @@ export default function BookingHistory() {
                             </div>
                         </div>
                     </div>
-
-                    {/* Hàng 2: Chi tiết Đơn hàng & Trạng thái */}
                     <div className="p-4 md:p-6 flex justify-between items-center bg-gray-50 dark:bg-neutral-900/50">
                         <div className="text-sm text-gray-700 dark:text-gray-300 space-y-1">
                             <p>Mã đơn: <span className="font-medium text-gray-800 dark:text-white">#{booking.id.substring(0, 8)}...</span></p>
@@ -338,7 +318,6 @@ export default function BookingHistory() {
                                 Tổng tiền: {formatCurrency(booking.total_price)}
                             </p>
                         </div>
-
                         <div className="flex flex-col items-end gap-3">
                             <StatusBadge status={booking.status} />
                             {hasReview ? (
@@ -366,7 +345,6 @@ export default function BookingHistory() {
         )}
       </div>
 
-      {/* Modal Portal */}
       <AnimatePresence>
         {showReviewModal && selectedBooking && (
           <ReviewModal
