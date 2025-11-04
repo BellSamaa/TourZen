@@ -75,7 +75,7 @@ export default function Login() {
                 if (signUpError) throw signUpError;
                 
 if (user) {
-                    // Insert profile thủ công
+                    // Insert profile thủ công - ĐƠN GIẢN HÓA
                     try {
                         // Kiểm tra user đã có profile chưa
                         const { data: existingProfile } = await supabase
@@ -85,8 +85,8 @@ if (user) {
                             .single();
                         
                         if (!existingProfile) {
-                            // Chỉ insert nếu chưa có profile
-                            const accountCode = 'TK' + Date.now().toString().slice(-8) + Math.floor(Math.random() * 100).toString().padStart(2, '0');
+                            // Tạo customer_code đơn giản: timestamp + random
+                            const customerCode = 'KH' + Date.now().toString().slice(-6);
                             
                             const { error: insertError } = await supabase
                                 .from('Users')
@@ -97,22 +97,23 @@ if (user) {
                                     address: form.address,
                                     phone_number: form.phone_number || null,
                                     ngay_sinh: form.ngay_sinh || null,
-                                    role: 'user', // Đổi từ 'customer' thành 'user'
-                                    account_code: accountCode
+                                    role: 'user',
+                                    customer_code: customerCode,
+                                    is_active: true // Thêm để đảm bảo user có thể login
                                 });
                             
                             if (insertError) {
                                 console.error("Insert profile error:", insertError);
-                                // Nếu vẫn lỗi duplicate, bỏ qua
-                                if (insertError.code !== '23505') {
-                                    throw insertError;
-                                }
+                                throw insertError; // Throw để biết lỗi gì
                             }
+                            
+                            console.log("Profile created successfully!");
                         } else {
-                            console.log("Profile already exists, skipping insert");
+                            console.log("Profile already exists");
                         }
                     } catch (profileError) {
-                        console.warn("Profile creation warning:", profileError);
+                        console.error("Profile creation error:", profileError);
+                        throw profileError; // Throw để user biết lỗi
                     }
                     
                     setSuccess("Đăng ký thành công! 🎉 Bạn có thể đăng nhập ngay.");
