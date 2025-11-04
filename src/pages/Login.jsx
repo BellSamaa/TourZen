@@ -262,7 +262,7 @@ export default function Login() {
                     setSuccess("Đổi mật khẩu thành công! 🎉");
                     setForm(initialFormState);
                     setIsOtpSent(false);
-_                    setTimeout(() => setMode('login'), 2000);
+                    setTimeout(() => setMode('login'), 2000);
                 }
             }
         } catch (err) {
