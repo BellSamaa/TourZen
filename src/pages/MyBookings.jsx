@@ -75,7 +75,7 @@ const ReviewModal = ({ booking, onClose, onSubmitSuccess, user }) => {
     // trước khi chèn vào Reviews.
     try {
       const { error: upsertError } = await supabase
-        .from('Users')
+        .from('users')
         .upsert({ 
             id: user.id, // ID từ context (phải khớp với user_id của booking)
             email: user.email, 
