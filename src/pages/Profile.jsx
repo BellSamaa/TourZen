@@ -1,10 +1,12 @@
 // src/pages/Profile.jsx
-/* *** (SỬA LỖI v37 - THEO YÊU CẦU) ***
-  1. (XÓA) Xóa bỏ hoàn toàn 'AvatarBannerManager' và 'AvatarBannerWrapper' (gây lỗi).
-  2. (THÊM) Tạo component mới 'AnimatedNameDisplay' chỉ để hiển thị tên.
-  3. (THÊM) Thêm hiệu ứng CSS "Galaxy Text" (xanh dương, chuyển động) cho tên.
-  4. (GIỮ NGUYÊN) 'ProfileInfoForm' (vì nó đã trỏ đúng vào bảng 'Users').
-  5. (GIỮ NGUYÊN) Logic 'ChangePasswordForm' và 'IdentityForm'.
+/* *** (SỬA LỖI v38 - THEO YÊU CẦU) ***
+  1. (Fix) THÊM LOGIC FETCH MỚI: Trang Profile giờ sẽ tự động fetch
+     dữ liệu đầy đủ (SĐT, địa chỉ, v.v.) từ bảng 'Users'
+     thay vì chỉ dựa vào 'useAuth()'.
+  2. (Fix) ProfileInfoForm giờ sẽ nhận 'fullUserProfile' để
+     hiển thị đúng dữ liệu SĐT, địa chỉ, ngày sinh.
+  3. (Sửa) AnimatedNameDisplay giờ sẽ hiển thị 'customer_tier'
+     (ví dụ: "Tiêu chuẩn") thay vì 'role' (ví dụ: "user").
 */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -97,6 +99,7 @@ const TabButton = ({ label, icon, isActive, onClick, disabled = false }) => (
 
 /* ------------------ ProfileInfoForm (GIỮ NGUYÊN) ------------------ */
 // (Component này đã đọc/ghi đúng bảng 'Users' như bạn yêu cầu)
+// (SỬA v38: Giờ nó sẽ nhận 'user' đầy đủ từ state của cha)
 const ProfileInfoForm = ({ user, onProfileUpdate }) => {
   const [formData, setFormData] = useState({
     full_name: '', phone_number: '', address: '', ngay_sinh: '',
@@ -144,6 +147,7 @@ const ProfileInfoForm = ({ user, onProfileUpdate }) => {
             data: { full_name: updates.full_name }
          });
          if (authUpdateError) throw authUpdateError;
+         // (SỬA v38) Gọi onProfileUpdate để fetch lại dữ liệu
          if (onProfileUpdate) onProfileUpdate(authUser);
       } else {
          // Cập nhật localStorage cho user "ảo" (nếu có)
@@ -151,6 +155,7 @@ const ProfileInfoForm = ({ user, onProfileUpdate }) => {
          if (localUser) {
            const updatedLocalUser = { ...localUser, ...updates };
            localStorage.setItem('user', JSON.stringify(updatedLocalUser));
+           // (SỬA v38) Gọi onProfileUpdate để fetch lại dữ liệu
            if (onProfileUpdate) onProfileUpdate(updatedLocalUser);
          }
       }
@@ -605,6 +610,7 @@ const IdentityForm = ({ user, session, identity, loading, onRefresh }) => {
 
 /* ------------------ (MỚI) AnimatedNameDisplay ------------------ */
 // (Thay thế cho AvatarBannerManager theo yêu cầu)
+// (SỬA v38: Hiển thị customer_tier)
 const AnimatedNameDisplay = ({ user }) => {
   return (
     <div className="p-6 text-center"> {/* Thêm padding vào đây */}
@@ -612,47 +618,74 @@ const AnimatedNameDisplay = ({ user }) => {
         {user.full_name || user.email}
       </h2>
       <p className="text-base font-medium text-slate-500 dark:text-slate-400 capitalize">
-        {user?.role || 'Người dùng'}
+        {/* SỬA: Hiển thị customer_tier hoặc role (như "Tiêu chuẩn") */}
+        {user.customer_tier || user.role || 'Người dùng'}
       </p>
     </div>
   );
 };
 
 
-/* ------------------ Main Profile Component (SỬA v34) ------------------ */
+/* ------------------ Main Profile Component (SỬA v38) ------------------ */
 export default function Profile() {
-  const { user, loading, refreshUser, session } = useAuth(); // 'session' rất quan trọng
+  // SỬA v38: Đổi tên 'user' -> 'authUser' để tránh nhầm lẫn
+  const { user: authUser, loading: authLoading, refreshUser: refreshAuthUser, session } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('profile');
   
-  // <<< SỬA: Hợp nhất state >>>
-  const [identity, setIdentity] = useState(null); // Giờ là object
+  // SỬA v38: Thêm state cho dữ liệu đầy đủ từ bảng 'Users'
+  const [fullUserProfile, setFullUserProfile] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  
+  const [identity, setIdentity] = useState(null);
   const [loadingIdentity, setLoadingIdentity] = useState(true);
 
   useEffect(() => {
-    if (!loading && !user) navigate('/login');
-  }, [user, loading, navigate]);
+    if (!authLoading && !authUser) navigate('/login');
+  }, [authUser, authLoading, navigate]);
   
-  // <<< SỬA: Tách hàm fetch ra ngoài để có thể gọi lại >>>
+  // SỬA v38: Thêm hàm fetch dữ liệu đầy đủ từ bảng 'Users'
+  const fetchFullProfile = useCallback(async () => {
+    if (!authUser) {
+      setLoadingProfile(false);
+      return;
+    }
+    setLoadingProfile(true);
+    try {
+      const { data, error } = await supabase
+        .from('Users')
+        .select('*') // Lấy tất cả cột (SĐT, địa chỉ, ngày sinh, customer_tier)
+        .eq('id', authUser.id)
+        .single();
+      
+      if (error) throw error;
+      setFullUserProfile(data); // Lưu dữ liệu đầy đủ
+    } catch (error) {
+      console.error("Lỗi fetch full user profile:", error.message);
+      toast.error("Không thể tải đầy đủ thông tin tài khoản.");
+      setFullUserProfile(authUser); // Dùng tạm dữ liệu cơ bản nếu lỗi
+    } finally {
+      setLoadingProfile(false);
+    }
+  }, [authUser]); // Chỉ phụ thuộc vào authUser
+
+  // SỬA v38: Thêm hàm fetch 'user_identity' (giữ nguyên logic cũ)
   const fetchIdentity = useCallback(async () => {
-    if (!user) return;
-    
-    // (FIX v33) ĐÃ XÓA LOGIC CHẶN 'SESSION'
-    // (YÊU CẦU SQL POLICY "INSECURE" ĐỂ CHẠY)
-    
+    if (!authUser) {
+      setLoadingIdentity(false);
+      return;
+    }
     setLoadingIdentity(true);
     try {
       const { data, error } = await supabase
         .from('user_identity')
-        .select('*') // Lấy tất cả
-        .eq('id', user.id)
+        .select('*')
+        .eq('id', authUser.id)
         .single();
         
-      if (data) {
-        setIdentity(data);
-      } else {
-        setIdentity(null);
-      }
+      if (data) setIdentity(data);
+      else setIdentity(null);
+      
       if (error && error.code !== 'PGRST116') throw error;
     } catch (error) {
       console.error("Lỗi fetch identity:", error.message);
@@ -660,18 +693,24 @@ export default function Profile() {
     } finally {
       setLoadingIdentity(false);
     }
-  }, [user, session]); // Thêm 'session' vào dependency array
+  }, [authUser]); // Phụ thuộc vào authUser
   
-  // <<< SỬA: useEffect giờ chỉ gọi hàm fetch >>>
+  // SỬA v38: Chạy cả hai hàm fetch khi có authUser
   useEffect(() => {
-    fetchIdentity();
-  }, [fetchIdentity]);
+    if (!authLoading && authUser) {
+      fetchFullProfile();
+      fetchIdentity();
+    }
+  }, [authLoading, authUser, fetchFullProfile, fetchIdentity]);
 
-  const handleProfileUpdate = (updatedData) => {
-    if(refreshUser) refreshUser();
+  // SỬA v38: Sửa hàm update để fetch lại dữ liệu đầy đủ
+  const handleProfileUpdate = () => {
+    if(refreshAuthUser) refreshAuthUser(); // Cập nhật tên trong context (nếu có)
+    fetchFullProfile(); // Tải lại SĐT, địa chỉ, v.v. từ DB
   };
 
-  if (loading || !user || loadingIdentity) {
+  // SỬA v38: Cập nhật điều kiện loading
+  if (authLoading || loadingProfile || loadingIdentity || !fullUserProfile) {
     return (
       <div className="p-6 flex justify-center items-center min-h-screen bg-slate-100 dark:bg-slate-900">
         <CircleNotch size={40} className="animate-spin text-sky-500" />
@@ -680,7 +719,6 @@ export default function Profile() {
   }
 
   const isHybridUser = !session;
-  // <<< SỬA: Lấy status từ object 'identity' >>>
   const identityStatus = identity?.status || null;
 
   return (
@@ -700,10 +738,9 @@ export default function Profile() {
           <aside className="md:w-1/4 mb-6 md:mb-0">
             <div className="sticky top-24">
               
-              {/* === (THAY ĐỔI) === */}
-              {/* (Xóa p-4, vì component mới đã có padding) */}
+              {/* SỬA v38: Truyền 'fullUserProfile' vào */}
               <div className="bg-white/70 dark:bg-slate-800/50 backdrop-blur rounded-2xl mb-4 overflow-hidden">
-                <AnimatedNameDisplay user={user} />
+                <AnimatedNameDisplay user={fullUserProfile} />
               </div>
               {/* === (KẾT THÚC THAY ĐỔI) === */}
 
@@ -715,11 +752,10 @@ export default function Profile() {
                   onClick={() => setActiveTab('profile')}
                 />
                 
-                {/* <<< SỬA LỖI v35: Xóa 'isHybridUser' >>> */}
                 <TabButton
                   label="Bảo mật & Mật khẩu"
                   icon={<ShieldCheck className="text-orange-600" />}
-                  isActive={activeTab === 'password'}
+                  isActive={activeTop === 'password'}
                   onClick={() => setActiveTab('password')}
                   disabled={identityStatus !== 'approved'} // Giờ chỉ khóa khi chưa duyệt
                 />
@@ -733,7 +769,6 @@ export default function Profile() {
                 />
               </nav>
               
-              {/* <<< SỬA LỖI v35: Cập nhật thông báo lỗi >>> */}
               {(identityStatus !== 'approved') && (
                  <div className="mt-4 p-3 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded-2xl text-xs font-medium text-center">
                     <Warning size={16} className="inline mr-1" />
@@ -759,15 +794,15 @@ export default function Profile() {
                   transition={{ duration: 0.3, ease: "easeInOut" }}
                   className="text-slate-800 dark:text-white"
                 >
-                  {activeTab === 'profile' && <ProfileInfoForm user={user} onProfileUpdate={handleProfileUpdate} />}
+                  {/* SỬA v38: Truyền 'fullUserProfile' vào các component con */}
                   
-                  {/* <<< SỬA: Truyền 'identity' (object) xuống >>> */}
-                  {activeTab === 'password' && <ChangePasswordForm user={user} identity={identity} />}
+                  {activeTab === 'profile' && <ProfileInfoForm user={fullUserProfile} onProfileUpdate={handleProfileUpdate} />}
                   
-                  {/* <<< SỬA: Truyền 'identity', 'loading' và 'onRefresh' xuống >>> */}
+                  {activeTab === 'password' && <ChangePasswordForm user={fullUserProfile} identity={identity} />}
+                  
                   {activeTab === 'identity' && (
                     <IdentityForm 
-                      user={user} 
+                      user={fullUserProfile} 
                       session={session}
                       identity={identity}
                       loading={loadingIdentity}
