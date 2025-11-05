@@ -741,86 +741,81 @@ export default function ManageTour() {
 
     
     // (*** CẬP NHẬT V29: Sử dụng logic Subquery (Snippet 2) do người dùng cung cấp ***)
-    const fetchBookings = useCallback(async (isInitialLoad = false) => {
-        if (!isInitialLoad) setIsFetchingPage(true);
-        else setLoading(true); 
-        setError(null);
-        try {
-            const from = (currentPage - 1) * ITEMS_PER_PAGE;
-            const to = from + ITEMS_PER_PAGE - 1;
-            
-            const selectQuery = `
-                id,created_at,departure_date,status,total_price,quantity,
-                num_adult,num_child,num_elder,num_infant,departure_id,
-                user:user_id(id,full_name,email),
-                product:product_id(id,name,image_url),
-                hotel:hotel_product_id(id,name),
-                transport:Products!Bookings_transport_product_id_fkey(id,name,price,product_type,details),
-                flight:flight_product_id(id,name,price,product_type,details),
-                voucher_code,voucher_discount,notes,payment_method,
-                Invoices(id),
-                Reviews!booking_id(id,rating,comment,reviewer:user_id(full_name,email)) 
-            `.replace(/\s+/g, '');
-            
-            let query = supabase
-                .from('Bookings')
-                .select(selectQuery, { count: 'exact' }); 
-                
-            // (*** SỬA LỖI V29: Áp dụng logic subquery của Snippet 2 ***)
-            // Chaining (nối) các filter lại với nhau. Chained filters = AND
+const fetchBookings = useCallback(async (isInitialLoad = false) => {
+  if (!isInitialLoad) setIsFetchingPage(true);
+  else setLoading(true);
+  setError(null);
 
-            // Filter 1: Trạng thái
-            if (filterStatus !== 'all') {
-              query = query.eq('status', filterStatus);
-            }
-            
-            // Filter 2: Khách hàng (Sử dụng subquery)
-            if (debouncedCustomerSearch) {
-              const val = `%${debouncedCustomerSearch}%`;
-              // Cú pháp .or() với subquery .in.()
-              // Đây là cú pháp PostgREST để lọc bảng 'Bookings' dựa trên điều kiện của bảng 'Users'
-              query = query.or(`user_id.in.(select id from Users where full_name.ilike.${val}),user_id.in.(select id from Users where email.ilike.${val})`);
-            }
-            
-            // Filter 3: Tour/ID
-            if (debouncedSearch) {
-              let val = debouncedSearch;
-              if (val.startsWith('#')) val = val.substring(1);
-              const tourVal = `%${val}%`;
-              // Cú pháp .or() cho bảng chính (id) và bảng phụ (product.name)
-              query = query.or(`id::text.ilike.${tourVal},product.name.ilike.${tourVal}`);
-            }
-            // (*** KẾT THÚC SỬA V29 ***)
+  try {
+    const from = (currentPage - 1) * ITEMS_PER_PAGE;
+    const to = from + ITEMS_PER_PAGE - 1;
 
-            // Sắp xếp và Phân trang (Giữ nguyên)
-            query = query.order('created_at', { ascending: false }).range(from, to);
-            
-            const { data, error: queryError, count } = await query;
-            
-            if (queryError) throw queryError;
-            
-             // Xử lý join Invoices (trả về mảng) và Reviews
-             const formattedData = (data || []).map(b => ({
-                 ...b,
-                 has_invoice: b.Invoices && b.Invoices.length > 0,
-                 review_data: b.Reviews && b.Reviews.length > 0 ? b.Reviews[0] : null // Lấy review (nếu có)
-             }));
+    const selectQuery = `
+      id,created_at,departure_date,status,total_price,quantity,
+      num_adult,num_child,num_elder,num_infant,departure_id,
+      user:user_id(id,full_name,email),
+      product:product_id(id,name,image_url),
+      hotel:hotel_product_id(id,name),
+      transport:Products!Bookings_transport_product_id_fkey(id,name,price,product_type,details),
+      flight:flight_product_id(id,name,price,product_type,details),
+      voucher_code,voucher_discount,notes,payment_method,
+      Invoices(id),
+      Reviews!booking_id(id,rating,comment,reviewer:user_id(full_name,email))
+    `.replace(/\s+/g, '');
 
-            setBookings(formattedData || []);
-            setTotalItems(count || 0);
-            if (!isInitialLoad && currentPage > 1 && (data || []).length === 0 && count > 0) {
-                 setCurrentPage(1);
-            }
-        } catch (err) {
-             console.error("Lỗi tải danh sách đơn hàng (V29):", err);
-             const errorMessage = err.message || "Không thể tải dữ liệu.";
-             setError(errorMessage);
-             toast.error(`Lỗi tải đơn hàng: ${errorMessage}`);
-        } finally {
-            if (isInitialLoad) setLoading(false);
-            setIsFetchingPage(false);
-        }
-    }, [currentPage, debouncedSearch, debouncedCustomerSearch, filterStatus]);
+    let query = supabase.from("Bookings").select(selectQuery, { count: "exact" });
+
+    // Lọc trạng thái
+    if (filterStatus !== "all") {
+      query = query.eq("status", filterStatus);
+    }
+
+    // Lọc theo Tour / Mã đơn
+    let sanitizedTourSearch = debouncedSearch;
+    if (sanitizedTourSearch?.startsWith("#")) sanitizedTourSearch = sanitizedTourSearch.substring(1);
+    const tourSearchVal = sanitizedTourSearch ? `%${sanitizedTourSearch}%` : null;
+    if (tourSearchVal) {
+      query = query.or(`id.ilike.${tourSearchVal},product.name.ilike.${tourSearchVal}`);
+    }
+
+    // Phân trang và sắp xếp
+    query = query.order("created_at", { ascending: false }).range(from, to);
+
+    const { data, error: queryError, count } = await query;
+    if (queryError) throw queryError;
+
+    // --- 🔍 Lọc khách hàng (client-side) ---
+    let filteredData = data || [];
+    if (debouncedCustomerSearch) {
+      const keyword = debouncedCustomerSearch.toLowerCase();
+      filteredData = filteredData.filter(b =>
+        b.user?.full_name?.toLowerCase().includes(keyword) ||
+        b.user?.email?.toLowerCase().includes(keyword)
+      );
+    }
+
+    // Định dạng dữ liệu
+    const formattedData = filteredData.map(b => ({
+      ...b,
+      has_invoice: b.Invoices?.length > 0,
+      review_data: b.Reviews?.length > 0 ? b.Reviews[0] : null,
+    }));
+
+    setBookings(formattedData);
+    setTotalItems(count || 0);
+
+    if (!isInitialLoad && currentPage > 1 && filteredData.length === 0 && count > 0) {
+      setCurrentPage(1);
+    }
+  } catch (err) {
+    console.error("Lỗi tải danh sách đơn hàng:", err);
+    toast.error(`Lỗi tải đơn hàng: ${err.message}`);
+    setError(err.message);
+  } finally {
+    if (isInitialLoad) setLoading(false);
+    setIsFetchingPage(false);
+  }
+}, [currentPage, debouncedSearch, debouncedCustomerSearch, filterStatus]);
     // (*** KẾT THÚC SỬA LỖI V29 ***)
     
 
