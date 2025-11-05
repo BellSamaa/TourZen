@@ -1,5 +1,5 @@
 // src/pages/ManageTour.jsx
-// (V22: Fix search logic (parse tree error) & Tách layout filter/search)
+// (V23: Fix "parse logic tree" error by using single .and() block)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -738,7 +738,7 @@ export default function ManageTour() {
     const [viewingReview, setViewingReview] = useState(null); // Lưu object review
 
     
-    // (CẬP NHẬT v22) Fetch Bookings (Fix lỗi parse tree)
+    // (CẬP NHẬT v23) Fetch Bookings (Fix lỗi parse tree bằng 1 .and() block)
     const fetchBookings = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         else setLoading(true); 
@@ -764,41 +764,37 @@ export default function ManageTour() {
                 .from('Bookings')
                 .select(selectQuery, { count: 'exact' }); 
                 
+            // (CẬP NHẬT V23) Xây dựng một mảng filter cho .and()
+            const andFilters = [];
+
             // Filter 1: Trạng thái
-            if (filterStatus !== 'all') { query = query.eq('status', filterStatus); }
+            if (filterStatus !== 'all') {
+                andFilters.push(`status.eq.${filterStatus}`);
+            }
             
-            // (CẬP NHẬT V22) Xử lý 2 thanh search
-            
-            // Chuẩn bị search values
+            // Filter 2: Khách hàng (Tên hoặc Email)
             const customerSearchVal = debouncedCustomerSearch ? `%${debouncedCustomerSearch}%` : null;
-            
+            if (customerSearchVal) {
+                 andFilters.push(`or(user.full_name.ilike.${customerSearchVal},user.email.ilike.${customerSearchVal})`);
+            }
+
+            // Filter 3: Tour hoặc Mã đơn (đã lọc dấu #)
             let sanitizedTourSearch = debouncedSearch;
-            if (sanitizedTourSearch.startsWith('#')) {
-                sanitizedTourSearch = sanitizedTourSearch.substring(1); // Bỏ dấu #
+            if (sanitizedTourSearch && sanitizedTourSearch.startsWith('#')) {
+                sanitizedTourSearch = sanitizedTourSearch.substring(1);
             }
             const tourSearchVal = sanitizedTourSearch ? `%${sanitizedTourSearch}%` : null;
-
-            // (CẬP NHẬT V22) Kết hợp logic filter
-            if (customerSearchVal && tourSearchVal) {
-                // AND của 2 OR
-                query = query.and(
-                    `or(user.full_name.ilike.${customerSearchVal},user.email.ilike.${customerSearchVal}),` +
-                    `or(product.name.ilike.${tourSearchVal},id::text.ilike.${tourSearchVal})`
-                );
-            } else if (customerSearchVal) {
-                // Chỉ search Khách hàng
-                query = query.or(
-                    `user.full_name.ilike.${customerSearchVal},user.email.ilike.${customerSearchVal}`
-                );
-            } else if (tourSearchVal) {
-                // Chỉ search Tour/ID
-                query = query.or(
-                    `product.name.ilike.${tourSearchVal},id::text.ilike.${tourSearchVal}`
-                );
-            }
-            // Nếu cả 2 đều null, không làm gì cả (tải tất cả)
-
             
+            if (tourSearchVal) {
+                 andFilters.push(`or(product.name.ilike.${tourSearchVal},id::text.ilike.${tourSearchVal})`);
+            }
+            
+            // Áp dụng tất cả filter bằng MỘT lệnh .and()
+            if (andFilters.length > 0) {
+                query = query.and(andFilters.join(','));
+            }
+            
+            // Sắp xếp và Phân trang
             query = query.order('created_at', { ascending: false }).range(from, to);
             
             const { data, error: queryError, count } = await query;
@@ -819,12 +815,16 @@ export default function ManageTour() {
         } catch (err) {
              console.error("Lỗi tải danh sách đơn hàng:", err);
              setError(err.message || "Không thể tải dữ liệu.");
-             toast.error(`Lỗi tải đơn hàng: ${err.message}`);
+             // Hiển thị lỗi cho người dùng
+             if (err.message.includes("parse logic tree")) {
+                 toast.error("Lỗi cú pháp tìm kiếm. Vui lòng thử lại.");
+             } else {
+                 toast.error(`Lỗi tải đơn hàng: ${err.message}`);
+             }
         } finally {
             if (isInitialLoad) setLoading(false);
             setIsFetchingPage(false);
         }
-    // (CẬP NHẬT V21) Thêm debouncedCustomerSearch vào dependencies
     }, [currentPage, debouncedSearch, debouncedCustomerSearch, filterStatus]);
 
     // (GIỮ NGUYÊN V8) useEffect để fetch Users, Tours & Services
@@ -1051,7 +1051,7 @@ export default function ManageTour() {
             {/* Thẻ Thống Kê (Giữ nguyên) */}
             <BookingStats />
 
-            {/* (CẬP NHẬT V22) Filter & Search (Layout mới) */}
+            {/* (CẬP NHẬT V22) Filter & Search (Layout mới - giữ nguyên) */}
             <div className="bg-white dark:bg-slate-800 shadow-xl rounded-lg border border-gray-100 dark:border-slate-700">
                 {/* Filter & Search Bar */}
                 <div className="p-4 border-b border-gray-100 dark:border-slate-700 flex flex-col md:flex-row items-center gap-3 justify-between">
@@ -1127,6 +1127,12 @@ export default function ManageTour() {
                                     {searchTerm || customerSearchTerm || filterStatus !== 'all' ? 'Không tìm thấy đơn hàng phù hợp.' : 'Chưa có đơn hàng nào.'}
                                 </td></tr>
                             )}
+                            {/* (MỚI V23) Hiển thị lỗi nếu có */}
+                             {!loading && error && (
+                                <tr><td colSpan="11" className="td-center text-red-500 font-medium py-10">
+                                    Đã xảy ra lỗi: {error}
+                                </td></tr>
+                             )}
                             {!error && bookings.map((booking) => {
                                 return (
                                 <motion.tr key={booking.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors group" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }} >
