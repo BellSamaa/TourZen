@@ -1,5 +1,5 @@
 // src/pages/ManageTour.jsx
-// (V29: Thêm Biểu đồ Thống kê Review chung)
+// (V29-Sửa đổi: 1. Thay Biểu đồ Review bằng Tour Yêu Thích Nhất. 2. Nâng cấp Modal Thêm Đơn Hàng)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -98,7 +98,7 @@ const RatingDisplay = ({ rating, size = 16 }) => {
     const displayRating = Math.round((rating || 0) * 2) / 2;
     
     return (
-        <div className="flex justify-center text-yellow-500" title={`${rating.toFixed(1)}/${totalStars} sao`}>
+        <div className="flex justify-center text-yellow-500" title={`${(rating || 0).toFixed(1)}/${totalStars} sao`}>
             {[...Array(totalStars)].map((_, i) => (
                 <Star key={i} weight={i + 0.5 < displayRating ? "fill" : "regular"} size={size} />
             ))}
@@ -159,74 +159,121 @@ const BookingStats = () => {
 };
 
 
-// --- (MỚI V29) Component con cho thanh % ---
-const RatingBar = ({ label, percentage, count }) => (
-    <div className="flex items-center gap-2 text-sm">
-        <span className="w-12 text-slate-500 dark:text-slate-400">{label}</span>
-        <div className="flex-1 bg-slate-200 dark:bg-slate-600 rounded-full h-2.5 overflow-hidden">
-            <motion.div 
-                className="bg-yellow-500 h-2.5 rounded-full" 
-                initial={{ width: 0 }}
-                animate={{ width: `${percentage}%` }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
-            ></motion.div>
-        </div>
-        <span className="w-10 text-right font-medium text-slate-700 dark:text-slate-300">{count}</span>
-    </div>
-);
-
-// --- (MỚI V29) Component Biểu đồ Đánh giá ---
-const ReviewStatsChart = () => {
-    const [stats, setStats] = useState({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 });
-    const [totalReviews, setTotalReviews] = useState(0);
-    const [averageRating, setAverageRating] = useState(0);
+// --- (MỚI V29-Sửa) Component Tour Yêu Thích Nhất ---
+const FavoriteTourStats = () => {
     const [loading, setLoading] = useState(true);
+    const [favoriteTour, setFavoriteTour] = useState(null); // { product: {...}, avg_rating: 0, review_count: 0 }
+    const [reviews, setReviews] = useState([]); // Reviews for that tour
 
     useEffect(() => {
-        const fetchReviewStats = async () => {
+        const fetchFavoriteTour = async () => {
             setLoading(true);
             try {
-                // Fetch *tất cả* review (không phân trang)
-                const { data, error, count } = await supabase
+                // 1. Fetch all reviews with product_id and rating
+                // (Giống logic ReviewStatsChart cũ, fetch tất cả)
+                const { data: allReviews, error: reviewError } = await supabase
                     .from('Reviews')
-                    .select('rating', { count: 'exact' });
-
-                if (error) throw error;
-
-                const totalCount = count || 0;
-                setTotalReviews(totalCount);
-
-                if (totalCount > 0) {
-                    const newStats = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-                    let totalRatingSum = 0;
-
-                    data.forEach(r => {
-                        if (r.rating >= 1 && r.rating <= 5) {
-                            newStats[r.rating]++;
-                            totalRatingSum += r.rating;
-                        }
-                    });
-                    
-                    setStats(newStats);
-                    setAverageRating(totalRatingSum / totalCount);
-                } else {
-                    setStats({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 });
-                    setAverageRating(0);
+                    .select('rating, product_id');
+                
+                if (reviewError) throw reviewError;
+                if (!allReviews || allReviews.length === 0) {
+                    setLoading(false); return; // No reviews, do nothing
                 }
+
+                // 2. Process in JS to find the best tour
+                const tourStats = allReviews.reduce((acc, review) => {
+                    const { product_id, rating } = review;
+                    if (!product_id || !rating) return acc;
+                    
+                    if (!acc[product_id]) {
+                        acc[product_id] = { total_rating: 0, count: 0 };
+                    }
+                    acc[product_id].total_rating += rating;
+                    acc[product_id].count++;
+                    return acc;
+                }, {});
+
+                let topTourId = null;
+                let maxAvg = -1;
+                let maxCount = -1;
+
+                for (const productId in tourStats) {
+                    const stat = tourStats[productId];
+                    const avg = stat.total_rating / stat.count;
+                    
+                    if (avg > maxAvg) {
+                        maxAvg = avg;
+                        maxCount = stat.count;
+                        topTourId = productId;
+                    } else if (avg === maxAvg) {
+                        if (stat.count > maxCount) {
+                            maxCount = stat.count;
+                            topTourId = productId;
+                        }
+                    }
+                }
+
+                if (!topTourId) {
+                    setLoading(false); return; // No valid tour found
+                }
+
+                // 3. Fetch details for the top tour
+                const { data: productData, error: productError } = await supabase
+                    .from('Products')
+                    .select('id, name, image_url')
+                    .eq('id', topTourId)
+                    .single();
+
+                if (productError) throw productError;
+
+                setFavoriteTour({
+                    product: productData,
+                    avg_rating: maxAvg,
+                    review_count: maxCount
+                });
+
+                // 4. Fetch recent reviews for that top tour (limit 3)
+                const { data: recentReviews, error: recentReviewsError } = await supabase
+                    .from('Reviews')
+                    .select('id, rating, comment, reviewer:user_id(full_name, email)')
+                    .eq('product_id', topTourId)
+                    .order('created_at', { ascending: false })
+                    .limit(3);
+
+                if (recentReviewsError) throw recentReviewsError;
+                setReviews(recentReviews || []);
+
             } catch (err) {
-                console.error("Lỗi fetch review stats:", err);
-                toast.error("Không thể tải thống kê review.");
+                console.error("Lỗi fetch favorite tour:", err);
+                toast.error("Không thể tải tour yêu thích.");
             } finally {
                 setLoading(false);
             }
         };
-        fetchReviewStats();
+        
+        fetchFavoriteTour();
     }, []); // Chạy 1 lần khi mount
 
-    const getPercentage = (ratingCount) => {
-        if (totalReviews === 0) return 0;
-        return (ratingCount / totalReviews) * 100;
-    };
+    if (loading) {
+        return (
+             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-md border border-gray-100 dark:border-slate-700 flex justify-center items-center h-40">
+                <CircleNotch size={32} className="animate-spin text-sky-500" />
+                <span className="ml-3 text-slate-500">Đang tìm tour yêu thích nhất...</span>
+            </div>
+        );
+    }
+
+    if (!favoriteTour) {
+        return (
+             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-md border border-gray-100 dark:border-slate-700">
+                <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                     <Star weight="fill" className="text-yellow-500" />
+                     Tour Yêu Thích Nhất
+                </h3>
+                <p className="text-slate-500 italic">Chưa có đủ dữ liệu đánh giá để tìm tour yêu thích.</p>
+            </div>
+        );
+    }
 
     return (
         <motion.div
@@ -237,38 +284,59 @@ const ReviewStatsChart = () => {
         >
             <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
                 <Star weight="fill" className="text-yellow-500" />
-                Tổng quan Đánh giá
+                Tour Yêu Thích Nhất
             </h3>
-            {loading ? (
-                <div className="flex justify-center items-center h-40">
-                    <CircleNotch size={32} className="animate-spin text-sky-500" />
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Cột 1: Điểm trung bình */}
-                    <div className="flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-700 pb-4 md:pb-0 md:pr-6">
-                        <span className="text-5xl font-extrabold text-slate-800 dark:text-white">
-                            {averageRating.toFixed(1)}
+            
+            {/* Thông tin tour */}
+            <div className="flex flex-col md:flex-row gap-6 border-b dark:border-slate-700 pb-6 mb-6">
+                <img 
+                    src={favoriteTour.product.image_url || 'https://placehold.co/150x100/eee/ccc?text=Tour'} 
+                    alt={favoriteTour.product.name}
+                    className="w-full md:w-1/3 lg:w-1/4 h-auto object-cover rounded-lg shadow-md"
+                />
+                <div className="flex-1">
+                     <h4 className="text-lg font-bold text-sky-600 dark:text-sky-400">
+                        {favoriteTour.product.name}
+                     </h4>
+                     <div className="flex items-center gap-3 mt-2">
+                        <span className="text-4xl font-extrabold text-slate-800 dark:text-white">
+                            {favoriteTour.avg_rating.toFixed(1)}
                         </span>
-                        <RatingDisplay rating={averageRating} size={28} />
-                        <span className="text-sm text-slate-500 dark:text-slate-400 mt-2">
-                            (Từ {totalReviews} đánh giá)
-                        </span>
-                    </div>
-                    
-                    {/* Cột 2: Thanh % */}
-                    <div className="md:col-span-2 flex flex-col justify-center space-y-2 pt-4 md:pt-0">
-                        <RatingBar label="5 Sao" percentage={getPercentage(stats[5])} count={stats[5]} />
-                        <RatingBar label="4 Sao" percentage={getPercentage(stats[4])} count={stats[4]} />
-                        <RatingBar label="3 Sao" percentage={getPercentage(stats[3])} count={stats[3]} />
-                        <RatingBar label="2 Sao" percentage={getPercentage(stats[2])} count={stats[2]} />
-                        <RatingBar label="1 Sao" percentage={getPercentage(stats[1])} count={stats[1]} />
-                    </div>
+                        <div className="flex flex-col">
+                            <RatingDisplay rating={favoriteTour.avg_rating} size={24} />
+                            <span className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                (Từ {favoriteTour.review_count} đánh giá)
+                            </span>
+                        </div>
+                     </div>
                 </div>
-            )}
+            </div>
+
+            {/* Bình luận */}
+            <h4 className="text-md font-semibold text-slate-700 dark:text-slate-300 mb-3">
+                Một số bình luận nổi bật:
+            </h4>
+            <div className="space-y-4">
+                {reviews.length > 0 ? reviews.map(review => (
+                    <div key={review.id} className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                        <div className="flex items-center justify-between mb-1">
+                            <span className="font-semibold text-sm text-slate-800 dark:text-white">
+                                {review.reviewer?.full_name || review.reviewer?.email || "Khách ẩn danh"}
+                            </span>
+                            <RatingDisplay rating={review.rating} size={14} />
+                        </div>
+                        <p className="text-sm text-slate-600 dark:text-slate-300 italic">
+                            "{review.comment || 'Không có bình luận.'}"
+                        </p>
+                    </div>
+                )) : (
+                    <p className="text-sm text-slate-500 italic">Chưa có bình luận cho tour này.</p>
+                )}
+            </div>
         </motion.div>
     );
 };
+// --- (HẾT) Component Tour Yêu Thích Nhất ---
 
 
 // --- (GIỮ NGUYÊN V8) Component Modal Chi tiết/Sửa Đơn hàng ---
@@ -659,12 +727,21 @@ const ViewReviewModal = ({ review, onClose }) => {
 };
 
 
-// --- Component Modal Thêm Đơn Hàng (Giữ nguyên v8) ---
-const AddBookingModal = ({ users, tours, onClose, onSuccess }) => {
-    const [formData, setFormData] = useState({ user_id: '', product_id: '', departure_id: '', num_adult: 1, num_child: 0, num_elder: 0, num_infant: 0, total_price: 0, status: 'pending', notes: '', });
+// --- (*** CẬP NHẬT V29-SỬA) Component Modal Thêm Đơn Hàng ---
+const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
+    // (MỚI) Thêm state cho dịch vụ
+    const [formData, setFormData] = useState({ 
+        user_id: '', product_id: '', departure_id: '', 
+        num_adult: 1, num_child: 0, num_elder: 0, num_infant: 0, 
+        total_price: 0, status: 'pending', notes: '',
+        hotel_product_id: '', // (MỚI)
+        transport_product_id: '', // (MỚI)
+        flight_product_id: '' // (MỚI)
+    });
     const [departures, setDepartures] = useState([]);
     const [loadingDepartures, setLoadingDepartures] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
     useEffect(() => {
         if (!formData.product_id) { setDepartures([]); setFormData(prev => ({ ...prev, departure_id: '' })); return; }
         const fetchDepartures = async () => {
@@ -676,33 +753,77 @@ const AddBookingModal = ({ users, tours, onClose, onSuccess }) => {
         };
         fetchDepartures();
     }, [formData.product_id]);
+
     const handleChange = (e) => {
         const { name, value, type } = e.target;
         setFormData(prev => ({ ...prev, [name]: type === 'number' ? parseInt(value, 10) || 0 : value }));
     };
+
     const selectedDeparture = useMemo(() => { return departures.find(d => d.id == formData.departure_id); }, [formData.departure_id, departures]);
     const currentGuests = formData.num_adult + formData.num_child + formData.num_elder + formData.num_infant;
     const remainingSlots = selectedDeparture ? (selectedDeparture.max_slots || 0) - (selectedDeparture.booked_slots || 0) : 0;
+
+    // (*** CẬP NHẬT V29-SỬA) Logic handleSubmit giống Payment.jsx
     const handleSubmit = async (e) => {
         e.preventDefault();
+        // --- (GIỮ NGUYÊN) Validations ---
         if (!formData.user_id) { toast.error("Vui lòng chọn khách hàng."); return; }
         if (!formData.product_id) { toast.error("Vui lòng chọn tour."); return; }
         if (!formData.departure_id) { toast.error("Vui lòng chọn ngày khởi hành."); return; }
         if (currentGuests <= 0) { toast.error("Số lượng khách phải lớn hơn 0."); return; }
         if (currentGuests > remainingSlots) { toast.error(`Số khách (${currentGuests}) vượt quá số chỗ còn lại (${remainingSlots}).`); return; }
         if (formData.total_price <= 0) { toast.error("Tổng tiền phải lớn hơn 0 (Admin tự nhập)."); return; }
+        
         setIsSubmitting(true);
+        
+        let tourSlotBooked = false;
+        let servicesBooked = { hotel: false, transport: false, flight: false };
+        const guestCount = currentGuests; // Lấy số khách
+
         try {
+            // 1. Giữ chỗ Tour (Chỉ giữ nếu status là 'confirmed')
             if (formData.status === 'confirmed') {
-                const { error: rpcError } = await supabase.rpc('book_tour_slot', { departure_id_input: formData.departure_id, guest_count_input: currentGuests });
-                if (rpcError) throw new Error(`Lỗi giữ chỗ: ${rpcError.message}`);
+                const { error: rpcError, data: rpcData } = await supabase.rpc('book_tour_slot', { 
+                    departure_id_input: formData.departure_id, 
+                    guest_count_input: guestCount 
+                });
+                if (rpcError || !rpcData) throw new Error(`Lỗi giữ chỗ tour: ${rpcError?.message || 'Hết chỗ'}`);
+                tourSlotBooked = true;
             }
+
+            // 2. Giữ chỗ Dịch vụ (Chỉ giữ nếu status là 'confirmed')
+            if (formData.status === 'confirmed') {
+                const servicePromises = [];
+                if (formData.hotel_product_id) {
+                    servicePromises.push(supabase.rpc('book_service_slot', { product_id_input: formData.hotel_product_id, quantity_input: 1 }).then(res => ({ ...res, type: 'hotel' })));
+                }
+                if (formData.transport_product_id) {
+                    servicePromises.push(supabase.rpc('book_service_slot', { product_id_input: formData.transport_product_id, quantity_input: 1 }).then(res => ({ ...res, type: 'transport' })));
+                }
+                if (formData.flight_product_id && guestCount > 0) {
+                    servicePromises.push(supabase.rpc('book_service_slot', { product_id_input: formData.flight_product_id, quantity_input: guestCount }).then(res => ({ ...res, type: 'flight' })));
+                }
+
+                if (servicePromises.length > 0) {
+                    const results = await Promise.all(servicePromises);
+                    for (const result of results) {
+                        if (result.error || !result.data) {
+                            // Lỗi
+                            throw new Error(`Lỗi giữ chỗ dịch vụ (${result.type}): ${result.error?.message || 'Hết hàng'}`);
+                        }
+                        // Đánh dấu đã book thành công
+                        servicesBooked[result.type] = true;
+                    }
+                }
+            }
+            
+            // 3. Tạo Booking Payload (GIỐNG VỚI PAYMENT.JSX)
             const bookingPayload = { 
                 user_id: formData.user_id, 
                 product_id: formData.product_id, 
                 departure_id: formData.departure_id, 
                 departure_date: selectedDeparture.departure_date, 
-                quantity: currentGuests, 
+                quantity: guestCount, 
                 num_adult: formData.num_adult, 
                 num_child: formData.num_child, 
                 num_elder: formData.num_elder, 
@@ -710,20 +831,52 @@ const AddBookingModal = ({ users, tours, onClose, onSuccess }) => {
                 total_price: formData.total_price, 
                 status: formData.status, 
                 notes: formData.notes,
-                payment_method: 'direct' // Mặc định
+                payment_method: 'direct', // Mặc định
+                
+                // (MỚI) Thêm dịch vụ
+                hotel_product_id: formData.hotel_product_id || null,
+                transport_product_id: formData.transport_product_id || null,
+                flight_product_id: formData.flight_product_id || null,
             };
+
+            // 4. Insert Booking
             const { error: insertError } = await supabase.from('Bookings').insert(bookingPayload);
             if (insertError) throw insertError;
+            
+            // 5. Thành công
             toast.success("Tạo đơn hàng thành công!");
-            onSuccess();
+            onSuccess(); // Re-fetch
             onClose();
+
         } catch (err) {
             console.error("Lỗi tạo đơn hàng:", err);
             toast.error(`Lỗi: ${err.message}`);
+
+            // (MỚI) ROLLBACK LOGIC
+            if (formData.status === 'confirmed') {
+                toast.warn("Đang thử hoàn lại chỗ...");
+                // Rollback tour slot
+                if (tourSlotBooked) {
+                    await supabase.rpc('book_tour_slot', { departure_id_input: formData.departure_id, guest_count_input: -guestCount });
+                }
+                // Rollback service slots
+                if (servicesBooked.hotel) {
+                    await supabase.rpc('book_service_slot', { product_id_input: formData.hotel_product_id, quantity_input: -1 });
+                }
+                if (servicesBooked.transport) {
+                    await supabase.rpc('book_service_slot', { product_id_input: formData.transport_product_id, quantity_input: -1 });
+                }
+                if (servicesBooked.flight && guestCount > 0) {
+                    await supabase.rpc('book_service_slot', { product_id_input: formData.flight_product_id, quantity_input: -guestCount });
+                }
+            }
+            
         } finally {
             setIsSubmitting(false);
         }
     };
+    // (*** HẾT CẬP NHẬT handleSubmit ***)
+
     return (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4" onClick={onClose} >
              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} transition={{ type: 'spring', damping: 18, stiffness: 250 }} className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()} >
@@ -759,6 +912,47 @@ const AddBookingModal = ({ users, tours, onClose, onSuccess }) => {
                         </select>
                          {selectedDeparture && currentGuests > remainingSlots && <p className="text-xs text-red-500 mt-1">Số lượng khách ({currentGuests}) vượt quá số chỗ còn lại ({remainingSlots})!</p>}
                     </div>
+                    
+                    {/* (MỚI V29-SỬA) Dịch vụ kèm theo */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t dark:border-slate-700">
+                        <div>
+                            <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="hotel_product_id_add"><Buildings size={16}/> Khách sạn:</label>
+                            <select id="hotel_product_id_add" name="hotel_product_id" value={formData.hotel_product_id} onChange={handleChange} className="input-style w-full mt-1">
+                                <option value="">Không chọn</option>
+                                {allServices.hotels.map(s => 
+                                    <option key={s.id} value={s.id} disabled={s.inventory <= 0}>
+                                        {s.name} ({formatCurrency(s.price)})
+                                        {s.inventory <= 0 ? ' (Hết hàng)' : ` (Còn ${s.inventory})`}
+                                    </option>
+                                )}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="transport_product_id_add"><Car size={16}/> Vận chuyển:</label>
+                            <select id="transport_product_id_add" name="transport_product_id" value={formData.transport_product_id} onChange={handleChange} className="input-style w-full mt-1">
+                                <option value="">Không chọn</option>
+                                {allServices.transport.map(s => 
+                                    <option key={s.id} value={s.id} disabled={s.inventory <= 0}>
+                                        {s.name} ({formatCurrency(s.price)})
+                                        {s.inventory <= 0 ? ' (Hết hàng)' : ` (Còn ${s.inventory})`}
+                                    </option>
+                                )}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="flight_product_id_add"><AirplaneTilt size={16}/> Chuyến bay:</label>
+                            <select id="flight_product_id_add" name="flight_product_id" value={formData.flight_product_id} onChange={handleChange} className="input-style w-full mt-1">
+                                <option value="">Không chọn</option>
+                                {allServices.flights.map(s => 
+                                    <option key={s.id} value={s.id} disabled={s.inventory <= 0}>
+                                        {s.name} ({formatCurrency(s.price)})
+                                        {s.inventory <= 0 ? ' (Hết hàng)' : ` (Còn ${s.inventory})`}
+                                    </option>
+                                )}
+                            </select>
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t dark:border-slate-700">
                         <div>
                             <label className="label-modal font-semibold" htmlFor="num_adult">Người lớn *</label>
@@ -1154,8 +1348,8 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
             {/* Thẻ Thống Kê (Giữ nguyên) */}
             <BookingStats />
 
-            {/* (MỚI V29) Biểu đồ Thống kê Review */}
-            <ReviewStatsChart />
+            {/* (MỚI V29-SỬA) Tour Yêu Thích Nhất */}
+            <FavoriteTourStats />
 
             {/* (CẬP NHẬT V22) Filter & Search (Layout mới - giữ nguyên) */}
             <div className="bg-white dark:bg-slate-800 shadow-xl rounded-lg border border-gray-100 dark:border-slate-700">
@@ -1320,10 +1514,12 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
                 )}
                 {bookingToDelete && <DeleteConfirmationModal booking={bookingToDelete} onClose={() => setBookingToDelete(null)} onConfirm={confirmDeleteBooking} />}
                 
+                {/* (CẬP NHẬT V29-SỬA) Pass allServices vào AddBookingModal */}
                 {showAddModal && (
                     <AddBookingModal
                         users={allUsers}
                         tours={allTours}
+                        allServices={allServices} 
                         onClose={() => setShowAddModal(false)}
                         onSuccess={() => fetchBookings(false)} 
                     />
