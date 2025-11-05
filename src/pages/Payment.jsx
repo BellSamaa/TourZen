@@ -1,10 +1,10 @@
 // src/pages/Payment.jsx
 // (V14: Chuyển Dịch vụ cộng thêm vào từng item tour)
-/* (SỬA v38.5 - FIX LỖI BUILD)
-  1. (Fix) Xóa dòng code rác "AN_ELDER: ..." (dòng 602) gây lỗi build.
-  2. (Giữ nguyên) Cập nhật hàm handleApplyVoucher để sử dụng mã
-     từ file promotionsData.js (ví dụ: LEQUOCKHANH, HEVUI)
-     và giữ lại mã VIP30 làm mã VIP đặc biệt.
+/* (SỬA v38.6 - YÊU CẦU NGƯỜI DÙNG)
+  1. (THÊM) Thêm lựa chọn 2 văn phòng (HN/HCM) khi thanh toán trực tiếp.
+  2. (CẬP NHẬT) Lưu `branch_address` vào payload của `Bookings` khi checkout.
+  3. (Giữ nguyên) Sửa lỗi build v38.5
+  4. (Giữ nguyên) Cập nhật hàm handleApplyVoucher.
 */
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
@@ -18,7 +18,7 @@ import {
     FaUserTie // Icon Người già
 } from "react-icons/fa";
 import { IoIosMail, IoIosCall } from "react-icons/io";
-import { Buildings, Ticket, CircleNotch, X, WarningCircle, QrCode, Bank } from "@phosphor-icons/react"; 
+import { Buildings, Ticket, CircleNotch, X, WarningCircle, QrCode, Bank } from "@phosph-icons/react"; 
 import { getSupabase } from "../lib/supabaseClient";
 import toast from 'react-hot-toast';
 import { useAuth } from "../context/AuthContext.jsx"; 
@@ -33,6 +33,14 @@ const allPromos = [
   ...PROMOTIONS.regions,
   ...PROMOTIONS.thematic,
 ];
+
+// --- (THÊM v38.6) Danh sách văn phòng ---
+const officeBranches = [
+  "VP Hà Nội: Số 123, Đường ABC, Quận Hoàn Kiếm",
+  "VP HCM: Số 456, Đường XYZ, Quận 1"
+];
+// --- (HẾT THÊM) ---
+
 
 // --- Hàm slugify ---
 function slugify(text) {
@@ -114,7 +122,11 @@ export default function Payment() {
     const [contactInfo, setContactInfo] = useState({ name: "", phone: "", email: "", address: "" });
     const [notes, setNotes] = useState("");
     const [paymentMethod, setPaymentMethod] = useState("direct");
-    const [selectedBranch, setSelectedBranch] = useState("VP Hà Nội: Số 123, Đường ABC, Quận Hoàn Kiếm");
+    
+    // <<< SỬA v38.6: Dùng state với danh sách văn phòng >>>
+    const [selectedBranch, setSelectedBranch] = useState(officeBranches[0]);
+    // <<< HẾT SỬA v38.6 >>>
+
     const [agreedToTerms, setAgreedToTerms] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [notification, setNotification] = useState({ message: "", type: "" });
@@ -503,7 +515,7 @@ export default function Payment() {
     };
     // *** (KẾT THÚC SỬA) ***
 
-    // --- (CẬP NHẬT) HÀM CHECKOUT (Logic dịch vụ và payload) ---
+    // --- (CẬP NHẬT v38.6) HÀM CHECKOUT (Thêm branch_address) ---
     const handleCheckout = async (e) => { 
         e.preventDefault();
 
@@ -605,14 +617,17 @@ export default function Payment() {
                 // (THAY THẾ) Gán dịch vụ của item này
                 hotel_product_id: itemServices.hotel || null,
                 transport_product_id: itemServices.transport || null,
-                // (SỬA v38.5) XÓA DÒNG CODE RÁC
                 flight_product_id: itemServices.flight || null,
                 // (HẾT THAY THẾ)
 
                 // (Giữ nguyên) Voucher chỉ áp dụng cho item đầu tiên
                 voucher_code: item === displayItems[0] ? voucherCode || null : null,
                 voucher_discount: item === displayItems[0] ? voucherDiscount || 0 : 0,
-                payment_method: paymentMethod 
+                payment_method: paymentMethod,
+
+                // <<< THÊM v38.6: Lưu địa chỉ văn phòng nếu thanh toán trực tiếp >>>
+                branch_address: paymentMethod === 'direct' ? selectedBranch : null 
+                // <<< HẾT THÊM v38.6 >>>
             };
             bookingPromises.push(
                 supabase.from('Bookings').insert(bookingPayload).select('id')
@@ -647,7 +662,7 @@ export default function Payment() {
                         state: { 
                             bookingIds: successfulBookingIds,
                             method: paymentMethod,
-                            branch: selectedBranch,
+                            branch: selectedBranch, // <<< v38.6: Đã truyền đi branch
                             deadline: formattedDeadline,
                             total: finalTotal 
                         } 
@@ -930,15 +945,43 @@ export default function Payment() {
                            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Yêu cầu đặc biệt chung cho tất cả các tour (ví dụ: liên hệ qua email...)" className="input-style w-full h-24" />
                         </div>
                         
-                        {/* Phương thức thanh toán (Giữ nguyên) */}
+                        {/* <<< SỬA v38.6: Phương thức thanh toán (Thêm dropdown) >>> */}
                         <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg p-5 border dark:border-neutral-700">
                             <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">PHƯƠNG THỨC THANH TOÁN</h2>
                             <div className="space-y-3">
-                                <label className="flex items-center p-3 border dark:border-neutral-600 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-700/50 cursor-pointer transition-colors">
-                                    <input type="radio" name="paymentMethod" value="direct" checked={paymentMethod === "direct"} onChange={(e) => setPaymentMethod(e.target.value)} className="mr-3 text-sky-600 focus:ring-sky-500"/>
-                                    <Bank size={20} className="mr-2 text-sky-600 dark:text-sky-400" />
-                                    <span className="font-medium dark:text-white">Thanh toán trực tiếp tại văn phòng</span>
+                                {/* Thanh toán trực tiếp */}
+                                <label className="block p-3 border dark:border-neutral-600 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-700/50 cursor-pointer transition-colors">
+                                    <div className="flex items-center">
+                                        <input type="radio" name="paymentMethod" value="direct" checked={paymentMethod === "direct"} onChange={(e) => setPaymentMethod(e.target.value)} className="mr-3 text-sky-600 focus:ring-sky-500"/>
+                                        <Bank size={20} className="mr-2 text-sky-600 dark:text-sky-400" />
+                                        <span className="font-medium dark:text-white">Thanh toán trực tiếp tại văn phòng</span>
+                                    </div>
+                                    
+                                    {/* Dropdown chỉ hiển thị khi chọn 'direct' */}
+                                    <AnimatePresence>
+                                        {paymentMethod === 'direct' && (
+                                            <motion.div
+                                                initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                                                animate={{ opacity: 1, height: 'auto', marginTop: '12px' }}
+                                                exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                                                className="overflow-hidden"
+                                            >
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-8">Chọn văn phòng:</label>
+                                                <select 
+                                                    value={selectedBranch}
+                                                    onChange={(e) => setSelectedBranch(e.target.value)}
+                                                    className="input-style w-full max-w-sm ml-8"
+                                                >
+                                                    {officeBranches.map(branch => (
+                                                        <option key={branch} value={branch}>{branch}</option>
+                                                    ))}
+                                                </select>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </label>
+                                
+                                {/* Thanh toán QR */}
                                 <label className="flex items-center p-3 border dark:border-neutral-600 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-700/50 cursor-pointer transition-colors">
                                     <input type="radio" name="paymentMethod" value="virtual_qr" checked={paymentMethod === "virtual_qr"} onChange={(e) => setPaymentMethod(e.target.value)} className="mr-3 text-sky-600 focus:ring-sky-500"/>
                                     <QrCode size={20} className="mr-2 text-sky-600 dark:text-sky-400" />
@@ -946,6 +989,8 @@ export default function Payment() {
                                 </label>
                             </div>
                         </div>
+                        {/* <<< HẾT SỬA v38.6 >>> */}
+
                      </div>
 
                      {/* Cột Phải: Tóm tắt (Giữ nguyên) */}
@@ -1035,7 +1080,7 @@ export default function Payment() {
                 )}
              </AnimatePresence>
              
-             {/* Styles (Giữ nguyên) */}
+             {/* Styles (GiGữ nguyên) */}
              <style jsx>{`
                 .input-style { @apply border border-gray-300 p-2 rounded-md w-full dark:bg-neutral-700 dark:border-neutral-600 dark:text-white focus:ring-sky-500 focus:border-sky-500 transition-colors duration-200 text-sm; }
                 .button-secondary { @apply px-4 py-2 bg-neutral-200 dark:bg-neutral-600 rounded-md font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-500 dark:text-neutral-900 dark:text-neutral-100 text-sm disabled:opacity-50; }

@@ -1,11 +1,13 @@
 // src/pages/BookingHistory.jsx
 // (SỬA LỖI: Thay thế `supabase.auth.getUser()` bằng `useAuth()` để hỗ trợ "Tài khoản ảo")
 // (SỬA LỖI v2: Tự động UPSERT user "ảo" vào bảng Users khi đánh giá)
+// (SỬA v3: (YÊU CẦU) Hiển thị chi tiết thanh toán trực tiếp giống PaymentSuccess)
 
 import React, { useState, useEffect, useCallback } from "react";
 import { getSupabase } from "../lib/supabaseClient";
 import { useAuth } from "../context/AuthContext"; // <<< BƯỚC 1: IMPORT useAuth
-import { FaSpinner, FaBoxOpen, FaStar, FaRegStar, FaMoneyBillWave, FaClock, FaMapMarkerAlt } from "react-icons/fa";
+// <<< SỬA v3: Thêm FaCalendarCheck >>>
+import { FaSpinner, FaBoxOpen, FaStar, FaRegStar, FaMoneyBillWave, FaClock, FaMapMarkerAlt, FaCalendarCheck } from "react-icons/fa";
 import { CircleNotch } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
@@ -25,6 +27,31 @@ const formatDate = (dateString) => {
   const options = { year: "numeric", month: "2-digit", day: "2-digit" };
   return new Date(dateString).toLocaleDateString("vi-VN", options);
 };
+
+// <<< THÊM v3: Hàm tính hạn thanh toán (giống Payment.jsx) >>>
+const getPaymentDeadline = (departureDateStr) => {
+  if (!departureDateStr) return "N/A";
+  try {
+    // Đảm bảo ngày được hiểu là UTC để tránh lỗi lệch múi giờ
+    const parsedDate = new Date(departureDateStr + 'T00:00:00Z'); 
+    if (isNaN(parsedDate.getTime())) return "N/A";
+    
+    parsedDate.setDate(parsedDate.getDate() - 7); // Trừ 7 ngày
+    
+    return parsedDate.toLocaleDateString("vi-VN", { 
+      weekday: "long", 
+      year: "numeric", 
+      month: "long", 
+      day: "numeric",
+      timeZone: 'UTC' // Đảm bảo output không bị lệch ngày
+    });
+  } catch (e) {
+    console.error("Lỗi tính hạn thanh toán:", e);
+    return "N/A";
+  }
+};
+// <<< HẾT THÊM v3 >>>
+
 const StatusBadge = ({ status }) => {
   const getStatusStyle = () => {
     switch (status) {
@@ -219,7 +246,7 @@ export default function BookingHistory() {
     }
     // (Không cần setCurrentUser nữa, vì 'user' từ context đã là state)
 
-    // Truy vấn thêm các trường chi tiết tour cần thiết
+    // <<< SỬA v3: Thêm departure_date và branch_address >>>
     const { data, error: fetchError } = await supabase
       .from("Bookings")
       .select(`
@@ -230,6 +257,8 @@ export default function BookingHistory() {
         user_id,
         product_id,
         payment_method, 
+        departure_date, 
+        branch_address, 
         Products:Products!product_id ( id, name, image_url, location, duration, price ), 
         Reviews ( id ) 
       `)
@@ -321,6 +350,9 @@ export default function BookingHistory() {
               const tour = booking.Products;
               const hasReview = booking.Reviews && booking.Reviews.length > 0;
               const canReview = booking.status === 'confirmed' && tour;
+              
+              // <<< THÊM v3: Tính deadline cho render >>>
+              const paymentDeadline = getPaymentDeadline(booking.departure_date);
 
               return (
                 <motion.div
@@ -346,16 +378,36 @@ export default function BookingHistory() {
                             </div>
                         </div>
                     </div>
-                    <div className="p-4 md:p-6 flex justify-between items-center bg-gray-50 dark:bg-neutral-900/50">
-                        <div className="text-sm text-gray-700 dark:text-gray-300 space-y-1">
+                    <div className="p-4 md:p-6 flex justify-between items-start bg-gray-50 dark:bg-neutral-900/50">
+                        <div className="text-sm text-gray-700 dark:text-gray-300 space-y-1 flex-1">
                             <p>Mã đơn: <span className="font-medium text-gray-800 dark:text-white">#{booking.id.substring(0, 8)}...</span></p>
                             <p>Ngày đặt: {formatDate(booking.created_at)}</p>
-                            <p>Thanh toán: <span className="font-semibold text-sky-600 dark:text-sky-400">{booking.payment_method || 'N/A'}</span></p>
-                            <p className="text-xl font-bold text-red-600 dark:text-red-500 pt-1">
+                            
+                            {/* <<< SỬA v3: Hiển thị chi tiết thanh toán >>> */}
+                            {booking.payment_method === 'direct' ? (
+                                <div className="bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-lg p-3 mt-2 text-xs border border-blue-200 dark:border-blue-700 max-w-md">
+                                    <p className="font-semibold flex items-center gap-1.5"><FaCalendarCheck /> Chi tiết thanh toán trực tiếp:</p>
+                                    <ul className="list-disc list-inside mt-1 pl-1 space-y-0.5">
+                                        <li>
+                                            <strong>Địa điểm:</strong> {booking.branch_address || 'N/A'}
+                                        </li>
+                                        <li>
+                                            <strong>Hạn thanh toán:</strong> {paymentDeadline}
+                                        </li>
+                                    </ul>
+                                </div>
+                            ) : (
+                                <p>Thanh toán: <span className="font-semibold text-sky-600 dark:text-sky-400">
+                                    {booking.payment_method === 'virtual_qr' ? 'Thanh toán QR Ảo' : (booking.payment_method || 'N/A')}
+                                </span></p>
+                            )}
+                            {/* <<< HẾT SỬA v3 >>> */}
+
+                            <p className="text-xl font-bold text-red-600 dark:text-red-500 pt-2">
                                 Tổng tiền: {formatCurrency(booking.total_price)}
                             </p>
                         </div>
-                        <div className="flex flex-col items-end gap-3">
+                        <div className="flex flex-col items-end gap-3 flex-shrink-0 ml-4">
                             <StatusBadge status={booking.status} />
                             {hasReview ? (
                                 <span className="px-3 py-1.5 text-sm font-medium text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-300 rounded-lg">
