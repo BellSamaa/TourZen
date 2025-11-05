@@ -1,5 +1,5 @@
 // src/pages/AdminManageProducts.jsx
-// (SỬA LỖI LỚN v2: Sửa lỗi logic đọc/ghi 'itinerary' từ JSON string)
+// (SỬA LỖI v3.1: Giữ nguyên text[] và sửa lỗi logic đọc/ghi)
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from 'react-router-dom';
@@ -106,7 +106,7 @@ const DeparturesManagerReadOnly = ({ tourId }) => {
              if (error) throw error;
              setDepartures(data || []);
          } catch(err) {
-             setError("Lỗi tải lịch khởi hành: " + err.message);
+             setError("Lỗi tải lịch khởi hành: "" + err.message);
          } finally {
              setLoading(false);
          }
@@ -124,11 +124,11 @@ const DeparturesManagerReadOnly = ({ tourId }) => {
                      <table className="min-w-full text-sm">
                          <thead className="bg-gray-100 dark:bg-neutral-700 sticky top-0">
                              <tr>
-                                 <th className="px-3 py-2 text-left">Ngày đi</th>
-                                 <th className="px-3 py-2 text-left">Giá Lớn (NCC)</th>
-                                 <th className="px-3 py-2 text-left">Giá Trẻ (NCC)</th>
-                                 <th className="px-3 py-2 text-left">Slots</th>
-                                 <th className="px-3 py-2 text-left">Đã đặt</th>
+                                 <th className="px-3 py-2 text-left"">Ngày đi</th>
+                                 <th className="px-3 py-2 text-left"">Giá Lớn (NCC)</th>
+                                 <th className="px-3 py-2 text-left"">Giá Trẻ (NCC)</th>
+                                 <th className="px-3 py-2 text-left"">Slots</th>
+                                 <th className="px-3 py-2 text-left"">Đã đặt</th>
                              </tr>
                          </thead>
                          <tbody className="divide-y dark:divide-neutral-600">
@@ -172,24 +172,28 @@ const EditTourModalAdmin = ({ tour, onClose, onSuccess, suppliers }) => {
 
     useEffect(() => {
         if (tour) {
-            // === SỬA LỖI LOGIC: Đọc và Parse mảng 'itinerary' ===
-            const parsedItinerary = Array.isArray(tour.itinerary) && tour.itinerary.length > 0
+            // =================================================================
+            // === SỬA LỖI LOGIC: Đọc mảng 'text[]' và parse JSON
+            // =================================================================
+            const parsedItinerary = (Array.isArray(tour.itinerary) && tour.itinerary.length > 0)
                 ? tour.itinerary.map((item, index) => {
                     let title = `Ngày ${index + 1}`;
                     let content = '';
 
                     if (typeof item === 'string') {
                         try {
-                            // Thử parse chuỗi JSON (dựa trên hình ảnh lỗi)
+                            // Thử parse chuỗi JSON
                             const parsedItem = JSON.parse(item);
                             title = parsedItem.title || title;
                             content = parsedItem.content || '';
                         } catch (e) {
-                            // Nếu không phải JSON, nó là một chuỗi nội dung đơn giản (lỗi dữ liệu cũ)
-                            content = item; 
+                            // Lỗi parse! Đây chính là dữ liệu hỏng bạn thấy.
+                            // Hiển thị rỗng để admin sửa lại.
+                            content = ''; 
+                            console.warn("Lỗi parse lịch trình (item bị hỏng):", item);
                         }
                     } else if (typeof item === 'object' && item !== null) {
-                        // Nếu nó đã là một object (dữ liệu chuẩn)
+                        // Hỗ trợ nếu có dữ liệu 'jsonb' cũ
                         title = item.title || title;
                         content = item.content || '';
                     }
@@ -250,7 +254,9 @@ const EditTourModalAdmin = ({ tour, onClose, onSuccess, suppliers }) => {
         }
         setLoading(true);
 
-        // === SỬA LỖI LOGIC: Stringify 'itinerary' trước khi lưu ===
+        // =================================================================
+        // === LOGIC LƯU (ĐÃ ĐÚNG): Lưu mảng JSON string vào 'text[]'
+        // =================================================================
         const dataToSave = {
             name: formData.name, description: formData.description,
             selling_price_adult: formData.selling_price_adult,
@@ -262,7 +268,7 @@ const EditTourModalAdmin = ({ tour, onClose, onSuccess, suppliers }) => {
             is_published: isPublished,
             
             // Chuyển đổi mảng object [{title, content}] thành mảng chuỗi JSON
-            // để khớp với định dạng dữ liệu trong DB của bạn
+            // để khớp với định dạng 'text[]' của bạn
             itinerary: formData.itinerary.map(item => {
                 const title = item.title?.trim() || 'Tiêu đề';
                 const content = item.content?.trim() || '';
@@ -325,7 +331,7 @@ const EditTourModalAdmin = ({ tour, onClose, onSuccess, suppliers }) => {
                         <div className="space-y-3 max-h-48 overflow-y-auto pr-2"> 
                             {formData.itinerary.map((item, index) => ( 
                                 <div key={index} className="flex gap-2 items-start"> 
-                                    {/* === SỬA LỖI TYPO: 'e.container.value' -> 'e.target.value' === */}
+                                    {/* Sửa lỗi typo 'e.container.value' -> 'e.target.value' (Đã có) */}
                                     <input 
                                         value={item.title} 
                                         onChange={(e) => handleItineraryChange(index, 'title', e.target.value)} 
@@ -586,7 +592,7 @@ export default function AdminManageProducts() {
                                     <th className="th-style">Duyệt</th>
                                     <th className="th-style">Đăng</th>
                                     <th className="th-style text-right">Hành động</th>
-                                </tr>
+                                </h5>
                             </thead> 
                             <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700"> 
                                 {products.map((p) => <TourListItem key={p.id} product={p} />)} 

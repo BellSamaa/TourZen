@@ -1,5 +1,5 @@
 // src/pages/TourDetail.jsx
-// (V5: FIX LỖI WHITE SCREEN - Tách useEffect cuộn trang khi ID thay đổi)
+// (V6: Sửa lỗi hiển thị lịch trình từ 'text[]')
 
 import React, { useState, useEffect, useLayoutEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -193,7 +193,6 @@ const TourDetail = () => {
     const bannerTextY = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
 
     // --- (FIX V5) useLayoutEffect cuộn trang khi ID thay đổi ---
-    // Đảm bảo trang luôn cuộn lên đầu ngay khi ID thay đổi, trước khi render, tránh lỗi hiển thị trắng
     useLayoutEffect(() => {
         if (id) {
             window.scrollTo({ top: 0, behavior: 'instant' });
@@ -242,6 +241,44 @@ const TourDetail = () => {
         
         fetchTour();
     }, [id]); // Chạy lại mỗi khi ID thay đổi
+
+    // =================================================================
+    // === SỬA LỖI LOGIC (V6): Parse mảng 'text[]' (itinerary)
+    // =================================================================
+    const parsedItinerary = useMemo(() => {
+        if (!tour?.itinerary || !Array.isArray(tour.itinerary)) {
+            return [];
+        }
+        return tour.itinerary.map((item, i) => {
+            if (typeof item === 'string') {
+                try {
+                    // Thử parse chuỗi JSON
+                    const parsedItem = JSON.parse(item);
+                    return {
+                        title: parsedItem.title || `Ngày ${i + 1}`,
+                        content: parsedItem.content || ''
+                    };
+                } catch (e) {
+                    // Lỗi parse! Có thể là dữ liệu cũ hỏng, hoặc
+                    // là dữ liệu rất cũ (chỉ là chuỗi nội dung)
+                    if (item && !item.trim().startsWith('{')) {
+                        // Nếu không bắt đầu bằng '{', giả sử nó là nội dung
+                        return { title: `Ngày ${i + 1}`, content: item };
+                    }
+                    // Nếu là chuỗi JSON hỏng, trả về lỗi
+                    return { title: `Ngày ${i + 1}`, content: '[Lịch trình lỗi, vui lòng liên hệ]' };
+                }
+            } else if (typeof item === 'object' && item !== null) {
+                // Hỗ trợ nếu dữ liệu là 'jsonb'
+                return {
+                    title: item.title || `Ngày ${i + 1}`,
+                    content: item.content || ''
+                };
+            }
+            return { title: `Ngày ${i + 1}`, content: '' };
+        });
+    }, [tour?.itinerary]);
+
 
     // --- (SỬA v3) Dùng 'price' ---
     const displayPrice = tour?.price || 0;
@@ -365,20 +402,22 @@ const TourDetail = () => {
                 </motion.div>
             </motion.section>
 
-            {/* === Lịch trình (Giữ nguyên) === */}
-            {tour.itinerary && tour.itinerary.length > 0 && (
+            {/* === Lịch trình (ĐÃ SỬA) === */}
+            {parsedItinerary.length > 0 && (
                 <motion.section className="max-w-4xl mx-auto p-6 md:p-10 mt-8 mb-16 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border dark:border-slate-700" initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
                    <h2 className="text-2xl md:text-3xl font-bold mb-10 text-center text-sky-700 dark:text-sky-400"> Lịch Trình Dự Kiến </h2>
                    <div className="relative pl-6 border-l-4 border-sky-300 dark:border-sky-700 space-y-10">
-                     {tour.itinerary.map((item, i) => (
+                     
+                     {/* Dùng mảng parsedItinerary đã xử lý */}
+                     {parsedItinerary.map((item, i) => (
                         <motion.div key={i} className="relative pl-10" initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: i * 0.15 }}>
-                          {/* Sửa logic hiển thị tiêu đề/nội dung lịch trình */}
+                          
                           <div className="absolute top-1 left-[-1.45rem] w-8 h-8 bg-sky-500 border-4 border-white dark:border-slate-800 rounded-full z-10 flex items-center justify-center shadow"> <span className="text-sm font-bold text-white">{i + 1}</span> </div>
                           <h4 className="font-semibold text-lg md:text-xl text-slate-800 dark:text-slate-100 mb-1.5"> 
-                            { (typeof item === 'object' && item.title) ? item.title : `Ngày ${i + 1}` }
+                            {item.title} {/* Hiển thị title đã parse */}
                           </h4>
                           <p className="text-slate-600 dark:text-slate-300 text-base leading-relaxed"> 
-                            { (typeof item === 'object' && item.content) ? item.content : (typeof item === 'string' ? item : '') }
+                            {item.content} {/* Hiển thị content đã parse */}
                           </p>
                         </motion.div>
                      ))}
