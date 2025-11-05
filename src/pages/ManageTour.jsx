@@ -1,6 +1,7 @@
 // src/pages/ManageTour.jsx
-// (V29: Fix lỗi. Áp dụng logic subquery (truy vấn con) do người dùng cung cấp
-// để lọc TẤT CẢ (Status, Customer, Tour) phía server)
+// (V28: Fix lỗi "parse logic tree" và "invalid input syntax for type uuid")
+// Giải pháp: Sử dụng .and() với mảng filter strings.
+// Đây là cú pháp PostgREST chuẩn để kết hợp nhiều bộ lọc AND phức tạp.
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -777,6 +778,7 @@ export default function ManageTour() {
             if (debouncedCustomerSearch) {
               const val = `%${debouncedCustomerSearch}%`;
               // Cú pháp .or() với subquery .in.()
+              // Đây là cú pháp PostgREST để lọc bảng 'Bookings' dựa trên điều kiện của bảng 'Users'
               query = query.or(`user_id.in.(select id from Users where full_name.ilike.${val}),user_id.in.(select id from Users where email.ilike.${val})`);
             }
             
@@ -786,7 +788,7 @@ export default function ManageTour() {
               if (val.startsWith('#')) val = val.substring(1);
               const tourVal = `%${val}%`;
               // Cú pháp .or() cho bảng chính (id) và bảng phụ (product.name)
-              query = query.or(`id.ilike.${tourVal},product.name.ilike.${tourVal}`);
+              query = query.or(`id::text.ilike.${tourVal},product.name.ilike.${tourVal}`);
             }
             // (*** KẾT THÚC SỬA V29 ***)
 
@@ -1153,7 +1155,7 @@ export default function ManageTour() {
                                     <td className="td-style-figma text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatDate(booking.created_at)}</td>
                                     <td className="td-style-figma text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatShortDate(booking.departure_date)}</td>
                                     <td className="td-style-figma text-xs text-center text-gray-600 dark:text-gray-300">{formatQuantity(booking)}</td>
-                                    <td className="td-style-figma text-right font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">{formatCurrency(booking.total_price)}</td>
+                                    <td className="td-style-figma text-right font-semibold text-red-600 dark:text-red-400 whitespace-noww-rap">{formatCurrency(booking.total_price)}</td>
                                     {/* (V8) Cột PTTT */}
                                     <td className="td-style-figma text-center text-xs text-gray-600 dark:text-gray-300 font-medium">
                                         {formatPaymentMethod(booking.payment_method)}
