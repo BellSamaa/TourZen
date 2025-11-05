@@ -1,5 +1,5 @@
 // src/pages/TourDetail.jsx
-// (V7: Thêm thống kê % đánh giá sao)
+// (V8: Sửa lỗi logic ReviewsSection hiển thị sai rating trung bình)
 
 import React, { useState, useEffect, useLayoutEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -15,7 +15,6 @@ import {
 import { motion, useScroll, useTransform } from "framer-motion";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
-// (LƯU Ý: Không import TourReviews.jsx ở đây, vì chúng ta sửa component ReviewsSection nội bộ)
 
 const supabase = getSupabase();
 
@@ -61,7 +60,7 @@ const ErrorComponent = ({ message }) => (
     </motion.div>
 ); 
 
-// --- (MỚI) Component hiển thị thanh % (Thêm bên ngoài) ---
+// --- Component hiển thị thanh % (Giữ nguyên) ---
 const RatingBar = ({ label, percentage }) => (
     <div className="flex items-center gap-2 text-sm">
         <span className="w-12 text-slate-500 dark:text-slate-400">{label}</span>
@@ -89,15 +88,17 @@ const StarRating = ({ rating, size = "text-lg" }) => {
     );
 };
 
-// --- (ĐÃ SỬA) Component Mục Đánh giá ---
+// --- (ĐÃ SỬA V8) Component Mục Đánh giá ---
 const ReviewsSection = ({ tourId, initialRating }) => {
     const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [totalReviews, setTotalReviews] = useState(0);
 
-    // (MỚI) State cho thống kê %
+    // (SỬA V8) State cho thống kê %
     const [stats, setStats] = useState({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 });
+    // (SỬA V8) State cho rating trung bình *tính toán được*
+    const [calculatedRating, setCalculatedRating] = useState(null); // Bắt đầu là null
 
     useEffect(() => {
         if (!tourId) return;
@@ -114,10 +115,10 @@ const ReviewsSection = ({ tourId, initialRating }) => {
                         created_at,
                         rating,
                         comment
-                    `, { count: 'exact' }) // Thêm 'count'
+                    `, { count: 'exact' }) 
                     .eq("product_id", tourId)
                     .order("created_at", { ascending: false })
-                    .limit(10); // Chỉ lấy 10 review mới nhất
+                    .limit(10); 
 
                 if (fetchError) throw fetchError;
                 
@@ -125,7 +126,7 @@ const ReviewsSection = ({ tourId, initialRating }) => {
                 const totalCount = count || 0;
                 setTotalReviews(totalCount); // Lưu tổng số
 
-                // (MỚI) Fetch 2: Lấy TẤT CẢ ratings để tính toán thống kê
+                // (SỬA V8) Fetch 2: Lấy TẤT CẢ ratings để tính toán thống kê
                 if (totalCount > 0) {
                     const { data: allRatingsData, error: statsError } = await supabase
                         .from("Reviews")
@@ -136,17 +137,21 @@ const ReviewsSection = ({ tourId, initialRating }) => {
                         console.error("Lỗi tải thống kê ratings:", statsError);
                     } else if (allRatingsData) {
                         const newStats = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+                        let totalRatingSum = 0; // (SỬA V8) Thêm biến tính tổng
+                        
                         allRatingsData.forEach(r => {
-                            // Đảm bảo rating là số hợp lệ
                             if (r.rating >= 1 && r.rating <= 5) {
                                 newStats[r.rating]++;
+                                totalRatingSum += r.rating; // (SỬA V8) Cộng dồn
                             }
                         });
                         setStats(newStats);
+                        // (SỬA V8) Tính và set rating trung bình thực tế
+                        setCalculatedRating(totalRatingSum / totalCount); 
                     }
                 } else {
-                    // Reset nếu không có review
                      setStats({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 });
+                     setCalculatedRating(0); // (SỬA V8) Set là 0 nếu không có review
                 }
 
             } catch (err) {
@@ -159,7 +164,9 @@ const ReviewsSection = ({ tourId, initialRating }) => {
         fetchReviews();
     }, [tourId]);
 
-    const averageRating = parseFloat(initialRating) || 0; // Lấy từ cột Product.rating
+    // (SỬA V8) Ưu tiên hiển thị rating đã tính toán,
+    // nếu chưa tính xong (còn là null) thì tạm dùng initialRating
+    const displayRating = calculatedRating !== null ? calculatedRating : (parseFloat(initialRating) || 0);
 
     // (MỚI) Hàm tính %
     const getPercentage = (ratingCount) => {
@@ -179,20 +186,23 @@ const ReviewsSection = ({ tourId, initialRating }) => {
                 Đánh giá từ Khách hàng
             </h2>
 
-            {/* (ĐÃ SỬA) Khu vực tổng quan VÀ thống kê % */}
+            {/* (ĐÃ SỬA V8) Khu vực tổng quan VÀ thống kê % */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 p-6 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
                 {/* Cột 1: Điểm trung bình */}
                 <div className="flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-600 pb-4 md:pb-0 md:pr-6">
                     <span className="text-5xl font-extrabold text-slate-800 dark:text-white">
-                        {averageRating.toFixed(1)} / 5
+                        {/* (SỬA V8) Dùng displayRating */}
+                        {displayRating.toFixed(1)} / 5
                     </span>
-                    <StarRating rating={averageRating} size="text-3xl" />
+                    {/* (SỬA V8) Dùng displayRating */}
+                    <StarRating rating={displayRating} size="text-3xl" />
                     <span className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+                        {/* (SỬA V8) Dùng totalReviews state */}
                         Dựa trên {totalReviews} đánh giá
                     </span>
                 </div>
                 
-                {/* (MỚI) Cột 2: Thanh % */}
+                {/* Cột 2: Thanh % */}
                 <div className="md:col-span-2 flex flex-col justify-center space-y-2 pt-4 md:pt-0">
                     <RatingBar label="5 Sao" percentage={getPercentage(stats[5])} />
                     <RatingBar label="4 Sao" percentage={getPercentage(stats[4])} />
@@ -246,7 +256,7 @@ const ReviewsSection = ({ tourId, initialRating }) => {
 };
 
 
-// --- Component Chính ---
+// --- Component Chính (Giữ nguyên) ---
 const TourDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -257,22 +267,17 @@ const TourDetail = () => {
     const { ref: bannerRef, scrollYProgress } = useScroll();
     const bannerTextY = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
 
-    // --- (FIX V5) useLayoutEffect cuộn trang khi ID thay đổi ---
     useLayoutEffect(() => {
         if (id) {
             window.scrollTo({ top: 0, behavior: 'instant' });
         }
     }, [id]);
 
-    // --- (SỬA V4) useEffect fix lỗi không tự tải lại ---
     useEffect(() => {
-        // --- 1. RESET STATE NGAY LẬP TỨC ---
         setLoading(true);
         setError(null);
         setTour(null);
-        // window.scrollTo(0, 0); // Đã chuyển lên useLayoutEffect (FIX V5)
 
-        // --- 2. HÀM FETCH DATA ---
         async function fetchTour() {
             if (!id || !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id)) {
                  setError("ID tour không hợp lệ.");
@@ -281,10 +286,9 @@ const TourDetail = () => {
             }
             
             try {
-                // Fetch 1: Lấy thông tin Tour
                 const { data: tourData, error: tourError } = await supabase
                     .from("Products")
-                    .select("*, rating, price, supplier_name:Suppliers(name)") // Lấy cột rating và price
+                    .select("*, rating, price, supplier_name:Suppliers(name)") 
                     .eq("id", id)
                     .eq("is_published", true)
                     .eq("approval_status", "approved")
@@ -305,11 +309,8 @@ const TourDetail = () => {
         }
         
         fetchTour();
-    }, [id]); // Chạy lại mỗi khi ID thay đổi
+    }, [id]); 
 
-    // =================================================================
-    // === SỬA LỖI LOGIC (V6): Parse mảng 'text[]' (itinerary)
-    // =================================================================
     const parsedItinerary = useMemo(() => {
         if (!tour?.itinerary || !Array.isArray(tour.itinerary)) {
             return [];
@@ -317,24 +318,18 @@ const TourDetail = () => {
         return tour.itinerary.map((item, i) => {
             if (typeof item === 'string') {
                 try {
-                    // Thử parse chuỗi JSON
                     const parsedItem = JSON.parse(item);
                     return {
                         title: parsedItem.title || `Ngày ${i + 1}`,
                         content: parsedItem.content || ''
                     };
                 } catch (e) {
-                    // Lỗi parse! Có thể là dữ liệu cũ hỏng, hoặc
-                    // là dữ liệu rất cũ (chỉ là chuỗi nội dung)
                     if (item && !item.trim().startsWith('{')) {
-                        // Nếu không bắt đầu bằng '{', giả sử nó là nội dung
                         return { title: `Ngày ${i + 1}`, content: item };
                     }
-                    // Nếu là chuỗi JSON hỏng, trả về lỗi
                     return { title: `Ngày ${i + 1}`, content: '[Lịch trình lỗi, vui lòng liên hệ]' };
                 }
             } else if (typeof item === 'object' && item !== null) {
-                // Hỗ trợ nếu dữ liệu là 'jsonb'
                 return {
                     title: item.title || `Ngày ${i + 1}`,
                     content: item.content || ''
@@ -345,28 +340,23 @@ const TourDetail = () => {
     }, [tour?.itinerary]);
 
 
-    // --- (SỬA v3) Dùng 'price' ---
     const displayPrice = tour?.price || 0;
 
-    // --- (SỬA) Logic "Đặt Ngay" ---
     const handleBookNow = () => {
-        // Gửi data qua trang Payment
         navigate('/payment', {
             state: {
-                item: tour, // Gửi toàn bộ thông tin tour
+                item: tour, 
             }
         });
     };
-    // --- KẾT THÚC SỬA ---
 
     if (loading) { return <LoadingComponent />; }
     if (!tour) { return <ErrorComponent message={error || "Tour không tồn tại."} />; }
 
-    // --- Xử lý Ảnh (Giữ nguyên) ---
     const mainImageUrl = getTourImage(tour);
     const galleryImages = tour?.galleryImages && tour.galleryImages.length > 0
         ? tour.galleryImages
-        : [mainImageUrl]; // Luôn có ít nhất 1 ảnh
+        : [mainImageUrl]; 
 
     const sliderSettings = {
         dots: true,
@@ -378,15 +368,14 @@ const TourDetail = () => {
         fade: true, pauseOnHover: true,
      };
 
-    // --- Animation Variants (Giữ nguyên) ---
     const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.1 } } }; 
     const itemVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } } }; 
 
     return (
         <motion.div
-            key={id} // (SỬA MỚI) Thêm key={id} để force remount component khi ID thay đổi, tránh lỗi white screen khi navigate client-side
+            key={id} 
             className="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-200 overflow-x-hidden"
-            initial="hidden" animate="visible" // Xóa exit để tránh vấn đề animation khi không có AnimatePresence
+            initial="hidden" animate="visible" 
             variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { duration: 0.4 } } }} 
         >
             <Toaster position="top-center" reverseOrder={false} />
@@ -404,7 +393,8 @@ const TourDetail = () => {
                         <p className="text-lg md:text-xl flex items-center gap-2">
                             <FaMapMarkerAlt /> {tour.location || 'Chưa rõ'}
                         </p>
-                        {/* (MỚI) Hiển thị rating trung bình */}
+                        {/* (SỬA V8) Hiển thị rating trung bình từ cột 'rating' của Product */}
+                        {/* Lưu ý: Đây vẫn là rating "cứng", nhưng nó nhất quán với TourCard */}
                         {tour.rating > 0 && (
                             <div className="flex items-center gap-1.5 text-amber-400">
                                 <FaStar />
@@ -454,7 +444,6 @@ const TourDetail = () => {
                 <motion.div className="lg:col-span-1 bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border dark:border-slate-700 lg:sticky lg:top-24 self-start" variants={itemVariants}>
                     <p className="text-slate-500 dark:text-slate-400 text-sm mb-1 font-medium">Giá chỉ từ</p>
                     <p className="text-4xl md:text-5xl font-bold text-red-600 mb-6 pb-6 border-b dark:border-slate-600">
-                        {/* (SỬA v3) Dùng displayPrice (tức price) */}
                         {displayPrice > 0 ? formatCurrency(displayPrice) : "Liên hệ"}
                     </p>
                     <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
@@ -467,22 +456,21 @@ const TourDetail = () => {
                 </motion.div>
             </motion.section>
 
-            {/* === Lịch trình (ĐÃ SỬA) === */}
+            {/* === Lịch trình (Giữ nguyên) === */}
             {parsedItinerary.length > 0 && (
                 <motion.section className="max-w-4xl mx-auto p-6 md:p-10 mt-8 mb-16 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border dark:border-slate-700" initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
                    <h2 className="text-2xl md:text-3xl font-bold mb-10 text-center text-sky-700 dark:text-sky-400"> Lịch Trình Dự Kiến </h2>
                    <div className="relative pl-6 border-l-4 border-sky-300 dark:border-sky-700 space-y-10">
                      
-                     {/* Dùng mảng parsedItinerary đã xử lý */}
                      {parsedItinerary.map((item, i) => (
                         <motion.div key={i} className="relative pl-10" initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: i * 0.15 }}>
                           
                           <div className="absolute top-1 left-[-1.45rem] w-8 h-8 bg-sky-500 border-4 border-white dark:border-slate-800 rounded-full z-10 flex items-center justify-center shadow"> <span className="text-sm font-bold text-white">{i + 1}</span> </div>
                           <h4 className="font-semibold text-lg md:text-xl text-slate-800 dark:text-slate-100 mb-1.5"> 
-                            {item.title} {/* Hiển thị title đã parse */}
+                            {item.title} 
                           </h4>
                           <p className="text-slate-600 dark:text-slate-300 text-base leading-relaxed"> 
-                            {item.content} {/* Hiển thị content đã parse */}
+                            {item.content}
                           </p>
                         </motion.div>
                      ))}
@@ -490,8 +478,7 @@ const TourDetail = () => {
                 </motion.section>
             )}
 
-            {/* === (ĐÃ SỬA) Mục Đánh giá === */}
-            {/* Truyền tour.id (UUID) và tour.rating (số) vào */}
+            {/* === (ĐÃ SỬA V8) Mục Đánh giá === */}
             <ReviewsSection tourId={tour.id} initialRating={tour.rating} />
 
             {/* === Bản đồ (Giữ nguyên) === */}
