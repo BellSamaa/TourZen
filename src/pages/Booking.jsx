@@ -1,5 +1,6 @@
 // src/pages/BookingHistory.jsx
 // (SỬA LỖI: Thay thế `supabase.auth.getUser()` bằng `useAuth()` để hỗ trợ "Tài khoản ảo")
+// (SỬA LỖI v2: Tự động UPSERT user "ảo" vào bảng Users khi đánh giá)
 
 import React, { useState, useEffect, useCallback } from "react";
 import { getSupabase } from "../lib/supabaseClient";
@@ -12,8 +13,7 @@ import toast from "react-hot-toast";
 
 const supabase = getSupabase();
 
-// (Các hàm formatCurrency, formatDate, StatusBadge, ReviewModal giữ nguyên...)
-// ... (Giữ nguyên các hàm helper) ...
+// (Các hàm formatCurrency, formatDate, StatusBadge giữ nguyên...)
 const formatCurrency = (number) => {
   if (typeof number !== "number" || isNaN(number)) return "0 ₫";
   return new Intl.NumberFormat("vi-VN", {
@@ -48,11 +48,14 @@ const StatusBadge = ({ status }) => {
     </span>
   );
 };
-const ReviewModal = ({ booking, onClose, onSubmitSuccess }) => {
+
+// <<< SỬA LỖI TỰ ĐỘNG: Thêm 'user' vào props >>>
+const ReviewModal = ({ booking, onClose, onSubmitSuccess, user }) => {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (rating === 0) {
@@ -66,21 +69,55 @@ const ReviewModal = ({ booking, onClose, onSubmitSuccess }) => {
     setIsSubmitting(true);
     setError("");
     const { user_id, product_id, id: booking_id } = booking; 
-    const { error: insertError } = await supabase.from("Reviews").insert({
-      user_id: user_id,
-      product_id: product_id,
-      rating: rating,
-      comment: comment.trim(),
-      booking_id: booking_id 
-    });
-    setIsSubmitting(false);
-    if (insertError) {
-      console.error("Lỗi gửi đánh giá:", insertError);
-      setError(`Lỗi: ${insertError.message}. (Có thể bạn đã đánh giá tour này rồi)`);
-    } else {
+
+    // <<< SỬA LỖI TỰ ĐỘNG: BẮT ĐẦU >>>
+    // Đảm bảo user này (dù thật hay ảo) tồn tại trong public.Users
+    // trước khi chèn vào Reviews.
+    try {
+      const { error: upsertError } = await supabase
+        .from('Users')
+        .upsert({ 
+            id: user.id, // ID từ context (phải khớp với user_id của booking)
+            email: user.email, 
+            full_name: user.full_name,
+            role: user.role || 'user' // Gán vai trò mặc định là 'user'
+        }, { onConflict: 'id' }); // Nếu user đã tồn tại, không làm gì cả
+
+      if (upsertError) throw upsertError;
+
+      // Tiếp tục chèn đánh giá
+      const { error: insertError } = await supabase.from("Reviews").insert({
+        user_id: user_id,
+        product_id: product_id,
+        rating: rating,
+        comment: comment.trim(),
+        booking_id: booking_id 
+      });
+
+      if (insertError) throw insertError;
+
+      // Thành công
       onSubmitSuccess();
+
+    } catch (err) {
+      console.error("Lỗi gửi đánh giá (handleSubmit):", err);
+      // Lỗi 23505 là 'unique_violation' (trùng lặp) -> Lỗi 409 Conflict
+      if (err.code === '23505') { 
+          setError(`Lỗi: Bạn đã đánh giá tour này rồi.`);
+      } 
+      // Lỗi 23503 là 'foreign_key_violation' (không tìm thấy user_id)
+      else if (err.code === '23503') {
+          setError(`Lỗi tài khoản: Không tìm thấy ID người dùng. Vui lòng tải lại trang.`);
+      }
+      else {
+          setError(`Lỗi: ${err.message}.`);
+      }
+    } finally {
+      setIsSubmitting(false);
     }
+    // <<< SỬA LỖI TỰ ĐỘNG: KẾT THÚC >>>
   };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -351,6 +388,7 @@ export default function BookingHistory() {
             booking={selectedBooking}
             onClose={handleCloseModal}
             onSubmitSuccess={handleReviewSuccess}
+            user={user} // <<< SỬA LỖI TỰ ĐỘNG: Truyền user vào
           />
         )}
       </AnimatePresence>

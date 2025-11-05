@@ -1,5 +1,6 @@
 // HỆ THỐNG ĐA XÁC THỰC (HYBRID: Auth cho Admin, Ảo cho User)
 // (SỬA LỖI: Đã thêm 'supplier' vào hệ thống xác thực Auth)
+// (SỬA THEO YÊU CẦU: Thêm cờ localStorage cho popup xác thực)
 
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -100,6 +101,12 @@ export default function Login() {
                 if (insertError) {
                     throw new Error(`Không thể tạo tài khoản: ${insertError.message}`);
                 }
+
+                // **************************************************
+                // *** THÊM YÊU CẦU MỚI CỦA BẠN TẠI ĐÂY ***
+                // Đặt cờ trong localStorage để trang chủ hiển thị popup
+                localStorage.setItem('show_identity_prompt', 'true');
+                // **************************************************
 
                 // (YÊU CẦU 2 - ĐANG CHẠY ĐÚNG) 
                 // Chỉ báo thành công và chuyển sang login, không tự đăng nhập

@@ -1,5 +1,5 @@
 // src/pages/Payment.jsx
-// (V13: Thêm phương thức 'virtual_qr' và lưu 'payment_method' vào booking)
+// (V14: Chuyển Dịch vụ cộng thêm vào từng item tour)
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -12,11 +12,10 @@ import {
     FaUserTie // Icon Người già
 } from "react-icons/fa";
 import { IoIosMail, IoIosCall } from "react-icons/io";
-// (MỚI) Thêm icon QrCode
 import { Buildings, Ticket, CircleNotch, X, WarningCircle, QrCode, Bank } from "@phosphor-icons/react"; 
 import { getSupabase } from "../lib/supabaseClient";
 import toast from 'react-hot-toast';
-import { useAuth } from "../context/AuthContext.jsx"; // Cần user auth
+import { useAuth } from "../context/AuthContext.jsx"; 
 
 const supabase = getSupabase();
 
@@ -50,7 +49,7 @@ const InfoInput = ({ icon: Icon, ...props }) => (
 const QuantityInput = ({ label, icon: Icon, value, onDecrease, onIncrease, max, min = 0, disabled = false }) => (
     <div className="flex items-center justify-between">
         <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-            {Icon && <Icon className="text-gray-500" />} {/* Kiểm tra Icon tồn tại */}
+            {Icon && <Icon className="text-gray-500" />} 
             {label}
         </label>
         <div className="flex items-center gap-2">
@@ -71,7 +70,7 @@ const formatCurrency = (num) => {
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(num);
 };
 
-// --- (THÊM MỚI) Hàm tính tổng tiền cho từng item (giống logic tourSubtotal) ---
+// --- Hàm tính tổng tiền cho từng item (giống logic tourSubtotal) ---
 const calculateItemTotal = (item) =>
   (item.adults || 0) * (item.priceAdult || 0) +
   (item.children || 0) * (item.priceChild || 0) +
@@ -99,7 +98,6 @@ export default function Payment() {
     // State khác
     const [contactInfo, setContactInfo] = useState({ name: "", phone: "", email: "", address: "" });
     const [notes, setNotes] = useState("");
-    // (SỬA) Mặc định là 'direct'
     const [paymentMethod, setPaymentMethod] = useState("direct");
     const [selectedBranch, setSelectedBranch] = useState("VP Hà Nội: Số 123, Đường ABC, Quận Hoàn Kiếm");
     const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -108,9 +106,8 @@ export default function Payment() {
 
     // State Dịch vụ
     const [availableServices, setAvailableServices] = useState({ hotels: [], transport: [], flights: [] });
-    const [selectedHotel, setSelectedHotel] = useState('');
-    const [selectedTransport, setSelectedTransport] = useState('');
-    const [selectedFlight, setSelectedFlight] = useState('');
+    // (THAY THẾ) State Dịch vụ: Lưu theo key của item
+    const [selectedServices, setSelectedServices] = useState({}); // { [itemKey]: { hotel: '', transport: '', flight: '' } }
     const [loadingServices, setLoadingServices] = useState(true);
 
     // State Voucher
@@ -128,11 +125,10 @@ export default function Payment() {
     const displayItems = useMemo(() => {
         if (isBuyNow && buyNowTourData) {
             const departure = (departuresData[buyNowTourData.id] || []).find(d => d.id === buyNowDepartureId);
-            // (SỬA) Lấy giá bán (selling_price)
             const sellingPriceAdult = buyNowTourData.selling_price_adult || 0;
             const sellingPriceChild = buyNowTourData.selling_price_child || 0;
             const sellingPriceElder = buyNowTourData.selling_price_elder || 0;
-            const priceInfant = 0; // Trẻ sơ sinh free (theo yêu cầu)
+            const priceInfant = 0; 
 
             return [{
                 key: buyNowDepartureId || `buynow_${buyNowTourData.id}`,
@@ -149,17 +145,16 @@ export default function Payment() {
         } else {
             return cartItemsFromContext.map(item => {
                  const departure = (departuresData[item.tourId] || []).find(d => d.id === item.departure_id);
-                 // (SỬA) Lấy giá bán từ item trong cart
                  const sellingPriceAdult = item.selling_price_adult || item.priceAdult || 0;
                  const sellingPriceChild = item.selling_price_child || item.priceChild || 0;
-                 const sellingPriceElder = item.selling_price_elder || item.priceElder || sellingPriceAdult; // Fallback
-                 const priceInfant = 0; // Trẻ sơ sinh free (theo yêu cầu)
+                 const sellingPriceElder = item.selling_price_elder || item.priceElder || sellingPriceAdult; 
+                 const priceInfant = 0; 
 
                  return {
                     ...item,
                     priceAdult: sellingPriceAdult, priceChild: sellingPriceChild, priceElder: sellingPriceElder, priceInfant: priceInfant,
                     departure_id: item.departure_id, 
-                    departure_date: departure?.departure_date || item.departure_date, // Lấy từ departure hoặc từ item (nếu đã lưu)
+                    departure_date: departure?.departure_date || item.departure_date, 
                     max_slots: departure ? Math.max(0, (departure.max_slots || 0) - (departure.booked_slots || 0)) : undefined,
                  }
             });
@@ -172,7 +167,6 @@ export default function Payment() {
     // Tính Tạm tính (Chỉ tiền tour)
     const tourSubtotal = useMemo(() => {
         return displayItems.reduce((sum, item) => {
-            // (SỬA) Trẻ sơ sinh (infant) miễn phí
             const itemTotal = (item.adults * item.priceAdult) +
                               (item.children * item.priceChild) +
                               (item.elders * item.priceElder); // Infant free
@@ -180,10 +174,38 @@ export default function Payment() {
         }, 0);
     }, [displayItems]);
 
-    // Tính Phí dịch vụ
-    const selectedHotelCost = useMemo(() => availableServices.hotels.find(h => h.id === selectedHotel)?.price || 0, [selectedHotel, availableServices.hotels]);
-    const selectedTransportCost = useMemo(() => availableServices.transport.find(t => t.id === selectedTransport)?.price || 0, [selectedTransport, availableServices.transport]);
-    const selectedFlightCost = useMemo(() => availableServices.flights.find(f => f.id === selectedFlight)?.price || 0, [selectedFlight, availableServices.flights]);
+    // (THAY THẾ) Tính Phí dịch vụ (từ state mới)
+    const serviceCosts = useMemo(() => {
+        let hotel = 0;
+        let transport = 0;
+        let flight = 0;
+        
+        // Cần displayItems để biết số lượng khách (cho vé máy bay)
+        displayItems.forEach(item => {
+            const itemServices = selectedServices[item.key];
+            const guestsForItem = (item.adults || 0) + (item.children || 0) + (item.elders || 0) + (item.infants || 0);
+
+            if (itemServices) {
+                const hotelData = availableServices.hotels.find(h => h.id === itemServices.hotel);
+                if (hotelData) hotel += hotelData.price; // Giá KS/Xe tính 1 lần/dịch vụ
+                
+                const transportData = availableServices.transport.find(t => t.id === itemServices.transport);
+                if (transportData) transport += transportData.price;
+                
+                const flightData = availableServices.flights.find(f => f.id === itemServices.flight);
+                if (flightData && guestsForItem > 0) {
+                    // (QUAN TRỌNG) Vé máy bay tính theo đầu người của item đó
+                    flight += (flightData.price * guestsForItem); 
+                }
+            }
+        });
+        
+        return { hotel, transport, flight };
+    }, [selectedServices, availableServices.hotels, availableServices.transport, availableServices.flights, displayItems]); // Phụ thuộc vào displayItems
+
+    const selectedHotelCost = serviceCosts.hotel;
+    const selectedTransportCost = serviceCosts.transport;
+    const selectedFlightCost = serviceCosts.flight;
 
     // Tính Tổng cuối cùng
     const finalTotal = useMemo(() => {
@@ -192,16 +214,14 @@ export default function Payment() {
         return Math.max(0, afterDiscount);
     }, [tourSubtotal, selectedHotelCost, selectedTransportCost, selectedFlightCost, voucherDiscount]);
 
-    // Hạn thanh toán
+    // Hạn thanh toán (Giữ nguyên)
     const paymentDeadline = useMemo(() => {
         let dateToProcess = null;
         try {
-            // Ưu tiên ngày đã chọn
             const firstItemWithDate = displayItems.find(item => item.departure_date);
             if (firstItemWithDate) {
                 dateToProcess = firstItemWithDate.departure_date;
             }
-            // Nếu chưa chọn (cart), lấy ngày sớm nhất có thể
             else if (!isBuyNow && cartItemsFromContext.length > 0) {
                  const earliestPossibleDate = cartItemsFromContext
                     .flatMap(item => departuresData[item.tourId] || [])
@@ -222,7 +242,7 @@ export default function Payment() {
                 }
             }
         } catch (error) { console.error("Deadline error:", error); }
-        return null; // Trả về null nếu không tính được
+        return null; 
     }, [displayItems, isBuyNow, cartItemsFromContext, departuresData]);
 
     const formattedDeadline = useMemo(() => {
@@ -234,7 +254,7 @@ export default function Payment() {
     }, [paymentDeadline]);
 
     // --- useEffects ---
-    // 1. Lấy thông tin User
+    // 1. Lấy thông tin User (Giữ nguyên)
     useEffect(() => {
         if (currentUser) {
             setContactInfo(prev => ({
@@ -247,25 +267,22 @@ export default function Payment() {
         }
     }, [currentUser]);
 
-    // 2. Lấy Dịch vụ kèm theo (Theo yêu cầu: Dịch vụ đã được duyệt)
+    // 2. Lấy Dịch vụ kèm theo (Giữ nguyên)
     useEffect(() => {
         async function getApprovedServices() {
             setLoadingServices(true);
             const { data, error } = await supabase
                 .from('Products')
-                // (SỬA) Lấy thêm inventory
                 .select('id, name, price, product_type, details, inventory')
                 .neq('product_type', 'tour')
-                .eq('approval_status', 'approved') // <-- CHỈ LẤY ĐÃ DUYỆT
-                .eq('is_published', true); // Chỉ lấy dịch vụ đang hoạt động
+                .eq('approval_status', 'approved') 
+                .eq('is_published', true); 
 
             if (error) { toast.error("Lỗi tải dịch vụ kèm theo."); console.error(error); }
             else if (data) {
                 setAvailableServices({
                     hotels: data.filter(s => s.product_type === 'hotel'),
-                    // (SỬA) Lọc đúng 'transport'
                     transport: data.filter(s => s.product_type === 'transport'), 
-                    // (SỬA) Lọc đúng 'flight'
                     flights: data.filter(s => s.product_type === 'flight') 
                 });
             }
@@ -274,23 +291,23 @@ export default function Payment() {
         getApprovedServices();
     }, []);
 
-    // 3. Lấy Lịch khởi hành
+    // 3. Lấy Lịch khởi hành (Giữ nguyên)
     const fetchDeparturesForTour = useCallback(async (tourId) => {
-        if (!tourId || departuresData[tourId]) return; // Không fetch lại nếu đã có
+        if (!tourId || departuresData[tourId]) return; 
 
         setLoadingDepartures(prev => ({ ...prev, [tourId]: true }));
         const today = new Date().toISOString().split('T')[0];
         const { data, error } = await supabase
             .from("Departures")
-            .select("*") // Lấy tất cả thông tin departure
+            .select("*") 
             .eq("product_id", tourId)
-            .gte("departure_date", today) // Chỉ lấy ngày từ hôm nay trở đi
+            .gte("departure_date", today) 
             .order("departure_date", { ascending: true });
 
         if (error) { toast.error(`Lỗi tải lịch khởi hành.`); }
         else { setDeparturesData(prev => ({ ...prev, [tourId]: data || [] })); }
         setLoadingDepartures(prev => ({ ...prev, [tourId]: false }));
-    }, [departuresData]); // Phụ thuộc vào departuresData
+    }, [departuresData]); 
 
     useEffect(() => {
         const tourIdsToFetch = new Set();
@@ -306,14 +323,14 @@ export default function Payment() {
 
 
     // --- Handlers ---
-    // (SỬA) Tìm max_slots cho Buy Now
+    // (Giữ nguyên)
     const maxGuests = useMemo(() => {
-        if (!isBuyNow || !buyNowDepartureId) return Infinity; // Không giới hạn nếu chưa chọn
+        if (!isBuyNow || !buyNowDepartureId) return Infinity; 
         const departure = (departuresData[buyNowTourData.id] || []).find(d => d.id === buyNowDepartureId);
         return departure ? Math.max(0, (departure.max_slots || 0) - (departure.booked_slots || 0)) : Infinity;
     }, [isBuyNow, buyNowDepartureId, departuresData, buyNowTourData]);
     
-    // Thay đổi số lượng Buy Now
+    // (Giữ nguyên)
     const handleBuyNowQtyChange = (type, delta) => {
         const currentTotal = buyNowAdults + buyNowChildren + buyNowElders + buyNowInfants;
         const potentialTotal = currentTotal + delta;
@@ -336,11 +353,10 @@ export default function Payment() {
         if (delta < 0 && (type === 'adult' || type === 'elder') && currentAdultsAndElders === 1 && (buyNowChildren > 0 || buyNowInfants > 0)) {
             toast.error("Phải có ít nhất 1 người lớn hoặc người già đi kèm."); return;
         }
-        // Cho phép giảm người lớn/người già cuối cùng về 0 nếu không còn trẻ em/sơ sinh
         if (delta < 0 && (type === 'adult' || type === 'elder') && currentAdultsAndElders === 1 && newChildren === 0 && newInfants === 0) {
-             // Allow decreasing to 0 if no dependents
+             // Allow
         } else if (delta < 0 && (type === 'adult' && newAdults < 0) || (type === 'elder' && newElders < 0)) {
-             return; // Don't go below zero implicitly
+             return; 
         }
 
         setBuyNowAdults(newAdults);
@@ -349,7 +365,7 @@ export default function Payment() {
         setBuyNowInfants(newInfants);
     };
 
-    // Thay đổi số lượng Cart
+    // (Giữ nguyên)
     const handleCartQtyChange = (key, type, delta) => {
         const item = cartItemsFromContext.find(i => i.key === key);
         if (!item) return;
@@ -359,13 +375,11 @@ export default function Payment() {
         let newElders = item.elders || 0;
         let newInfants = item.infants || 0;
 
-        // Apply delta
         if (type === 'adult') newAdults = Math.max(0, newAdults + delta);
         if (type === 'child') newChildren = Math.max(0, newChildren + delta);
         if (type === 'elder') newElders = Math.max(0, newElders + delta);
         if (type === 'infant') newInfants = Math.max(0, newInfants + delta);
 
-        // Check total against max slots if departure is selected
         const departure = (departuresData[item.tourId] || []).find(d => d.id === item.departure_id);
         const itemMaxGuests = departure ? Math.max(0, (departure.max_slots || 0) - (departure.booked_slots || 0)) : undefined;
         const newTotalGuests = newAdults + newChildren + newElders + newInfants;
@@ -374,7 +388,6 @@ export default function Payment() {
              toast.error(`Chỉ còn tối đa ${itemMaxGuests} chỗ cho ngày đã chọn.`); return;
         }
 
-        // Validation
         if ((newAdults + newElders === 0) && (newChildren > 0 || newInfants > 0)) {
              toast.error("Phải có ít nhất 1 người lớn hoặc người già đi kèm."); return;
         }
@@ -382,15 +395,13 @@ export default function Payment() {
             toast.error("Phải có ít nhất 1 người lớn hoặc người già đi kèm."); return;
         }
 
-        // (SỬA) Gọi context update function (đúng thứ tự A, C, I, E)
         updateCartQty(key, newAdults, newChildren, newInfants, newElders); 
     };
 
-    // Chọn Lịch khởi hành cho Cart Item
+    // (Giữ nguyên)
     const handleCartDepartureSelect = (itemKey, departureId) => {
         if (updateCartItemDeparture) {
-            updateCartItemDeparture(itemKey, departureId); // Gọi hàm context để cập nhật
-             // Tải lại lịch trình để cập nhật max_slots (không bắt buộc nhưng tốt)
+            updateCartItemDeparture(itemKey, departureId); 
              const item = cartItemsFromContext.find(i => i.key === itemKey);
              if(item) fetchDeparturesForTour(item.tourId);
         } else {
@@ -399,21 +410,32 @@ export default function Payment() {
         }
     };
 
+    // (MỚI) Handler để cập nhật state dịch vụ
+    const handleServiceChange = (itemKey, serviceType, serviceId) => {
+        setSelectedServices(prev => ({
+            ...prev,
+            [itemKey]: {
+                ...prev[itemKey], // Giữ các dịch vụ khác của item này
+                [serviceType]: serviceId // Cập nhật dịch vụ cụ thể (hotel, transport, flight)
+            }
+        }));
+    };
+
     const handleInputChange = (e, setState) => {
         const { name, value } = e.target;
         setState(prev => ({ ...prev, [name]: value }));
     };
     const showNotification = (message, type = "error") => {
         setNotification({ message, type });
-        setTimeout(() => setNotification({ message: "", type: "" }), 4000); // Tăng thời gian hiển thị
+        setTimeout(() => setNotification({ message: "", type: "" }), 4000); 
     };
     
-    // (Giả lập)
+    // (Giữ nguyên)
     const handleApplyVoucher = async () => { 
         if (!voucherCode) return;
         setIsCheckingVoucher(true);
         setVoucherMessage({ type: '', text: '' });
-        await new Promise(res => setTimeout(res, 1000)); // Giả lập check DB
+        await new Promise(res => setTimeout(res, 1000)); 
         
         if (voucherCode === "TOURZEN10") {
             const discount = tourSubtotal * 0.1;
@@ -426,7 +448,7 @@ export default function Payment() {
         setIsCheckingVoucher(false);
     };
 
-    // --- (CẬP NHẬT) HÀM CHECKOUT (Thêm payment_method và điều hướng) ---
+    // --- (CẬP NHẬT) HÀM CHECKOUT (Logic dịch vụ và payload) ---
     const handleCheckout = async (e) => { 
         e.preventDefault();
 
@@ -449,18 +471,18 @@ export default function Payment() {
         setIsSubmitting(true);
         let bookingErrorOccurred = false;
         let successfulBookingIds = [];
-        const bookingPromises = []; // Khai báo mảng
-        const totalAllGuests = displayItems.reduce((sum, i) => sum + (i.adults || 0) + (i.children || 0) + (i.elders || 0) + (i.infants || 0), 0);
+        const bookingPromises = []; 
+        // (XÓA) totalAllGuests không cần ở đây nữa
 
-        // 2. Xử lý từng tour (Giữ nguyên logic RPC)
+        // 2. Xử lý từng tour
         for (const item of displayItems) {
             const numAdults = item.adults || 0;
             const numChildren = item.children || 0;
             const numElders = item.elders || 0;
             const numInfants = item.infants || 0;
-            const quantity = numAdults + numChildren + numElders + numInfants;
+            const quantity = numAdults + numChildren + numElders + numInfants; // Số khách cho item này
 
-            // 2.1. Gọi RPC giữ chỗ TOUR
+            // 2.1. Gọi RPC giữ chỗ TOUR (Giữ nguyên)
             const { data: bookedSuccess, error: rpcError } = await supabase.rpc('book_tour_slot', {
                 departure_id_input: item.departure_id,
                 guest_count_input: quantity
@@ -472,30 +494,47 @@ export default function Payment() {
                 break; 
         	 }
 
-            // 2.2. Giữ chỗ DỊCH VỤ (Giữ nguyên logic RPC)
-            if (item === displayItems[0]) {
-                const servicePromises = [];
-                if (selectedHotel) servicePromises.push(supabase.rpc('book_service_slot', { product_id_input: selectedHotel, quantity_input: 1 }));
-                if (selectedTransport) servicePromises.push(supabase.rpc('book_service_slot', { product_id_input: selectedTransport, quantity_input: 1 }));
-                if (selectedFlight) servicePromises.push(supabase.rpc('book_service_slot', { product_id_input: selectedFlight, quantity_input: totalAllGuests }));
+            // (THAY THẾ) 2.2. Giữ chỗ DỊCH VỤ (cho từng item)
+            const itemServices = selectedServices[item.key] || {};
+            const itemGuests = quantity; // Lấy số khách của item này
 
-                if (servicePromises.length > 0) {
-                    const serviceResults = await Promise.all(servicePromises);
-                    for (const result of serviceResults) {
-                        if (result.error || !result.data) { 
-                            console.error("Lỗi RPC book_service_slot:", result.error);
-                            toast.error("Lỗi: Một dịch vụ (Xe/KS/Vé) đã hết hàng.");
-                            bookingErrorOccurred = true;
-                            await supabase.rpc('book_tour_slot', { 
-                                departure_id_input: item.departure_id,
-                                guest_count_input: -quantity 
-                            });
-                            break; 
-                        }
+            const servicePromises = [];
+            if (itemServices.hotel) servicePromises.push(supabase.rpc('book_service_slot', { product_id_input: itemServices.hotel, quantity_input: 1 }));
+            if (itemServices.transport) servicePromises.push(supabase.rpc('book_service_slot', { product_id_input: itemServices.transport, quantity_input: 1 }));
+            // (SỬA) Tính vé máy bay theo số khách của item này
+            if (itemServices.flight && itemGuests > 0) servicePromises.push(supabase.rpc('book_service_slot', { product_id_input: itemServices.flight, quantity_input: itemGuests })); 
+
+            if (servicePromises.length > 0) {
+                const serviceResults = await Promise.all(servicePromises);
+                let serviceError = false;
+                for (const result of serviceResults) {
+                    if (result.error || !result.data) { 
+                        console.error("Lỗi RPC book_service_slot:", result.error);
+                        toast.error(`Lỗi: Dịch vụ cho tour "${item.title}" đã hết hàng.`);
+                        serviceError = true;
+                        break; 
                     }
                 }
+
+                // Nếu có lỗi dịch vụ -> rollback tour VÀ rollback dịch vụ (nếu lỡ book)
+                if (serviceError) {
+                    bookingErrorOccurred = true;
+                    // Rollback tour slot
+                    await supabase.rpc('book_tour_slot', { 
+                        departure_id_input: item.departure_id,
+                        guest_count_input: -quantity 
+                    });
+                    
+                    // (SỬA) Rollback services đã lỡ book
+                    console.warn(`ROLLBACK DỊCH VỤ cho ${item.title}...`);
+                    if(itemServices.hotel) supabase.rpc('book_service_slot', { product_id_input: itemServices.hotel, quantity_input: -1 });
+                    if(itemServices.transport) supabase.rpc('book_service_slot', { product_id_input: itemServices.transport, quantity_input: -1 });
+                    if(itemServices.flight && itemGuests > 0) supabase.rpc('book_service_slot', { product_id_input: itemServices.flight, quantity_input: -itemGuests });
+                    
+                    break; // Dừng vòng lặp for (const item...)
+                }
             }
-            if (bookingErrorOccurred) break;
+            // (HẾT THAY THẾ)
 
             // 2.3. Tạo bản ghi Booking nếu RPC thành công
             const itemTotalPrice = calculateItemTotal(item); 
@@ -507,14 +546,17 @@ export default function Payment() {
                 num_adult: numAdults, num_child: numChildren, num_elder: numElders, num_infant: numInfants,
                 total_price: itemTotalPrice, 
                 status: 'pending', notes: notes,
-                hotel_product_id: item === displayItems[0] ? selectedHotel || null : null,
-                transport_product_id: item === displayItems[0] ? selectedTransport || null : null,
-                flight_product_id: item === displayItems[0] ? selectedFlight || null : null,
+                
+                // (THAY THẾ) Gán dịch vụ của item này
+                hotel_product_id: itemServices.hotel || null,
+                transport_product_id: itemServices.transport || null,
+                flight_product_id: itemServices.flight || null,
+                // (HẾT THAY THẾ)
+
+                // (Giữ nguyên) Voucher chỉ áp dụng cho item đầu tiên
                 voucher_code: item === displayItems[0] ? voucherCode || null : null,
                 voucher_discount: item === displayItems[0] ? voucherDiscount || 0 : 0,
-                // --- (THÊM MỚI) ---
                 payment_method: paymentMethod 
-                // --- (HẾT THÊM MỚI) ---
             };
             bookingPromises.push(
                 supabase.from('Bookings').insert(bookingPayload).select('id')
@@ -534,48 +576,51 @@ export default function Payment() {
                 if (!isBuyNow) clearCart(); 
                 toast.success("Đã giữ chỗ thành công!");
                 
-                // --- (CẬP NHẬT) Điều hướng dựa trên paymentMethod ---
+                // Điều hướng (Giữ nguyên)
                 if (paymentMethod === 'virtual_qr') {
-                    // Đi đến trang thanh toán ảo
                     navigate('/virtual-payment', { 
                         state: { 
                             bookingIds: successfulBookingIds,
-                            finalTotal: finalTotal, // Tổng tiền cuối cùng
-                            contactInfo: contactInfo, // Thông tin liên lạc
+                            finalTotal: finalTotal, 
+                            contactInfo: contactInfo, 
                             deadline: formattedDeadline
                         } 
                     });
                 } else {
-                    // Đi đến trang thành công (cho 'direct')
                     navigate('/booking-success', { 
                         state: { 
                             bookingIds: successfulBookingIds,
                             method: paymentMethod,
                             branch: selectedBranch,
                             deadline: formattedDeadline,
-                            total: finalTotal // (Thêm) Gửi tổng tiền
+                            total: finalTotal 
                         } 
                     });
                 }
-                // --- (HẾT CẬP NHẬT) ---
 
             } catch (insertError) { 
                  console.error("Lỗi insert Bookings:", insertError);
                  toast.error("Lỗi khi lưu đơn hàng. Đang thử hoàn lại chỗ...");
                  bookingErrorOccurred = true;
                  
-                 // Rollback (Giữ nguyên)
+                 // (CẬP NHẬT) Rollback
                  console.warn("ĐANG THỬ ROLLBACK...");
                  for (const item of displayItems) {
+                     // Rollback Tour
                      const quantity = (item.adults || 0) + (item.children || 0) + (item.elders || 0) + (item.infants || 0);
                      supabase.rpc('book_tour_slot', { 
                         departure_id_input: item.departure_id,
                         guest_count_input: -quantity 
                      });
+
+                     // (THAY THẾ) Rollback Dịch vụ theo từng item
+                     const itemServices = selectedServices[item.key] || {};
+                     const itemGuests = quantity;
+                     
+                     if(itemServices.hotel) supabase.rpc('book_service_slot', { product_id_input: itemServices.hotel, quantity_input: -1 });
+                     if(itemServices.transport) supabase.rpc('book_service_slot', { product_id_input: itemServices.transport, quantity_input: -1 });
+                     if(itemServices.flight && itemGuests > 0) supabase.rpc('book_service_slot', { product_id_input: itemServices.flight, quantity_input: -itemGuests });
                  }
-                 if(selectedHotel) supabase.rpc('book_service_slot', { product_id_input: selectedHotel, quantity_input: -1 });
-                 if(selectedTransport) supabase.rpc('book_service_slot', { product_id_input: selectedTransport, quantity_input: -1 });
-                 if(selectedFlight) supabase.rpc('book_service_slot', { product_id_input: selectedFlight, quantity_input: -totalAllGuests });
             }
         }
         setIsSubmitting(false);
@@ -583,6 +628,7 @@ export default function Payment() {
     // --- KẾT THÚC CHECKOUT ---
 
     // --- Render ---
+    // (Giữ nguyên)
     if (!isBuyNow && cartItemsFromContext.length === 0) {
         return (
             <div className="text-center py-20 max-w-lg mx-auto">
@@ -604,7 +650,6 @@ export default function Payment() {
     return (
         <div className="bg-gray-100 dark:bg-neutral-900 min-h-screen py-8 px-4 sm:px-6 lg:px-8">
              <div className="max-w-7xl mx-auto">
-                 {/* Header */}
                  <div className="text-center mb-8"> 
                     <h1 className="text-3xl font-bold text-gray-800 dark:text-white">XÁC NHẬN ĐẶT TOUR</h1> 
                  </div>
@@ -612,7 +657,7 @@ export default function Payment() {
                  <form onSubmit={handleCheckout} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                      {/* Cột Trái */}
                      <div className="lg:col-span-2 space-y-6">
-                        {/* Mục Tour & Số lượng (Giữ nguyên JSX) */}
+                        {/* Mục Tour & Số lượng */}
                         <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg overflow-hidden border dark:border-neutral-700">
                             <h2 className="text-xl font-semibold p-5 border-b dark:border-neutral-700 flex items-center gap-2 text-gray-800 dark:text-white">
                                 <FaUmbrellaBeach className="text-sky-500" />
@@ -626,110 +671,190 @@ export default function Payment() {
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                     exit={{ opacity: 0 }}
-                                    className="flex flex-col md:flex-row p-5 gap-6 border-b dark:border-neutral-700 last:border-b-0"
+                                    // (SỬA) Tách riêng phần thông tin và dịch vụ
+                                    className="p-5 border-b dark:border-neutral-700 last:border-b-0"
                                 >
-                                    {/* 1. Thông tin & Giá */}
-                                    <div className="flex-shrink-0 w-full md:w-1/3 lg:w-1/4">
-                                        <img 
-                                            src={item.image} 
-                                            alt={item.title} 
-                                            className="w-full h-40 object-cover rounded-lg shadow-md"
-                                            onError={(e) => { e.target.onerror = null; e.target.src='/images/default.jpg'; }}
-                                        />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="text-lg font-bold text-gray-800 dark:text-white truncate">{item.title}</h3>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1.5 mt-1">
-                                            <FaMapMarkerAlt size={12}/> {item.location}
-                                        </p>
-                                        
-                                        <p className="text-2xl font-bold text-red-600 dark:text-red-500 mt-3">
-                                            {formatCurrency(calculateItemTotal(item))}
-                                        </p>
-                                        <p className="text-xs text-gray-500 italic">(Tổng cho mục này)</p>
+                                    <div 
+                                        className="flex flex-col md:flex-row gap-6"
+                                    >
+                                        {/* 1. Thông tin & Giá */}
+                                        <div className="flex-shrink-0 w-full md:w-1/3 lg:w-1/4">
+                                            <img 
+                                                src={item.image} 
+                                                alt={item.title} 
+                                                className="w-full h-40 object-cover rounded-lg shadow-md"
+                                                onError={(e) => { e.target.onerror = null; e.target.src='/images/default.jpg'; }}
+                                            />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="text-lg font-bold text-gray-800 dark:text-white truncate">{item.title}</h3>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1.5 mt-1">
+                                                <FaMapMarkerAlt size={12}/> {item.location}
+                                            </p>
+                                            
+                                            <p className="text-2xl font-bold text-red-600 dark:text-red-500 mt-3">
+                                                {formatCurrency(calculateItemTotal(item))}
+                                            </p>
+                                            <p className="text-xs text-gray-500 italic">(Tổng cho mục này)</p>
+                                        </div>
+
+                                        {/* 2. Chọn Lịch & Số lượng */}
+                                        <div className="w-full md:w-1/2 lg:w-1/3 space-y-4">
+                                            {/* Chọn Lịch Khởi hành */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                                                    <FaCalendarAlt className="inline-block mr-1.5 text-sky-500" />
+                                                    Chọn ngày khởi hành
+                                                </label>
+                                                {loadingDepartures[item.tourId] ? (
+                                                    <div className="flex items-center gap-2 text-gray-500">
+                                                        <CircleNotch size={18} className="animate-spin" /> Đang tải lịch...
+                                                    </div>
+                                                ) : (
+                                                    <select 
+                                                        value={isBuyNow ? (buyNowDepartureId || '') : (item.departure_id || '')}
+                                                        onChange={(e) => {
+                                                            const depId = e.target.value;
+                                                            if (isBuyNow) setBuyNowDepartureId(depId);
+                                                            else handleCartDepartureSelect(item.key, depId);
+                                                        }}
+                                                        className="input-style w-full"
+                                                        required
+                                                    >
+                                                        <option value="" disabled>-- Vui lòng chọn ngày đi --</option>
+                                                        {(departuresData[item.tourId] || []).map(dep => {
+                                                            const remaining = Math.max(0, (dep.max_slots || 0) - (dep.booked_slots || 0));
+                                                            return (
+                                                                <option key={dep.id} value={dep.id} disabled={remaining === 0}>
+                                                                    {dep.departure_date} (Còn {remaining} chỗ)
+                                                                </option>
+                                                            );
+                                                        })}
+                                                        {(departuresData[item.tourId] || []).length === 0 && (
+                                                            <option value="" disabled>Không có lịch khởi hành sắp tới</option>
+                                                        )}
+                                                    </select>
+                                                )}
+                                            </div>
+                                            
+                                            {/* Chọn Số lượng */}
+                                            <div className="space-y-2 border-t dark:border-neutral-700 pt-4">
+                                                <QuantityInput 
+                                                    label="Người lớn" icon={FaUser}
+                                                    value={isBuyNow ? buyNowAdults : item.adults}
+                                                    onIncrease={() => isBuyNow ? handleBuyNowQtyChange('adult', 1) : handleCartQtyChange(item.key, 'adult', 1)}
+                                                    onDecrease={() => isBuyNow ? handleBuyNowQtyChange('adult', -1) : handleCartQtyChange(item.key, 'adult', -1)}
+                                                    max={isBuyNow ? maxGuests : item.max_slots}
+                                                    min={0}
+                                                />
+                                                <QuantityInput 
+                                                    label="Người già" icon={FaUserTie}
+                                                    value={isBuyNow ? buyNowElders : item.elders}
+                                                    onIncrease={() => isBuyNow ? handleBuyNowQtyChange('elder', 1) : handleCartQtyChange(item.key, 'elder', 1)}
+                                                    onDecrease={() => isBuyNow ? handleBuyNowQtyChange('elder', -1) : handleCartQtyChange(item.key, 'elder', -1)}
+                                                    max={isBuyNow ? maxGuests : item.max_slots}
+                                                    min={0}
+                                                />
+                                                <QuantityInput 
+                                                    label="Trẻ em" icon={FaChild}
+                                                    value={isBuyNow ? buyNowChildren : item.children}
+                                                    onIncrease={() => isBuyNow ? handleBuyNowQtyChange('child', 1) : handleCartQtyChange(item.key, 'child', 1)}
+                                                    onDecrease={() => isBuyNow ? handleBuyNowQtyChange('child', -1) : handleCartQtyChange(item.key, 'child', -1)}
+                                                    max={isBuyNow ? maxGuests : item.max_slots}
+                                                    min={0}
+                                                />
+                                                <QuantityInput 
+                                                    label="Trẻ sơ sinh (Free)" icon={FaBaby}
+                                                    value={isBuyNow ? buyNowInfants : item.infants}
+                                                    onIncrease={() => isBuyNow ? handleBuyNowQtyChange('infant', 1) : handleCartQtyChange(item.key, 'infant', 1)}
+                                                    onDecrease={() => isBuyNow ? handleBuyNowQtyChange('infant', -1) : handleCartQtyChange(item.key, 'infant', -1)}
+                                                    max={isBuyNow ? maxGuests : item.max_slots}
+                                                    min={0}
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
 
-                                    {/* 2. Chọn Lịch & Số lượng */}
-                                    <div className="w-full md:w-1/2 lg:w-1/3 space-y-4">
-                                        {/* Chọn Lịch Khởi hành */}
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                                                <FaCalendarAlt className="inline-block mr-1.5 text-sky-500" />
-                                                Chọn ngày khởi hành
-                                            </label>
-                                            {loadingDepartures[item.tourId] ? (
-                                                <div className="flex items-center gap-2 text-gray-500">
-                                                    <CircleNotch size={18} className="animate-spin" /> Đang tải lịch...
-                                                </div>
-                                            ) : (
-                                                <select 
-                                                    value={isBuyNow ? (buyNowDepartureId || '') : (item.departure_id || '')}
-                                                    onChange={(e) => {
-                                                        const depId = e.target.value;
-                                                        if (isBuyNow) setBuyNowDepartureId(depId);
-                                                        else handleCartDepartureSelect(item.key, depId);
-                                                    }}
-                                                    className="input-style w-full"
-                                                    required
-                                                >
-                                                    <option value="" disabled>-- Vui lòng chọn ngày đi --</option>
-                                                    {(departuresData[item.tourId] || []).map(dep => {
-                                                        const remaining = Math.max(0, (dep.max_slots || 0) - (dep.booked_slots || 0));
-                                                        return (
-                                                            <option key={dep.id} value={dep.id} disabled={remaining === 0}>
-                                                                {dep.departure_date} (Còn {remaining} chỗ)
-                                                            </option>
-                                                        );
-                                                    })}
-                                                    {(departuresData[item.tourId] || []).length === 0 && (
-                                                        <option value="" disabled>Không có lịch khởi hành sắp tới</option>
+                                    {/* (DI CHUYỂN) Dịch vụ cộng thêm cho item NÀY */}
+                                    {(availableServices.hotels.length > 0 || availableServices.transport.length > 0 || availableServices.flights.length > 0) && (
+                                        <div className="mt-6 pt-4 border-t dark:border-neutral-700">
+                                            <h4 className="text-md font-semibold mb-3 text-gray-800 dark:text-white flex items-center gap-2">
+                                                <FaPlus className="text-sky-500" size={16}/> 
+                                                Dịch vụ cộng thêm cho tour này (Tùy chọn)
+                                            </h4>
+                                            {loadingServices ? <div className="text-center"><CircleNotch size={24} className="animate-spin text-sky-500"/></div> : (
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                    {/* Khách sạn */}
+                                                    {availableServices.hotels.length > 0 && (
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5"><Buildings/> Khách sạn</label>
+                                                            <select 
+                                                                // (SỬA) Dùng state object
+                                                                value={selectedServices[item.key]?.hotel || ''} 
+                                                                // (SỬA) Dùng handler mới
+                                                                onChange={(e) => handleServiceChange(item.key, 'hotel', e.target.value)} 
+                                                                className="input-style w-full"
+                                                            >
+                                                                <option value="">Không chọn</option>
+                                                                {availableServices.hotels.map(s => 
+                                                                    <option key={s.id} value={s.id} disabled={s.inventory <= 0}>
+                                                                        {s.name} ({formatCurrency(s.price)})
+                                                                        {s.inventory <= 0 ? ' (Hết hàng)' : ` (Còn ${s.inventory})`}
+                                                                    </option>
+                                                                )}
+                                                            </select>
+                                                        </div>
                                                     )}
-                                                </select>
+                                                    {/* Di chuyển */}
+                                                    {availableServices.transport.length > 0 && (
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5"><FaCar/> Di chuyển</label>
+                                                            <select 
+                                                                value={selectedServices[item.key]?.transport || ''} 
+                                                                onChange={(e) => handleServiceChange(item.key, 'transport', e.target.value)}
+                                                                className="input-style w-full"
+                                                            >
+                                                                <option value="">Không chọn</option>
+                                                                {availableServices.transport.map(s => 
+                                                                    <option key={s.id} value={s.id} disabled={s.inventory <= 0}>
+                                                                        {s.name} ({formatCurrency(s.price)})
+                                                                        {s.inventory <= 0 ? ' (Hết hàng)' : ` (Còn ${s.inventory})`}
+                                                                    </option>
+                                                                )}
+                                                            </select>
+                                                        </div>
+                                                    )}
+                                                    {/* Máy bay */}
+                                                    {availableServices.flights.length > 0 && (
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5"><FaPlane/> Vé máy bay</label>
+                                                            <select 
+                                                                value={selectedServices[item.key]?.flight || ''} 
+                                                                onChange={(e) => handleServiceChange(item.key, 'flight', e.target.value)} 
+                                                                className="input-style w-full"
+                                                            >
+                                                                <option value="">Không chọn</option>
+                                                                {availableServices.flights.map(s => 
+                                                                    <option key={s.id} value={s.id} disabled={s.inventory <= 0}>
+                                                                        {s.name} ({formatCurrency(s.price)})
+                                                                        {s.inventory <= 0 ? ' (Hết hàng)' : ` (Còn ${s.inventory})`}
+                                                                    </option>
+                                                                )}
+                                                            </select>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             )}
                                         </div>
-                                        
-                                        {/* Chọn Số lượng */}
-                                        <div className="space-y-2 border-t dark:border-neutral-700 pt-4">
-                                            <QuantityInput 
-                                                label="Người lớn" icon={FaUser}
-                                                value={isBuyNow ? buyNowAdults : item.adults}
-                                                onIncrease={() => isBuyNow ? handleBuyNowQtyChange('adult', 1) : handleCartQtyChange(item.key, 'adult', 1)}
-                                                onDecrease={() => isBuyNow ? handleBuyNowQtyChange('adult', -1) : handleCartQtyChange(item.key, 'adult', -1)}
-                                                max={isBuyNow ? maxGuests : item.max_slots}
-                                                min={0}
-                                            />
-                                            <QuantityInput 
-                                                label="Người già" icon={FaUserTie}
-                                                value={isBuyNow ? buyNowElders : item.elders}
-                                                onIncrease={() => isBuyNow ? handleBuyNowQtyChange('elder', 1) : handleCartQtyChange(item.key, 'elder', 1)}
-                                                onDecrease={() => isBuyNow ? handleBuyNowQtyChange('elder', -1) : handleCartQtyChange(item.key, 'elder', -1)}
-                                                max={isBuyNow ? maxGuests : item.max_slots}
-                                                min={0}
-                                            />
-                                            <QuantityInput 
-                                                label="Trẻ em" icon={FaChild}
-                                                value={isBuyNow ? buyNowChildren : item.children}
-                                                onIncrease={() => isBuyNow ? handleBuyNowQtyChange('child', 1) : handleCartQtyChange(item.key, 'child', 1)}
-                                                onDecrease={() => isBuyNow ? handleBuyNowQtyChange('child', -1) : handleCartQtyChange(item.key, 'child', -1)}
-                                                max={isBuyNow ? maxGuests : item.max_slots}
-                                                min={0}
-                                            />
-                                            <QuantityInput 
-                                                label="Trẻ sơ sinh (Free)" icon={FaBaby}
-                                                value={isBuyNow ? buyNowInfants : item.infants}
-                                                onIncrease={() => isBuyNow ? handleBuyNowQtyChange('infant', 1) : handleCartQtyChange(item.key, 'infant', 1)}
-                                                onDecrease={() => isBuyNow ? handleBuyNowQtyChange('infant', -1) : handleCartQtyChange(item.key, 'infant', -1)}
-                                                max={isBuyNow ? maxGuests : item.max_slots}
-                                                min={0}
-                                            />
-                                        </div>
-                                    </div>
+                                    )}
+                                    {/* (HẾT DI CHUYỂN) */}
+
                                 </motion.div>
                             ))}
                             </AnimatePresence>
                         </div>
                         
-                        {/* Thông tin liên lạc (Giữ nguyên JSX) */}
+                        {/* Thông tin liên lạc (Giữ nguyên) */}
                         <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg p-5 border dark:border-neutral-700">
                            <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white flex items-center gap-2"><FaUserFriends className="text-sky-500"/> THÔNG TIN LIÊN LẠC</h2>
                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -741,82 +866,23 @@ export default function Payment() {
                            <p className="text-xs text-gray-500 mt-3 italic">* Thông tin bắt buộc</p>
                         </div>
                         
-                        {/* Dịch vụ cộng thêm (Giữ nguyên JSX) */}
-                        {(availableServices.hotels.length > 0 || availableServices.transport.length > 0 || availableServices.flights.length > 0) && (
-                           <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg p-5 border dark:border-neutral-700">
-                               <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white flex items-center gap-2"><FaPlus className="text-sky-500"/> DỊCH VỤ CỘNG THÊM (Tùy chọn)</h2>
-                               {loadingServices ? <div className="text-center"><CircleNotch size={24} className="animate-spin text-sky-500"/></div> : (
-                                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                       {/* Khách sạn */}
-                                       {availableServices.hotels.length > 0 && (
-                                           <div>
-                                               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5"><Buildings/> Khách sạn</label>
-                                               <select value={selectedHotel} onChange={(e) => setSelectedHotel(e.target.value)} className="input-style w-full">
-                                                    <option value="">Không chọn</option>
-                                                    {availableServices.hotels.map(s => 
-                                                        <option key={s.id} value={s.id} disabled={s.inventory <= 0}>
-                                                            {s.name} ({formatCurrency(s.price)})
-                                                            {s.inventory <= 0 ? ' (Hết hàng)' : ` (Còn ${s.inventory})`}
-                                                        </option>
-                                                    )}
-                                               </select>
-                                           </div>
-                                       )}
-                                       {/* Di chuyển */}
-                                       {availableServices.transport.length > 0 && (
-                                           <div>
-                                               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5"><FaCar/> Di chuyển</label>
-                                               <select value={selectedTransport} onChange={(e) => setSelectedTransport(e.target.value)} className="input-style w-full">
-                                                    <option value="">Không chọn</option>
-                                                    {availableServices.transport.map(s => 
-                                                        <option key={s.id} value={s.id} disabled={s.inventory <= 0}>
-                                                            {s.name} ({formatCurrency(s.price)})
-                                                            {s.inventory <= 0 ? ' (Hết hàng)' : ` (Còn ${s.inventory})`}
-                                                        </option>
-                                                    )}
-                                               </select>
-                                           </div>
-                                       )}
-                                       {/* Máy bay */}
-                                       {availableServices.flights.length > 0 && (
-                                           <div>
-                                               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5"><FaPlane/> Vé máy bay</label>
-                                               <select value={selectedFlight} onChange={(e) => setSelectedFlight(e.target.value)} className="input-style w-full">
-                                                    <option value="">Không chọn</option>
-                                                    {availableServices.flights.map(s => 
-                                                        <option key={s.id} value={s.id} disabled={s.inventory <= 0}>
-                                                            {s.name} ({formatCurrency(s.price)})
-                                                            {s.inventory <= 0 ? ' (Hết hàng)' : ` (Còn ${s.inventory})`}
-                                                        </option>
-                                                    )}
-                                               </select>
-                                           </div>
-                                       )}
-                                   </div>
-                               )}
-                           </div>
-                        )}
+                        {/* (ĐÃ DI CHUYỂN) Khối dịch vụ cộng thêm gốc đã bị xóa khỏi đây */}
                         
-                        {/* Ghi chú (Giữ nguyên JSX) */}
+                        {/* Ghi chú (Giữ nguyên) */}
                         <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg p-5 border dark:border-neutral-700">
-                           <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">GHI CHÚ</h2>
-                           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Yêu cầu đặc biệt (ví dụ: ăn chay, phòng tầng cao...)" className="input-style w-full h-24" />
+                           <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">GHI CHÚ CHUNG</h2>
+                           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Yêu cầu đặc biệt chung cho tất cả các tour (ví dụ: liên hệ qua email...)" className="input-style w-full h-24" />
                         </div>
                         
-                        {/* (CẬP NHẬT) Phương thức thanh toán */}
+                        {/* Phương thức thanh toán (Giữ nguyên) */}
                         <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg p-5 border dark:border-neutral-700">
                             <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">PHƯƠNG THỨC THANH TOÁN</h2>
                             <div className="space-y-3">
-                                {/* 1. Trực tiếp */}
                                 <label className="flex items-center p-3 border dark:border-neutral-600 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-700/50 cursor-pointer transition-colors">
                                     <input type="radio" name="paymentMethod" value="direct" checked={paymentMethod === "direct"} onChange={(e) => setPaymentMethod(e.target.value)} className="mr-3 text-sky-600 focus:ring-sky-500"/>
                                     <Bank size={20} className="mr-2 text-sky-600 dark:text-sky-400" />
                                     <span className="font-medium dark:text-white">Thanh toán trực tiếp tại văn phòng</span>
                                 </label>
-                                
-                                {/* 2. (BỊ XÓA: Chuyển khoản Admin) */}
-
-                                {/* 3. QR Ảo */}
                                 <label className="flex items-center p-3 border dark:border-neutral-600 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-700/50 cursor-pointer transition-colors">
                                     <input type="radio" name="paymentMethod" value="virtual_qr" checked={paymentMethod === "virtual_qr"} onChange={(e) => setPaymentMethod(e.target.value)} className="mr-3 text-sky-600 focus:ring-sky-500"/>
                                     <QrCode size={20} className="mr-2 text-sky-600 dark:text-sky-400" />
@@ -826,7 +892,7 @@ export default function Payment() {
                         </div>
                      </div>
 
-                     {/* Cột Phải: Tóm tắt (Giữ nguyên JSX) */}
+                     {/* Cột Phải: Tóm tắt (Giữ nguyên) */}
                      <aside className="lg:col-span-1">
                          <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg border dark:border-neutral-700 p-5 sticky top-24">
                              <h2 className="text-xl font-semibold mb-4 pb-4 border-b dark:border-neutral-700 text-gray-800 dark:text-white">TÓM TẮT ĐƠN HÀNG</h2>
@@ -844,15 +910,16 @@ export default function Payment() {
                                         ))}
                                     </div>
                                     
-                                    {/* Chi tiết Giá & Voucher */}
+                                    {/* (CẬP NHẬT) Chi tiết Giá & Voucher (Các biến cost đã được cập nhật) */}
                                     <div className="space-y-2 text-sm border-t dark:border-neutral-700 pt-4">
                                         <div className="flex justify-between"><span className="text-gray-600 dark:text-gray-400">Tổng khách:</span> <span className="font-medium dark:text-white">{totalPassengers}</span></div>
                                         <div className="flex justify-between"><span className="text-gray-600 dark:text-gray-400">Tạm tính (Tour):</span> <span className="font-medium dark:text-white">{formatCurrency(tourSubtotal)}</span></div>
                                         
-                                        {selectedHotelCost > 0 && <div className="flex justify-between"><span className="text-gray-600 dark:text-gray-400">Khách sạn:</span> <span className="font-medium dark:text-white">{formatCurrency(selectedHotelCost)}</span></div>}
-                                        {selectedTransportCost > 0 && <div className="flex justify-between"><span className="text-gray-600 dark:text-gray-400">Di chuyển:</span> <span className="font-medium dark:text-white">{formatCurrency(selectedTransportCost)}</span></div>}
-                                        {selectedFlightCost > 0 && <div className="flex justify-between"><span className="text-gray-600 dark:text-gray-400">Vé máy bay:</span> <span className="font-medium dark:text-white">{formatCurrency(selectedFlightCost)}</span></div>}
+                                        {selectedHotelCost > 0 && <div className="flex justify-between"><span className="text-gray-600 dark:text-gray-400">Khách sạn (Tổng):</span> <span className="font-medium dark:text-white">{formatCurrency(selectedHotelCost)}</span></div>}
+                                        {selectedTransportCost > 0 && <div className="flex justify-between"><span className="text-gray-600 dark:text-gray-400">Di chuyển (Tổng):</span> <span className="font-medium dark:text-white">{formatCurrency(selectedTransportCost)}</span></div>}
+                                        {selectedFlightCost > 0 && <div className="flex justify-between"><span className="text-gray-600 dark:text-gray-400">Vé máy bay (Tổng):</span> <span className="font-medium dark:text-white">{formatCurrency(selectedFlightCost)}</span></div>}
                                         
+                                        {/* Voucher (Giữ nguyên) */}
                                         <div className="pt-2">
                                             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Mã giảm giá</label>
                                             <div className="flex gap-2">
@@ -869,13 +936,13 @@ export default function Payment() {
                                         )}
                                     </div>
                                     
-                                    {/* Tổng cuối cùng */}
+                                    {/* Tổng cuối cùng (Giữ nguyên) */}
                                     <div className="mt-4 pt-4 border-t dark:border-neutral-700 flex justify-between items-center">
                                         <span className="text-lg font-semibold dark:text-white">Tổng cộng</span>
                                         <span className="text-2xl font-bold text-red-600">{formatCurrency(finalTotal)}</span>
                                     </div>
                                     
-                                    {/* Điều khoản & Nút Submit */}
+                                    {/* Điều khoản & Nút Submit (Giữ nguyên) */}
                                     <div className="mt-6">
                                         <label className="flex items-center text-sm text-gray-600 dark:text-gray-400">
                                             <input type="checkbox" checked={agreedToTerms} onChange={(e) => setAgreedToTerms(e.target.checked)} className="mr-2 text-sky-600 focus:ring-sky-500 rounded" />
@@ -898,7 +965,7 @@ export default function Payment() {
                  </form>
              </div>
              
-             {/* Notification (Giữ nguyên JSX) */}
+             {/* Notification (Giữ nguyên) */}
              <AnimatePresence>
                 {notification.message && (
                     <motion.div
@@ -912,7 +979,7 @@ export default function Payment() {
                 )}
              </AnimatePresence>
              
-             {/* Styles (Giữ nguyên JSX) */}
+             {/* Styles (Giữ nguyên) */}
              <style jsx>{`
                 .input-style { @apply border border-gray-300 p-2 rounded-md w-full dark:bg-neutral-700 dark:border-neutral-600 dark:text-white focus:ring-sky-500 focus:border-sky-500 transition-colors duration-200 text-sm; }
                 .button-secondary { @apply px-4 py-2 bg-neutral-200 dark:bg-neutral-600 rounded-md font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-500 dark:text-neutral-900 dark:text-neutral-100 text-sm disabled:opacity-50; }

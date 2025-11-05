@@ -1,6 +1,7 @@
 // src/pages/Home.jsx
 // (Phiên bản nâng cấp: Cải thiện giao diện với thêm gradient, shadow sâu hơn, hiệu ứng hover mượt mà hơn, và animation phức tạp hơn với framer-motion)
 // (Giữ nguyên cấu trúc, chỉ nâng cấp visual và effects)
+// (SỬA THEO YÊU CẦU: Thêm Popup yêu cầu xác thực CMND)
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
@@ -9,6 +10,10 @@ import { getSupabase } from "../lib/supabaseClient"; // Import Supabase
 import { FaMapMarkerAlt, FaStar, FaAward, FaHeadset, FaTags } from "react-icons/fa";
 // (SỬA v2) Thêm Gift (Quà)
 import { MapPin, Clock, Fire, Sun, CircleNotch, Ticket, ArrowRight, Star as PhosphorStar, Gift } from "@phosphor-icons/react";
+
+// *** IMPORT POPUP MỚI ***
+// (Hãy chắc chắn đường dẫn này đúng với cấu trúc dự án của bạn)
+import IdentityPromptPopup from '../components/IdentityPromptPopup'; 
 
 // Swiper
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -335,6 +340,10 @@ export default function Home() {
 
   return (
     <div className="bg-gradient-to-b from-slate-50 to-white dark:from-neutral-900 dark:to-neutral-800 text-slate-800 dark:text-neutral-200 overflow-x-hidden">
+      
+      {/* *** THÊM POPUP VÀO ĐÂY *** */}
+      <IdentityPromptPopup />
+
       {/* <FlyingPlane /> */} {/* (Tùy chọn) */}
 
       {/* SLIDE GIỚI THIỆU */}

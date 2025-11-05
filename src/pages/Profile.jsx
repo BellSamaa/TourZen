@@ -606,7 +606,7 @@ const IdentityForm = ({ user, session, identity, loading, onRefresh }) => {
   );
 };
 
-/* ------------------ AvatarBannerManager (SỬA LỖI THEO YÊU CẦU) ------------------ */
+/* ------------------ AvatarBannerManager (ĐÃ SỬA LỖI UPLOAD) ------------------ */
 // 1. (Fix) Trỏ đến bảng 'Users' thay vì 'user_identity' (dựa theo ảnh Supabase)
 // 2. (Fix) Gỡ bỏ check 'session' để "User ảo" (không có session) có thể fetch và upload
 const AvatarBannerManager = ({ user, refreshUser, session }) => {
@@ -673,6 +673,8 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
     else setIsBannerCropOpen(true);
   };
 
+  // *** SỬA LỖI (FIX) NÚT TẢI LÊN ***
+  // (Lỗi là do tạo 'new File()' từ 'blob'. Sửa bằng cách upload 'blob' trực tiếp.)
   const uploadCropped = async () => {
     if (!imageSrc || !croppedAreaPixels || !currentUploadType) {
       toast.error('Không có ảnh hoặc vùng cắt.');
@@ -680,12 +682,13 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
     }
     setIsUploading(true);
     try {
-      const blob = await getCroppedImg(imageSrc, croppedAreaPixels);
+      const blob = await getCroppedImg(imageSrc, croppedAreaPixels); // 1. Lấy blob đã crop
       const fileName = `${user.id}-${currentUploadType}-${Date.now()}.jpg`;
-      const file = new File([blob], fileName, { type: 'image/jpeg' });
+      // const file = new File([blob], fileName, { type: 'image/jpeg' }); // <-- DÒNG NÀY GÂY LỖI (XÓA ĐI)
       const bucket = currentUploadType === 'avatar' ? 'avatars' : 'banners';
       
-      const { error: uploadError } = await supabase.storage.from(bucket).upload(fileName, file, { contentType: 'image/jpeg' });
+      // 2. Sửa: Tải 'blob' lên trực tiếp, thay vì 'file'
+      const { error: uploadError } = await supabase.storage.from(bucket).upload(fileName, blob, { contentType: 'image/jpeg' });
       if (uploadError) throw uploadError;
 
       const updates = currentUploadType === 'avatar' ? { avatar_url: fileName } : { banner_url: fileName };
@@ -720,6 +723,7 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
       setIsUploading(false);
     }
   };
+  // *** KẾT THÚC SỬA LỖI ***
 
   const handleAvatarFileSelected = async (e) => {
     const f = e.target.files?.[0];
