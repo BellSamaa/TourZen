@@ -1,22 +1,15 @@
 // ManageAccounts.jsx
-/* *** (SỬA LỖI v22) Sửa lỗi Logic hiển thị Mã ID ***
-  1. (Logic) Sửa logic cột "Mã ID" để LUÔN hiển thị 'account_code'
-     thay vì 'customer_code' (đáp ứng yêu cầu của user).
+/* *** (SỬA LỖI v26 - THEO YÊU CẦU) Sửa lỗi Duplicate Key 'Users_account_code_key' ***
+  1. (Fix) VIẾT LẠI HOÀN TOÀN logic Thêm Mới trong 'AccountModal'
+     để tuân thủ hệ thống Hybrid.
+  2. (Logic) Nếu Admin thêm 'admin'/'supplier', sẽ dùng 'supabase.auth.signUp'
+     (Tài khoản thật, có trong Auth) VÀ SỬ DỤNG LỆNH "UPDATE" (thay vì "insert").
+  3. (Logic) Nếu Admin thêm 'user', sẽ dùng logic insert trực tiếp vào 'Users'
+     với mật khẩu Base64 (Tài khoản ảo, không có trong Auth),
+     giống hệt logic của file Login.jsx.
 */
-/* *** (DI CHUYỂN v21) ***
-  1. (Logic) Chuyển component `PasswordResetRequests` từ ManageCustomers
-     sang ManageAccounts.
-  2. (UI) Thêm `<PasswordResetRequests />` vào layout.
-  3. (UI) Thêm CSS `.simple-scrollbar` để hỗ trợ component mới.
-  4. (UI) Thay thế `FaBell` bằng `Bell` của Phosphor.
-*/
-/* *** (SỬA LỖI v20) Sửa lỗi Logic + Crash ***
-  1. (Logic) Xóa TẤT CẢ các tham chiếu đến 'username'.
-  2. (Logic) ĐỊNH NGHĨA LẠI 'pageVariants' và 'itemVariant'.
-  3. (UI) Xóa dòng "ID: {account.username}"
-*/
-/* *** (Nâng cấp v18 - Giữ lại) ***
-  1. (UI/Logic) Giữ lại Nút Xóa, Modal Xóa, và hàm handleDeleteAccount.
+/* *** (SỬA THEO YÊU CẦU v25) Thêm trường Địa chỉ & SĐT cho Modal ***
+  (Giữ nguyên các thay đổi cũ...)
 */
 
 
@@ -28,7 +21,8 @@ import {
     PencilLine, ArrowsClockwise, WarningCircle, UserPlus, UserCircleMinus, UserCircleCheck,
     Eye, EyeSlash, CheckCircle, XCircle, User, At, ShieldCheck, CalendarBlank, Hourglass,
     Archive, Key, IdentificationBadge, Trash,
-    Bell, Sparkle // <<< THÊM v21: Imports cho PasswordResetRequests
+    Bell, Sparkle,
+    MapPin, Phone // <<< THÊM THEO YÊU CẦU: Icons cho trường mới
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -36,6 +30,7 @@ const supabase = getSupabase();
 
 // --- Hook Debounce (Giữ nguyên) ---
 const useDebounce = (value, delay) => {
+    // ... (code giữ nguyên) ...
     const [debouncedValue, setDebouncedValue] = useState(value);
     useEffect(() => {
         const handler = setTimeout(() => {
@@ -50,6 +45,7 @@ const useDebounce = (value, delay) => {
 
 // --- Helper Pagination Window (Giữ nguyên) ---
 const getPaginationWindow = (currentPage, totalPages, width = 2) => {
+    // ... (code giữ nguyên) ...
     if (totalPages <= 1) return [];
     if (totalPages <= 5 + width) {
         return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -66,6 +62,7 @@ const getPaginationWindow = (currentPage, totalPages, width = 2) => {
 
 // --- Variants cho Modal (Giữ nguyên) ---
 const modalFormVariants = {
+    // ... (code giữ nguyên) ...
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
@@ -76,27 +73,31 @@ const modalFormVariants = {
     }
 };
 const fieldVariant = {
+    // ... (code giữ nguyên) ...
     hidden: { opacity: 0, y: 10 },
     visible: { opacity: 1, y: 0 }
 };
 
-// --- (SỬA v13 & v14) Modal Thêm/Sửa Tài Khoản (Nâng cấp UI & Lọc Role) ---
+// --- (SỬA LỖI v26) Modal Thêm/Sửa Tài Khoản (Logic Hybrid) ---
 const AccountModal = ({ account, onClose, onSuccess }) => {
     const isEdit = !!account;
     
-    // (SỬA v14) Bỏ Manager và Staff
     const ROLES = [
         { id: 'admin', name: 'Admin', color: 'bg-purple-500' },
         { id: 'supplier', name: 'Supplier', color: 'bg-orange-500' },
         { id: 'user', name: 'User', color: 'bg-slate-500' },
     ];
 
+    // <<< SỬA THEO YÊU CẦU: Thêm address, phone_number vào state
     const [formData, setFormData] = useState({
         email: isEdit ? account.email : '',
         password: '', 
         confirm_password: '', 
-        // username: isEdit ? (account.username || '') : '', // <<< SỬA v19: Xóa username
         full_name: isEdit ? account.full_name : '',
+        // <<< THÊM:
+        address: isEdit ? (account.address || '') : '', 
+        phone_number: isEdit ? (account.phone_number || '') : '',
+        // >>>
         role: isEdit ? account.role : 'admin', 
         is_active: isEdit ? account.is_active : true,
     });
@@ -112,7 +113,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
         }));
     };
 
-    // --- (SỬA v12) Logic handleSubmit (Giữ nguyên) ---
+    // --- (SỬA LỖI v26) Logic handleSubmit (Phân luồng Thật/Ảo) ---
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -132,12 +133,14 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
             }
 
             if (isEdit) {
-                // --- (SỬA v12) CHỈNH SỬA: Gọi Edge Function ---
+                // --- CHỈNH SỬA (Giữ nguyên logic cũ v25) ---
+                // (Logic này gọi Edge Function, đã bao gồm SĐT, Địa chỉ)
                 const { data, error: functionError } = await supabase.functions.invoke('admin-update-user', {
                     body: {
                         user_id: account.id,
-                        // username: formData.username, // <<< SỬA v19: Xóa username
                         full_name: formData.full_name,
+                        address: formData.address || null, 
+                        phone_number: formData.phone_number || null,
                         role: formData.role,
                         is_active: formData.is_active,
                         password: formData.password || null 
@@ -150,49 +153,98 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                 toast.success('Cập nhật tài khoản thành công!');
 
             } else {
-                // --- THÊM MỚI (Giữ nguyên logic cũ) ---
-                const { data: authData, error: authError } = await supabase.auth.signUp({
-                    email: formData.email,
-                    password: formData.password,
-                    // (SỬA v19) Thêm full_name vào meta_data khi đăng ký
-                    // (Mặc dù admin-create-user có thể không dùng trigger,
-                    // nhưng đây là best practice)
-                    options: {
-                        data: {
-                            full_name: formData.full_name
-                            // (SỬA v19) Xóa username
-                        }
-                    }
-                });
-                if (authError) throw authError;
-                if (!authData.user) throw new Error('Không thể tạo user trong Auth.');
-
-                const { error: profileError } = await supabase
-                    .from('Users')
-                    .insert({
-                        id: authData.user.id,
+                // --- THÊM MỚI (PHÂN LUỒNG LOGIC) ---
+                
+                if (formData.role === 'admin' || formData.role === 'supplier') {
+                    // --- (HỆ THỐNG 1: TÀI KHOẢN "THẬT" - ADMIN/SUPPLIER) ---
+                    
+                    // 1. Tạo user trong auth.users
+                    const { data: authData, error: authError } = await supabase.auth.signUp({
                         email: formData.email,
-                        // username: formData.username, // <<< SỬA v19: Xóa username
-                        full_name: formData.full_name,
-                        role: formData.role,
-                        is_active: formData.is_active,
-                        created_at: new Date().toISOString(),
+                        password: formData.password,
+                        options: {
+                            data: {
+                                // Trigger 'on_auth_user_created' sẽ tự động copy full_name
+                                full_name: formData.full_name 
+                            }
+                        }
                     });
-                if (profileError) throw profileError;
-                toast.success('Thêm tài khoản mới thành công!');
+                    if (authError) throw authError;
+                    if (!authData.user) throw new Error('Không thể tạo user trong Auth.');
+
+                    // 2. (SỬA LỖI v26) Dùng UPDATE, không dùng INSERT.
+                    // Trigger 'on_auth_user_created' đã tạo dòng trong public.Users.
+                    // Giờ ta UPDATE dòng đó với thông tin bổ sung.
+                    const { error: profileError } = await supabase
+                        .from('Users')
+                        .update({
+                            // id, email, full_name đã được trigger sao chép
+                            address: formData.address || null,
+                            phone_number: formData.phone_number || null,
+                            role: formData.role, // Đây là thông tin quan trọng nhất
+                            is_active: formData.is_active,
+                        })
+                        .eq('id', authData.user.id); // Update đúng dòng vừa được trigger tạo
+                    
+                    if (profileError) throw profileError;
+                    
+                    toast.success('Thêm tài khoản (Admin/Supplier) thành công!');
+
+                } else {
+                    // --- (HỆ THỐNG 2: TÀI KHOẢN "ẢO" - USER) ---
+                    // (Logic này giống hệt Login.jsx và ManageCustomers.jsx)
+
+                    // 1. Kiểm tra email đã tồn tại chưa (vì không dùng auth.signUp)
+                    const { data: existingUser } = await supabase
+                        .from('Users')
+                        .select('email')
+                        .eq('email', formData.email)
+                        .single();
+                    if (existingUser) {
+                        throw new Error("Email đã được sử dụng. Vui lòng dùng email khác.");
+                    }
+
+                    // 2. Mã hóa mật khẩu
+                    const hashedPassword = btoa(formData.password); 
+
+                    // 3. Insert thẳng vào public.Users
+                    // (DB Trigger sẽ tự động gán customer_code/account_code)
+                    const { error: profileError } = await supabase
+                        .from('Users')
+                        .insert({
+                            // 'id' sẽ tự động tạo (UUID)
+                            email: formData.email,
+                            password: hashedPassword, // Mật khẩu Base64
+                            full_name: formData.full_name,
+                            address: formData.address || null,
+                            phone_number: formData.phone_number || null,
+                            role: 'user', // Cố định là 'user'
+                            is_active: formData.is_active,
+                            created_at: new Date().toISOString(),
+                        });
+                    
+                    if (profileError) throw profileError;
+                    
+                    toast.success('Thêm tài khoản (User) mới thành công!');
+                }
             }
+            
+            // Chung cho cả hai
             onSuccess();
             onClose();
+            
         } catch (error) {
             console.error("Lỗi Thêm/Sửa tài khoản:", error);
             const errorMessage = error.message.includes("Edge Function") 
                 ? "Lỗi server: " + error.message
-                : (error.message || 'Đã xảy ra lỗi không xác định.');
+                : (error.message.includes("Email already in use") ? "Email đã tồn tại trong hệ thống Auth." : error.message)
+                || 'Đã xảy ra lỗi không xác định.';
             toast.error(errorMessage);
         } finally {
             setLoading(false);
         }
     };
+    // --- KẾT THÚC SỬA LỖI v26 ---
 
     return (
         <motion.div
@@ -207,9 +259,10 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                 exit={{ scale: 0.9, opacity: 0 }}
                 transition={{ duration: 0.2, type: "spring", stiffness: 200, damping: 25 }}
             >
-                {/* === (SỬA v13) Header màu mè, bo góc === */}
+                {/* === Header === */}
                 <div className="flex justify-between items-center p-5 border-b border-indigo-700/50 dark:border-indigo-900/50 bg-gradient-to-br from-indigo-600 to-indigo-700 dark:from-indigo-700 dark:to-indigo-800 rounded-t-2xl">
-                    <h3 className="text-lg font-sora font-semibold text-white">
+                    {/* ... (code header giữ nguyên) ... */}
+                     <h3 className="text-lg font-sora font-semibold text-white">
                         {isEdit ? 'Chỉnh sửa Tài khoản' : 'Thêm Tài khoản mới'}
                     </h3>
                     <motion.button 
@@ -245,7 +298,8 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
 
                         {/* --- Mật khẩu mới --- */}
                         <motion.div variants={fieldVariant}>
-                            <label className="label-style flex items-center gap-2" htmlFor="password">
+                             {/* ... (code mật khẩu giữ nguyên) ... */}
+                             <label className="label-style flex items-center gap-2" htmlFor="password">
                                 <Key size={18} className="text-indigo-500" />
                                 <span>{isEdit ? 'Mật khẩu mới (Bỏ trống nếu không đổi)' : 'Mật khẩu *'}</span>
                             </label>
@@ -273,6 +327,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                         {/* --- Xác nhận Mật khẩu --- */}
                         {(formData.password || !isEdit) && (
                             <motion.div variants={fieldVariant}>
+                                {/* ... (code xác nhận mật khẩu giữ nguyên) ... */}
                                 <label className="label-style flex items-center gap-2" htmlFor="confirm_password">
                                     <Key size={18} className="text-indigo-500" />
                                     <span>Xác nhận Mật khẩu {isEdit ? '' : '*'}</span>
@@ -298,7 +353,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                             </motion.div>
                         )}
                         
-                        {/* (SỬA v19) Xóa Username, chỉ còn Full Name */}
+                        {/* Họ và Tên */}
                         <motion.div variants={fieldVariant}>
                             <label className="label-style flex items-center gap-2" htmlFor="full_name">
                                 <User size={18} className="text-indigo-500" />
@@ -310,6 +365,34 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                                 required className="input-style-pro" placeholder="Nguyễn Văn An"
                             />
                         </motion.div>
+                        
+                        {/* <<< THÊM THEO YÊU CẦU: Địa chỉ >>> */}
+                        <motion.div variants={fieldVariant}>
+                            <label className="label-style flex items-center gap-2" htmlFor="address">
+                                <MapPin size={18} className="text-indigo-500" />
+                                <span>Địa chỉ (Tỉnh/Thành phố)</span>
+                            </label>
+                            <input 
+                                id="address"
+                                type="text" name="address" value={formData.address} onChange={handleChange} 
+                                className="input-style-pro" placeholder="Ví dụ: Hà Nội, Đà Nẵng,..."
+                            />
+                        </motion.div>
+                        
+                        {/* <<< THÊM THEO YÊU CẦU: Số điện thoại >>> */}
+                        <motion.div variants={fieldVariant}>
+                            <label className="label-style flex items-center gap-2" htmlFor="phone_number">
+                                <Phone size={18} className="text-indigo-500" />
+                                <span>Số điện thoại</span>
+                            </label>
+                            <input 
+                                id="phone_number"
+                                type="tel" name="phone_number" value={formData.phone_number} onChange={handleChange} 
+                                className="input-style-pro" placeholder="Ví dụ: 0912345678"
+                            />
+                        </motion.div>
+                        {/* <<< KẾT THÚC THÊM >>> */}
+
 
                         {/* Role */}
                         <motion.div variants={fieldVariant}>
@@ -326,6 +409,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                                 >
                                     {ROLES.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                                 </select>
+                                {/* ... (code icon select giữ nguyên) ... */}
                                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
                                     <CaretLeft size={16} weight="bold" />
                                 </div>
@@ -338,6 +422,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                         {/* Status (Edit only) */}
                         {isEdit && (
                             <motion.div variants={fieldVariant}>
+                                {/* ... (code trạng thái giữ nguyên) ... */}
                                 <label className="label-style flex items-center gap-2">
                                     <CheckCircle size={18} className="text-indigo-500" />
                                     <span>Trạng thái</span>
@@ -359,6 +444,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                     
                     {/* Modal Footer Buttons */}
                     <div className="p-5 border-t border-slate-200/80 dark:border-slate-700/50 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-b-2xl">
+                        {/* ... (code nút bấm giữ nguyên) ... */}
                         <motion.button 
                             type="button" onClick={onClose} disabled={loading} 
                             className="modal-button-secondary-pro"
@@ -384,6 +470,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
 
 // <<< THÊM v21: COMPONENT YÊU CẦU RESET MẬT KHẨU (Từ ManageCustomers) >>>
 const PasswordResetRequests = () => {
+    // ... (Toàn bộ code của PasswordResetRequests giữ nguyên như file v22 của bạn) ...
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
   
@@ -489,7 +576,6 @@ const PasswordResetRequests = () => {
       );
     }
   
-    // Nếu không có yêu cầu nào thì không hiển thị gì
     if (!loading && requests.length === 0) {
       return null;
     }
@@ -501,7 +587,6 @@ const PasswordResetRequests = () => {
         animate={{ opacity: 1, y: 0 }}
       >
         <h3 className="text-2xl font-sora font-bold mb-4 flex items-center gap-3">
-          {/* (SỬA v21) Thay thế FaBell bằng Bell của Phosphor */}
           <Bell className="animate-pulse" size={24} />
           Yêu Cầu Hỗ Trợ Đổi Mật Khẩu ({requests.length})
         </h3>
@@ -560,8 +645,8 @@ const PasswordResetRequests = () => {
 
 
 // --- (SỬA v20) ĐỊNH NGHĨA LẠI CÁC BIẾN BỊ MẤT ---
-// Các biến này phải được định nghĩa ở ngoài component
 const pageVariants = {
+    // ... (code giữ nguyên) ...
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
@@ -571,6 +656,7 @@ const pageVariants = {
     }
 };
 const itemVariant = {
+    // ... (code giữ nguyên) ...
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100 } }
 };
@@ -579,6 +665,7 @@ const itemVariant = {
 
 // --- Component chính: Quản lý Tài Khoản ---
 export default function AdminManageAccounts() {
+    // ... (code state giữ nguyên) ...
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isFetchingPage, setIsFetchingPage] = useState(false);
@@ -593,7 +680,8 @@ export default function AdminManageAccounts() {
     const [totalItems, setTotalItems] = useState(0);
     const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
 
-    // --- (SỬA v19) Fetch data (Đã xóa 'username') ---
+
+    // --- Fetch data (Thêm 'address', 'phone_number' vào selectQuery) ---
     const fetchAccounts = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         setError(null);
@@ -601,15 +689,16 @@ export default function AdminManageAccounts() {
             const from = (currentPage - 1) * ITEMS_PER_PAGE;
             const to = from + ITEMS_PER_PAGE - 1;
             
-            // (SỬA v19) Xóa 'username' khỏi select
-            const selectQuery = `id, full_name, email, role, is_active, created_at, customer_code, account_code`;
+            // <<< SỬA THEO YÊU CẦU: Thêm address, phone_number
+            const selectQuery = `id, full_name, email, role, is_active, created_at, customer_code, account_code, address, phone_number`;
             
             let query = supabase.from("Users").select(selectQuery, { count: 'exact' });
 
             if (debouncedSearch.trim() !== "") {
                 const searchStr = `%${debouncedSearch.trim()}%`;
-                // (SỬA v19) Xóa 'username' khỏi search
-                const searchQuery = `customer_code.ilike.${searchStr},account_code.ilike.${searchStr},full_name.ilike.${searchStr},email.ilike.${searchStr}`;
+                // (SỬA v19) Xóa 'username' khỏi search (Giữ nguyên)
+                // <<< THÊM: Thêm address, phone_number vào search
+                const searchQuery = `customer_code.ilike.${searchStr},account_code.ilike.${searchStr},full_name.ilike.${searchStr},email.ilike.${searchStr},address.ilike.${searchStr},phone_number.ilike.${searchStr}`;
                 query = query.or(searchQuery);
             }
             
@@ -618,13 +707,13 @@ export default function AdminManageAccounts() {
             const { data, count, error: fetchError } = await query;
 
             if (fetchError) {
+                // ... (xử lý lỗi giữ nguyên) ...
                 if (fetchError.message.includes("policy")) {
                     throw new Error(`Lỗi RLS (Row Level Security): ${fetchError.message}. Hãy kiểm tra RLS trên bảng Users.`);
                 }
                 throw fetchError;
             }
             
-            // (SỬA v19) Không cần map 'username' nữa
             setAccounts(data || []);
             setTotalItems(count || 0);
             
@@ -653,7 +742,7 @@ export default function AdminManageAccounts() {
     
     // --- (SỬA v12) Sửa logic handleSuspend để gọi Edge Function ---
     const handleSuspend = (account) => {
-        // (SỬA v19) Dùng 'full_name' thay 'username'
+        // ... (code giữ nguyên) ...
         toast((t) => (
             <div className="flex flex-col items-center p-1">
                  <span className="text-center font-inter">
@@ -668,13 +757,16 @@ export default function AdminManageAccounts() {
                         toast.dismiss(t.id);
                         setIsFetchingPage(true);
                         
+                        // <<< SỬA THEO YÊU CẦU: Thêm address, phone_number (để undefined)
                         const { data, error: functionError } = await supabase.functions.invoke('admin-update-user', {
                             body: {
                                 user_id: account.id,
                                 is_active: false, 
-                                // (SỬA v19) Xóa 'username'
-                                // username: undefined,
                                 full_name: undefined,
+                                // <<< THÊM:
+                                address: undefined,
+                                phone_number: undefined,
+                                // >>>
                                 role: undefined,
                                 password: null
                             }
@@ -701,6 +793,7 @@ export default function AdminManageAccounts() {
 
     // <<< THÊM v18: Hàm Xử lý Xóa Tài Khoản Vĩnh Viễn >>>
     const handleDeleteAccount = async () => {
+        // ... (code giữ nguyên) ...
         if (!deletingAccount || isDeleting) return;
 
         setIsDeleting(true);
@@ -731,6 +824,7 @@ export default function AdminManageAccounts() {
     // <<< KẾT THÚC v18 >>>
 
     const formatDate = (dateString) => {
+        // ... (code giữ nguyên) ...
         if (!dateString) return "N/A";
         try {
             return new Date(dateString).toLocaleDateString('vi-VN', {
@@ -743,8 +837,8 @@ export default function AdminManageAccounts() {
         }
     };
     
-    // (SỬA v14) Bỏ Manager/Staff khỏi map này
     const getRoleInfo = (roleId) => {
+        // ... (code giữ nguyên) ...
         const rolesMap = { 
             admin: { name: 'Admin', color: 'bg-purple-500' }, 
             supplier: { name: 'Supplier', color: 'bg-orange-500' }, 
@@ -756,6 +850,7 @@ export default function AdminManageAccounts() {
     const paginationWindow = useMemo(() => getPaginationWindow(currentPage, totalPages, 2), [currentPage, totalPages]);
 
      if (loading && accounts.length === 0) {
+        // ... (code loading giữ nguyên) ...
         return (
             <div className="p-6 flex justify-center items-center min-h-screen bg-slate-50 dark:bg-slate-900">
                 <CircleNotch size={40} className="animate-spin text-indigo-600" />
@@ -770,13 +865,13 @@ export default function AdminManageAccounts() {
             initial="hidden"
             animate="visible"
         >
-            {/* (SỬA v19) Sử dụng 'pageVariants' */}
             <motion.div 
                 className="space-y-6"
                 variants={pageVariants}
             >
-                {/* (SỬA v19) Sử dụng 'itemVariant' */}
+                {/* Header */}
                 <motion.div variants={itemVariant} className="flex flex-wrap items-center justify-between gap-4">
+                    {/* ... (code header giữ nguyên) ... */}
                     <div>
                         <h1 className="text-3xl font-sora font-bold text-slate-900 dark:text-white flex items-center gap-3">
                             <UsersThree weight="duotone" className="text-indigo-600" size={36} />
@@ -804,29 +899,28 @@ export default function AdminManageAccounts() {
                 {/* <<< KẾT THÚC THÊM v21 >>> */}
 
                 {/* Bảng */}
-                {/* (SỬA v19) Sử dụng 'itemVariant' */}
                 <motion.div
                     variants={itemVariant}
                     className="bg-white dark:bg-slate-800 shadow-2xl rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-700/50"
                 >
                     <div className="p-6 flex flex-wrap justify-between items-center gap-4 border-b border-slate-200 dark:border-slate-700">
+                        {/* ... (code header bảng giữ nguyên) ... */}
                         <h2 className="text-xl font-sora font-semibold text-slate-800 dark:text-slate-100">
                             Danh Sách Tài Khoản
                         </h2>
                         <div className="flex items-center gap-3 w-full sm:w-auto">
                             <div className="relative w-full sm:w-72">
-                                {/* ================== SỬA LỖI ICON TẠI ĐÂY ================== */}
                                 <MagnifyingGlass size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                                {/* ========================================================== */}
                                 <input 
                                     type="text" 
                                     value={searchTerm} 
                                     onChange={(e) => setSearchTerm(e.target.value)} 
-                                    placeholder="Tìm Mã, Tên, Email..." // (SỬA v19) Xóa Username
+                                    // <<< SỬA THEO YÊU CẦU: Cập nhật placeholder
+                                    placeholder="Tìm Mã, Tên, Email, SĐT..."
                                     className="search-input-pro"
                                 />
                             </div>
-                            <motion.button
+                             <motion.button
                                 whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
                                 onClick={() => fetchAccounts(false)} disabled={isFetchingPage} 
                                 className="button-secondary-pro"
@@ -842,6 +936,7 @@ export default function AdminManageAccounts() {
                         <table className="min-w-full">
                             <thead className="border-b-2 border-slate-100 dark:border-slate-700">
                                 <tr>
+                                    {/* ... (code các <th> giữ nguyên) ... */}
                                     <th className="th-style-pro w-[10%]"><div className="flex items-center gap-1.5"><Archive size={14}/>Mã ID</div></th>
                                     <th className="th-style-pro w-[25%]"><div className="flex items-center gap-1.5"><User size={14}/>Họ và Tên</div></th>
                                     <th className="th-style-pro w-[20%]"><div className="flex items-center gap-1.5"><At size={14}/>Email</div></th>
@@ -853,6 +948,7 @@ export default function AdminManageAccounts() {
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
                                 <AnimatePresence>
+                                    {/* ... (code xử lý lỗi/rỗng giữ nguyên) ... */}
                                     {error && !isFetchingPage && ( 
                                         <tr><td colSpan="7" className="td-center py-20 text-red-500">
                                             {`Lỗi: ${error.message}`}
@@ -870,10 +966,8 @@ export default function AdminManageAccounts() {
                                     )}
                                     
                                     {!error && accounts.map((account) => {
+                                        // ... (code render <tr> giữ nguyên) ...
                                         const roleInfo = getRoleInfo(account.role);
-                                        
-                                        // <<< *** (SỬA v22) *** >>>
-                                        // Luôn hiển thị account_code trên trang Quản lý Tài khoản
                                         const displayCode = account.account_code;
                                         
                                         return (
@@ -890,12 +984,9 @@ export default function AdminManageAccounts() {
                                                     {displayCode || <span className="italic text-slate-400">N/A</span>}
                                                 </span>
                                             </td>
-
-                                            {/* === (SỬA v19) Xóa "ID: {username}" === */}
                                             <td className="td-style-pro">
                                                 <div className="font-sora font-semibold text-slate-800 dark:text-slate-100">{account.full_name}</div>
                                             </td>
-                                            
                                             <td className="td-style-pro font-inter text-slate-600 dark:text-slate-400">{account.email}</td>
                                             <td className="td-style-pro">
                                                 <span className="badge-pro">
@@ -911,6 +1002,7 @@ export default function AdminManageAccounts() {
                                             <td className="td-style-pro font-inter text-slate-500 text-sm">{formatDate(account.created_at)}</td>
                                             <td className="td-style-pro text-center">
                                                 <div className="flex justify-center gap-1">
+                                                    {/* ... (code các nút action giữ nguyên) ... */}
                                                     <motion.button 
                                                         whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }}
                                                         onClick={() => setModalAccount(account)} 
@@ -937,7 +1029,6 @@ export default function AdminManageAccounts() {
                                                         > <UserCircleCheck size={18}/> </motion.button>
                                                     )}
                                                     
-                                                    {/* === (THÊM v18) Nút Xóa === */}
                                                     <motion.button
                                                         whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }}
                                                         onClick={() => setDeletingAccount(account)} // Mở modal xác nhận
@@ -958,12 +1049,12 @@ export default function AdminManageAccounts() {
                 </motion.div>
 
                 {/* Pagination UI */}
-                {/* (SỬA v19) Sử dụng 'itemVariant' */}
                 {!loading && totalItems > ITEMS_PER_PAGE && (
                     <motion.div
                         variants={itemVariant}
                         className="flex flex-col sm:flex-row justify-between items-center mt-5 text-sm text-slate-600 dark:text-slate-400"
                     >
+                         {/* ... (code phân trang giữ nguyên) ... */}
                         <div>
                             Hiển thị <b>{(currentPage - 1) * ITEMS_PER_PAGE + 1}</b> - <b>{Math.min(currentPage * ITEMS_PER_PAGE, totalItems)}</b> trên <b>{totalItems}</b> tài khoản
                         </div>
@@ -1003,6 +1094,7 @@ export default function AdminManageAccounts() {
             {/* <<< THÊM v18: Modal Xác nhận Xóa >>> */}
             <AnimatePresence>
                 {deletingAccount && (
+                    // ... (code modal xóa giữ nguyên) ...
                     <motion.div
                         className="fixed inset-0 bg-black/70 z-50 flex justify-center items-center p-4"
                         initial={{ opacity: 0 }}
@@ -1067,13 +1159,12 @@ export default function AdminManageAccounts() {
 
             {/* <<< UPGRADE: Toàn bộ CSS mới */}
             <style jsx>{`
-                /* <<< UPGRADE: Import Phông chữ */
+                /* ... (Toàn bộ CSS giữ nguyên như file v22 của bạn) ... */
                 @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Inter:wght@400;500;600&display=swap');
                 
                 .font-sora { font-family: 'Sora', sans-serif; }
                 .font-inter { font-family: 'Inter', sans-serif; }
 
-                /* === (SỬA v13) Tăng bo góc === */
                 .search-input-pro { 
                     @apply w-full pl-11 pr-4 py-2.5 text-sm rounded-xl border-transparent 
                            bg-slate-100 dark:bg-slate-700/60 
@@ -1084,7 +1175,6 @@ export default function AdminManageAccounts() {
                            outline-none transition-all duration-300;
                 }
                 
-                /* === (SỬA v13) Tăng bo góc === */
                 .button-secondary-pro {
                     @apply h-[42px] w-[42px] flex items-center justify-center
                            bg-slate-100 hover:bg-slate-200 
@@ -1094,7 +1184,6 @@ export default function AdminManageAccounts() {
                            disabled:opacity-50 disabled:cursor-not-allowed;
                 }
                 
-                /* === (SỬA v13) Tăng bo góc === */
                 .button-primary-pro {
                     @apply bg-indigo-600 hover:bg-indigo-700 
                            text-white font-semibold 
@@ -1103,29 +1192,25 @@ export default function AdminManageAccounts() {
                            disabled:opacity-50 disabled:cursor-not-allowed;
                 }
 
-                /* <<< UPGRADE: Tiêu đề Bảng Pro */
                 .th-style-pro { 
                     @apply px-6 py-4 text-left text-sm font-semibold 
                            text-slate-500 dark:text-slate-400 
                            uppercase tracking-wider; 
                 }
                 
-                /* <<< UPGRADE: Ô Bảng Pro */
                 .td-style-pro { 
-                    @apply px-6 py-4 text-sm align-top; /* align-top để username/fullname thẳng hàng */
+                    @apply px-6 py-4 text-sm align-top;
                 }
                 .td-center { 
                     @apply px-6 text-center;
                 }
                 
-                /* <<< UPGRADE: Badge Chấm Màu Pro */
                 .badge-pro {
                     @apply px-3 py-1 text-sm rounded-full inline-flex items-center gap-2
                            bg-slate-100 dark:bg-slate-700
                            text-slate-800 dark:text-slate-100;
                 }
                 
-                /* <<< UPGRADE: Badge Trạng thái Pro (nhạt hơn) */
                 .badge-green-pro { 
                     @apply px-3 py-1 text-xs font-semibold rounded-md inline-flex items-center gap-1.5 
                            bg-green-100/60 dark:bg-green-500/10 
@@ -1137,7 +1222,6 @@ export default function AdminManageAccounts() {
                            text-slate-600 dark:text-slate-300; 
                 }
 
-                /* <<< UPGRADE: Phân trang Pro */
                 .pagination-arrow-pro { @apply p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors; }
                 .pagination-number-pro { @apply w-9 h-9 rounded-md font-semibold transition-colors hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed; }
                 .pagination-active-pro { @apply bg-indigo-600 text-white hover:bg-indigo-600 dark:hover:bg-indigo-600; }
@@ -1145,7 +1229,6 @@ export default function AdminManageAccounts() {
 
                 .loading-overlay { @apply absolute inset-0 bg-white/70 dark:bg-slate-800/70 flex items-center justify-center z-10; }
                 
-                /* === (SỬA v13) Tăng bo góc === */
                 .input-style-pro { 
                     @apply border border-slate-200 dark:border-slate-700 
                            p-3 rounded-xl w-full 
@@ -1158,37 +1241,31 @@ export default function AdminManageAccounts() {
                 .input-style-pro::placeholder {
                     @apply text-slate-400 dark:text-slate-500;
                 }
-                /* <<< UPGRADE: Custom select cho role */
                 .input-style-pro.appearance-none {
-                    @apply pl-10; /* Chừa chỗ cho chấm màu */
+                    @apply pl-10;
                 }
 
                 .label-style { @apply block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5; }
                 
-                /* === (SỬA v13) Tăng bo góc === */
                 .modal-button-secondary-pro { 
                     @apply px-5 py-2.5 bg-slate-100 hover:bg-slate-200 
                            dark:bg-slate-700 dark:hover:bg-slate-600 
                            text-slate-800 dark:text-slate-100
                            rounded-xl font-semibold text-sm disabled:opacity-50 transition-colors;
                 }
-                /* === (SỬA v13) Tăng bo góc === */
                 .modal-button-primary-pro { 
                     @apply px-5 py-2.5 bg-indigo-600 text-white 
                            rounded-xl font-semibold hover:bg-indigo-700 
                            text-sm disabled:opacity-50 transition-colors shadow-lg shadow-indigo-500/30;
                 }
-                /* === (SỬA v13) Tăng bo góc === */
                 .modal-button-danger-pro { 
                     @apply px-5 py-2.5 bg-red-600 text-white 
                            rounded-xl font-semibold hover:bg-red-700 
                            text-sm disabled:opacity-50 transition-colors shadow-lg shadow-red-500/30;
                 }
                 
-                /* <<< (SỬA UI) Nút hành động Pro (trong bảng) - Xóa hover chung */
                 .action-button-pro { 
                     @apply p-2 rounded-lg transition-colors duration-150 
-                           /* hover:bg-slate-100 dark:hover:bg-slate-700 (XÓA) - Đã chuyển hover vào class cụ thể */
                            focus:outline-none focus:ring-1 focus:ring-offset-1 
                            dark:focus:ring-offset-slate-800 disabled:opacity-50 disabled:cursor-not-allowed; 
                 }
@@ -1197,7 +1274,6 @@ export default function AdminManageAccounts() {
                     @apply absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors;
                 }
                 
-                /* <<< THÊM v21: CSS cho Scrollbar của component mới >>> */
                 .simple-scrollbar::-webkit-scrollbar { width: 8px; }
                 .simple-scrollbar::-webkit-scrollbar-track { background: transparent; }
                 .simple-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }

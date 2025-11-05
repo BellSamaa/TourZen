@@ -2,6 +2,7 @@
 // (UPGRADED V4: Sửa logic Thống kê, Sửa Trạng thái click, Thêm Icons)
 // (Nâng cấp giao diện: Tăng kích thước font, padding; Thêm nhiều icon; Nút bấm màu sắc đa dạng hơn với gradient, hover effects; Cải thiện layout cho dễ nhìn)
 // (Nâng cấp Form NCC: Thêm icons vào các ô input)
+// (YÊU CẦU MỚI: Thêm thông báo Realtime khi hết hàng - inventory = 0)
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -594,6 +595,69 @@ export default function ManageSuppliers() {
         fetchProductStats();
 
     }, [fetchSuppliers]); // fetchSuppliers đã có useCallback
+
+    // ====================================================================
+    // (YÊU CẦU MỚI) Thêm Realtime listener để thông báo khi hết hàng
+    // ====================================================================
+    useEffect(() => {
+        // Chỉ chạy khi đã tải xong danh sách NCC (để tra cứu tên)
+        if (suppliers.length === 0) return;
+
+        // Hàm helper dịch loại sản phẩm
+        const getProductTypeName = (type) => {
+            if (type === 'flight') return 'Chuyến bay';
+            if (type === 'transport') return 'Xe';
+            if (type === 'hotel') return 'Phòng khách sạn';
+            return 'Dịch vụ';
+        };
+
+        const channel = supabase
+            .channel('public:Products:inventory_check')
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'Products' },
+                (payload) => {
+                    console.log('Product update received:', payload);
+                    const oldData = payload.old;
+                    const newData = payload.new;
+
+                    // Điều kiện: Chỉ thông báo khi hàng TỪ > 0 VỀ 0
+                    if (newData.inventory === 0 && oldData.inventory > 0) {
+                        // Tìm tên Nhà cung cấp
+                        const supplier = suppliers.find(s => s.id === newData.supplier_id);
+                        const supplierName = supplier ? supplier.name : 'Không rõ';
+                        
+                        const productTypeName = getProductTypeName(newData.product_type);
+
+                        // Hiển thị thông báo (toast)
+                        toast.error(
+                            `HẾT HÀNG: Nhà cung cấp "${supplierName}" đã hết ${productTypeName} (Dịch vụ: ${newData.name})`,
+                            {
+                                icon: <WarningCircle size={24} className="text-red-500" />,
+                                duration: 8000 // Tăng thời gian hiển thị
+                            }
+                        );
+                    }
+                }
+            )
+            .subscribe((status, err) => {
+                if (status === 'SUBSCRIBED') {
+                    console.log('Subscribed to Product inventory updates!');
+                }
+                if (status === 'CHANNEL_ERROR') {
+                    console.error('Realtime subscription error:', err);
+                    toast.error('Lỗi kết nối realtime để theo dõi tồn kho.');
+                }
+            });
+
+        // Hàm dọn dẹp khi component unmount
+        return () => {
+            supabase.removeChannel(channel);
+        };
+
+    }, [suppliers]); // Phụ thuộc vào `suppliers` để tra cứu tên
+    // ====================================================================
+
 
     // --- Logic Modal NCC ---
     const handleOpenModal = (supplier = null) => {

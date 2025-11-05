@@ -662,7 +662,8 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
     setCroppedAreaPixels(croppedAreaPixels);
   }, []);
 
-SỬA
+  // *** LỖI CỦA BẠN NẰM Ở ĐÂY (ĐÃ SỬA) ***
+  // (Tôi đã xóa chữ 'SỬA' bị lạc ở dòng 735)
   const openCropForFile = async (file, type) => {
     if (!file) return;
     const dataUrl = await readFileAsDataURL(file);
