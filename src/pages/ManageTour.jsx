@@ -801,7 +801,8 @@ export default function ManageTour() {
             // Áp dụng TẤT CẢ filter bằng AND (nếu có filter)
             if (filters.length > 0) {
                 // Đây là cú pháp .and() chuẩn
-                query = query.and(filters.join(','));
+const combined = filters.map(f => `(${f})`).join(',');
+    query = query.filter(combined);
             }
             // (*** KẾT THÚC SỬA V28 ***)
 
