@@ -3,6 +3,7 @@
 // (Nâng cấp giao diện: Tăng kích thước font, padding; Thêm nhiều icon; Nút bấm màu sắc đa dạng hơn với gradient, hover effects; Cải thiện layout cho dễ nhìn)
 // (Nâng cấp Form NCC: Thêm icons vào các ô input)
 // (YÊU CẦU MỚI: Thêm thông báo Realtime khi hết hàng - inventory = 0)
+// (YÊU CẦU MỚI v2: Hiển thị SĐT/Địa chỉ của NCC và của Người liên hệ (User) trong bảng)
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -536,11 +537,15 @@ export default function ManageSuppliers() {
         if(!isInitialLoad) setIsFetchingPage(true); 
         setError(null);
         if(isInitialLoad) setLoading(true); 
+        
+        // <<< (SỬA THEO YÊU CẦU) Thêm phone_number, address vào join Users
         const selectQuery = `
             id, name, created_at, user_id, phone, email, address,
             supplier_code,
-            managing_user:Users(id, full_name, email)
+            managing_user:Users(id, full_name, email, phone_number, address)
         `;
+        // <<< KẾT THÚC SỬA
+
         const { data, error: fetchError } = await supabase
             .from('Suppliers')
             .select(selectQuery)
@@ -833,8 +838,8 @@ export default function ManageSuppliers() {
                                 <th scope="col" className="th-style-new text-base">Mã NCC</th>
                                 <th scope="col" className="th-style-new text-base">Tên công ty</th>
                                 <th scope="col" className="th-style-new text-base">Loại</th>
-                                <th scope="col" className="th-style-new text-base">Người liên hệ</th>
-                                <th scope="col" className="th-style-new text-base">Liên hệ</th>
+                                <th scope="col" className="th-style-new text-base">Người liên hệ (User)</th>
+                                <th scope="col" className="th-style-new text-base">Liên hệ (NCC)</th>
                                 <th scope="col" className="th-style-new text-base">Đánh giá</th>
                                 <th scope="col" className="th-style-new text-base">Trạng thái</th>
                                 <th scope="col" className="th-style-new text-right text-base">Thao tác</th>
@@ -864,19 +869,39 @@ export default function ManageSuppliers() {
                                         <span className={`badge-base ${typeInfo.className} text-lg`}>{typeInfo.type}</span>
                                     </td>
                                     
-                                    {/* (FIX 3) Thêm Icon Người liên hệ */}
-                                    <td className="td-style-new text-lg">
+                                    {/* <<< (SỬA THEO YÊU CẦU) Hiển thị SĐT/Địa chỉ của Người liên hệ >>> */}
+                                    <td className="td-style-new text-base text-gray-700 dark:text-gray-300 space-y-2">
                                         {supplier.managing_user ? (
-                                            <div className="flex items-center gap-3">
-                                                <UserCircle size={24} className="text-gray-500 flex-shrink-0" />
-                                                <span title={supplier.managing_user.email}>{supplier.managing_user.full_name}</span>
-                                            </div>
+                                            <>
+                                                {/* Tên Người liên hệ */}
+                                                <div className="flex items-center gap-3">
+                                                    <UserCircle size={24} className="text-gray-500 flex-shrink-0" />
+                                                    <span className="font-bold text-gray-900 dark:text-white" title={supplier.managing_user.email}>
+                                                        {supplier.managing_user.full_name}
+                                                    </span>
+                                                </div>
+                                                {/* SĐT Người liên hệ (từ bảng Users) */}
+                                                {supplier.managing_user.phone_number && (
+                                                    <div className="flex items-center gap-3 pl-1">
+                                                        <Phone size={20} className="flex-shrink-0 text-gray-400" />
+                                                        <span>{supplier.managing_user.phone_number}</span>
+                                                    </div>
+                                                )}
+                                                {/* Địa chỉ Người liên hệ (từ bảng Users) */}
+                                                {supplier.managing_user.address && (
+                                                    <div className="flex items-center gap-3 pl-1 truncate max-w-[220px]">
+                                                        <MapPin size={20} className="flex-shrink-0 text-gray-400" />
+                                                        <span className="truncate">{supplier.managing_user.address}</span>
+                                                    </div>
+                                                )}
+                                            </>
                                         ) : (
                                             <span className="text-gray-500 italic">N/A</span>
                                         )}
                                     </td>
+                                    {/* <<< KẾT THÚC SỬA >>> */}
                                     
-                                    {/* (FIX 3) Thêm Icon Liên hệ */}
+                                    {/* <<< (SỬA THEO YÊU CẦU) Hiển thị SĐT/Địa chỉ của NCC >>> */}
                                     <td className="td-style-new text-base text-gray-700 dark:text-gray-300 space-y-2">
                                         {supplier.phone && (
                                             <div className="flex items-center gap-3">
@@ -890,7 +915,15 @@ export default function ManageSuppliers() {
                                                 <span className="truncate">{supplier.email}</span>
                                             </div>
                                         )}
+                                        {/* Thêm địa chỉ của NCC (từ bảng Suppliers) */}
+                                        {supplier.address && (
+                                            <div className="flex items-center gap-3 truncate max-w-[220px]">
+                                                <MapPin size={20} className="flex-shrink-0 text-gray-400" />
+                                                <span className="truncate">{supplier.address}</span>
+                                            </div>
+                                        )}
                                     </td>
+                                    {/* <<< KẾT THÚC SỬA >>> */}
                                     
                                     <td className="td-style-new">
                                         <div className="flex items-center gap-2">

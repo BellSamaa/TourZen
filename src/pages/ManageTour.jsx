@@ -1,5 +1,5 @@
 // src/pages/ManageTour.jsx
-// (V20: CHỈ HOÀN SLOT KHI XÓA ĐƠN 'pending'/'cancelled')
+// (V21: Tách riêng 2 thanh search: Khách hàng và Tour/ID)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -709,8 +709,14 @@ export default function ManageTour() {
     const [loading, setLoading] = useState(true);
     const [isFetchingPage, setIsFetchingPage] = useState(false);
     const [error, setError] = useState(null);
-    const [searchTerm, setSearchTerm] = useState("");
+    
+    // (CẬP NHẬT V21) Tách 2 thanh search
+    const [searchTerm, setSearchTerm] = useState(""); // Search Tour / ID
+    const [customerSearchTerm, setCustomerSearchTerm] = useState(""); // Search Khách hàng
+    
     const debouncedSearch = useDebounce(searchTerm, 500);
+    const debouncedCustomerSearch = useDebounce(customerSearchTerm, 500); // (MỚI V21)
+    
     const ITEMS_PER_PAGE = 10;
     const [currentPage, setCurrentPage] = useState(1);
     const [totalItems, setTotalItems] = useState(0);
@@ -732,7 +738,7 @@ export default function ManageTour() {
     const [viewingReview, setViewingReview] = useState(null); // Lưu object review
 
     
-    // (CẬP NHẬT v18) Fetch Bookings (Fix lỗi Parsing Reviews)
+    // (CẬP NHẬT v21) Fetch Bookings (Dùng 2 thanh search)
     const fetchBookings = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         else setLoading(true); 
@@ -741,7 +747,6 @@ export default function ManageTour() {
             const from = (currentPage - 1) * ITEMS_PER_PAGE;
             const to = from + ITEMS_PER_PAGE - 1;
             
-
             const selectQuery = `
                 id,created_at,departure_date,status,total_price,quantity,
                 num_adult,num_child,num_elder,num_infant,departure_id,
@@ -759,12 +764,23 @@ export default function ManageTour() {
                 .from('Bookings')
                 .select(selectQuery, { count: 'exact' }); 
                 
+            // Filter 1: Trạng thái
             if (filterStatus !== 'all') { query = query.eq('status', filterStatus); }
+            
+            // (MỚI V21) Filter 2: Khách hàng (Tên hoặc Email)
+            if (debouncedCustomerSearch) {
+                const customerSearchVal = `%${debouncedCustomerSearch}%`;
+                query = query.or(`user.full_name.ilike.${customerSearchVal},user.email.ilike.${customerSearchVal}`);
+            }
+
+            // (CẬP NHẬT V21) Filter 3: Tour hoặc Mã đơn
             if (debouncedSearch) {
                  const searchTermVal = `%${debouncedSearch}%`;
-                 query = query.or(`product.name.ilike.${searchTermVal},user.full_name.ilike.${searchTermVal},user.email.ilike.${searchTermVal},id::text.like.${searchTermVal}`);
+                 query = query.or(`product.name.ilike.${searchTermVal},id::text.ilike.${searchTermVal}`);
             }
+            
             query = query.order('created_at', { ascending: false }).range(from, to);
+            
             const { data, error: queryError, count } = await query;
             if (queryError) throw queryError;
             
@@ -788,7 +804,8 @@ export default function ManageTour() {
             if (isInitialLoad) setLoading(false);
             setIsFetchingPage(false);
         }
-    }, [currentPage, debouncedSearch, filterStatus]);
+    // (CẬP NHẬT V21) Thêm debouncedCustomerSearch vào dependencies
+    }, [currentPage, debouncedSearch, debouncedCustomerSearch, filterStatus]);
 
     // (GIỮ NGUYÊN V8) useEffect để fetch Users, Tours & Services
     useEffect(() => {
@@ -837,17 +854,19 @@ export default function ManageTour() {
     }, []);
 
 
+    // (CẬP NHẬT V21) Thêm debouncedCustomerSearch vào dependencies
      useEffect(() => {
         fetchBookings(true);
-     }, [debouncedSearch, filterStatus, fetchBookings]); 
+     }, [debouncedSearch, debouncedCustomerSearch, filterStatus, fetchBookings]); 
 
      useEffect(() => {
         if (!loading) { fetchBookings(false); }
      }, [currentPage, loading, fetchBookings]);
 
+    // (CẬP NHẬT V21) Thêm debouncedCustomerSearch vào dependencies
      useEffect(() => {
         if (currentPage !== 1) { setCurrentPage(1); }
-     }, [debouncedSearch, filterStatus]);
+     }, [debouncedSearch, debouncedCustomerSearch, filterStatus]);
 
 
     // (GIỮ NGUYÊN V8) Event Handlers
@@ -1012,10 +1031,11 @@ export default function ManageTour() {
             {/* Thẻ Thống Kê (Giữ nguyên) */}
             <BookingStats />
 
-            {/* Filter & Search + Danh sách (Giữ nguyên) */}
+            {/* (CẬP NHẬT V21) Filter & Search (Tách 2 thanh search) */}
             <div className="bg-white dark:bg-slate-800 shadow-xl rounded-lg border border-gray-100 dark:border-slate-700">
-                {/* Filter & Search Bar (Giữ nguyên) */}
+                {/* Filter & Search Bar */}
                 <div className="p-4 border-b border-gray-100 dark:border-slate-700 flex flex-col md:flex-row items-center gap-3">
+                    {/* Filter Trạng thái */}
                     <div className="flex items-center gap-2 w-full md:w-auto flex-shrink-0">
                         <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="filter-select-figma" disabled={isFetchingPage} >
                             <option value="all">Tất cả</option> 
@@ -1024,10 +1044,34 @@ export default function ManageTour() {
                             <option value="cancelled">Đã hủy</option>
                         </select>
                     </div>
-                    <div className="relative flex-grow w-full">
-                        <MagnifyingGlass size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                        <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Tìm kiếm đơn hàng..." className="search-input-figma" disabled={isFetchingPage} />
+                    
+                    {/* (MỚI V21) Search Khách hàng */}
+                    <div className="relative flex-grow w-full md:w-auto">
+                        <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                        <input 
+                            type="text" 
+                            value={customerSearchTerm} 
+                            onChange={(e) => setCustomerSearchTerm(e.target.value)} 
+                            placeholder="Tìm theo khách hàng (tên/email)..." 
+                            className="search-input-figma !pl-10" 
+                            disabled={isFetchingPage} 
+                        />
                     </div>
+                    
+                    {/* (CẬP NHẬT V21) Search Tour / Mã đơn */}
+                    <div className="relative flex-grow w-full md:w-auto">
+                        <MagnifyingGlass size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                        <input 
+                            type="text" 
+                            value={searchTerm} 
+                            onChange={(e) => setSearchTerm(e.target.value)} 
+                            placeholder="Tìm theo Tour hoặc Mã đơn..." 
+                            className="search-input-figma !pl-10" 
+                            disabled={isFetchingPage} 
+                        />
+                    </div>
+                    
+                    {/* Nút Reload */}
                     <button onClick={() => fetchBookings(true)} disabled={loading || isFetchingPage} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors flex-shrink-0">
                         <ArrowClockwise size={18} className={isFetchingPage ? "animate-spin" : ""} />
                     </button>
@@ -1056,7 +1100,7 @@ export default function ManageTour() {
                             {!loading && !error && bookings.length === 0 && !isFetchingPage && (
                                 // (SỬA v9) Colspan 11
                                 <tr><td colSpan="11" className="td-center text-gray-500 italic py-10">
-                                    {searchTerm || filterStatus !== 'all' ? 'Không tìm thấy đơn hàng phù hợp.' : 'Chưa có đơn hàng nào.'}
+                                    {searchTerm || customerSearchTerm || filterStatus !== 'all' ? 'Không tìm thấy đơn hàng phù hợp.' : 'Chưa có đơn hàng nào.'}
                                 </td></tr>
                             )}
                             {!error && bookings.map((booking) => {
@@ -1185,7 +1229,7 @@ export default function ManageTour() {
             {/* CSS (Giữ nguyên) */}
             <style jsx>{`
                 .filter-select-figma { @apply appearance-none block w-full md:w-auto px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:opacity-50 cursor-pointer; }
-                .search-input-figma { @apply w-full pl-10 pr-4 py-2 text-sm text-gray-900 dark:text-white bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:opacity-50; }
+                .search-input-figma { @apply w-full pl-4 pr-4 py-2 text-sm text-gray-900 dark:text-white bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:opacity-50; }
                 .loading-overlay { @apply absolute inset-0 bg-white/70 dark:bg-slate-800/70 flex items-center justify-center z-10 rounded-lg; }
                 .th-style-figma { @apply px-5 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap; }
                 .td-style-figma { @apply px-5 py-4 text-sm align-middle; }
