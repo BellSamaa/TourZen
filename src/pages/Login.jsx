@@ -1,7 +1,9 @@
 // HỆ THỐNG ĐA XÁC THỰC (HYBRID: Auth cho Admin, Ảo cho User)
-// (SỬA LỖI: Đã thêm 'supplier' vào hệ thống xác thực Auth)
-// (SỬA THEO YÊU CẦU: Thêm cờ localStorage cho popup xác thực)
-// (SỬA THEO YÊU CẦU: Xóa logic tạo customer_code phía client, để DB Trigger tự động gán mã KHxxxx)
+// (SỬA LỖI v27 - THEO YÊU CẦU) Sửa lỗi 406 Not Acceptable
+// 1. (Fix) Xóa bước 'SELECT' email (kiểm tra existingUser)
+//    vì RLS đang chặn request này từ user 'anon', gây lỗi 406.
+// 2. (Fix) Chuyển logic bắt email trùng lặp xuống phần 'insertError',
+//    dựa vào 'unique constraint "Users_email_key"'.
 
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -45,48 +47,46 @@ export default function Login() {
                 if (form.password.length < 6) throw new Error("Mật khẩu phải có ít nhất 6 ký tự.");
 
                 // ========== CẬP NHẬT VALIDATION (SĐT & ĐỊA CHỈ) ==========
-
-                // 1. Yêu cầu SĐT (nếu có nhập) phải đúng 10 số VÀ hợp lệ
-                if (form.phone_number) { // Chỉ kiểm tra nếu SĐT được cung cấp
+                // (Giữ nguyên logic validation của bạn)
+                if (form.phone_number) { 
                     if (form.phone_number.length !== 10) {
                         throw new Error("Số điện thoại phải có đúng 10 chữ số.");
                     }
                     if (!phoneRegex.test(form.phone_number)) {
-                        // Regex cũ của bạn đã bao gồm kiểm tra 10 số, nhưng ta thêm SĐT không hợp lệ
                         throw new Error("Số điện thoại không hợp lệ (Sai đầu số hoặc định dạng).");
                     }
                 }
-
-                // 2. Yêu cầu Địa chỉ (Tỉnh/Thành phố)
-                if (form.address.length < 5) { // Giảm yêu cầu tối thiểu (ví dụ: "Hà Nội", "Đà Nẵng")
+                if (form.address.length < 5) { 
                     throw new Error("Địa chỉ (Tỉnh/Thành phố) có vẻ quá ngắn.");
                 }
-                if (!/[a-zA-Z]/.test(form.address)) { // Phải chứa ít nhất 1 ký tự chữ
+                if (!/[a-zA-Z]/.test(form.address)) { 
                     throw new Error("Địa chỉ (Tỉnh/Thành phố) phải chứa ký tự chữ (không chỉ số hoặc ký tự đặc biệt).");
                 }
-                // (Bạn có thể thêm regex kiểm tra ký tự đặc biệt không mong muốn nếu cần)
                 if (/[!@#$%^&*()_+\=\[\]{};':"\\|<>?~]/.test(form.address)) {
                      throw new Error("Địa chỉ (Tỉnh/Thành phố) chứa ký tự đặc biệt không hợp lệ.");
                 }
                 
                 // ========== KẾT THÚC CẬP NHẬT ==========
 
-                // Kiểm tra email đã tồn tại chưa
-                const { data: existingUser } = await supabase
-                    .from('Users')
-                    .select('email')
-                    .eq('email', form.email)
-                    .single();
+                // *** (SỬA LỖI v27) XÓA BƯỚC KIỂM TRA EMAIL (GÂY LỖI 406) ***
+                // Lý do: RLS (Row Level Security) đang chặn request 'SELECT' 
+                // từ người dùng ẩn danh (anonymous).
+                
+                // const { data: existingUser } = await supabase
+                //     .from('Users')
+                //     .select('email')
+                //     .eq('email', form.email)
+                //     .single();
+                //
+                // if (existingUser) {
+                //     throw new Error("Email đã được sử dụng. Vui lòng dùng email khác.");
+                // }
+                // *** KẾT THÚC SỬA v27 ***
 
-                if (existingUser) {
-                    throw new Error("Email đã được sử dụng. Vui lòng dùng email khác.");
-                }
 
                 const hashedPassword = btoa(form.password);
                 
-                // *** (ĐÃ XÓA) *** logic 'const customerCode = ...' 
-                // DB Trigger sẽ tự động gán mã KHxxxx
-
+                // (Giữ nguyên) DB Trigger sẽ tự động gán mã KHxxxx
                 const { error: insertError } = await supabase
                     .from('Users')
                     .insert({
@@ -97,22 +97,25 @@ export default function Login() {
                         phone_number: form.phone_number || null,
                         ngay_sinh: form.ngay_sinh || null,
                         role: 'user', 
-                        // *** (ĐÃ XÓA) *** 'customer_code: customerCode'
                         is_active: true
                     });
 
                 if (insertError) {
+                    // *** (SỬA v27) Bắt lỗi email trùng lặp tại đây ***
+                    // (Giả định cột email của bạn có unique constraint là "Users_email_key")
+                    if (insertError.message.includes('unique constraint "Users_email_key"')) {
+                         throw new Error("Email đã được sử dụng. Vui lòng dùng email khác.");
+                    }
+                    // Nếu là lỗi khác
                     throw new Error(`Không thể tạo tài khoản: ${insertError.message}`);
                 }
 
                 // **************************************************
-                // *** THÊM YÊU CẦU MỚI CỦA BẠN TẠI ĐÂY ***
-                // Đặt cờ trong localStorage để trang chủ hiển thị popup
+                // *** (Giữ nguyên) Đặt cờ localStorage cho popup ***
                 localStorage.setItem('show_identity_prompt', 'true');
                 // **************************************************
 
-                // (YÊU CẦU 2 - ĐANG CHẠY ĐÚNG) 
-                // Chỉ báo thành công và chuyển sang login, không tự đăng nhập
+                // (Giữ nguyên) Báo thành công và chuyển sang login
                 setSuccess("Đăng ký thành công! 🎉 Bạn có thể đăng nhập ngay.");
                 setForm(initialFormState);
                 
@@ -124,7 +127,7 @@ export default function Login() {
             } else if (mode === 'login') {
                 // ========== ĐĂNG NHẬP (Đa hệ thống) ==========
                 
-                // Bước 1: Kiểm tra vai trò (role) trong bảng Users (profile)
+                // (Toàn bộ logic Đăng nhập của bạn giữ nguyên)
                 const { data: userProfile, error: profileError } = await supabase
                     .from('Users')
                     .select('*')
@@ -134,46 +137,30 @@ export default function Login() {
                 if (profileError || !userProfile) {
                     throw new Error("Email hoặc mật khẩu không đúng.");
                 }
-
                 if (userProfile.is_active === false) {
                     throw new Error("Tài khoản của bạn đã bị khóa. 🔒");
                 }
-                
-                let from = "/"; // Mặc định là trang chủ
-
-                // Bước 2: Dựa vào role để chọn hệ thống đăng nhập
-                
-                // <<< SỬA LỖI TẠI ĐÂY: Thêm '|| userProfile.role === 'supplier'' >>>
+                let from = "/"; 
                 if (userProfile.role === 'admin' || userProfile.role === 'supplier') {
-                    // --- (HỆ THỐNG 1: ADMIN VÀ SUPPLIER DÙNG SUPABASE AUTH) ---
                     const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
                         email: form.email,
                         password: form.password,
                     });
-
                     if (loginError) {
-                        // (Sửa câu báo lỗi cho chung chung)
                         throw new Error("Email hoặc mật khẩu không đúng.");
                     }
                     if (!loginData.session) {
                          throw new Error("Đăng nhập thất bại, không nhận được session.");
                     }
-                    
-                    // (SỬA) Phân luồng điều hướng
                     if(userProfile.role === 'admin') {
-                        // Admin sẽ ở lại trang Home (hoặc trang trước đó)
                         from = location.state?.from?.pathname || "/";
                     } else if (userProfile.role === 'supplier') {
-                        // Supplier thì điều hướng thẳng vào trang supplier
                         from = "/supplier"; 
                     }
-                    
                 } else {
-                    // --- (HỆ THỐNG 2: USER 'user' DÙNG TÀI KHOẢN ẢO) ---
                     if (!userProfile.password) {
                         throw new Error("Tài khoản này không có mật khẩu (Lỗi NULL). Vui lòng liên hệ Admin.");
                     }
-
                     try {
                         const decodedPassword = atob(userProfile.password);
                         if (decodedPassword !== form.password) {
@@ -182,8 +169,6 @@ export default function Login() {
                     } catch (e) {
                         throw new Error("Đã xảy ra lỗi khi kiểm tra mật khẩu (Base64).");
                     }
-
-                    // Lưu thông tin user "ảo" vào localStorage
                     localStorage.setItem('user', JSON.stringify({
                         id: userProfile.id,
                         email: userProfile.email,
@@ -191,70 +176,52 @@ export default function Login() {
                         role: userProfile.role,
                         customer_code: userProfile.customer_code
                     }));
-                    
                     from = location.state?.from?.pathname || "/";
                 }
-
-                // Bước 3: Chuyển hướng (Dùng chung cho cả hai hệ thống)
                 setSuccess("Đăng nhập thành công! 🎉");
-                
-                // (FIX LỖI NAVBAR) - Dùng window.location.href để BUỘC TẢI LẠI TRANG
                 setTimeout(() => {
                     window.location.href = from;
                 }, 1000);
 
             } else if (mode === 'forgot') {
-                // (YÊU CẦU 3) - Giữ nguyên hệ thống "Admin OTP"
+                // (Toàn bộ logic Quên mật khẩu của bạn giữ nguyên)
                 if (!form.email) throw new Error("Vui lòng nhập email của bạn.");
-
                 if (!isOtpSent) {
-                    // BƯỚC 1: Gửi yêu cầu hỗ trợ (Tạo bản ghi trong password_reset_requests)
                     const { data: user, error: findError } = await supabase
                         .from('Users')
-                        .select('id, role') // Lấy cả role
+                        .select('id, role')
                         .eq('email', form.email)
                         .single();
-
                     if (findError || !user) {
                         throw new Error("Email không tồn tại trong hệ thống.");
                     }
-                    
-                    // <<< SỬA LỖI TẠI ĐÂY: Thêm '|| user.role === 'supplier'' >>>
                     if (user.role === 'admin' || user.role === 'supplier') {
                          throw new Error("Không thể dùng chức năng này cho tài khoản Quản trị/NCC.");
                     }
-
                     const expiresAt = new Date();
                     expiresAt.setHours(expiresAt.getHours() + 24);
-
                     const { error: insertError } = await supabase
                         .from('password_reset_requests')
                         .insert({
                             email: form.email,
-                            otp: null, // (Tên cột này có thể là 'token' tùy CSDL của bạn)
+                            otp: null, 
                             is_resolved: false,
                             requested_at: new Date().toISOString(),
                             expires_at: expiresAt.toISOString()
                         });
-
                     if (insertError) throw insertError;
-
                     setSuccess(`Yêu cầu đã gửi! Vui lòng liên hệ Admin (SĐT: ${ADMIN_PHONE}) để nhận mã OTP.`);
                     setIsOtpSent(true);
-
                 } else {
-                    // BƯỚC 2: Xác thực OTP và đổi mật khẩu (User nhập OTP)
                     if (!form.otp || form.otp.length !== 6) throw new Error("Vui lòng nhập Mã OTP 6 số.");
                     if (!form.password || form.password.length < 6) throw new Error("Mật khẩu mới phải có ít nhất 6 ký tự.");
                     if (form.password !== form.confirm) throw new Error("Mật khẩu không khớp.");
-
-                    // (FIX) Sửa 'otp' thành 'token' cho khớp với ảnh database của bạn
-                    // (Giữ nguyên code cũ của bạn vì nó đã được sửa)
+                    
                     const { data: req, error: reqError } = await supabase
                         .from('password_reset_requests')
                         .select('*')
                         .eq('email', form.email)
-                        .eq('token', form.otp) // <-- SỬA LẠI THÀNH 'token' (Đã giữ)
+                        .eq('token', form.otp) 
                         .eq('is_resolved', false)
                         .gt('expires_at', new Date().toISOString())
                         .single();
@@ -262,23 +229,16 @@ export default function Login() {
                     if (reqError || !req) {
                         throw new Error("Mã OTP không hợp lệ hoặc đã hết hạn.");
                     }
-                    
-                    const hashedPassword = btoa(form.password); // Mã hóa Base64
-
-                    // Cập nhật mật khẩu trong bảng Users
+                    const hashedPassword = btoa(form.password); 
                     const { error: updateError } = await supabase
                         .from('Users')
-                        .update({ password: hashedPassword }) // Cập nhật cột password "ảo"
+                        .update({ password: hashedPassword }) 
                         .eq('email', form.email);
-
                     if (updateError) throw updateError;
-
-                    // Đánh dấu yêu cầu đã xử lý
                     await supabase
                         .from('password_reset_requests')
                         .update({ is_resolved: true })
                         .eq('id', req.id);
-
                     setSuccess("Đổi mật khẩu thành công! 🎉");
                     setForm(initialFormState);
                     setIsOtpSent(false);
