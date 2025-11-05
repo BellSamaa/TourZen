@@ -1,4 +1,5 @@
 // src/pages/ManageTour.jsx
+// (V27: Fix lỗi "ke.and is not a function". Quay lại V25 (chaining) nhưng giữ cú pháp filter V26)
 // (V26: Fix lỗi "parse logic tree" bằng cách gộp filter dùng .and())
 // (V25: Fix lỗi search bằng cách chain .eq() và .or() theo file mẫu)
 
@@ -739,9 +740,10 @@ export default function ManageTour() {
     const [viewingReview, setViewingReview] = useState(null); // Lưu object review
 
     
-    // (*** CẬP NHẬT V26: Sửa lỗi "parse logic tree" ***)
-    // Nguyên nhân: Không thể chain (nối) nhiều .or() khi chúng cần được kết hợp bằng AND.
-    // Giải pháp: Xây dựng một mảng filter và gọi .and() một lần duy nhất.
+    // (*** CẬP NHẬT V27: Sửa lỗi "ke.and is not a function" ***)
+    // Nguyên nhân: Đã dùng .and() (V26) thay vì chaining.
+    // Giải pháp: Quay lại V25 (chaining filters), nhưng SỬA LẠI CÁC CHUỖI FILTER
+    // cho đúng cú pháp PostgREST (đã đúng ở V26).
     const fetchBookings = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         else setLoading(true); 
@@ -767,21 +769,21 @@ export default function ManageTour() {
                 .from('Bookings')
                 .select(selectQuery, { count: 'exact' }); 
                 
-            // (*** SỬA LỖI V26 ***)
-            // Xây dựng mảng filter (AND)
-            const filters = [];
+            // (*** SỬA LỖI V27 ***)
+            // Chaining (nối) các filter lại với nhau. Chained filters = AND
 
             // Filter 1: Trạng thái
             if (filterStatus !== 'all') {
-                filters.push(`status.eq.${filterStatus}`);
+                query = query.eq('status', filterStatus);
             }
             
             // Filter 2: Khách hàng (sử dụng cú pháp 'user.or(...)' để lọc trên foreign table)
             const customerSearchVal = debouncedCustomerSearch ? `%${debouncedCustomerSearch}%` : null;
             if (customerSearchVal) {
-                // Logic OR bên trong bộ lọc 'user'
+                // SỬA: Dùng cú pháp PostgREST đúng cho foreign table
                 const customerSearchQuery = `user.or(full_name.ilike.${customerSearchVal},email.ilike.${customerSearchVal})`;
-                filters.push(customerSearchQuery);
+                // Chaining .or() (sẽ được AND với filter status)
+                query = query.or(customerSearchQuery);
             }
 
             // Filter 3: Tour/ID
@@ -792,17 +794,12 @@ export default function ManageTour() {
             const tourSearchVal = sanitizedTourSearch ? `%${sanitizedTourSearch}%` : null;
             
             if (tourSearchVal) {
-                // Logic OR giữa bảng chính (id) và foreign table (product.name)
-                // Đây là cú pháp PostgREST chuẩn
+                // SỬA: Dùng cú pháp PostgREST đúng để OR (bảng chính) và (bảng foreign)
                 const tourSearchQuery = `or(id::text.ilike.${tourSearchVal},product.name.ilike.${tourSearchVal})`;
-                filters.push(tourSearchQuery);
+                // Chaining .or() (sẽ được AND với các filter trước)
+                query = query.or(tourSearchQuery);
             }
-            
-            // Áp dụng TẤT CẢ filter bằng AND
-            if (filters.length > 0) {
-                query = query.and(filters.join(','));
-            }
-            // (*** KẾT THÚC SỬA V26 ***)
+            // (*** KẾT THÚC SỬA V27 ***)
 
             // Sắp xếp và Phân trang (Giữ nguyên)
             query = query.order('created_at', { ascending: false }).range(from, to);
@@ -824,15 +821,20 @@ export default function ManageTour() {
             }
         } catch (err) {
              console.error("Lỗi tải danh sách đơn hàng:", err);
+             // (SỬA V27) Báo lỗi cụ thể hơn
              const errorMessage = err.message || "Không thể tải dữ liệu.";
              setError(errorMessage);
-             toast.error(`Lỗi tải đơn hàng: ${errorMessage}`);
+             if (err.message.includes("parse logic tree")) {
+                 toast.error("Lỗi cú pháp tìm kiếm (parse logic tree). Vui lòng kiểm tra lại.");
+             } else {
+                toast.error(`Lỗi tải đơn hàng: ${errorMessage}`);
+             }
         } finally {
             if (isInitialLoad) setLoading(false);
             setIsFetchingPage(false);
         }
     }, [currentPage, debouncedSearch, debouncedCustomerSearch, filterStatus]);
-    // (*** KẾT THÚC SỬA LỖI V26 ***)
+    // (*** KẾT THÚC SỬA LỖI V27 ***)
     
 
     // (GIỮ NGUYÊN V8) useEffect để fetch Users, Tours & Services
