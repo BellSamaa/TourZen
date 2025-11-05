@@ -1,5 +1,5 @@
 // ManageAccounts.jsx
-/* *** (SỬA LỖI v26 - THEO YÊU CẦU) Sửa lỗi Duplicate Key 'Users_account_code_key' ***
+/* *** (SỬA LỖI v26) Sửa lỗi Duplicate Key 'Users_account_code_key' ***
   1. (Fix) VIẾT LẠI HOÀN TOÀN logic Thêm Mới trong 'AccountModal'
      để tuân thủ hệ thống Hybrid.
   2. (Logic) Nếu Admin thêm 'admin'/'supplier', sẽ dùng 'supabase.auth.signUp'
@@ -237,6 +237,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
             console.error("Lỗi Thêm/Sửa tài khoản:", error);
             const errorMessage = error.message.includes("Edge Function") 
                 ? "Lỗi server: " + error.message
+                // (Sửa v26) Cải thiện thông báo lỗi
                 : (error.message.includes("Email already in use") ? "Email đã tồn tại trong hệ thống Auth." : error.message)
                 || 'Đã xảy ra lỗi không xác định.';
             toast.error(errorMessage);
@@ -470,7 +471,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
 
 // <<< THÊM v21: COMPONENT YÊU CẦU RESET MẬT KHẨU (Từ ManageCustomers) >>>
 const PasswordResetRequests = () => {
-    // ... (Toàn bộ code của PasswordResetRequests giữ nguyên như file v22 của bạn) ...
+    // ... (Toàn bộ code của PasswordResetRequests giữ nguyên) ...
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
   
