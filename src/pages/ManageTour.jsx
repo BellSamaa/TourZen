@@ -1,5 +1,5 @@
 // src/pages/ManageTour.jsx
-// (V23: Fix "parse logic tree" error by using single .and() block)
+// (V24: Fix "Ne.and is not a function" by using spread operator)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -738,7 +738,7 @@ export default function ManageTour() {
     const [viewingReview, setViewingReview] = useState(null); // Lưu object review
 
     
-    // (CẬP NHẬT v23) Fetch Bookings (Fix lỗi parse tree bằng 1 .and() block)
+    // (CẬP NHẬT v24) Fetch Bookings (Fix lỗi .and() bằng spread operator ...)
     const fetchBookings = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         else setLoading(true); 
@@ -789,9 +789,10 @@ export default function ManageTour() {
                  andFilters.push(`or(product.name.ilike.${tourSearchVal},id::text.ilike.${tourSearchVal})`);
             }
             
-            // Áp dụng tất cả filter bằng MỘT lệnh .and()
+            // (CẬP NHẬT V24) Áp dụng tất cả filter bằng MỘT lệnh .and() dùng SPREAD
             if (andFilters.length > 0) {
-                query = query.and(andFilters.join(','));
+                // Đây là chỗ sửa lỗi
+                query = query.and(...andFilters);
             }
             
             // Sắp xếp và Phân trang
@@ -816,7 +817,7 @@ export default function ManageTour() {
              console.error("Lỗi tải danh sách đơn hàng:", err);
              setError(err.message || "Không thể tải dữ liệu.");
              // Hiển thị lỗi cho người dùng
-             if (err.message.includes("parse logic tree")) {
+             if (err.message.includes("parse logic tree") || err.message.includes(".and is not a function")) {
                  toast.error("Lỗi cú pháp tìm kiếm. Vui lòng thử lại.");
              } else {
                  toast.error(`Lỗi tải đơn hàng: ${err.message}`);
