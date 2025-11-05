@@ -1,4 +1,5 @@
 // src/pages/ManageTour.jsx
+// (V26: Fix lỗi "parse logic tree" bằng cách gộp filter dùng .and())
 // (V25: Fix lỗi search bằng cách chain .eq() và .or() theo file mẫu)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
@@ -738,7 +739,9 @@ export default function ManageTour() {
     const [viewingReview, setViewingReview] = useState(null); // Lưu object review
 
     
-    // (*** CẬP NHẬT V25: Sửa lỗi tìm kiếm ***)
+    // (*** CẬP NHẬT V26: Sửa lỗi "parse logic tree" ***)
+    // Nguyên nhân: Không thể chain (nối) nhiều .or() khi chúng cần được kết hợp bằng AND.
+    // Giải pháp: Xây dựng một mảng filter và gọi .and() một lần duy nhất.
     const fetchBookings = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         else setLoading(true); 
@@ -764,23 +767,24 @@ export default function ManageTour() {
                 .from('Bookings')
                 .select(selectQuery, { count: 'exact' }); 
                 
-            // (CẬP NHẬT V25) Chaining filters (Logic = AND)
-            // (Tham khảo ManageAccounts.jsx và ManageCustomers.jsx)
+            // (*** SỬA LỖI V26 ***)
+            // Xây dựng mảng filter (AND)
+            const filters = [];
 
-            // Filter 1: Trạng thái (luôn là AND)
+            // Filter 1: Trạng thái
             if (filterStatus !== 'all') {
-                query = query.eq('status', filterStatus);
+                filters.push(`status.eq.${filterStatus}`);
             }
             
-            // Filter 2: Khách hàng (AND (Name ILIKE ... OR Email ILIKE ...))
+            // Filter 2: Khách hàng (sử dụng cú pháp 'user.or(...)' để lọc trên foreign table)
             const customerSearchVal = debouncedCustomerSearch ? `%${debouncedCustomerSearch}%` : null;
             if (customerSearchVal) {
-                // Giống hệt logic file mẫu
-                const customerSearchQuery = `user.full_name.ilike.${customerSearchVal},user.email.ilike.${customerSearchVal}`;
-                query = query.or(customerSearchQuery);
+                // Logic OR bên trong bộ lọc 'user'
+                const customerSearchQuery = `user.or(full_name.ilike.${customerSearchVal},email.ilike.${customerSearchVal})`;
+                filters.push(customerSearchQuery);
             }
 
-            // Filter 3: Tour/ID (AND (Product Name ILIKE ... OR ID ILIKE ...))
+            // Filter 3: Tour/ID
             let sanitizedTourSearch = debouncedSearch;
             if (sanitizedTourSearch && sanitizedTourSearch.startsWith('#')) {
                 sanitizedTourSearch = sanitizedTourSearch.substring(1);
@@ -788,12 +792,19 @@ export default function ManageTour() {
             const tourSearchVal = sanitizedTourSearch ? `%${sanitizedTourSearch}%` : null;
             
             if (tourSearchVal) {
-                // Giống hệt logic file mẫu
-                const tourSearchQuery = `product.name.ilike.${tourSearchVal},id::text.ilike.${tourSearchVal}`;
-                query = query.or(tourSearchQuery);
+                // Logic OR giữa bảng chính (id) và foreign table (product.name)
+                // Đây là cú pháp PostgREST chuẩn
+                const tourSearchQuery = `or(id::text.ilike.${tourSearchVal},product.name.ilike.${tourSearchVal})`;
+                filters.push(tourSearchQuery);
             }
             
-            // Sắp xếp và Phân trang
+            // Áp dụng TẤT CẢ filter bằng AND
+            if (filters.length > 0) {
+                query = query.and(filters.join(','));
+            }
+            // (*** KẾT THÚC SỬA V26 ***)
+
+            // Sắp xếp và Phân trang (Giữ nguyên)
             query = query.order('created_at', { ascending: false }).range(from, to);
             
             const { data, error: queryError, count } = await query;
@@ -813,21 +824,16 @@ export default function ManageTour() {
             }
         } catch (err) {
              console.error("Lỗi tải danh sách đơn hàng:", err);
-             setError(err.message || "Không thể tải dữ liệu.");
-             // (SỬA V25) Hiển thị lỗi thân thiện hơn
-             if (err.message.includes("parse logic tree")) {
-                 toast.error("Lỗi cú pháp tìm kiếm (parse tree). Vui lòng thử lại.");
-             } else if (err.message.includes(".and is not a function") || err.message.includes(".or is not a function")) {
-                 toast.error("Lỗi cú pháp tìm kiếm (invalid function). Vui lòng thử lại.");
-             } else {
-                 toast.error(`Lỗi tải đơn hàng: ${err.message}`);
-             }
+             const errorMessage = err.message || "Không thể tải dữ liệu.";
+             setError(errorMessage);
+             toast.error(`Lỗi tải đơn hàng: ${errorMessage}`);
         } finally {
             if (isInitialLoad) setLoading(false);
             setIsFetchingPage(false);
         }
     }, [currentPage, debouncedSearch, debouncedCustomerSearch, filterStatus]);
-    // (*** KẾT THÚC SỬA LỖI V25 ***)
+    // (*** KẾT THÚC SỬA LỖI V26 ***)
+    
 
     // (GIỮ NGUYÊN V8) useEffect để fetch Users, Tours & Services
     useEffect(() => {
@@ -878,16 +884,26 @@ export default function ManageTour() {
 
     // (CẬP NHẬT V21) Thêm debouncedCustomerSearch vào dependencies
      useEffect(() => {
-        fetchBookings(true);
-     }, [debouncedSearch, debouncedCustomerSearch, filterStatus, fetchBookings]); 
+        // (SỬA V26) fetchBookings giờ là dependency, nó sẽ tự gọi khi các state thay đổi
+        // fetchBookings(true); 
+     }, [debouncedSearch, debouncedCustomerSearch, filterStatus]); 
 
      useEffect(() => {
         if (!loading) { fetchBookings(false); }
+         // (SỬA V26) Thêm fetchBookings vào dependency array
      }, [currentPage, loading, fetchBookings]);
+     
+     // (SỬA V26) Gọi fetchBookings lần đầu tiên
+     useEffect(() => {
+         fetchBookings(true);
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+     }, [fetchBookings]); // Chỉ chạy 1 lần khi mount
+
 
     // (CẬP NHẬT V21) Thêm debouncedCustomerSearch vào dependencies
      useEffect(() => {
         if (currentPage !== 1) { setCurrentPage(1); }
+     // eslint-disable-next-line react-hooks/exhaustive-deps
      }, [debouncedSearch, debouncedCustomerSearch, filterStatus]);
 
 
@@ -928,8 +944,7 @@ export default function ManageTour() {
             // (MỚI v9) Xóa Reviews trước (nếu có)
              if (booking.review_data) {
                  const { data, error } = await supabase
-  .from('Reviews')
-  .select('*, Users(*)')
+                     .from('Reviews')
                      .delete()
                      .eq('booking_id', booking.id); // Xóa theo booking_id
                  if (error) {
@@ -1096,7 +1111,7 @@ export default function ManageTour() {
                         </div>
                         
                         {/* Nút Reload */}
-                        <button onClick={() => fetchBookings(true)} disabled={loading || isFetchingPage} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors flex-shrink-0">
+                        <button onClick={() => fetchBookings(false)} disabled={loading || isFetchingPage} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors flex-shrink-0">
                             <ArrowClockwise size={18} className={isFetchingPage ? "animate-spin" : ""} />
                         </button>
                     </div>
