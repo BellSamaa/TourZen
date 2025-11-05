@@ -1,7 +1,7 @@
 // src/pages/ManageTour.jsx
-// (V27: Fix lỗi "ke.and is not a function". Quay lại V25 (chaining) nhưng giữ cú pháp filter V26)
-// (V26: Fix lỗi "parse logic tree" bằng cách gộp filter dùng .and())
-// (V25: Fix lỗi search bằng cách chain .eq() và .or() theo file mẫu)
+// (V28: Fix lỗi "parse logic tree" và "ke.and is not a function")
+// Giải pháp: Sử dụng V26 (dùng .and()) vì đây là cách duy nhất
+// để kết hợp nhiều bộ lọc AND phức tạp.
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -740,10 +740,9 @@ export default function ManageTour() {
     const [viewingReview, setViewingReview] = useState(null); // Lưu object review
 
     
-    // (*** CẬP NHẬT V27: Sửa lỗi "ke.and is not a function" ***)
-    // Nguyên nhân: Đã dùng .and() (V26) thay vì chaining.
-    // Giải pháp: Quay lại V25 (chaining filters), nhưng SỬA LẠI CÁC CHUỖI FILTER
-    // cho đúng cú pháp PostgREST (đã đúng ở V26).
+    // (*** CẬP NHẬT V28: Quay lại V26. Lỗi V27 (parse logic tree) xác nhận V25/V27 (chaining) là sai. ***)
+    // Vấn đề: Phải kết hợp nhiều bộ lọc (Status, Customer Search, Tour Search) bằng AND.
+    // Giải pháp: Xây dựng mảng filter strings và gọi query.and(filters.join(',')) MỘT LẦN DUY NHẤT.
     const fetchBookings = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         else setLoading(true); 
@@ -763,27 +762,27 @@ export default function ManageTour() {
                 voucher_code,voucher_discount,notes,payment_method,
                 Invoices(id),
                 Reviews!booking_id(id,rating,comment,reviewer:user_id(full_name,email)) 
-            `.replace(/\s+/g, ''); // Loại bỏ tất cả khoảng trắng, tab, newline
+            `.replace(/\s+/g, '');
             
             let query = supabase
                 .from('Bookings')
                 .select(selectQuery, { count: 'exact' }); 
                 
-            // (*** SỬA LỖI V27 ***)
-            // Chaining (nối) các filter lại với nhau. Chained filters = AND
+            // (*** SỬA LỖI V28 ***)
+            // Xây dựng mảng filter (AND)
+            const filters = [];
 
             // Filter 1: Trạng thái
             if (filterStatus !== 'all') {
-                query = query.eq('status', filterStatus);
+                filters.push(`status.eq.${filterStatus}`);
             }
             
             // Filter 2: Khách hàng (sử dụng cú pháp 'user.or(...)' để lọc trên foreign table)
             const customerSearchVal = debouncedCustomerSearch ? `%${debouncedCustomerSearch}%` : null;
             if (customerSearchVal) {
-                // SỬA: Dùng cú pháp PostgREST đúng cho foreign table
+                // Logic OR bên trong bộ lọc 'user'
                 const customerSearchQuery = `user.or(full_name.ilike.${customerSearchVal},email.ilike.${customerSearchVal})`;
-                // Chaining .or() (sẽ được AND với filter status)
-                query = query.or(customerSearchQuery);
+                filters.push(customerSearchQuery);
             }
 
             // Filter 3: Tour/ID
@@ -794,17 +793,23 @@ export default function ManageTour() {
             const tourSearchVal = sanitizedTourSearch ? `%${sanitizedTourSearch}%` : null;
             
             if (tourSearchVal) {
-                // SỬA: Dùng cú pháp PostgREST đúng để OR (bảng chính) và (bảng foreign)
+                // Logic OR giữa bảng chính (id) và foreign table (product.name)
                 const tourSearchQuery = `or(id::text.ilike.${tourSearchVal},product.name.ilike.${tourSearchVal})`;
-                // Chaining .or() (sẽ được AND với các filter trước)
-                query = query.or(tourSearchQuery);
+                filters.push(tourSearchQuery);
             }
-            // (*** KẾT THÚC SỬA V27 ***)
+            
+            // Áp dụng TẤT CẢ filter bằng AND (nếu có filter)
+            if (filters.length > 0) {
+                // Đây là cú pháp .and() chuẩn
+                query = query.and(filters.join(','));
+            }
+            // (*** KẾT THÚC SỬA V28 ***)
 
             // Sắp xếp và Phân trang (Giữ nguyên)
             query = query.order('created_at', { ascending: false }).range(from, to);
             
             const { data, error: queryError, count } = await query;
+            
             if (queryError) throw queryError;
             
              // Xử lý join Invoices (trả về mảng) và Reviews
@@ -820,21 +825,16 @@ export default function ManageTour() {
                  setCurrentPage(1);
             }
         } catch (err) {
-             console.error("Lỗi tải danh sách đơn hàng:", err);
-             // (SỬA V27) Báo lỗi cụ thể hơn
+             console.error("Lỗi tải danh sách đơn hàng (V28):", err);
              const errorMessage = err.message || "Không thể tải dữ liệu.";
              setError(errorMessage);
-             if (err.message.includes("parse logic tree")) {
-                 toast.error("Lỗi cú pháp tìm kiếm (parse logic tree). Vui lòng kiểm tra lại.");
-             } else {
-                toast.error(`Lỗi tải đơn hàng: ${errorMessage}`);
-             }
+             toast.error(`Lỗi tải đơn hàng: ${errorMessage}`);
         } finally {
             if (isInitialLoad) setLoading(false);
             setIsFetchingPage(false);
         }
     }, [currentPage, debouncedSearch, debouncedCustomerSearch, filterStatus]);
-    // (*** KẾT THÚC SỬA LỖI V27 ***)
+    // (*** KẾT THÚC SỬA LỖI V28 ***)
     
 
     // (GIỮ NGUYÊN V8) useEffect để fetch Users, Tours & Services
@@ -884,26 +884,24 @@ export default function ManageTour() {
     }, []);
 
 
-    // (CẬP NHẬT V21) Thêm debouncedCustomerSearch vào dependencies
+    // (CẬP NHẬT V28) Sửa lại logic gọi useEffect
      useEffect(() => {
-        // (SỬA V26) fetchBookings giờ là dependency, nó sẽ tự gọi khi các state thay đổi
-        // fetchBookings(true); 
-     }, [debouncedSearch, debouncedCustomerSearch, filterStatus]); 
-
-     useEffect(() => {
-        if (!loading) { fetchBookings(false); }
-         // (SỬA V26) Thêm fetchBookings vào dependency array
-     }, [currentPage, loading, fetchBookings]);
-     
-     // (SỬA V26) Gọi fetchBookings lần đầu tiên
-     useEffect(() => {
-         fetchBookings(true);
-     // eslint-disable-next-line react-hooks/exhaustive-deps
-     }, [fetchBookings]); // Chỉ chạy 1 lần khi mount
+        // Chỉ chạy fetchBookings khi các dependencies thay đổi
+        // (currentPage, debouncedSearch, debouncedCustomerSearch, filterStatus)
+        // fetchBookings đã được bọc trong useCallback và có các dependencies này
+        
+        // Gọi fetchBookings khi component mount (isInitialLoad = true)
+        // và khi các dependencies thay đổi (isInitialLoad = false)
+        if (loading) { // Chỉ chạy lần đầu khi loading=true
+             fetchBookings(true);
+        } else {
+             fetchBookings(false);
+        }
+     }, [currentPage, debouncedSearch, debouncedCustomerSearch, filterStatus, fetchBookings, loading]);
 
 
-    // (CẬP NHẬT V21) Thêm debouncedCustomerSearch vào dependencies
      useEffect(() => {
+        // Reset về trang 1 khi filter thay đổi
         if (currentPage !== 1) { setCurrentPage(1); }
      // eslint-disable-next-line react-hooks/exhaustive-deps
      }, [debouncedSearch, debouncedCustomerSearch, filterStatus]);
