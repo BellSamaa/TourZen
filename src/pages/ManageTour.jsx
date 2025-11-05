@@ -1,5 +1,5 @@
 // src/pages/ManageTour.jsx
-// (V24: Fix "Ne.and is not a function" by using spread operator)
+// (V25: Fix lỗi search bằng cách chain .eq() và .or() theo file mẫu)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -738,7 +738,7 @@ export default function ManageTour() {
     const [viewingReview, setViewingReview] = useState(null); // Lưu object review
 
     
-    // (CẬP NHẬT v24) Fetch Bookings (Fix lỗi .and() bằng spread operator ...)
+    // (*** CẬP NHẬT V25: Sửa lỗi tìm kiếm ***)
     const fetchBookings = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         else setLoading(true); 
@@ -764,21 +764,23 @@ export default function ManageTour() {
                 .from('Bookings')
                 .select(selectQuery, { count: 'exact' }); 
                 
-            // (CẬP NHẬT V23) Xây dựng một mảng filter cho .and()
-            const andFilters = [];
+            // (CẬP NHẬT V25) Chaining filters (Logic = AND)
+            // (Tham khảo ManageAccounts.jsx và ManageCustomers.jsx)
 
-            // Filter 1: Trạng thái
+            // Filter 1: Trạng thái (luôn là AND)
             if (filterStatus !== 'all') {
-                andFilters.push(`status.eq.${filterStatus}`);
+                query = query.eq('status', filterStatus);
             }
             
-            // Filter 2: Khách hàng (Tên hoặc Email)
+            // Filter 2: Khách hàng (AND (Name ILIKE ... OR Email ILIKE ...))
             const customerSearchVal = debouncedCustomerSearch ? `%${debouncedCustomerSearch}%` : null;
             if (customerSearchVal) {
-                 andFilters.push(`or(user.full_name.ilike.${customerSearchVal},user.email.ilike.${customerSearchVal})`);
+                // Giống hệt logic file mẫu
+                const customerSearchQuery = `user.full_name.ilike.${customerSearchVal},user.email.ilike.${customerSearchVal}`;
+                query = query.or(customerSearchQuery);
             }
 
-            // Filter 3: Tour hoặc Mã đơn (đã lọc dấu #)
+            // Filter 3: Tour/ID (AND (Product Name ILIKE ... OR ID ILIKE ...))
             let sanitizedTourSearch = debouncedSearch;
             if (sanitizedTourSearch && sanitizedTourSearch.startsWith('#')) {
                 sanitizedTourSearch = sanitizedTourSearch.substring(1);
@@ -786,13 +788,9 @@ export default function ManageTour() {
             const tourSearchVal = sanitizedTourSearch ? `%${sanitizedTourSearch}%` : null;
             
             if (tourSearchVal) {
-                 andFilters.push(`or(product.name.ilike.${tourSearchVal},id::text.ilike.${tourSearchVal})`);
-            }
-            
-            // (CẬP NHẬT V24) Áp dụng tất cả filter bằng MỘT lệnh .and() dùng SPREAD
-            if (andFilters.length > 0) {
-                // Đây là chỗ sửa lỗi
-                query = query.and(...andFilters);
+                // Giống hệt logic file mẫu
+                const tourSearchQuery = `product.name.ilike.${tourSearchVal},id::text.ilike.${tourSearchVal}`;
+                query = query.or(tourSearchQuery);
             }
             
             // Sắp xếp và Phân trang
@@ -816,9 +814,11 @@ export default function ManageTour() {
         } catch (err) {
              console.error("Lỗi tải danh sách đơn hàng:", err);
              setError(err.message || "Không thể tải dữ liệu.");
-             // Hiển thị lỗi cho người dùng
-             if (err.message.includes("parse logic tree") || err.message.includes(".and is not a function")) {
-                 toast.error("Lỗi cú pháp tìm kiếm. Vui lòng thử lại.");
+             // (SỬA V25) Hiển thị lỗi thân thiện hơn
+             if (err.message.includes("parse logic tree")) {
+                 toast.error("Lỗi cú pháp tìm kiếm (parse tree). Vui lòng thử lại.");
+             } else if (err.message.includes(".and is not a function") || err.message.includes(".or is not a function")) {
+                 toast.error("Lỗi cú pháp tìm kiếm (invalid function). Vui lòng thử lại.");
              } else {
                  toast.error(`Lỗi tải đơn hàng: ${err.message}`);
              }
@@ -827,6 +827,7 @@ export default function ManageTour() {
             setIsFetchingPage(false);
         }
     }, [currentPage, debouncedSearch, debouncedCustomerSearch, filterStatus]);
+    // (*** KẾT THÚC SỬA LỖI V25 ***)
 
     // (GIỮ NGUYÊN V8) useEffect để fetch Users, Tours & Services
     useEffect(() => {
