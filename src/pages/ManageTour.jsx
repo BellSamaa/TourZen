@@ -1,7 +1,5 @@
 // src/pages/ManageTour.jsx
-// (V28: Fix lỗi "parse logic tree" và "invalid input syntax for type uuid")
-// Giải pháp: Sử dụng .and() với mảng filter strings.
-// Đây là cú pháp PostgREST chuẩn để kết hợp nhiều bộ lọc AND phức tạp.
+// (V29: Thêm Biểu đồ Thống kê Review chung)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -96,10 +94,13 @@ const StatusBadge = ({ status }) => {
 // --- (V9) Component hiển thị sao Rating ---
 const RatingDisplay = ({ rating, size = 16 }) => {
     const totalStars = 5;
+    // (MỚI V29) Làm tròn lên 0.5 gần nhất
+    const displayRating = Math.round((rating || 0) * 2) / 2;
+    
     return (
-        <div className="flex justify-center text-yellow-500" title={`${rating}/${totalStars} sao`}>
+        <div className="flex justify-center text-yellow-500" title={`${rating.toFixed(1)}/${totalStars} sao`}>
             {[...Array(totalStars)].map((_, i) => (
-                <Star key={i} weight={i < rating ? "fill" : "regular"} size={size} />
+                <Star key={i} weight={i + 0.5 < displayRating ? "fill" : "regular"} size={size} />
             ))}
         </div>
     );
@@ -154,6 +155,118 @@ const BookingStats = () => {
             <StatCard title="Đơn đã xác nhận" value={stats.confirmed} loading={loading} />
             <StatCard title="Tổng doanh thu (Xác nhận)" value={formatCurrency(stats.revenue)} loading={loading} />
         </div>
+    );
+};
+
+
+// --- (MỚI V29) Component con cho thanh % ---
+const RatingBar = ({ label, percentage, count }) => (
+    <div className="flex items-center gap-2 text-sm">
+        <span className="w-12 text-slate-500 dark:text-slate-400">{label}</span>
+        <div className="flex-1 bg-slate-200 dark:bg-slate-600 rounded-full h-2.5 overflow-hidden">
+            <motion.div 
+                className="bg-yellow-500 h-2.5 rounded-full" 
+                initial={{ width: 0 }}
+                animate={{ width: `${percentage}%` }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+            ></motion.div>
+        </div>
+        <span className="w-10 text-right font-medium text-slate-700 dark:text-slate-300">{count}</span>
+    </div>
+);
+
+// --- (MỚI V29) Component Biểu đồ Đánh giá ---
+const ReviewStatsChart = () => {
+    const [stats, setStats] = useState({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 });
+    const [totalReviews, setTotalReviews] = useState(0);
+    const [averageRating, setAverageRating] = useState(0);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchReviewStats = async () => {
+            setLoading(true);
+            try {
+                // Fetch *tất cả* review (không phân trang)
+                const { data, error, count } = await supabase
+                    .from('Reviews')
+                    .select('rating', { count: 'exact' });
+
+                if (error) throw error;
+
+                const totalCount = count || 0;
+                setTotalReviews(totalCount);
+
+                if (totalCount > 0) {
+                    const newStats = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+                    let totalRatingSum = 0;
+
+                    data.forEach(r => {
+                        if (r.rating >= 1 && r.rating <= 5) {
+                            newStats[r.rating]++;
+                            totalRatingSum += r.rating;
+                        }
+                    });
+                    
+                    setStats(newStats);
+                    setAverageRating(totalRatingSum / totalCount);
+                } else {
+                    setStats({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 });
+                    setAverageRating(0);
+                }
+            } catch (err) {
+                console.error("Lỗi fetch review stats:", err);
+                toast.error("Không thể tải thống kê review.");
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchReviewStats();
+    }, []); // Chạy 1 lần khi mount
+
+    const getPercentage = (ratingCount) => {
+        if (totalReviews === 0) return 0;
+        return (ratingCount / totalReviews) * 100;
+    };
+
+    return (
+        <motion.div
+            className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-md border border-gray-100 dark:border-slate-700"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+        >
+            <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                <Star weight="fill" className="text-yellow-500" />
+                Tổng quan Đánh giá
+            </h3>
+            {loading ? (
+                <div className="flex justify-center items-center h-40">
+                    <CircleNotch size={32} className="animate-spin text-sky-500" />
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Cột 1: Điểm trung bình */}
+                    <div className="flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-700 pb-4 md:pb-0 md:pr-6">
+                        <span className="text-5xl font-extrabold text-slate-800 dark:text-white">
+                            {averageRating.toFixed(1)}
+                        </span>
+                        <RatingDisplay rating={averageRating} size={28} />
+                        <span className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+                            (Từ {totalReviews} đánh giá)
+                        </span>
+                    </div>
+                    
+                    {/* Cột 2: Thanh % */}
+                    <div className="md:col-span-2 flex flex-col justify-center space-y-2 pt-4 md:pt-0">
+                        <RatingBar label="5 Sao" percentage={getPercentage(stats[5])} count={stats[5]} />
+                        <RatingBar label="4 Sao" percentage={getPercentage(stats[4])} count={stats[4]} />
+                        <RatingBar label="3 Sao" percentage={getPercentage(stats[3])} count={stats[3]} />
+                        <RatingBar label="2 Sao" percentage={getPercentage(stats[2])} count={stats[2]} />
+                        <RatingBar label="1 Sao" percentage={getPercentage(stats[1])} count={stats[1]} />
+                    </div>
+                </div>
+            )}
+        </motion.div>
     );
 };
 
@@ -515,6 +628,7 @@ const ViewReviewModal = ({ review, onClose }) => {
                         <UserCircle size={40} className="text-gray-400" weight="duotone" />
                         <div>
                             <p className="font-semibold text-gray-800 dark:text-white">{userName}</p>
+                            {/* (SỬA V29) Sử dụng RatingDisplay đã định nghĩa ở global */}
                             <RatingDisplay rating={review.rating} size={20} />
                         </div>
                     </div>
@@ -1039,6 +1153,9 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
 
             {/* Thẻ Thống Kê (Giữ nguyên) */}
             <BookingStats />
+
+            {/* (MỚI V29) Biểu đồ Thống kê Review */}
+            <ReviewStatsChart />
 
             {/* (CẬP NHẬT V22) Filter & Search (Layout mới - giữ nguyên) */}
             <div className="bg-white dark:bg-slate-800 shadow-xl rounded-lg border border-gray-100 dark:border-slate-700">
