@@ -1,7 +1,6 @@
 // src/pages/ManageTour.jsx
-// (V28: Fix lỗi "parse logic tree" và "ke.and is not a function")
-// Giải pháp: Sử dụng V26 (dùng .and()) vì đây là cách duy nhất
-// để kết hợp nhiều bộ lọc AND phức tạp.
+// (V29: Fix lỗi. Áp dụng logic subquery (truy vấn con) do người dùng cung cấp
+// để lọc TẤT CẢ (Status, Customer, Tour) phía server)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -740,9 +739,7 @@ export default function ManageTour() {
     const [viewingReview, setViewingReview] = useState(null); // Lưu object review
 
     
-    // (*** CẬP NHẬT V28: Quay lại V26. Lỗi V27 (parse logic tree) xác nhận V25/V27 (chaining) là sai. ***)
-    // Vấn đề: Phải kết hợp nhiều bộ lọc (Status, Customer Search, Tour Search) bằng AND.
-    // Giải pháp: Xây dựng mảng filter strings và gọi query.and(filters.join(',')) MỘT LẦN DUY NHẤT.
+    // (*** CẬP NHẬT V29: Sử dụng logic Subquery (Snippet 2) do người dùng cung cấp ***)
     const fetchBookings = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         else setLoading(true); 
@@ -768,55 +765,30 @@ export default function ManageTour() {
                 .from('Bookings')
                 .select(selectQuery, { count: 'exact' }); 
                 
-            // (*** SỬA LỖI V28 ***)
-            // Xây dựng mảng filter (AND)
-            const filters = [];
+            // (*** SỬA LỖI V29: Áp dụng logic subquery của Snippet 2 ***)
+            // Chaining (nối) các filter lại với nhau. Chained filters = AND
 
             // Filter 1: Trạng thái
             if (filterStatus !== 'all') {
-                filters.push(`status.eq.${filterStatus}`);
+              query = query.eq('status', filterStatus);
             }
             
-            // Filter 2: Khách hàng (sử dụng cú pháp 'user.or(...)' để lọc trên foreign table)
-            const customerSearchVal = debouncedCustomerSearch ? `%${debouncedCustomerSearch}%` : null;
-            if (customerSearchVal) {
-                // Logic OR bên trong bộ lọc 'user'
-                const customerSearchQuery = `user.or(full_name.ilike.${customerSearchVal},email.ilike.${customerSearchVal})`;
-                filters.push(customerSearchQuery);
+            // Filter 2: Khách hàng (Sử dụng subquery)
+            if (debouncedCustomerSearch) {
+              const val = `%${debouncedCustomerSearch}%`;
+              // Cú pháp .or() với subquery .in.()
+              query = query.or(`user_id.in.(select id from Users where full_name.ilike.${val}),user_id.in.(select id from Users where email.ilike.${val})`);
             }
-
+            
             // Filter 3: Tour/ID
-            let sanitizedTourSearch = debouncedSearch;
-            if (sanitizedTourSearch && sanitizedTourSearch.startsWith('#')) {
-                sanitizedTourSearch = sanitizedTourSearch.substring(1);
+            if (debouncedSearch) {
+              let val = debouncedSearch;
+              if (val.startsWith('#')) val = val.substring(1);
+              const tourVal = `%${val}%`;
+              // Cú pháp .or() cho bảng chính (id) và bảng phụ (product.name)
+              query = query.or(`id.ilike.${tourVal},product.name.ilike.${tourVal}`);
             }
-            const tourSearchVal = sanitizedTourSearch ? `%${sanitizedTourSearch}%` : null;
-            
-            if (tourSearchVal) {
-                // Logic OR giữa bảng chính (id) và foreign table (product.name)
-                const tourSearchQuery = `or(id::text.ilike.${tourSearchVal},product.name.ilike.${tourSearchVal})`;
-                filters.push(tourSearchQuery);
-            }
-            
-            // Áp dụng TẤT CẢ filter bằng AND (nếu có filter)
-// Xây dựng filter an toàn, không dùng .and hoặc user.or
-if (filterStatus !== 'all') {
-  query = query.eq('status', filterStatus);
-}
-
-if (debouncedCustomerSearch) {
-  const val = `%${debouncedCustomerSearch}%`;
-  query = query.or(`user_id.in.(select id from Users where full_name.ilike.${val}),user_id.in.(select id from Users where email.ilike.${val})`);
-}
-
-if (debouncedSearch) {
-  let val = debouncedSearch;
-  if (val.startsWith('#')) val = val.substring(1);
-  const tourVal = `%${val}%`;
-  query = query.or(`id.ilike.${tourVal},product.name.ilike.${tourVal}`);
-}
-
-            // (*** KẾT THÚC SỬA V28 ***)
+            // (*** KẾT THÚC SỬA V29 ***)
 
             // Sắp xếp và Phân trang (Giữ nguyên)
             query = query.order('created_at', { ascending: false }).range(from, to);
@@ -838,7 +810,7 @@ if (debouncedSearch) {
                  setCurrentPage(1);
             }
         } catch (err) {
-             console.error("Lỗi tải danh sách đơn hàng (V28):", err);
+             console.error("Lỗi tải danh sách đơn hàng (V29):", err);
              const errorMessage = err.message || "Không thể tải dữ liệu.";
              setError(errorMessage);
              toast.error(`Lỗi tải đơn hàng: ${errorMessage}`);
@@ -847,7 +819,7 @@ if (debouncedSearch) {
             setIsFetchingPage(false);
         }
     }, [currentPage, debouncedSearch, debouncedCustomerSearch, filterStatus]);
-    // (*** KẾT THÚC SỬA LỖI V28 ***)
+    // (*** KẾT THÚC SỬA LỖI V29 ***)
     
 
     // (GIỮ NGUYÊN V8) useEffect để fetch Users, Tours & Services
