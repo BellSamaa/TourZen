@@ -713,10 +713,8 @@ export default function ManageTour() {
     const [error, setError] = useState(null);
     
     // (CẬP NHẬT V21) Tách 2 thanh search
-    const [searchTerm, setSearchTerm] = useState(""); // Search Tour / ID
     const [customerSearchTerm, setCustomerSearchTerm] = useState(""); // Search Khách hàng
     
-    const debouncedSearch = useDebounce(searchTerm, 500);
     const debouncedCustomerSearch = useDebounce(customerSearchTerm, 500); // (MỚI V21)
     
     const ITEMS_PER_PAGE = 10;
@@ -770,14 +768,6 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
       query = query.eq("status", filterStatus);
     }
 
-    // Lọc theo Tour / Mã đơn
-    let sanitizedTourSearch = debouncedSearch;
-    if (sanitizedTourSearch?.startsWith("#")) sanitizedTourSearch = sanitizedTourSearch.substring(1);
-    const tourSearchVal = sanitizedTourSearch ? `%${sanitizedTourSearch}%` : null;
-    if (tourSearchVal) {
-      query = query.or(`id.ilike.${tourSearchVal},product.name.ilike.${tourSearchVal}`);
-    }
-
     // Phân trang và sắp xếp
     query = query.order("created_at", { ascending: false }).range(from, to);
 
@@ -815,7 +805,7 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
     if (isInitialLoad) setLoading(false);
     setIsFetchingPage(false);
   }
-}, [currentPage, debouncedSearch, debouncedCustomerSearch, filterStatus]);
+}, [currentPage, debouncedCustomerSearch, filterStatus]);
     // (*** KẾT THÚC SỬA LỖI V29 ***)
     
 
@@ -869,7 +859,7 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
     // (CẬP NHẬT V28) Sửa lại logic gọi useEffect
      useEffect(() => {
         // Chỉ chạy fetchBookings khi các dependencies thay đổi
-        // (currentPage, debouncedSearch, debouncedCustomerSearch, filterStatus)
+        // (currentPage, debouncedCustomerSearch, filterStatus)
         // fetchBookings đã được bọc trong useCallback và có các dependencies này
         
         // Gọi fetchBookings khi component mount (isInitialLoad = true)
@@ -879,14 +869,14 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
         } else {
              fetchBookings(false);
         }
-     }, [currentPage, debouncedSearch, debouncedCustomerSearch, filterStatus, fetchBookings, loading]);
+     }, [currentPage, debouncedCustomerSearch, filterStatus, fetchBookings, loading]);
 
 
      useEffect(() => {
         // Reset về trang 1 khi filter thay đổi
         if (currentPage !== 1) { setCurrentPage(1); }
      // eslint-disable-next-line react-hooks/exhaustive-deps
-     }, [debouncedSearch, debouncedCustomerSearch, filterStatus]);
+     }, [debouncedCustomerSearch, filterStatus]);
 
 
     // (GIỮ NGUYÊN V8) Event Handlers
@@ -1079,19 +1069,6 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
                             />
                         </div>
                         
-                        {/* Search Tour / Mã đơn */}
-                        <div className="relative w-full md:w-auto">
-                            <MagnifyingGlass size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                            <input 
-                                type="text" 
-                                value={searchTerm} 
-                                onChange={(e) => setSearchTerm(e.target.value)} 
-                                placeholder="Tìm theo Tour/Mã đơn..." 
-                                className="search-input-figma !pl-10 md:w-60"
-                                disabled={isFetchingPage} 
-                            />
-                        </div>
-                        
                         {/* Nút Reload */}
                         <button onClick={() => fetchBookings(false)} disabled={loading || isFetchingPage} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors flex-shrink-0">
                             <ArrowClockwise size={18} className={isFetchingPage ? "animate-spin" : ""} />
@@ -1123,7 +1100,7 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
                             {!loading && !error && bookings.length === 0 && !isFetchingPage && (
                                 // (SỬA v9) Colspan 11
                                 <tr><td colSpan="11" className="td-center text-gray-500 italic py-10">
-                                    {searchTerm || customerSearchTerm || filterStatus !== 'all' ? 'Không tìm thấy đơn hàng phù hợp.' : 'Chưa có đơn hàng nào.'}
+                                    {customerSearchTerm || filterStatus !== 'all' ? 'Không tìm thấy đơn hàng phù hợp.' : 'Chưa có đơn hàng nào.'}
                                 </td></tr>
                             )}
                             {/* (MỚI V23) Hiển thị lỗi nếu có */}
