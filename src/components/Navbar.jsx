@@ -1,11 +1,10 @@
 // src/components/Navbar.jsx
-/* *** (SỬA THEO YÊU CẦU v37.1) ***
-  1. (CSS) Thêm hiệu ứng "Galaxy Text" vào file Navbar.
-  2. (Sửa) Áp dụng .galaxy-text cho "TourZen" và "Đăng nhập".
-  3. (Sửa) Tăng kích thước (text-3xl -> text-4xl) cho "TourZen".
-  4. (Sửa) Tăng kích thước (w-7 h-7 -> w-9 h-9) cho logo.
-  5. (Sửa) Tăng kích thước (text-sm -> text-base, padding) cho nút "Đăng nhập".
-  6. (Sửa) Đổi nền nút "Đăng nhập" sang nền trung tính để hiệu ứng text nổi bật.
+/* *** (SỬA THEO YÊU CẦU v37.2) ***
+  1. (CSS) SỬA LỖI: Bọc @keyframes trong :global() để animation hoạt động.
+  2. (Giữ nguyên) Áp dụng .galaxy-text cho "TourZen" và "Đăng nhập".
+  3. (Giữ nguyên) Tăng kích thước (text-3xl -> text-4xl) cho "TourZen".
+  4. (Giữ nguyên) Tăng kích thước (w-7 h-7 -> w-9 h-9) cho logo.
+  5. (Giữ nguyên) Tăng kích thước (text-sm -> text-base, padding) cho nút "Đăng nhập".
 */
 
 import React, { useState, useEffect } from "react";
@@ -383,12 +382,7 @@ export default function Navbar() {
         )}
       </AnimatePresence>
       
-      {/* === (THÊM CSS CHO HIỆU ỨNG GALAXY) === */}
-      {/* Chúng ta thêm thẻ <style jsx> để định nghĩa .galaxy-text 
-        chỉ trong phạm vi component này.
-        Sử dụng :global() để đảm bảo nó hoạt động
-        bất kể cấu trúc lồng nhau của Tailwind.
-      */}
+      {/* === (SỬA LỖI v37.2) Bọc @keyframes trong :global() === */}
       <style jsx>{`
         :global(.galaxy-text) {
           background: linear-gradient(90deg, #007cf0, #00dfd8, #ff00c3, #007cf0);
@@ -400,7 +394,8 @@ export default function Navbar() {
           -webkit-text-fill-color: transparent; /* Đảm bảo hoạt động trên Safari */
         }
         
-        @keyframes galaxy-animation {
+        /* Bọc keyframes trong :global() để styled-jsx nhận diện */
+        :global(@keyframes galaxy-animation) {
           0% { background-position: 0% 50%; }
           100% { background-position: 100% 50%; }
         }
