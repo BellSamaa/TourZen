@@ -799,11 +799,23 @@ export default function ManageTour() {
             }
             
             // Áp dụng TẤT CẢ filter bằng AND (nếu có filter)
-            if (filters.length > 0) {
-                // Đây là cú pháp .and() chuẩn
-const combined = filters.map(f => `(${f})`).join(',');
-    query = query.filter(combined);
-            }
+// Xây dựng filter an toàn, không dùng .and hoặc user.or
+if (filterStatus !== 'all') {
+  query = query.eq('status', filterStatus);
+}
+
+if (debouncedCustomerSearch) {
+  const val = `%${debouncedCustomerSearch}%`;
+  query = query.or(`user_id.in.(select id from Users where full_name.ilike.${val}),user_id.in.(select id from Users where email.ilike.${val})`);
+}
+
+if (debouncedSearch) {
+  let val = debouncedSearch;
+  if (val.startsWith('#')) val = val.substring(1);
+  const tourVal = `%${val}%`;
+  query = query.or(`id.ilike.${tourVal},product.name.ilike.${tourVal}`);
+}
+
             // (*** KẾT THÚC SỬA V28 ***)
 
             // Sắp xếp và Phân trang (Giữ nguyên)
