@@ -662,6 +662,7 @@ const AvatarBannerManager = ({ user, refreshUser, session }) => {
     setCroppedAreaPixels(croppedAreaPixels);
   }, []);
 
+SỬA
   const openCropForFile = async (file, type) => {
     if (!file) return;
     const dataUrl = await readFileAsDataURL(file);

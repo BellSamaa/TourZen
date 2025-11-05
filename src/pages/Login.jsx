@@ -1,6 +1,7 @@
 // HỆ THỐNG ĐA XÁC THỰC (HYBRID: Auth cho Admin, Ảo cho User)
 // (SỬA LỖI: Đã thêm 'supplier' vào hệ thống xác thực Auth)
 // (SỬA THEO YÊU CẦU: Thêm cờ localStorage cho popup xác thực)
+// (SỬA THEO YÊU CẦU: Xóa logic tạo customer_code phía client, để DB Trigger tự động gán mã KHxxxx)
 
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -82,7 +83,9 @@ export default function Login() {
                 }
 
                 const hashedPassword = btoa(form.password);
-                const customerCode = 'KH' + Date.now().toString().slice(-6);
+                
+                // *** (ĐÃ XÓA) *** logic 'const customerCode = ...' 
+                // DB Trigger sẽ tự động gán mã KHxxxx
 
                 const { error: insertError } = await supabase
                     .from('Users')
@@ -94,7 +97,7 @@ export default function Login() {
                         phone_number: form.phone_number || null,
                         ngay_sinh: form.ngay_sinh || null,
                         role: 'user', 
-                        customer_code: customerCode,
+                        // *** (ĐÃ XÓA) *** 'customer_code: customerCode'
                         is_active: true
                     });
 
