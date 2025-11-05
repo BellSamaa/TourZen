@@ -18,7 +18,7 @@ import {
     FaUserTie // Icon Người già
 } from "react-icons/fa";
 import { IoIosMail, IoIosCall } from "react-icons/io";
-import { Buildings, Ticket, CircleNotch, X, WarningCircle, QrCode, Bank } from "@phosph-icons/react"; 
+import { Buildings, Ticket, CircleNotch, X, WarningCircle, QrCode, Bank } from "phosphor-react";
 import { getSupabase } from "../lib/supabaseClient";
 import toast from 'react-hot-toast';
 import { useAuth } from "../context/AuthContext.jsx"; 

@@ -8,7 +8,7 @@ import { getSupabase } from "../lib/supabaseClient";
 import { useAuth } from "../context/AuthContext"; // <<< BƯỚC 1: IMPORT useAuth
 // <<< SỬA v3: Thêm FaCalendarCheck >>>
 import { FaSpinner, FaBoxOpen, FaStar, FaRegStar, FaMoneyBillWave, FaClock, FaMapMarkerAlt, FaCalendarCheck } from "react-icons/fa";
-import { CircleNotch } from "@phosphor-icons/react";
+import { CircleNotch } from "phosphor-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
