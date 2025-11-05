@@ -755,7 +755,7 @@ export default function Profile() {
                 <TabButton
                   label="Bảo mật & Mật khẩu"
                   icon={<ShieldCheck className="text-orange-600" />}
-                  isActive={activeTop === 'password'}
+                  isActive={activeTab === 'password'}
                   onClick={() => setActiveTab('password')}
                   disabled={identityStatus !== 'approved'} // Giờ chỉ khóa khi chưa duyệt
                 />
