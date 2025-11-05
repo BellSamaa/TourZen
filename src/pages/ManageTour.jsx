@@ -1,5 +1,5 @@
 // src/pages/ManageTour.jsx
-// (V18: FIX LỖI PARSING & SCHEMA CACHE - Truy vấn Reviews an toàn)
+// (V20: CHỈ HOÀN SLOT KHI XÓA ĐƠN 'pending'/'cancelled')
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -426,7 +426,7 @@ const EditBookingModal = ({
 };
 
 
-// --- Component Modal Xác nhận Xóa (Giữ nguyên) ---
+// --- (CẬP NHẬT V20) Component Modal Xác nhận Xóa ---
 const DeleteConfirmationModal = ({ booking, onClose, onConfirm }) => {
     const [isDeleting, setIsDeleting] = useState(false);
     const handleConfirm = async () => {
@@ -454,7 +454,14 @@ const DeleteConfirmationModal = ({ booking, onClose, onConfirm }) => {
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white">Xác nhận Xóa Đơn Hàng</h3>
                     <div className="mt-3 text-base text-gray-600 dark:text-gray-300 space-y-2">
                         <p>Xóa vĩnh viễn đơn <b>#{booking.id.slice(-8).toUpperCase()}</b>?</p>
-                        {booking.status === 'confirmed' && <p className="font-semibold text-orange-600 dark:text-orange-400 mt-1 flex items-center justify-center gap-1"><UsersThree size={18}/> Số chỗ ({booking.quantity}) sẽ được hoàn trả.</p>}
+                        
+                        {/* (CẬP NHẬT V20) Chỉ hoàn slot nếu đơn KHÔNG PHẢI 'confirmed' */}
+                        {booking.status !== 'confirmed' && (
+                            <p className="font-semibold text-orange-600 dark:text-orange-400 mt-1 flex items-center justify-center gap-1">
+                                <UsersThree size={18}/> Số chỗ ({booking.quantity}) sẽ được hoàn trả.
+                            </p>
+                        )}
+                        
                         <p className="text-sm text-gray-500">Hành động này không thể hoàn tác.</p>
                     </div>
                 </div>
@@ -868,11 +875,14 @@ export default function ManageTour() {
         }
     };
     
-    // (CẬP NHẬT v9) Xóa: Xóa hóa đơn/review liên kết trước khi xóa booking
+    // (CẬP NHẬT V20) Xóa: Chỉ hoàn slot nếu status KHÔNG PHẢI 'confirmed'
     const confirmDeleteBooking = async (booking) => {
         setIsFetchingPage(true);
-        let needsSlotUpdate = booking.status === 'confirmed'; 
+        
+        // (V20) Chỉ hoàn slot nếu trạng thái không phải là 'confirmed'
+        let needsSlotUpdate = booking.status !== 'confirmed'; 
         let slotChange = booking.quantity;
+
         try {
             // (MỚI v9) Xóa Reviews trước (nếu có)
              if (booking.review_data) {
@@ -898,10 +908,13 @@ export default function ManageTour() {
                  }
              }
             
-            // Hoàn slot (giữ nguyên)
+            // (CẬP NHẬT V20) Hoàn slot nếu cần
             if (needsSlotUpdate && booking.departure_id) {
                  const { error: rpcError } = await supabase.rpc('update_departure_slot', { departure_id_input: booking.departure_id, change_amount: slotChange });
-                 if (rpcError) { console.warn(`Lỗi hoàn trả slot khi xóa booking ${booking.id}: ${rpcError.message}`); toast.warn(`Lỗi hoàn trả slot: ${rpcError.message}. Vui lòng kiểm tra lại.`); }
+                 if (rpcError) { 
+                     console.warn(`Lỗi hoàn trả slot khi xóa booking ${booking.id}: ${rpcError.message}`); 
+                     toast.warn(`Lỗi hoàn trả slot: ${rpcError.message}. Vui lòng kiểm tra lại.`); 
+                 }
             }
             
             // Xóa booking (giữ nguyên)
