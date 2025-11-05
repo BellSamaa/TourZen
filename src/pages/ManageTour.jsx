@@ -1,5 +1,5 @@
 // src/pages/ManageTour.jsx
-// (V21: Tách riêng 2 thanh search: Khách hàng và Tour/ID)
+// (V22: Fix search logic (parse tree error) & Tách layout filter/search)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -738,7 +738,7 @@ export default function ManageTour() {
     const [viewingReview, setViewingReview] = useState(null); // Lưu object review
 
     
-    // (CẬP NHẬT v21) Fetch Bookings (Dùng 2 thanh search)
+    // (CẬP NHẬT v22) Fetch Bookings (Fix lỗi parse tree)
     const fetchBookings = useCallback(async (isInitialLoad = false) => {
         if (!isInitialLoad) setIsFetchingPage(true);
         else setLoading(true); 
@@ -767,17 +767,37 @@ export default function ManageTour() {
             // Filter 1: Trạng thái
             if (filterStatus !== 'all') { query = query.eq('status', filterStatus); }
             
-            // (MỚI V21) Filter 2: Khách hàng (Tên hoặc Email)
-            if (debouncedCustomerSearch) {
-                const customerSearchVal = `%${debouncedCustomerSearch}%`;
-                query = query.or(`user.full_name.ilike.${customerSearchVal},user.email.ilike.${customerSearchVal}`);
+            // (CẬP NHẬT V22) Xử lý 2 thanh search
+            
+            // Chuẩn bị search values
+            const customerSearchVal = debouncedCustomerSearch ? `%${debouncedCustomerSearch}%` : null;
+            
+            let sanitizedTourSearch = debouncedSearch;
+            if (sanitizedTourSearch.startsWith('#')) {
+                sanitizedTourSearch = sanitizedTourSearch.substring(1); // Bỏ dấu #
             }
+            const tourSearchVal = sanitizedTourSearch ? `%${sanitizedTourSearch}%` : null;
 
-            // (CẬP NHẬT V21) Filter 3: Tour hoặc Mã đơn
-            if (debouncedSearch) {
-                 const searchTermVal = `%${debouncedSearch}%`;
-                 query = query.or(`product.name.ilike.${searchTermVal},id::text.ilike.${searchTermVal}`);
+            // (CẬP NHẬT V22) Kết hợp logic filter
+            if (customerSearchVal && tourSearchVal) {
+                // AND của 2 OR
+                query = query.and(
+                    `or(user.full_name.ilike.${customerSearchVal},user.email.ilike.${customerSearchVal}),` +
+                    `or(product.name.ilike.${tourSearchVal},id::text.ilike.${tourSearchVal})`
+                );
+            } else if (customerSearchVal) {
+                // Chỉ search Khách hàng
+                query = query.or(
+                    `user.full_name.ilike.${customerSearchVal},user.email.ilike.${customerSearchVal}`
+                );
+            } else if (tourSearchVal) {
+                // Chỉ search Tour/ID
+                query = query.or(
+                    `product.name.ilike.${tourSearchVal},id::text.ilike.${tourSearchVal}`
+                );
             }
+            // Nếu cả 2 đều null, không làm gì cả (tải tất cả)
+
             
             query = query.order('created_at', { ascending: false }).range(from, to);
             
@@ -1031,11 +1051,11 @@ export default function ManageTour() {
             {/* Thẻ Thống Kê (Giữ nguyên) */}
             <BookingStats />
 
-            {/* (CẬP NHẬT V21) Filter & Search (Tách 2 thanh search) */}
+            {/* (CẬP NHẬT V22) Filter & Search (Layout mới) */}
             <div className="bg-white dark:bg-slate-800 shadow-xl rounded-lg border border-gray-100 dark:border-slate-700">
                 {/* Filter & Search Bar */}
-                <div className="p-4 border-b border-gray-100 dark:border-slate-700 flex flex-col md:flex-row items-center gap-3">
-                    {/* Filter Trạng thái */}
+                <div className="p-4 border-b border-gray-100 dark:border-slate-700 flex flex-col md:flex-row items-center gap-3 justify-between">
+                    {/* Filter Trạng thái (Left) */}
                     <div className="flex items-center gap-2 w-full md:w-auto flex-shrink-0">
                         <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="filter-select-figma" disabled={isFetchingPage} >
                             <option value="all">Tất cả</option> 
@@ -1045,37 +1065,41 @@ export default function ManageTour() {
                         </select>
                     </div>
                     
-                    {/* (MỚI V21) Search Khách hàng */}
-                    <div className="relative flex-grow w-full md:w-auto">
-                        <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                        <input 
-                            type="text" 
-                            value={customerSearchTerm} 
-                            onChange={(e) => setCustomerSearchTerm(e.target.value)} 
-                            placeholder="Tìm theo khách hàng (tên/email)..." 
-                            className="search-input-figma !pl-10" 
-                            disabled={isFetchingPage} 
-                        />
+                    {/* Search Group (Right) */}
+                    <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
+                        {/* Search Khách hàng */}
+                        <div className="relative w-full md:w-auto">
+                            <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                            <input 
+                                type="text" 
+                                value={customerSearchTerm} 
+                                onChange={(e) => setCustomerSearchTerm(e.target.value)} 
+                                placeholder="Tìm theo khách hàng..." 
+                                className="search-input-figma !pl-10 md:w-60"
+                                disabled={isFetchingPage} 
+                            />
+                        </div>
+                        
+                        {/* Search Tour / Mã đơn */}
+                        <div className="relative w-full md:w-auto">
+                            <MagnifyingGlass size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                            <input 
+                                type="text" 
+                                value={searchTerm} 
+                                onChange={(e) => setSearchTerm(e.target.value)} 
+                                placeholder="Tìm theo Tour/Mã đơn..." 
+                                className="search-input-figma !pl-10 md:w-60"
+                                disabled={isFetchingPage} 
+                            />
+                        </div>
+                        
+                        {/* Nút Reload */}
+                        <button onClick={() => fetchBookings(true)} disabled={loading || isFetchingPage} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors flex-shrink-0">
+                            <ArrowClockwise size={18} className={isFetchingPage ? "animate-spin" : ""} />
+                        </button>
                     </div>
-                    
-                    {/* (CẬP NHẬT V21) Search Tour / Mã đơn */}
-                    <div className="relative flex-grow w-full md:w-auto">
-                        <MagnifyingGlass size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                        <input 
-                            type="text" 
-                            value={searchTerm} 
-                            onChange={(e) => setSearchTerm(e.target.value)} 
-                            placeholder="Tìm theo Tour hoặc Mã đơn..." 
-                            className="search-input-figma !pl-10" 
-                            disabled={isFetchingPage} 
-                        />
-                    </div>
-                    
-                    {/* Nút Reload */}
-                    <button onClick={() => fetchBookings(true)} disabled={loading || isFetchingPage} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors flex-shrink-0">
-                        <ArrowClockwise size={18} className={isFetchingPage ? "animate-spin" : ""} />
-                    </button>
                 </div>
+
 
                 {/* (CẬP NHẬT v10) Bảng Dữ liệu (Sửa cột Đánh giá) */}
                 <div className="overflow-x-auto relative">
