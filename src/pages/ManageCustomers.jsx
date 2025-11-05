@@ -11,6 +11,16 @@
 /* *** (DI CHUYỂN v21) ***
   (Giữ nguyên các bình luận cũ...)
 */
+/* *** (SỬA THEO YÊU CẦU) THÊM XÁC NHẬN KHI XÓA VIP ***
+  1. (State) Thêm `showVipDeleteConfirm` để quản lý modal thứ 2.
+  2. (Modal) Thêm modal `showVipDeleteConfirm` với cảnh báo đặc biệt (border cam, text cảnh báo).
+  3. (Handler) Thêm `handleDeleteAttempt` để kiểm tra Tier.
+     - Nếu không phải VIP -> Gọi `handleDelete` (xóa ngay).
+     - Nếu là VIP -> Đóng modal 1, mở modal 2 (VIP).
+  4. (Modal) Sửa modal `showDeleteConfirm` (modal 1) để luôn gọi `handleDeleteAttempt`.
+  5. (Handler) Sửa `handleDelete` để đóng cả 2 modal khi xóa xong.
+  6. (CSS) Thêm `.modal-button-warning` cho nút xóa VIP màu cam.
+*/
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 // (XÓA v21) Xóa FaBell
@@ -661,8 +671,12 @@ export default function ManageCustomersSupabase() {
   
   const [viewingBookingsCustomer, setViewingBookingsCustomer] = useState(null);
   const [viewingIdentity, setViewingIdentity] = useState(null); // <<< THÊM v12
+  
+  // <<< (SỬA THEO YÊU CẦU) THÊM STATE CHO XÓA VIP >>>
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showVipDeleteConfirm, setShowVipDeleteConfirm] = useState(false); // Modal bước 2
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  // <<< KẾT THÚC SỬA >>>
 
   // --- (SỬA v12) Fetch customers (Join user_identity) ---
   const fetchCustomers = useCallback(async (isInitialLoad = false) => {
@@ -804,25 +818,47 @@ export default function ManageCustomersSupabase() {
   const handleCloseBookingsModal = useCallback(() => { setViewingBookingsCustomer(null); }, []);
   const handleCloseIdentityModal = useCallback(() => { setViewingIdentity(null); }, []); // <<< THÊM v12
 
-  // --- Delete Handlers (Bọc useCallback) ---
+  // --- (SỬA THEO YÊU CẦU) TÁCH LOGIC DELETE HANDLERS ---
   const openDeleteConfirm = useCallback((c) => { setSelectedCustomer(c); setShowDeleteConfirm(true); }, []);
   const closeDeleteConfirm = useCallback(() => { setSelectedCustomer(null); setShowDeleteConfirm(false); }, []);
+  
+  // (Handler mới) Đóng modal VIP (bước 2)
+  const closeVipDeleteConfirm = useCallback(() => { setSelectedCustomer(null); setShowVipDeleteConfirm(false); }, []);
+
+  // (Handler xóa cuối cùng)
   const handleDelete = useCallback(async () => {
     if (!selectedCustomer) return;
     try {
-      // (SỬA v12) Sửa: Lỗi này chỉ xóa hồ sơ, không xóa auth. 
-      // (Ghi chú: Giữ nguyên logic cũ theo yêu cầu, chỉ xóa hồ sơ Users, không xóa auth)
       const { error } = await supabase.from("Users").delete().eq("id", selectedCustomer.id);
       if (error) throw error;
       toast.success(`Đã xóa hồ sơ "${selectedCustomer.full_name || selectedCustomer.email}"!`);
       if (customers.length === 1 && currentPage > 1) { setCurrentPage(currentPage - 1); } 
       else { fetchCustomers(); }
+      
+      // Đóng cả 2 modal
       closeDeleteConfirm();
+      closeVipDeleteConfirm();
+
     } catch (err) {
       console.error("Lỗi xóa:", err);
       toast.error(`Xóa thất bại: ${err.message}.`);
     }
-  }, [selectedCustomer, customers.length, currentPage, fetchCustomers, closeDeleteConfirm]);
+  }, [selectedCustomer, customers.length, currentPage, fetchCustomers, closeDeleteConfirm, closeVipDeleteConfirm]); // Thêm closeVipDeleteConfirm
+  
+  // (Handler kiểm tra)
+  const handleDeleteAttempt = useCallback(() => {
+    if (!selectedCustomer) return;
+    
+    if (selectedCustomer.customer_tier === 'VIP') {
+      // Là VIP -> Chuyển sang modal 2
+      setShowDeleteConfirm(false);
+      setShowVipDeleteConfirm(true);
+    } else {
+      // Không phải VIP -> Xóa ngay
+      handleDelete();
+    }
+  }, [selectedCustomer, handleDelete]);
+  // --- KẾT THÚC SỬA LOGIC DELETE ---
 
   const paginationWindow = useMemo(() => getPaginationWindow(currentPage, totalPages, 2), [currentPage, totalPages]);
 
@@ -987,6 +1023,7 @@ export default function ManageCustomersSupabase() {
                           {/* (SỬA v12) Thêm nút xem CMND */}
                           <button onClick={() => setViewingIdentity(c)} disabled={isFetchingPage || !!editingCustomer || isAddingCustomer || !c.user_identity} className="action-button text-violet-500 hover:bg-violet-100 dark:hover:bg-violet-900/30 disabled:opacity-30" title="Xem Xác thực CMND"><IdentificationCard size={20} weight="bold" /></button>
                           <button onClick={() => setEditingCustomer(c)} disabled={isFetchingPage || !!editingCustomer || isAddingCustomer} className="action-button text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30" title="Sửa thông tin"><PencilSimple size={20} weight="bold" /></button>
+                          {/* (SỬA THEO YÊU CẦU) Sửa onClick -> openDeleteConfirm */}
                           <button onClick={() => openDeleteConfirm(c)} disabled={isFetchingPage || !!editingCustomer || isAddingCustomer} className="action-button text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30" title="Xóa hồ sơ"><FaTrash size={18} /></button>
                         </>
                     </td>
@@ -1034,11 +1071,12 @@ export default function ManageCustomersSupabase() {
         )}
       </AnimatePresence>
 
+      {/* <<< (SỬA THEO YÊU CẦU) Modal Xác Nhận Xóa Bước 1 (Luôn hiển thị) >>> */}
       <AnimatePresence>
         {showDeleteConfirm && selectedCustomer && (
           <motion.div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex justify-center items-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <motion.div 
-              className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border border-gray-200 dark:border-slate-700 border-t-4 border-red-500"
+              className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border border-gray-200 dark:border-slate-700 border-t-4 border-red-500" // Luôn là màu đỏ
               initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
             >
               <h4 className="text-xl font-bold text-red-600 dark:text-red-500 mb-4"> Xác nhận xóa hồ sơ </h4>
@@ -1050,12 +1088,50 @@ export default function ManageCustomersSupabase() {
               </p>
               <div className="flex justify-center gap-4">
                 <button className="modal-button-secondary" onClick={closeDeleteConfirm}> Hủy </button>
-                <button className="modal-button-danger" onClick={handleDelete}> Xóa hồ sơ </button>
+                {/* Sửa onClick -> handleDeleteAttempt */}
+                <button className="modal-button-danger" onClick={handleDeleteAttempt}> Xóa hồ sơ </button>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+      {/* <<< KẾT THÚC SỬA >>> */}
+
+      {/* <<< (THÊM MỚI) Modal Xác Nhận Xóa VIP Bước 2 >>> */}
+      <AnimatePresence>
+        {showVipDeleteConfirm && selectedCustomer && (
+          <motion.div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex justify-center items-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div 
+              className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border border-gray-200 dark:border-slate-700 border-t-4 border-orange-500" // Border màu cam
+              initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+            >
+              <h4 className="text-xl font-bold text-orange-600 dark:text-orange-500 mb-4"> ⚠️ Cảnh Báo Xóa VIP ⚠️ </h4>
+              
+              <p className="mb-8 text-base text-gray-700 dark:text-gray-300">
+                Đây là một **Tài Khoản VIP**. 
+                <br/>
+                Xóa hồ sơ của <b className="text-gray-900 dark:text-white">{selectedCustomer.full_name || selectedCustomer.email} ({selectedCustomer.customer_code})</b> sẽ khiến họ **mất vĩnh viễn** mọi quyền lợi VIP và lịch sử tích lũy.
+                <br/>
+                <span className="text-sm font-medium text-red-600 dark:text-red-400 mt-2 block">Bạn có <u>thực sự chắc chắn</u> muốn tiếp tục?</span>
+              </p>
+
+              <div className="flex justify-center gap-4">
+                <button className="modal-button-secondary" onClick={closeVipDeleteConfirm}> Hủy </button>
+                {/* Button này mới gọi hàm xóa cuối cùng */}
+                <button 
+                  className="modal-button-warning" // Style màu cam
+                  onClick={handleDelete}
+                >
+                  Xác Nhận Xóa VIP
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* <<< KẾT THÚC THÊM MỚI >>> */}
+
+
       <AnimatePresence>
         {isAddingCustomer && (
           <FormModal title="Thêm Khách Hàng Mới" onClose={handleCloseAddModal}>
@@ -1097,6 +1173,10 @@ export default function ManageCustomersSupabase() {
         .form-input-style { @apply p-3.5 border border-slate-300 dark:border-slate-600 rounded-lg w-full bg-white dark:bg-slate-700/50 focus:ring-2 focus:ring-sky-400 focus:border-sky-400 outline-none transition duration-200 text-base; }
         .modal-button-secondary { @apply px-6 py-3 bg-neutral-200 dark:bg-neutral-700 rounded-lg font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-600 text-sm transition-all duration-200 disabled:opacity-50; }
         .modal-button-danger { @apply px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 text-sm transition-all duration-200 shadow-lg shadow-red-500/30; }
+        
+        /* <<< (THÊM MỚI) Style cho nút Xóa VIP >>> */
+        .modal-button-warning { @apply px-6 py-3 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 text-sm transition-all duration-200 shadow-lg shadow-orange-500/30; }
+
         .modal-button-primary { @apply flex items-center justify-center px-6 py-3 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 text-sm transition-all duration-200 shadow-lg shadow-sky-500/30 disabled:opacity-50; }
         .simple-scrollbar::-webkit-scrollbar { width: 8px; }
         .simple-scrollbar::-webkit-scrollbar-track { background: transparent; }
