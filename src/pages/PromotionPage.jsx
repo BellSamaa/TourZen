@@ -1,5 +1,11 @@
 // src/pages/PromotionPage.jsx
-// (FIXED v2: Kiểm tra user.customer_tier === 'VIP')
+/* (SỬA LỖI v38.4 - FIX LỖI CHẶN VIP)
+  1. (Fix) Thêm state 'fullUserProfile' và 'isLoadingProfile'.
+  2. (Fix) Thêm useEffect để fetch dữ liệu đầy đủ từ bảng 'Users'
+     (giống logic của Profile.jsx).
+  3. (Fix) Sửa điều kiện kiểm tra từ 'user.customer_tier'
+     thành 'fullUserProfile?.customer_tier'.
+*/
 
 import React, { useState, useEffect } from 'react'; // (FIXED) Added useEffect for navigation
 import { motion } from 'framer-motion';
@@ -11,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { CircleNotch, WarningCircle } from "@phosphor-icons/react";
 import toast from 'react-hot-toast'; // (FIXED) Added toast import
+import { getSupabase } from "../lib/supabaseClient"; // *** (THÊM) Import Supabase ***
 
 // Dữ liệu mẫu (Giả định)
 const promotionsData = {
@@ -26,10 +33,17 @@ const promotionsData = {
   ]
 };
 
+const supabase = getSupabase(); // *** (THÊM) Khởi tạo Supabase ***
+
 export default function PromotionPage() {
   const [selectedPromo, setSelectedPromo] = useState(null);
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+
+  // --- (SỬA v38.4) Thêm state để tải hồ sơ đầy đủ ---
+  const [fullUserProfile, setFullUserProfile] = useState(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  // ---
 
   const handleClaimVoucher = (promo) => setSelectedPromo(promo);
   const handleCloseModal = () => setSelectedPromo(null);
@@ -37,10 +51,41 @@ export default function PromotionPage() {
   const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1 } } };
   const cardVariants = { hidden: { opacity: 0, y: 30 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } } };
 
-  // --- (FIXED v2) Thêm kiểm tra VIP ---
+  // --- (SỬA v38.4) Thêm useEffect để fetch hồ sơ đầy đủ ---
+  useEffect(() => {
+    // 1. Nếu chưa đăng nhập (user từ useAuth), không làm gì cả
+    if (authLoading || !user) {
+      setIsLoadingProfile(false);
+      return;
+    }
+
+    // 2. Nếu đã đăng nhập, tải hồ sơ đầy đủ từ bảng 'Users'
+    const fetchFullProfile = async () => {
+      setIsLoadingProfile(true);
+      try {
+        const { data, error } = await supabase
+          .from('Users')
+          .select('customer_tier') // Chỉ cần lấy customer_tier
+          .eq('id', user.id)
+          .single();
+
+        if (error) throw error;
+        setFullUserProfile(data);
+      } catch (error) {
+        console.error("Lỗi fetch full user profile (Promotions):", error.message);
+        toast.error("Không thể xác thực loại tài khoản.");
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+
+    fetchFullProfile();
+  }, [user, authLoading]);
+  // ---
+
   
   // 1. Xử lý trạng thái loading
-  if (authLoading) {
+  if (authLoading || isLoadingProfile) {
       return (
           <div className="flex justify-center items-center h-screen bg-gray-50 dark:bg-neutral-900">
               <CircleNotch size={48} className="animate-spin text-sky-500" />
@@ -58,9 +103,9 @@ export default function PromotionPage() {
       return null; // Không render gì cả trong khi chờ redirect
   }
   
-  // 3. Xử lý đã đăng nhập nhưng không phải VIP
-  // Sử dụng 'customer_tier' thay vì 'role'
-  if (user.customer_tier !== 'VIP') {
+  // 3. (SỬA v38.4) Xử lý đã đăng nhập nhưng không phải VIP
+  // Sử dụng 'fullUserProfile?.customer_tier' thay vì 'user.customer_tier'
+  if (fullUserProfile?.customer_tier !== 'VIP') {
       return (
           <div className="flex flex-col justify-center items-center h-screen text-center p-4 bg-gray-50 dark:bg-neutral-900">
               <WarningCircle size={64} className="text-red-500" />

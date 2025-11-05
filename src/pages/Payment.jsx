@@ -1,5 +1,9 @@
 // src/pages/Payment.jsx
 // (V14: Chuyển Dịch vụ cộng thêm vào từng item tour)
+/* (SỬA v38.4: Cập nhật hàm handleApplyVoucher để sử dụng mã
+   từ file promotionsData.js (ví dụ: LEQUOCKHANH, HEVUI)
+   và giữ lại mã VIP30 làm mã VIP đặc biệt.
+*/
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -16,8 +20,17 @@ import { Buildings, Ticket, CircleNotch, X, WarningCircle, QrCode, Bank } from "
 import { getSupabase } from "../lib/supabaseClient";
 import toast from 'react-hot-toast';
 import { useAuth } from "../context/AuthContext.jsx"; 
+// *** (THÊM v38.4) Import mã voucher thật ***
+import { PROMOTIONS } from '../data/promotionsData.js';
 
 const supabase = getSupabase();
+
+// --- (SỬA v38.4) Tạo danh sách voucher phẳng ---
+const allPromos = [
+  ...PROMOTIONS.events,
+  ...PROMOTIONS.regions,
+  ...PROMOTIONS.thematic,
+];
 
 // --- Hàm slugify ---
 function slugify(text) {
@@ -430,23 +443,58 @@ export default function Payment() {
         setTimeout(() => setNotification({ message: "", type: "" }), 4000); 
     };
     
-    // (Giữ nguyên)
+    // *** (ĐÃ SỬA V38.4) HÀM VOUCHER ĐỂ DÙNG MÃ THẬT ***
     const handleApplyVoucher = async () => { 
         if (!voucherCode) return;
         setIsCheckingVoucher(true);
         setVoucherMessage({ type: '', text: '' });
-        await new Promise(res => setTimeout(res, 1000)); 
+        setVoucherDiscount(0); // Reset giảm giá cũ
         
-        if (voucherCode === "TOURZEN10") {
-            const discount = tourSubtotal * 0.1;
+        // Giả lập chờ mạng
+        await new Promise(res => setTimeout(res, 500)); 
+            
+        let discount = 0;
+        let isValid = false;
+        let discountPercent = 0;
+        let requiresVip = false;
+
+        // 1. Kiểm tra mã VIP đặc biệt (ưu tiên)
+        if (voucherCode === 'VIP30') {
+            discountPercent = 30;
+            isValid = true;
+            requiresVip = true;
+        } else {
+            // 2. Kiểm tra các mã từ promotionsData.js
+            const foundPromo = allPromos.find(p => p.voucherCode === voucherCode);
+            
+            if (foundPromo) {
+                // (Giả sử tất cả mã này đều dùng được, không kiểm tra ngày hết hạn)
+                discountPercent = foundPromo.discountPercent;
+                isValid = true;
+            }
+        }
+
+        // 3. Kiểm tra điều kiện (VIP)
+        if (isValid && requiresVip && currentUser?.customer_tier !== 'VIP') {
+            isValid = false;
+            setVoucherMessage({ type: 'error', text: 'Mã này chỉ dành cho thành viên VIP.' });
+        }
+
+        // 4. Tính toán và áp dụng
+        if (isValid && discountPercent > 0) {
+            discount = tourSubtotal * (discountPercent / 100);
             setVoucherDiscount(discount);
-            setVoucherMessage({ type: 'success', text: `Đã áp dụng giảm 10% (${formatCurrency(discount)})` });
+            setVoucherMessage({ type: 'success', text: `Đã áp dụng giảm ${discountPercent}%! (-${formatCurrency(discount)})` });
         } else {
             setVoucherDiscount(0);
-            setVoucherMessage({ type: 'error', text: 'Mã không hợp lệ hoặc đã hết hạn.' });
+            if (!voucherMessage.text) { // Nếu chưa có thông báo lỗi (từ check VIP)
+                setVoucherMessage({ type: 'error', text: 'Mã không hợp lệ hoặc đã hết hạn.' });
+            }
         }
+            
         setIsCheckingVoucher(false);
     };
+    // *** (KẾT THÚC SỬA) ***
 
     // --- (CẬP NHẬT) HÀM CHECKOUT (Logic dịch vụ và payload) ---
     const handleCheckout = async (e) => { 
@@ -474,6 +522,7 @@ export default function Payment() {
         const bookingPromises = []; 
         // (XÓA) totalAllGuests không cần ở đây nữa
 
+image.png
         // 2. Xử lý từng tour
         for (const item of displayItems) {
             const numAdults = item.adults || 0;
@@ -550,6 +599,7 @@ export default function Payment() {
                 // (THAY THẾ) Gán dịch vụ của item này
                 hotel_product_id: itemServices.hotel || null,
                 transport_product_id: itemServices.transport || null,
+AN_ELDER: item.selling_price_elder || item.priceElder || sellingPriceAdult;
                 flight_product_id: itemServices.flight || null,
                 // (HẾT THAY THẾ)
 
