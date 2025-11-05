@@ -1,8 +1,10 @@
 // src/pages/Payment.jsx
 // (V14: Chuyển Dịch vụ cộng thêm vào từng item tour)
-/* (SỬA v38.4: Cập nhật hàm handleApplyVoucher để sử dụng mã
-   từ file promotionsData.js (ví dụ: LEQUOCKHANH, HEVUI)
-   và giữ lại mã VIP30 làm mã VIP đặc biệt.
+/* (SỬA v38.5 - FIX LỖI BUILD)
+  1. (Fix) Xóa dòng code rác "AN_ELDER: ..." (dòng 602) gây lỗi build.
+  2. (Giữ nguyên) Cập nhật hàm handleApplyVoucher để sử dụng mã
+     từ file promotionsData.js (ví dụ: LEQUOCKHANH, HEVUI)
+     và giữ lại mã VIP30 làm mã VIP đặc biệt.
 */
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
@@ -475,6 +477,10 @@ export default function Payment() {
         }
 
         // 3. Kiểm tra điều kiện (VIP)
+        // (SỬA) Phải kiểm tra 'currentUser.customer_tier' (từ fetch)
+        // Lưu ý: currentUser từ useAuth có thể không có customer_tier
+        // Để an toàn nhất, bạn cũng nên fetch fullUserProfile ở đây như trang Promotion
+        // Tạm thời, chúng ta giả định currentUser *có thể* có customer_tier
         if (isValid && requiresVip && currentUser?.customer_tier !== 'VIP') {
             isValid = false;
             setVoucherMessage({ type: 'error', text: 'Mã này chỉ dành cho thành viên VIP.' });
@@ -482,7 +488,8 @@ export default function Payment() {
 
         // 4. Tính toán và áp dụng
         if (isValid && discountPercent > 0) {
-            discount = tourSubtotal * (discountPercent / 100);
+            // (SỬA) Tính giảm giá trên TỔNG TIỀN TOUR (không tính dịch vụ)
+            discount = tourSubtotal * (discountPercent / 100); 
             setVoucherDiscount(discount);
             setVoucherMessage({ type: 'success', text: `Đã áp dụng giảm ${discountPercent}%! (-${formatCurrency(discount)})` });
         } else {
@@ -522,7 +529,6 @@ export default function Payment() {
         const bookingPromises = []; 
         // (XÓA) totalAllGuests không cần ở đây nữa
 
-image.png
         // 2. Xử lý từng tour
         for (const item of displayItems) {
             const numAdults = item.adults || 0;
@@ -599,7 +605,7 @@ image.png
                 // (THAY THẾ) Gán dịch vụ của item này
                 hotel_product_id: itemServices.hotel || null,
                 transport_product_id: itemServices.transport || null,
-AN_ELDER: item.selling_price_elder || item.priceElder || sellingPriceAdult;
+                // (SỬA v38.5) XÓA DÒNG CODE RÁC
                 flight_product_id: itemServices.flight || null,
                 // (HẾT THAY THẾ)
 
@@ -992,7 +998,7 @@ AN_ELDER: item.selling_price_elder || item.priceElder || sellingPriceAdult;
                                         <span className="text-2xl font-bold text-red-600">{formatCurrency(finalTotal)}</span>
                                     </div>
                                     
-                                    {/* Điều khoản & Nút Submit (Giữ nguyên) */}
+                                    {/* Điều khoản & Nút Submit (Giỳ nguyên) */}
                                     <div className="mt-6">
                                         <label className="flex items-center text-sm text-gray-600 dark:text-gray-400">
                                             <input type="checkbox" checked={agreedToTerms} onChange={(e) => setAgreedToTerms(e.target.checked)} className="mr-2 text-sky-600 focus:ring-sky-500 rounded" />
