@@ -1,5 +1,5 @@
 // src/pages/TourDetail.jsx
-// (V6: Sửa lỗi hiển thị lịch trình từ 'text[]')
+// (V7: Thêm thống kê % đánh giá sao)
 
 import React, { useState, useEffect, useLayoutEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -15,6 +15,7 @@ import {
 import { motion, useScroll, useTransform } from "framer-motion";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
+// (LƯU Ý: Không import TourReviews.jsx ở đây, vì chúng ta sửa component ReviewsSection nội bộ)
 
 const supabase = getSupabase();
 
@@ -60,36 +61,52 @@ const ErrorComponent = ({ message }) => (
     </motion.div>
 ); 
 
-// --- (MỚI) Component Hiển thị Sao ---
+// --- (MỚI) Component hiển thị thanh % (Thêm bên ngoài) ---
+const RatingBar = ({ label, percentage }) => (
+    <div className="flex items-center gap-2 text-sm">
+        <span className="w-12 text-slate-500 dark:text-slate-400">{label}</span>
+        <div className="flex-1 bg-slate-200 dark:bg-slate-600 rounded-full h-2.5 overflow-hidden">
+            <div 
+                className="bg-amber-400 h-2.5 rounded-full transition-all duration-500" 
+                style={{ width: `${percentage}%` }}
+            ></div>
+        </div>
+        <span className="w-10 text-right font-medium text-slate-700 dark:text-slate-300">{percentage.toFixed(0)}%</span>
+    </div>
+);
+
+// --- Component Hiển thị Sao (Giữ nguyên) ---
 const StarRating = ({ rating, size = "text-lg" }) => {
     const totalStars = 5;
-    // Làm tròn rating lên 0.5 gần nhất
     const displayRating = Math.round((rating || 0) * 2) / 2;
 
     return (
         <div className={`flex items-center gap-0.5 text-amber-400 ${size}`}>
             {[...Array(totalStars)].map((_, i) => (
-                // Hiển thị sao đầy
                 i + 1 <= displayRating ? <FaStar key={i} /> : <FaRegStar key={i} />
             ))}
         </div>
     );
 };
 
-// --- (MỚI) Component Mục Đánh giá (Giữ nguyên) ---
+// --- (ĐÃ SỬA) Component Mục Đánh giá ---
 const ReviewsSection = ({ tourId, initialRating }) => {
     const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [totalReviews, setTotalReviews] = useState(0);
 
+    // (MỚI) State cho thống kê %
+    const [stats, setStats] = useState({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 });
+
     useEffect(() => {
         if (!tourId) return;
 
         async function fetchReviews() {
             setLoading(true);
+            setError(null);
             try {
-                // (SỬA v2) GỠ BỎ JOIN VỚI BẢNG 'Users' ĐỂ TRÁNH LỖI RLS
+                // Fetch 1: Lấy 10 review mới nhất để hiển thị (như cũ)
                 const { data, error: fetchError, count } = await supabase
                     .from("Reviews")
                     .select(`
@@ -103,8 +120,35 @@ const ReviewsSection = ({ tourId, initialRating }) => {
                     .limit(10); // Chỉ lấy 10 review mới nhất
 
                 if (fetchError) throw fetchError;
+                
                 setReviews(data || []);
-                setTotalReviews(count || 0); // Lưu tổng số
+                const totalCount = count || 0;
+                setTotalReviews(totalCount); // Lưu tổng số
+
+                // (MỚI) Fetch 2: Lấy TẤT CẢ ratings để tính toán thống kê
+                if (totalCount > 0) {
+                    const { data: allRatingsData, error: statsError } = await supabase
+                        .from("Reviews")
+                        .select("rating") // Chỉ cần cột rating
+                        .eq("product_id", tourId);
+
+                    if (statsError) {
+                        console.error("Lỗi tải thống kê ratings:", statsError);
+                    } else if (allRatingsData) {
+                        const newStats = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+                        allRatingsData.forEach(r => {
+                            // Đảm bảo rating là số hợp lệ
+                            if (r.rating >= 1 && r.rating <= 5) {
+                                newStats[r.rating]++;
+                            }
+                        });
+                        setStats(newStats);
+                    }
+                } else {
+                    // Reset nếu không có review
+                     setStats({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 });
+                }
+
             } catch (err) {
                 console.error("Lỗi tải reviews:", err);
                 setError("Không thể tải đánh giá.");
@@ -117,6 +161,12 @@ const ReviewsSection = ({ tourId, initialRating }) => {
 
     const averageRating = parseFloat(initialRating) || 0; // Lấy từ cột Product.rating
 
+    // (MỚI) Hàm tính %
+    const getPercentage = (ratingCount) => {
+        if (totalReviews === 0) return 0;
+        return (ratingCount / totalReviews) * 100;
+    };
+
     return (
         <motion.section 
             className="max-w-4xl mx-auto p-6 md:p-10 my-16 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border dark:border-slate-700"
@@ -125,22 +175,38 @@ const ReviewsSection = ({ tourId, initialRating }) => {
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
         >
-            <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center text-sky-700 dark:text-sky-400">
+            <h2 className="text-2xl md:text-3xl font-bold mb-8 text-center text-sky-700 dark:text-sky-400">
                 Đánh giá từ Khách hàng
             </h2>
 
-            {/* Rating trung bình */}
-            <div className="flex flex-col items-center justify-center mb-8 p-6 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                <span className="text-5xl font-extrabold text-slate-800 dark:text-white">
-                    {averageRating.toFixed(1)} / 5
-                </span>
-                <StarRating rating={averageRating} size="text-3xl" />
-                <span className="text-sm text-slate-500 dark:text-slate-400 mt-2">
-                    Dựa trên {totalReviews} đánh giá {/* (SỬA v2) Dùng totalReviews */}
-                </span>
+            {/* (ĐÃ SỬA) Khu vực tổng quan VÀ thống kê % */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 p-6 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                {/* Cột 1: Điểm trung bình */}
+                <div className="flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-600 pb-4 md:pb-0 md:pr-6">
+                    <span className="text-5xl font-extrabold text-slate-800 dark:text-white">
+                        {averageRating.toFixed(1)} / 5
+                    </span>
+                    <StarRating rating={averageRating} size="text-3xl" />
+                    <span className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+                        Dựa trên {totalReviews} đánh giá
+                    </span>
+                </div>
+                
+                {/* (MỚI) Cột 2: Thanh % */}
+                <div className="md:col-span-2 flex flex-col justify-center space-y-2 pt-4 md:pt-0">
+                    <RatingBar label="5 Sao" percentage={getPercentage(stats[5])} />
+                    <RatingBar label="4 Sao" percentage={getPercentage(stats[4])} />
+                    <RatingBar label="3 Sao" percentage={getPercentage(stats[3])} />
+                    <RatingBar label="2 Sao" percentage={getPercentage(stats[2])} />
+                    <RatingBar label="1 Sao" percentage={getPercentage(stats[1])} />
+                </div>
             </div>
 
+
             {/* Danh sách review */}
+            <h3 className="text-xl font-bold mb-4 text-slate-800 dark:text-white">
+                Bình luận chi tiết ({reviews.length > 0 ? `${reviews.length} mới nhất` : '...'})
+            </h3>
             <div className="space-y-6">
                 {loading && <div className="text-center"><FaSpinner className="animate-spin text-2xl text-sky-500 mx-auto" /></div>}
                 {error && <div className="text-center text-red-500">{error}</div>}
@@ -161,7 +227,6 @@ const ReviewsSection = ({ tourId, initialRating }) => {
                             <div className="flex items-center gap-2">
                                 <FaUserCircle className="text-2xl text-slate-400" />
                                 <span className="font-semibold text-slate-800 dark:text-white">
-                                    {/* (SỬA v2) Luôn hiển thị "Khách ẩn danh" */}
                                     {"Khách ẩn danh"}
                                 </span>
                             </div>
@@ -425,7 +490,7 @@ const TourDetail = () => {
                 </motion.section>
             )}
 
-            {/* === (MỚI) Mục Đánh giá === */}
+            {/* === (ĐÃ SỬA) Mục Đánh giá === */}
             {/* Truyền tour.id (UUID) và tour.rating (số) vào */}
             <ReviewsSection tourId={tour.id} initialRating={tour.rating} />
 
