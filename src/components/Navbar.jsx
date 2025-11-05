@@ -1,11 +1,6 @@
 // src/components/Navbar.jsx
-/* *** (SỬA THEO YÊU CẦU v37.2) ***
-  1. (CSS) SỬA LỖI: Bọc @keyframes trong :global() để animation hoạt động.
-  2. (Giữ nguyên) Áp dụng .galaxy-text cho "TourZen" và "Đăng nhập".
-  3. (Giữ nguyên) Tăng kích thước (text-3xl -> text-4xl) cho "TourZen".
-  4. (Giữ nguyên) Tăng kích thước (w-7 h-7 -> w-9 h-9) cho logo.
-  5. (Giữ nguyên) Tăng kích thước (text-sm -> text-base, padding) cho nút "Đăng nhập".
-*/
+// (SỬA LỖI v19.1) Sửa tên icon 'IdentificationCard' -> 'IdCard'
+// (SỬA v19) Thêm link "Thông tin cá nhân" (/profile) vào dropdown
 
 import React, { useState, useEffect } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
@@ -188,17 +183,15 @@ export default function Navbar() {
     if (user) return <ProfileMenu user={user} />;
     // <<< KẾT THÚC SỬA LỖI >>>
 
-    {/* === (SỬA v37.1) Sửa nút Đăng nhập === */}
     return (
       <Link
         to="/login"
-        className="hidden md:flex items-center gap-2 bg-gray-100 hover:bg-gray-200 dark:bg-neutral-700 dark:hover:bg-neutral-600 text-base font-semibold px-6 py-2.5 rounded-full shadow-md transition-all"
+        className="hidden md:flex items-center gap-2 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white text-sm font-semibold px-5 py-2 rounded-full shadow-md transition-all"
       >
-        <User size={16} className="galaxy-text" />
-        <span className="galaxy-text">Đăng nhập</span>
+        <User size={16} />
+        Đăng nhập
       </Link>
     );
-    {/* === (KẾT THÚC SỬA v37.1) === */}
   };
 
   return (
@@ -207,20 +200,15 @@ export default function Navbar() {
         {/* Logo */}
         <Link to="/" className="flex flex-col items-start leading-none group">
           <div className="flex items-center gap-2">
-            
-            {/* === (SỬA v37.1) Sửa "TourZen" === */}
-            <span className="text-4xl font-extrabold galaxy-text tracking-tight group-hover:scale-105 transition-transform duration-300">
+            <span className="text-3xl font-extrabold bg-gradient-to-r from-sky-500 to-blue-700 bg-clip-text text-transparent tracking-tight group-hover:scale-105 transition-transform duration-300">
               TourZen
             </span>
-            
-            {/* === (SỬA v37.1) Sửa Logo === */}
             <img
               src="/logo-icon.png"
               alt="TourZen Logo"
-              className="w-9 h-9 opacity-90 group-hover:opacity-100 transition"
+              className="w-7 h-7 opacity-90 group-hover:opacity-100 transition"
               onError={(e) => (e.target.style.display = "none")}
             />
-            
           </div>
           <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium mt-0.5">
             Managed by Nhóm 4
@@ -381,25 +369,6 @@ export default function Navbar() {
           </motion.div>
         )}
       </AnimatePresence>
-      
-      {/* === (SỬA LỖI v37.2) Bọc @keyframes trong :global() === */}
-      <style jsx>{`
-        :global(.galaxy-text) {
-          background: linear-gradient(90deg, #007cf0, #00dfd8, #ff00c3, #007cf0);
-          background-size: 400% 100%;
-          background-clip: text;
-          -webkit-background-clip: text;
-          color: transparent;
-          animation: galaxy-animation 5s linear infinite;
-          -webkit-text-fill-color: transparent; /* Đảm bảo hoạt động trên Safari */
-        }
-        
-        /* Bọc keyframes trong :global() để styled-jsx nhận diện */
-        :global(@keyframes galaxy-animation) {
-          0% { background-position: 0% 50%; }
-          100% { background-position: 100% 50%; }
-        }
-      `}</style>
     </header>
   );
 }
