@@ -1,16 +1,15 @@
 // ManageCustomersSupabase.jsx
+/* *** (SỬA THEO YÊU CẦU) Thêm Validation cho SĐT & Địa chỉ ***
+  1. (Logic) Thêm 'phoneRegex' từ file Login.jsx.
+  2. (Logic) Bổ sung logic kiểm tra SĐT/Địa chỉ vào 'handleSubmit'
+     của 'CustomerForm', sử dụng 'toast.error' để báo lỗi.
+*/
 /* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v13 (Tối ưu Modal CMND) ***
-  1. (UI/UX) Thay đổi bố cục `IdentityModal` từ 2 cột (trái-phải)
-     thành bố cục dọc (Ảnh Scan ở trên, Form nhập liệu ở dưới).
-  2. (UI) Đặt 2 ảnh (mặt trước, mặt sau) nằm cạnh nhau trong 1 hàng.
-  3. (UI) Tối ưu hóa cho Admin, giúp dễ dàng xem ảnh và nhập liệu
-     mà không cần cuộn nhiều.
+  (Giữ nguyên các bình luận cũ...)
 */
 /* NÂNG CẤP v7, v10, v11, v12 (Giữ nguyên) */
 /* *** (DI CHUYỂN v21) ***
-  1. (Logic) Xóa component `PasswordResetRequests`.
-  2. (UI) Xóa `<PasswordResetRequests />` khỏi layout.
-  3. (Logic) Xóa import `FaBell` (không còn dùng).
+  (Giữ nguyên các bình luận cũ...)
 */
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
@@ -28,6 +27,9 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const supabase = getSupabase();
 const ITEMS_PER_PAGE = 10;
+
+// <<< (SỬA THEO YÊU CẦU) Thêm Regex SĐT
+const phoneRegex = /^(0(3[2-9]|5[6|8|9]|7[0|6-9]|8[1-6|8|9]|9[0-4|6-9]))\d{7}$/;
 
 // --- Hooks & Helpers (Giữ nguyên) ---
 const useDebounce = (value, delay) => {
@@ -529,14 +531,51 @@ const CustomerForm = ({ initialData, onSubmit, isSaving, onCancel }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    // Kiểm tra Tên (Giữ nguyên)
     if (!formData.full_name?.trim()) {
       toast.error("Tên khách hàng không được để trống.");
       return;
     }
+    // Kiểm tra Email (Giữ nguyên)
     if (!formData.email?.trim()) {
       toast.error("Email không được để trống.");
       return;
     }
+
+    // <<< (SỬA THEO YÊU CẦU) VALIDATION SĐT & ĐỊA CHỈ >>>
+    try {
+        // Chỉ kiểm tra nếu SĐT được nhập (không bắt buộc)
+        if (formData.phone_number && formData.phone_number.trim() !== "") {
+            if (formData.phone_number.length !== 10) {
+                throw new Error("Số điện thoại phải có đúng 10 chữ số.");
+            }
+            if (!phoneRegex.test(formData.phone_number)) {
+                throw new Error("Số điện thoại không hợp lệ (Sai đầu số hoặc định dạng).");
+            }
+        }
+        
+        // Chỉ kiểm tra nếu Địa chỉ được nhập (không bắt buộc)
+        if (formData.address && formData.address.trim() !== "") {
+            if (formData.address.length < 5) { 
+                throw new Error("Địa chỉ (Tỉnh/Thành phố) có vẻ quá ngắn (yêu cầu 5+ ký tự).");
+            }
+            if (!/[a-zA-Z]/.test(formData.address)) { 
+                throw new Error("Địa chỉ (Tỉnh/Thành phố) phải chứa ký tự chữ.");
+            }
+            // (Regex kiểm tra ký tự đặc biệt)
+            if (/[!@#$%^&*()_+\=\[\]{};':"\\|<>?~]/.test(formData.address)) {
+                 throw new Error("Địa chỉ (Tỉnh/Thành phố) chứa ký tự đặc biệt không hợp lệ.");
+            }
+        }
+    } catch (err) {
+        // CustomerForm dùng toast, không dùng throw Error
+        toast.error(err.message);
+        return; // Dừng submit
+    }
+    // <<< KẾT THÚC SỬA >>>
+
+    // Nếu hợp lệ, chuẩn bị data và submit
     const dataToSubmit = {
       ...formData,
       phone_number: formData.phone_number?.trim() || null,

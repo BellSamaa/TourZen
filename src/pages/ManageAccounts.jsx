@@ -1,15 +1,11 @@
 // ManageAccounts.jsx
-/* *** (SỬA LỖI v26) Sửa lỗi Duplicate Key 'Users_account_code_key' ***
-  1. (Fix) VIẾT LẠI HOÀN TOÀN logic Thêm Mới trong 'AccountModal'
-     để tuân thủ hệ thống Hybrid.
-  2. (Logic) Nếu Admin thêm 'admin'/'supplier', sẽ dùng 'supabase.auth.signUp'
-     (Tài khoản thật, có trong Auth) VÀ SỬ DỤNG LỆNH "UPDATE" (thay vì "insert").
-  3. (Logic) Nếu Admin thêm 'user', sẽ dùng logic insert trực tiếp vào 'Users'
-     với mật khẩu Base64 (Tài khoản ảo, không có trong Auth),
-     giống hệt logic của file Login.jsx.
+/* *** (SỬA THEO YÊU CẦU) Thêm Validation cho SĐT & Địa chỉ ***
+  1. (Logic) Thêm 'phoneRegex' từ file Login.jsx.
+  2. (Logic) Bổ sung logic kiểm tra SĐT/Địa chỉ vào 'handleSubmit'
+     của 'AccountModal' để áp dụng cho cả Thêm mới và Chỉnh sửa.
 */
-/* *** (SỬA THEO YÊU CẦU v25) Thêm trường Địa chỉ & SĐT cho Modal ***
-  (Giữ nguyên các thay đổi cũ...)
+/* *** (SỬA LỖI v26) Sửa lỗi Duplicate Key 'Users_account_code_key' ***
+  (Giữ nguyên các bình luận cũ...)
 */
 
 
@@ -27,6 +23,9 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 
 const supabase = getSupabase();
+
+// <<< (SỬA THEO YÊU CẦU) Thêm Regex SĐT
+const phoneRegex = /^(0(3[2-9]|5[6|8|9]|7[0|6-9]|8[1-6|8|9]|9[0-4|6-9]))\d{7}$/;
 
 // --- Hook Debounce (Giữ nguyên) ---
 const useDebounce = (value, delay) => {
@@ -119,7 +118,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
         setLoading(true);
 
         try {
-            // Kiểm tra mật khẩu (cho cả Thêm mới và Reset)
+            // 1. Kiểm tra mật khẩu (Giữ nguyên)
             if (formData.password) {
                  if (formData.password.length < 6) {
                     throw new Error("Mật khẩu mới phải có ít nhất 6 ký tự.");
@@ -132,8 +131,36 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                  throw new Error("Mật khẩu là bắt buộc khi thêm tài khoản mới.");
             }
 
+            // <<< (SỬA THEO YÊU CẦU) VALIDATION SĐT & ĐỊA CHỈ >>>
+            // Áp dụng cho cả Thêm mới và Chỉnh sửa
+            // Chỉ kiểm tra nếu SĐT được nhập (không bắt buộc)
+            if (formData.phone_number && formData.phone_number.trim() !== "") {
+                if (formData.phone_number.length !== 10) {
+                    throw new Error("Số điện thoại phải có đúng 10 chữ số.");
+                }
+                if (!phoneRegex.test(formData.phone_number)) {
+                    throw new Error("Số điện thoại không hợp lệ (Sai đầu số hoặc định dạng).");
+                }
+            }
+            
+            // Chỉ kiểm tra nếu Địa chỉ được nhập (không bắt buộc)
+            if (formData.address && formData.address.trim() !== "") {
+                if (formData.address.length < 5) { 
+                    throw new Error("Địa chỉ (Tỉnh/Thành phố) có vẻ quá ngắn (yêu cầu 5+ ký tự).");
+                }
+                if (!/[a-zA-Z]/.test(formData.address)) { 
+                    throw new Error("Địa chỉ (Tỉnh/Thành phố) phải chứa ký tự chữ.");
+                }
+                // (Regex kiểm tra ký tự đặc biệt)
+                if (/[!@#$%^&*()_+\=\[\]{};':"\\|<>?~]/.test(formData.address)) {
+                     throw new Error("Địa chỉ (Tỉnh/Thành phố) chứa ký tự đặc biệt không hợp lệ.");
+                }
+            }
+            // <<< KẾT THÚC SỬA >>>
+
             if (isEdit) {
                 // --- CHỈNH SỬA (Giữ nguyên logic cũ v25) ---
+                
                 // (Logic này gọi Edge Function, đã bao gồm SĐT, Địa chỉ)
                 const { data, error: functionError } = await supabase.functions.invoke('admin-update-user', {
                     body: {
@@ -471,7 +498,7 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
 
 // <<< THÊM v21: COMPONENT YÊU CẦU RESET MẬT KHẨU (Từ ManageCustomers) >>>
 const PasswordResetRequests = () => {
-    // ... (Toàn bộ code của PasswordResetRequests giữ nguyên) ...
+    // ... (Toàn bộ code của PasswordResetRequests giữ nguyên như file v22 của bạn) ...
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
   
