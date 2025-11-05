@@ -1,17 +1,15 @@
 // src/pages/Profile.jsx
-/* *** (SỬA LỖI v36 - THEO YÊU CẦU) ***
-  1. (Fix) VIẾT LẠI HOÀN TOÀN 'ChangePasswordForm' để dùng
-     logic "Admin OTP" (giống file Login.jsx) cho "Tài khoản ảo".
-  2. (Fix) 'ChangePasswordForm' giờ sẽ có 2 chế độ:
-     - "Tài khoản thật" (Admin/có session): Dùng email reset (như cũ).
-     - "Tài khoản ảo" (User/không session): Dùng Admin OTP (mới).
-  3. (Giữ nguyên v35) Mở khóa Tab "Bảo mật" (chỉ khóa khi chưa duyệt).
-  4. (Giữ nguyên v34) Hợp nhất state 'identity'.
+/* *** (SỬA LỖI v37 - THEO YÊU CẦU) ***
+  1. (XÓA) Xóa bỏ hoàn toàn 'AvatarBannerManager' và 'AvatarBannerWrapper' (gây lỗi).
+  2. (THÊM) Tạo component mới 'AnimatedNameDisplay' chỉ để hiển thị tên.
+  3. (THÊM) Thêm hiệu ứng CSS "Galaxy Text" (xanh dương, chuyển động) cho tên.
+  4. (GIỮ NGUYÊN) 'ProfileInfoForm' (vì nó đã trỏ đúng vào bảng 'Users').
+  5. (GIỮ NGUYÊN) Logic 'ChangePasswordForm' và 'IdentityForm'.
 */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Dialog } from '@headlessui/react';
-import Cropper from 'react-easy-crop';
+import Cropper from 'react-easy-crop'; // (Vẫn giữ lại phòng khi component khác cần)
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext'; 
 import { getSupabase } from '../lib/supabaseClient';
@@ -21,6 +19,7 @@ import {
   UploadSimple, CircleNotch, PaperPlaneRight, Lock, Eye, EyeSlash, CheckCircle,
   WarningCircle, ShieldCheck, FileArrowUp, XCircle, Info, Sparkle, Palette,
   Camera, Image, PaintBrush, TrashSimple, MagnifyingGlassPlus, Warning
+  // (Đã xóa các icon không còn dùng cho Avatar/Banner)
 } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -28,7 +27,7 @@ const supabase = getSupabase();
 // (Thêm SĐT Admin từ Login.jsx)
 const ADMIN_PHONE = "0912345678"; 
 
-/* ------------------ Helper: getPublicUrlSafe ------------------ */
+/* ------------------ Helper: getPublicUrlSafe (Vẫn giữ) ------------------ */
 const getPublicUrlSafe = (bucket, path) => {
   if (!path) return null;
   try {
@@ -39,7 +38,7 @@ const getPublicUrlSafe = (bucket, path) => {
   }
 };
 
-/* ------------------ Crop Utility (in-file) ------------------ */
+/* ------------------ Crop Utility (Vẫn giữ) ------------------ */
 async function createImage(url) {
   return new Promise((resolve, reject) => {
     const image = new Image();
@@ -96,7 +95,8 @@ const TabButton = ({ label, icon, isActive, onClick, disabled = false }) => (
   </motion.button>
 );
 
-/* ------------------ ProfileInfoForm ------------------ */
+/* ------------------ ProfileInfoForm (GIỮ NGUYÊN) ------------------ */
+// (Component này đã đọc/ghi đúng bảng 'Users' như bạn yêu cầu)
 const ProfileInfoForm = ({ user, onProfileUpdate }) => {
   const [formData, setFormData] = useState({
     full_name: '', phone_number: '', address: '', ngay_sinh: '',
@@ -203,8 +203,7 @@ const ProfileInfoForm = ({ user, onProfileUpdate }) => {
   );
 };
 
-/* ------------------ ChangePasswordForm (SỬA v36) ------------------ */
-// (VIẾT LẠI HOÀN TOÀN: Giờ hỗ trợ cả "User ảo" và "User thật")
+/* ------------------ ChangePasswordForm (GIỮ NGUYÊN) ------------------ */
 const ChangePasswordForm = ({ user, identity }) => {
   const [loading, setLoading] = useState(false);
   const { session } = useAuth(); 
@@ -414,11 +413,9 @@ const ChangePasswordForm = ({ user, identity }) => {
     </div>
   );
 };
-/* ------------------ KẾT THÚC SỬA v36 ------------------ */
 
 
-/* ------------------ IdentityForm (SỬA v34) ------------------ */
-// (Nhận state từ cha, không tự fetch/load)
+/* ------------------ IdentityForm (GIỮ NGUYÊN) ------------------ */
 const IdentityForm = ({ user, session, identity, loading, onRefresh }) => { 
   const [isEditing, setIsEditing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -606,306 +603,21 @@ const IdentityForm = ({ user, session, identity, loading, onRefresh }) => {
   );
 };
 
-/* ------------------ AvatarBannerManager (ĐÃ SỬA LỖI UPLOAD) ------------------ */
-// 1. (Fix) Trỏ đến bảng 'Users' thay vì 'user_identity' (dựa theo ảnh Supabase)
-// 2. (Fix) Gỡ bỏ check 'session' để "User ảo" (không có session) có thể fetch và upload
-const AvatarBannerManager = ({ user, refreshUser, session }) => {
-  const [avatarPath, setAvatarPath] = useState(null);
-  const [bannerPath, setBannerPath] = useState(null);
-  const [avatarPreview, setAvatarPreview] = useState(null);
-  const [bannerPreview, setBannerPreview] = useState(null);
-  const [isAvatarCropOpen, setIsAvatarCropOpen] = useState(false);
-  const [isBannerCropOpen, setIsBannerCropOpen] = useState(false);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [previewSrc, setPreviewSrc] = useState(null);
-  const [imageSrc, setImageSrc] = useState(null);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
-  const [currentUploadType, setCurrentUploadType] = useState(null);
-  const [isUploading, setIsUploading] = useState(false);
-
-  useEffect(() => {
-    // SỬA: Bỏ check '!session' để user "ảo" cũng có thể fetch
-    if (!user) return; 
-    (async () => {
-      try {
-        const { data, error } = await supabase
-          .from('Users') // SỬA: Đổi từ 'user_identity' sang 'Users'
-          .select('avatar_url, banner_url')
-          .eq('id', user.id)
-          .single();
-        if (!error) {
-          setAvatarPath(data?.avatar_url || null);
-          setBannerPath(data?.banner_url || null);
-        }
-      } catch (e) { /* ignore */ }
-    })();
-  }, [user]); // SỬA: Bỏ 'session' khỏi dependency
-
-  useEffect(() => {
-    setAvatarPreview(getPublicUrlSafe('avatars', avatarPath));
-  }, [avatarPath]);
-
-  useEffect(() => {
-    setBannerPreview(getPublicUrlSafe('banners', bannerPath));
-  }, [bannerPath]);
-
-  const readFileAsDataURL = (file) => new Promise((res, rej) => {
-    const reader = new FileReader();
-    reader.addEventListener('load', () => res(reader.result));
-    reader.addEventListener('error', (e) => rej(e));
-    reader.readAsDataURL(file);
-  });
-
-  const onCropComplete = useCallback((_, croppedAreaPixels) => {
-    setCroppedAreaPixels(croppedAreaPixels);
-  }, []);
-
-  // *** LỖI CỦA BẠN NẰM Ở ĐÂY (ĐÃ SỬA) ***
-  // (Tôi đã xóa chữ 'SỬA' bị lạc ở dòng 735)
-  const openCropForFile = async (file, type) => {
-    if (!file) return;
-    const dataUrl = await readFileAsDataURL(file);
-    setImageSrc(dataUrl);
-    setCurrentUploadType(type);
-    setZoom(1);
-    setCrop({ x: 0, y: 0 });
-    if (type === 'avatar') setIsAvatarCropOpen(true);
-    else setIsBannerCropOpen(true);
-  };
-
-  // *** SỬA LỖI (FIX) NÚT TẢI LÊN ***
-  // (Lỗi là do tạo 'new File()' từ 'blob'. Sửa bằng cách upload 'blob' trực tiếp.)
-  const uploadCropped = async () => {
-    if (!imageSrc || !croppedAreaPixels || !currentUploadType) {
-      toast.error('Không có ảnh hoặc vùng cắt.');
-      return;
-    }
-    setIsUploading(true);
-    try {
-      const blob = await getCroppedImg(imageSrc, croppedAreaPixels); // 1. Lấy blob đã crop
-      const fileName = `${user.id}-${currentUploadType}-${Date.now()}.jpg`;
-      // const file = new File([blob], fileName, { type: 'image/jpeg' }); // <-- DÒNG NÀY GÂY LỖI (XÓA ĐI)
-      const bucket = currentUploadType === 'avatar' ? 'avatars' : 'banners';
-      
-      // 2. Sửa: Tải 'blob' lên trực tiếp, thay vì 'file'
-      const { error: uploadError } = await supabase.storage.from(bucket).upload(fileName, blob, { contentType: 'image/jpeg' });
-      if (uploadError) throw uploadError;
-
-      const updates = currentUploadType === 'avatar' ? { avatar_url: fileName } : { banner_url: fileName };
-      
-      // SỬA: Đổi từ 'user_identity' sang 'Users'
-      const { error: dbErr } = await supabase.from('Users').update(updates).eq('id', user.id);
-      if (dbErr) throw dbErr;
-
-      // (Giữ nguyên) Chỉ update auth nếu là user "thật" (có session)
-      if (session) {
-        const { error: authErr } = await supabase.auth.updateUser({ data: updates });
-        if (authErr) throw authErr;
-      }
-      
-      if (currentUploadType === 'avatar') {
-        setAvatarPath(fileName);
-        setAvatarPreview(getPublicUrlSafe('avatars', fileName));
-      } else {
-        setBannerPath(fileName);
-        setBannerPreview(getPublicUrlSafe('banners', fileName));
-      }
-      toast.success('Tải ảnh thành công!');
-      
-      setIsAvatarCropOpen(false);
-      setIsBannerCropOpen(false);
-      setImageSrc(null);
-      setCurrentUploadType(null);
-      if (refreshUser) refreshUser();
-    } catch (err) {
-      toast.error(`Tải ảnh thất bại: ${err.message}`);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-  // *** KẾT THÚC SỬA LỖI ***
-
-  const handleAvatarFileSelected = async (e) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    await openCropForFile(f, 'avatar');
-    e.target.value = null; // Reset input để có thể chọn lại file cũ
-  };
-
-  const handleBannerFileSelected = async (e) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    await openCropForFile(f, 'banner');
-    e.target.value = null; // Reset input
-  };
-
-  const handleDelete = async (type) => {
-    if (!user) return;
-    const confirm = window.confirm(`Bạn có chắc muốn xóa ${type === 'avatar' ? 'ảnh đại diện' : 'banner'}?`);
-    if (!confirm) return;
-    try {
-      const updates = type === 'avatar' ? { avatar_url: null } : { banner_url: null };
-      
-      // SỬA: Đổi từ 'user_identity' sang 'Users'
-      const { error: dbErr } = await supabase.from('Users').update(updates).eq('id', user.id);
-      if (dbErr) throw dbErr;
-
-      // (Giğ nguyên) Chỉ update auth nếu là user "thật" (có session)
-      if (session) {
-        const { error: authErr } = await supabase.auth.updateUser({ data: updates });
-        if (authErr) throw authErr;
-      }
-
-      if (type === 'avatar') {
-        setAvatarPath(null);
-        setAvatarPreview(null);
-      } else {
-        setBannerPath(null);
-        setBannerPreview(null);
-      }
-      toast.success('Đã xoá thành công.');
-      if (refreshUser) refreshUser();
-    } catch (err) {
-      toast.error(`Không thể xoá: ${err.message}`);
-    }
-  };
-
-  const openPreview = (src) => {
-    setPreviewSrc(src);
-    setIsPreviewOpen(true);
-  };
-
+/* ------------------ (MỚI) AnimatedNameDisplay ------------------ */
+// (Thay thế cho AvatarBannerManager theo yêu cầu)
+const AnimatedNameDisplay = ({ user }) => {
   return (
-    <div className="mb-6">
-      {/* Banner */}
-      <div className="relative rounded-2xl overflow-hidden shadow-lg">
-        {bannerPreview ? (
-          <img src={bannerPreview} alt="banner" className="w-full h-44 object-cover" onClick={() => openPreview(bannerPreview)} style={{ cursor: 'zoom-in' }} />
-        ) : (
-          <div className="w-full h-44 bg-gradient-to-r from-[#22d3ee] to-[#6366f1] flex items-center justify-center text-white">
-            <PaintBrush size={20} /> <span className="ml-2 font-semibold">Your Banner</span>
-          </div>
-        )}
-
-        {/* SỬA: Gỡ bỏ check 'session' để ai cũng thấy nút */}
-        <div className="absolute top-3 right-3 flex gap-2">
-          <label htmlFor="banner-upload-input" className="inline-flex items-center gap-2 bg-white/90 dark:bg-slate-800/80 p-2 rounded-xl cursor-pointer">
-            <Image size={18} /> <span className="hidden md:inline">Thay banner</span>
-          </label>
-          <input 
-            id="banner-upload-input" 
-            type="file" 
-            accept="image/*" 
-            onChange={handleBannerFileSelected} 
-            className="hidden" 
-            disabled={isUploading}
-          />
-          {bannerPreview && (
-            <button onClick={() => handleDelete('banner')} className="inline-flex items-center gap-2 bg-white/90 dark:bg-slate-800/80 p-2 rounded-xl hover:bg-rose-100" disabled={isUploading}>
-              <TrashSimple size={18} /> <span className="hidden md:inline">Xóa</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Avatar + name */}
-      <div className="flex items-end gap-4 mt- -12">
-        <div className="relative -mt-12">
-          <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-white dark:border-slate-900 shadow-lg" onClick={() => avatarPreview && openPreview(avatarPreview)} style={{ cursor: avatarPreview ? 'zoom-in' : 'default' }}>
-            {avatarPreview ? (
-              <img src={avatarPreview} alt="avatar" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-white/10 to-white/5">
-                <User size={28} className="text-white/80" />
-              </div>
-            )}
-          </div>
-
-          {/* SỬA: Gỡ bỏ check 'session' */}
-          <>
-            <label htmlFor="avatar-upload-input" className="absolute -right-1 -bottom-1 bg-white/90 dark:bg-slate-800/80 rounded-full p-1 cursor-pointer border border-white/40">
-              <Camera size={16} className="text-slate-700" />
-            </label>
-            <input 
-              id="avatar-upload-input" 
-              type="file" 
-              accept="image/*" 
-              onChange={handleAvatarFileSelected} 
-              className="hidden" 
-              disabled={isUploading}
-            />
-          </>
-        </div>
-
-        <div className="flex-1">
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{user.full_name || user.email}</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-300">{user?.role || 'Người dùng'}</p>
-        </div>
-
-        <div className="ml-auto flex items-center gap-2">
-          {/* SỬA: Gỡ bỏ check 'session', chỉ check 'avatarPreview' */}
-          {avatarPreview && (
-            <button onClick={() => handleDelete('avatar')} className="px-3 py-2 bg-white/90 dark:bg-slate-800/80 rounded-2xl inline-flex items-center gap-2" disabled={isUploading}>
-              <TrashSimple size={16} /> <span className="hidden md:inline">Xóa avatar</span>
-            </button>
-          )}
-          {avatarPreview && (
-            <button onClick={() => avatarPreview && openPreview(avatarPreview)} className="px-3 py-2 bg-white/90 dark:bg-slate-800/80 rounded-2xl inline-flex items-center gap-2">
-              <MagnifyingGlassPlus size={16} /> <span className="hidden md:inline">Xem ảnh</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Crop Modal (Giữ nguyên) */}
-      <Dialog open={isAvatarCropOpen || isBannerCropOpen} onClose={() => { setIsAvatarCropOpen(false); setIsBannerCropOpen(false); setImageSrc(null); }}>
-        <div className="fixed inset-0 bg-black/50" aria-hidden="true" />
-        <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="w-full max-w-3xl bg-white dark:bg-slate-800 rounded-2xl p-4">
-            <Dialog.Title className="text-lg font-semibold mb-3">Cắt ảnh trước khi tải lên</Dialog.Title>
-            <div className="relative w-full h-80 bg-neutral-200 dark:bg-neutral-700 rounded-lg overflow-hidden">
-              {imageSrc && (
-                <Cropper
-                  image={imageSrc}
-                  crop={crop}
-                  zoom={zoom}
-                  aspect={currentUploadType === 'avatar' ? 1 : 16 / 6}
-                  onCropChange={setCrop}
-                  onZoomChange={setZoom}
-                  onCropComplete={onCropComplete}
-                />
-              )}
-            </div>
-            <div className="mt-4 flex items-center gap-3">
-              <input type="range" min={1} max={3} step={0.01} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="w-full" />
-              <button onClick={uploadCropped} className="px-4 py-2 bg-gradient-to-r from-[#22d3ee] to-[#6366f1] text-white rounded-2xl inline-flex items-center gap-2" disabled={isUploading}>
-                {isUploading ? <CircleNotch size={16} className="animate-spin" /> : <UploadSimple size={16} />} Tải lên
-              </button>
-              <button onClick={() => { setIsAvatarCropOpen(false); setIsBannerCropOpen(false); setImageSrc(null); }} className="px-3 py-2 bg-slate-200 rounded-2xl">Hủy</button>
-            </div>
-          </Dialog.Panel>
-        </div>
-      </Dialog>
-
-      {/* Preview Modal (Giữ nguyên) */}
-      <Dialog open={isPreviewOpen} onClose={() => setIsPreviewOpen(false)}>
-        <div className="fixed inset-0 bg-black/70" aria-hidden="true" />
-        <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="w-full max-w-4xl bg-transparent rounded-md">
-            <div className="relative">
-              <img src={previewSrc} alt="preview" className="max-h-[80vh] w-auto mx-auto rounded-lg shadow-2xl object-contain" />
-              <button onClick={() => setIsPreviewOpen(false)} className="absolute top-3 right-3 bg-white/90 rounded-full p-2">
-                <XCircle size={20} />
-              </button>
-            </div>
-          </Dialog.Panel>
-        </div>
-      </Dialog>
+    <div className="p-6 text-center"> {/* Thêm padding vào đây */}
+      <h2 className="text-4xl font-bold galaxy-text mb-2">
+        {user.full_name || user.email}
+      </h2>
+      <p className="text-base font-medium text-slate-500 dark:text-slate-400 capitalize">
+        {user?.role || 'Người dùng'}
+      </p>
     </div>
   );
 };
+
 
 /* ------------------ Main Profile Component (SỬA v34) ------------------ */
 export default function Profile() {
@@ -987,9 +699,13 @@ export default function Profile() {
         <div className="md:flex md:gap-8">
           <aside className="md:w-1/4 mb-6 md:mb-0">
             <div className="sticky top-24">
-              <div className="bg-white/70 dark:bg-slate-800/50 backdrop-blur rounded-2xl p-4 mb-4">
-                <AvatarBannerWrapper user={user} refreshUser={handleProfileUpdate} session={session} />
+              
+              {/* === (THAY ĐỔI) === */}
+              {/* (Xóa p-4, vì component mới đã có padding) */}
+              <div className="bg-white/70 dark:bg-slate-800/50 backdrop-blur rounded-2xl mb-4 overflow-hidden">
+                <AnimatedNameDisplay user={user} />
               </div>
+              {/* === (KẾT THÚC THAY ĐỔI) === */}
 
               <nav className="bg-white/60 dark:bg-slate-800/50 backdrop-blur rounded-2xl p-3">
                 <TabButton
@@ -1067,12 +783,27 @@ export default function Profile() {
 
       <style jsx>{`
         .font-sora { font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue"; }
+
+        /* === (THÊM CSS CHO HIỆU ỨNG GALAXY) === */
+        .galaxy-text {
+          background: linear-gradient(90deg, #007cf0, #00dfd8, #ff00c3, #007cf0);
+          background-size: 400% 100%;
+          background-clip: text;
+          -webkit-background-clip: text;
+          color: transparent;
+          animation: galaxy-animation 5s linear infinite;
+          -webkit-text-fill-color: transparent; /* Đảm bảo hoạt động trên Safari */
+        }
+        
+        @keyframes galaxy-animation {
+          0% { background-position: 0% 50%; }
+          100% { background-position: 100% 50%; }
+        }
+        /* === (KẾT THÚC THÊM CSS) === */
       `}</style>
     </div>
   );
 }
 
-/* ------------------ AvatarBannerWrapper (SỬA THEO YÊU CẦU) ------------------ */
-function AvatarBannerWrapper({ user, refreshUser, session }) {
-  return <AvatarBannerManager user={user} refreshUser={refreshUser} session={session} />;
-}
+/* ------------------ (XÓA) AvatarBannerWrapper ------------------ */
+// (Đã xóa component)
