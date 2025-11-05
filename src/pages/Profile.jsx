@@ -1,12 +1,11 @@
 // src/pages/Profile.jsx
-/* *** (SỬA LỖI v38 - THEO YÊU CẦU) ***
-  1. (Fix) THÊM LOGIC FETCH MỚI: Trang Profile giờ sẽ tự động fetch
-     dữ liệu đầy đủ (SĐT, địa chỉ, v.v.) từ bảng 'Users'
-     thay vì chỉ dựa vào 'useAuth()'.
-  2. (Fix) ProfileInfoForm giờ sẽ nhận 'fullUserProfile' để
-     hiển thị đúng dữ liệu SĐT, địa chỉ, ngày sinh.
-  3. (Sửa) AnimatedNameDisplay giờ sẽ hiển thị 'customer_tier'
-     (ví dụ: "Tiêu chuẩn") thay vì 'role' (ví dụ: "user").
+/* *** (SỬA LỖI v38.2 - Fix Lỗi Reference & Thêm Style Tier) ***
+  1. (Fix) Sửa lỗi typo 'activeTop' -> 'activeTab' 
+     tại TabButton "Bảo mật & Mật khẩu".
+  2. (Fix) Cập nhật AnimatedNameDisplay để hiển thị Tier
+     (VIP, Tiêu chuẩn, v.v.)
+  3. (Fix) Cập nhật <style jsx> để thêm hiệu ứng
+     Vàng (VIP), Xám (Tiêu chuẩn), Xanh lá (Thường xuyên), Xanh dương (Mới).
 */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -609,17 +608,43 @@ const IdentityForm = ({ user, session, identity, loading, onRefresh }) => {
 };
 
 /* ------------------ (MỚI) AnimatedNameDisplay ------------------ */
-// (Thay thế cho AvatarBannerManager theo yêu cầu)
-// (SỬA v38: Hiển thị customer_tier)
+// (SỬA v38.2: Thêm style cho Tier)
 const AnimatedNameDisplay = ({ user }) => {
+  // Xác định tier để hiển thị
+  let displayTier = user.customer_tier;
+  if (!displayTier) {
+    if (user.role === 'admin') displayTier = 'Admin';
+    else if (user.role === 'supplier') displayTier = 'Supplier';
+    else displayTier = 'Tiêu chuẩn'; // Mặc định cho user
+  }
+
+  // Lấy class CSS tương ứng
+  let tierClass = '';
+  switch (displayTier) {
+    case 'VIP':
+      tierClass = 'tier-vip'; // Vàng óng ánh
+      break;
+    case 'Thường xuyên':
+      tierClass = 'tier-regular'; // Xanh lá
+      break;
+    case 'Mới':
+      tierClass = 'tier-new'; // Xanh dương
+      break;
+    case 'Tiêu chuẩn':
+      tierClass = 'tier-standard'; // Xám
+      break;
+    default:
+      // Dành cho 'Admin', 'Supplier', hoặc các giá trị khác
+      tierClass = 'tier-other'; 
+  }
+
   return (
-    <div className="p-6 text-center"> {/* Thêm padding vào đây */}
+    <div className="p-6 text-center">
       <h2 className="text-4xl font-bold galaxy-text mb-2">
         {user.full_name || user.email}
       </h2>
-      <p className="text-base font-medium text-slate-500 dark:text-slate-400 capitalize">
-        {/* SỬA: Hiển thị customer_tier hoặc role (như "Tiêu chuẩn") */}
-        {user.customer_tier || user.role || 'Người dùng'}
+      <p className={`text-base font-medium capitalize ${tierClass}`}>
+        {displayTier}
       </p>
     </div>
   );
@@ -752,10 +777,11 @@ export default function Profile() {
                   onClick={() => setActiveTab('profile')}
                 />
                 
+                {/* *** SỬA LỖI v38.1: activeTop -> activeTab *** */}
                 <TabButton
                   label="Bảo mật & Mật khẩu"
                   icon={<ShieldCheck className="text-orange-600" />}
-                  isActive={activeTab === 'password'}
+                  isActive={activeTab === 'password'} 
                   onClick={() => setActiveTab('password')}
                   disabled={identityStatus !== 'approved'} // Giờ chỉ khóa khi chưa duyệt
                 />
@@ -816,10 +842,11 @@ export default function Profile() {
         </div>
       </div>
 
+      {/* === (SỬA v38.2) THÊM CSS CHO TIER === */}
       <style jsx>{`
         .font-sora { font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue"; }
 
-        /* === (THÊM CSS CHO HIỆU ỨNG GALAXY) === */
+        /* === HIỆU ỨNG GALAXY (Tên) === */
         .galaxy-text {
           background: linear-gradient(90deg, #007cf0, #00dfd8, #ff00c3, #007cf0);
           background-size: 400% 100%;
@@ -834,7 +861,48 @@ export default function Profile() {
           0% { background-position: 0% 50%; }
           100% { background-position: 100% 50%; }
         }
-        /* === (KẾT THÚC THÊM CSS) === */
+        
+        /* === (MỚI) HIỆU ỨNG TIER (Hạng) === */
+
+        /* VIP (Mạ vàng óng ánh) */
+        .tier-vip {
+          font-weight: 700; /* Bold */
+          background: linear-gradient(90deg, #d4af37, #ffd700, #fbec5d, #d4af37);
+          background-size: 400% 100%;
+          background-clip: text;
+          -webkit-background-clip: text;
+          color: transparent;
+          animation: gold-animation 4s linear infinite;
+          -webkit-text-fill-color: transparent;
+        }
+
+        /* Tiêu chuẩn (Xám) */
+        .tier-standard {
+          color: #9ca3af; /* gray-400 */
+        }
+
+        /* Thường xuyên (Xanh lá) */
+        .tier-regular {
+          color: #22c55e; /* green-500 */
+          font-weight: 600;
+        }
+
+        /* Mới (Xanh dương) */
+        .tier-new {
+          color: #3b82f6; /* blue-500 */
+          font-weight: 600;
+        }
+
+        /* Các role khác (Admin, Supplier) */
+        .tier-other {
+          color: #64748b; /* slate-500 */
+        }
+        
+        /* Animation cho VIP */
+        @keyframes gold-animation {
+          0% { background-position: 0% 50%; }
+          100% { background-position: 100% 50%; }
+        }
       `}</style>
     </div>
   );
