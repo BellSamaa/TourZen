@@ -1,39 +1,90 @@
 // src/pages/PromotionPage.jsx
-/* (SỬA LỖI v38.4 - FIX LỖI CHẶN VIP)
-  1. (Fix) Thêm state 'fullUserProfile' và 'isLoadingProfile'.
-  2. (Fix) Thêm useEffect để fetch dữ liệu đầy đủ từ bảng 'Users'
-     (giống logic của Profile.jsx).
-  3. (Fix) Sửa điều kiện kiểm tra từ 'user.customer_tier'
-     thành 'fullUserProfile?.customer_tier'.
+/* (SỬA LỖI v38.5 - Bỏ Form, Hiển thị mã ngay)
+  1. (Fix) Xóa import 'VoucherModal'.
+  2. (Fix) Thêm component 'CodeDisplayModal' mới (không có form).
+  3. (Fix) Thay thế <VoucherModal/> bằng <CodeDisplayModal/>.
+  4. (Fix) Xóa khối 'promotionsData' hardcoded (vì đã import).
+  5. (Fix) Thêm 'CheckCircle', 'X' vào import (cho modal mới).
+  6. (Giữ nguyên) Toàn bộ logic kiểm tra VIP.
 */
 
-import React, { useState, useEffect } from 'react'; // (FIXED) Added useEffect for navigation
-import { motion } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { FiTag } from 'react-icons/fi';
 // Giả sử 2 component này tồn tại
 import PromotionCard from '../components/PromotionCard';
-import VoucherModal from '../components/VoucherModal';
+// (XÓA) import VoucherModal from '../components/VoucherModal';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { CircleNotch, WarningCircle } from "@phosphor-icons/react";
-import toast from 'react-hot-toast'; // (FIXED) Added toast import
-import { getSupabase } from "../lib/supabaseClient"; // *** (THÊM) Import Supabase ***
+import { CircleNotch, WarningCircle, CheckCircle, X } from "@phosphor-icons/react"; // (THÊM)
+import toast from 'react-hot-toast'; 
+import { getSupabase } from "../lib/supabaseClient"; 
+import { PROMOTIONS } from '../data/promotionsData.js'; 
 
-// Dữ liệu mẫu (Giả định)
-const promotionsData = {
-  events: [
-    { id: 1, title: 'Đại Lễ 2/9', description: 'Vi vu không lo về giá, giảm đến 30% tour toàn quốc.', image: 'https://images.unsplash.com/photo-1597093278291-a205a1e7a36f?q=80&w=2070', tag: 'Lễ 2/9', timeLimit: 'Còn 3 ngày', voucherCode: 'LEQUOCKHANH', discountPercent: 30 },
-    { id: 2, title: 'Chào hè rực rỡ', description: 'Ưu đãi đặc biệt cho các tour biển đảo. Tặng voucher lặn biển.', image: 'https://images.unsplash.com/photo-1507525428034-b723a996f6ea?q=80&w=2070', tag: 'Tour hè', timeLimit: 'Đến 31/08', voucherCode: 'HEVUI', discountPercent: 20, quantityLimit: true },
-  ],
-  regions: [
-    { id: 3, title: 'Khám phá Miền Trung', description: 'Hành trình di sản Đà Nẵng - Huế - Hội An giảm ngay 25%.', image: 'https://images.unsplash.com/photo-1528127269322-539801943592?q=80&w=2070', tag: 'Miền Trung', timeLimit: 'Vô thời hạn', voucherCode: 'DISANMT', discountPercent: 25 },
-  ],
-  thematic: [
-    { id: 5, title: 'Một vòng Việt Nam', description: 'Hành trình xuyên Việt 14 ngày, khám phá mọi miền Tổ quốc.', image: 'https://images.unsplash.com/photo-1543973156-3804b81a7351?q=80&w=2070', tag: 'Xuyên Việt', timeLimit: 'Ưu đãi tháng này', voucherCode: 'VIETNAMOI', discountPercent: 10 },
-  ]
+// (SỬA) Lấy dữ liệu từ file import
+const promotionsData = PROMOTIONS;
+
+const supabase = getSupabase(); 
+
+// *** (THÊM MỚI v38.5) Modal hiển thị mã, không cần form ***
+const CodeDisplayModal = ({ promo, onClose }) => {
+  if (!promo) return null;
+
+  // Hàm sao chép mã
+  const handleCopy = () => {
+    navigator.clipboard.writeText(promo.voucherCode);
+    toast.success("Đã sao chép mã!");
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ scale: 0.9, y: 20 }}
+          animate={{ scale: 1, y: 0 }}
+          exit={{ scale: 0.9, y: 20 }}
+          className="relative bg-white dark:bg-neutral-800 rounded-3xl shadow-2xl w-full max-w-md p-8"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 bg-gray-100 dark:bg-neutral-700 text-gray-600 dark:text-gray-300 p-2 rounded-full hover:bg-gray-200 dark:hover:bg-neutral-600 transition"
+          >
+            <X size={20} />
+          </button>
+
+          <div className="text-center space-y-4">
+            <CheckCircle size={60} className="mx-auto text-green-500" />
+            <h2 className="text-2xl font-bold text-neutral-900 dark:text-white">
+              Lấy mã thành công!
+            </h2>
+            <p className="text-neutral-600 dark:text-neutral-400">
+              Sử dụng mã dưới đây tại trang thanh toán:
+            </p>
+            <div className="mt-4 bg-gray-100 dark:bg-neutral-900 border-2 border-dashed border-gray-300 dark:border-neutral-600 rounded-lg p-4">
+              <p className="text-sm text-neutral-500">Mã của bạn:</p>
+              <p className="text-3xl font-extrabold text-sky-600 dark:text-sky-400 tracking-widest">{promo.voucherCode}</p>
+            </div>
+            <button 
+              onClick={handleCopy} 
+              className="w-full bg-sky-600 text-white py-3 rounded-lg font-bold hover:bg-sky-700 transition flex justify-center items-center gap-2"
+            >
+              Sao chép mã
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
 };
+// *** (KẾT THÚC THÊM MỚI) ***
 
-const supabase = getSupabase(); // *** (THÊM) Khởi tạo Supabase ***
 
 export default function PromotionPage() {
   const [selectedPromo, setSelectedPromo] = useState(null);
@@ -156,8 +207,8 @@ export default function PromotionPage() {
         </motion.div>
       </div>
 
-      {/* Modal với form Họ tên – SĐT – Email */}
-      <VoucherModal promo={selectedPromo} onClose={handleCloseModal} />
+      {/* *** (SỬA v38.5) Thay thế Modal *** */}
+      <CodeDisplayModal promo={selectedPromo} onClose={handleCloseModal} />
 
       {/* (FIXED) Thêm CSS cần thiết nếu chưa có global */}
        <style jsx global>{`
