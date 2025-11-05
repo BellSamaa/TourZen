@@ -1,5 +1,5 @@
 // src/pages/AdminManageProducts.jsx
-// (SỬA LỖI v3.1: Giữ nguyên text[] và sửa lỗi logic đọc/ghi)
+// (SỬA LỖI v3.2: Sửa lỗi cú pháp string literal)
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from 'react-router-dom';
@@ -106,7 +106,9 @@ const DeparturesManagerReadOnly = ({ tourId }) => {
              if (error) throw error;
              setDepartures(data || []);
          } catch(err) {
-             setError("Lỗi tải lịch khởi hành: "" + err.message);
+             // =================== SỬA LỖI TẠI ĐÂY ===================
+             setError("Lỗi tải lịch khởi hành: " + err.message);
+             // ======================================================
          } finally {
              setLoading(false);
          }
@@ -124,11 +126,11 @@ const DeparturesManagerReadOnly = ({ tourId }) => {
                      <table className="min-w-full text-sm">
                          <thead className="bg-gray-100 dark:bg-neutral-700 sticky top-0">
                              <tr>
-                                 <th className="px-3 py-2 text-left"">Ngày đi</th>
-                                 <th className="px-3 py-2 text-left"">Giá Lớn (NCC)</th>
-                                 <th className="px-3 py-2 text-left"">Giá Trẻ (NCC)</th>
-                                 <th className="px-3 py-2 text-left"">Slots</th>
-                                 <th className="px-3 py-2 text-left"">Đã đặt</th>
+                                 <th className="px-3 py-2 text-left">Ngày đi</th>
+                                 <th className="px-3 py-2 text-left">Giá Lớn (NCC)</th>
+                                 <th className="px-3 py-2 text-left">Giá Trẻ (NCC)</th>
+                                 <th className="px-3 py-2 text-left">Slots</th>
+                                 <th className="px-3 py-2 text-left">Đã đặt</th>
                              </tr>
                          </thead>
                          <tbody className="divide-y dark:divide-neutral-600">
@@ -592,7 +594,7 @@ export default function AdminManageProducts() {
                                     <th className="th-style">Duyệt</th>
                                     <th className="th-style">Đăng</th>
                                     <th className="th-style text-right">Hành động</th>
-                                </h5>
+                                </tr>
                             </thead> 
                             <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700"> 
                                 {products.map((p) => <TourListItem key={p.id} product={p} />)} 
