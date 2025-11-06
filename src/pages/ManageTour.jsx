@@ -8,6 +8,8 @@
 // 4. [AddModal] Tự động tính "Tổng tiền" (giống Payment.jsx).
 // 5. [AddModal] Thêm validation (phải có người lớn).
 // 6. [ManageTour] Cập nhật fetchTours (lấy giá) và handleSaveDetails (logic slot).
+// (*** GEMINI SỬA v30.1 - FIX BUILD ERROR ***)
+// 1. Thay thế 'Child' (không tồn tại) bằng 'Person'
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -25,7 +27,7 @@ import {
     // (THÊM v30) Icons cho số lượng
     User as FaUser, 
     UserFocus as FaUserTie, // Giả lập FaUserTie
-    Child as FaChild, 
+    Person as FaChild, // (*** SỬA v30.1) 'Child' không tồn tại, dùng 'Person'
     Baby as FaBaby 
 } from "@phosphor-icons/react";
 
