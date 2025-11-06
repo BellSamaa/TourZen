@@ -1,8 +1,17 @@
 // ManageCustomers.jsx
+/* *** (SỬA THEO YÊU CẦU) THÊM LÝ DO TỪ CHỐI (CMND) ***
+  1. (State) Thêm state `isRejecting` và `rejectReason` vào `IdentityModal`.
+  2. (Logic) Sửa `handleDecision`:
+     - Khi 'approved': Giữ nguyên logic, nhưng thêm `rejection_reason: null`
+       để xóa lý do từ chối cũ (nếu có).
+     - Khi 'rejected': Chỉ set `setIsRejecting(true)` để mở UI nhập lý do.
+  3. (Handler) Thêm `handleConfirmRejection` để gọi Supabase
+     với `status: 'rejected'` và `rejection_reason: rejectReason`.
+  4. (UI) Dùng `AnimatePresence` trong `IdentityModal` để chuyển đổi
+     giữa UI Duyệt (cũ) và UI Nhập Lý Do (mới).
+*/
 /* *** (SỬA THEO YÊU CẦU) Thêm Validation cho SĐT & Địa chỉ ***
-  1. (Logic) Thêm 'phoneRegex' từ file Login.jsx.
-  2. (Logic) Bổ sung logic kiểm tra SĐT/Địa chỉ vào 'handleSubmit'
-     của 'CustomerForm', sử dụng 'toast.error' để báo lỗi.
+  (Giữ nguyên các bình luận cũ...)
 */
 /* *** (SỬA THEO YÊU CẦU) NÂNG CẤP v13 (Tối ưu Modal CMND) ***
   (Giữ nguyên các bình luận cũ...)
@@ -12,14 +21,7 @@
   (Giữ nguyên các bình luận cũ...)
 */
 /* *** (SỬA THEO YÊU CẦU) THÊM XÁC NHẬN KHI XÓA VIP ***
-  1. (State) Thêm `showVipDeleteConfirm` để quản lý modal thứ 2.
-  2. (Modal) Thêm modal `showVipDeleteConfirm` với cảnh báo đặc biệt (border cam, text cảnh báo).
-  3. (Handler) Thêm `handleDeleteAttempt` để kiểm tra Tier.
-     - Nếu không phải VIP -> Gọi `handleDelete` (xóa ngay).
-     - Nếu là VIP -> Đóng modal 1, mở modal 2 (VIP).
-  4. (Modal) Sửa modal `showDeleteConfirm` (modal 1) để luôn gọi `handleDeleteAttempt`.
-  5. (Handler) Sửa `handleDelete` để đóng cả 2 modal khi xóa xong.
-  6. (CSS) Thêm `.modal-button-warning` cho nút xóa VIP màu cam.
+  (Giữ nguyên các bình luận cũ...)
 */
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
@@ -293,7 +295,7 @@ const CustomerBookingsModal = ({ customer, onClose }) => {
   );
 };
 
-// --- (*** SỬA v13: TỐI ƯU BỐ CỤC MODAL CMND ***) ---
+// --- (*** SỬA v13 & SỬA THEO YÊU CẦU: Thêm Lý Do Từ Chối ***) ---
 const IdentityModal = ({ customer, onClose, onSuccess }) => {
     const [identity, setIdentity] = useState(null);
     const [formData, setFormData] = useState({ id_number: '', full_name: '', dob: '', issue_date: '', issue_place: '' });
@@ -302,7 +304,10 @@ const IdentityModal = ({ customer, onClose, onSuccess }) => {
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
 
-    // Hàm tạo Signed URL
+    // (*** THÊM MỚI THEO YÊU CẦU ***)
+    const [isRejecting, setIsRejecting] = useState(false); // State quản lý modal lý do
+    const [rejectReason, setRejectReason] = useState(""); // State chứa lý do
+
 // --- SỬA HÀM createSignedUrl ---
 const createSignedUrl = async (filePath) => {
   if (!filePath) {
@@ -310,7 +315,6 @@ const createSignedUrl = async (filePath) => {
     return null;
   }
   try {
-    // Kiểm tra file tồn tại
     const { data: list, error: listError } = await supabase.storage
       .from("id-scans")
       .list("", { search: filePath });
@@ -320,13 +324,10 @@ const createSignedUrl = async (filePath) => {
       console.warn(`❌ File ${filePath} không tồn tại trong bucket id-scans`);
       return null;
     }
-
-    // Tạo signed URL hợp lệ 1 giờ
     const { data, error } = await supabase.storage
       .from("id-scans")
       .createSignedUrl(filePath, 3600);
     if (error) throw error;
-
     return data.signedUrl;
   } catch (error) {
     console.error("Lỗi tạo signed URL:", error.message);
@@ -334,22 +335,18 @@ const createSignedUrl = async (filePath) => {
   }
 };
 
-
     // Fetch dữ liệu và tạo signed URLs
     useEffect(() => {
         const fetchIdentityData = async () => {
             if (!customer) return;
             setLoading(true);
             try {
-                // 1. Fetch bản ghi identity
                 const { data, error } = await supabase
                     .from('user_identity')
                     .select('*')
                     .eq('id', customer.id)
                     .single();
-                
-                if (error && error.code !== 'PGRST116') throw error; // Bỏ qua lỗi "không tìm thấy"
-
+                if (error && error.code !== 'PGRST116') throw error; 
                 if (data) {
                     setIdentity(data);
                     setFormData({
@@ -359,8 +356,6 @@ const createSignedUrl = async (filePath) => {
                         issue_date: data.issue_date ? data.issue_date.split('T')[0] : '',
                         issue_place: data.issue_place || '',
                     });
-
-                    // 2. Tạo Signed URLs
                     const [frontUrl, backUrl] = await Promise.all([
                         createSignedUrl(data.front_image_url),
                         createSignedUrl(data.back_image_url)
@@ -383,18 +378,27 @@ const createSignedUrl = async (filePath) => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    // (*** SỬA LẠI THEO YÊU CẦU ***)
     // Xử lý Duyệt / Từ chối
     const handleDecision = async (decision) => {
+        // (MỚI) Nếu Từ chối, chỉ mở form nhập lý do
+        if (decision === 'rejected') {
+            setIsRejecting(true);
+            setRejectReason(""); // Xóa lý do cũ (nếu có)
+            return; // Dừng lại
+        }
+
+        // (CŨ) Nếu "Duyệt" (approved)
         setIsSaving(true);
         try {
             let updates = { status: decision };
             
-            // Nếu "Duyệt", lưu cả thông tin admin đã nhập
             if (decision === 'approved') {
                 if (!formData.id_number || !formData.full_name || !formData.dob) {
                     throw new Error("Phải nhập Số CMND, Họ Tên và Ngày sinh trước khi duyệt.");
                 }
-                updates = { ...updates, ...formData };
+                // (MỚI) Xóa lý do từ chối cũ (nếu có) khi duyệt
+                updates = { ...updates, ...formData, rejection_reason: null }; 
             }
 
             const { error } = await supabase
@@ -415,6 +419,40 @@ const createSignedUrl = async (filePath) => {
         }
     };
 
+    // (*** THÊM MỚI THEO YÊU CẦU ***)
+    // Hàm Xử lý xác nhận từ chối (sau khi nhập lý do)
+    const handleConfirmRejection = async () => {
+        if (!rejectReason || rejectReason.trim().length < 10) {
+            toast.error("Vui lòng nhập lý do từ chối (ít nhất 10 ký tự).");
+            return;
+        }
+        
+        setIsSaving(true);
+        try {
+            const updates = { 
+                status: 'rejected', 
+                rejection_reason: rejectReason.trim() 
+            };
+
+            const { error } = await supabase
+                .from('user_identity')
+                .update(updates)
+                .eq('id', customer.id);
+            
+            if (error) throw error;
+
+            toast.success("Đã từ chối hồ sơ (kèm lý do).");
+            onSuccess(); // Gọi hàm refresh bảng
+            onClose(); // Đóng modal chính
+
+        } catch (error) {
+            toast.error(`Lỗi: ${error.message}`);
+        } finally {
+            setIsSaving(false);
+            // setIsRejecting(false); // Không cần vì modal chính đã đóng (onClose)
+        }
+    };
+
     return (
         <motion.div
             className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex justify-center items-center p-4"
@@ -429,85 +467,143 @@ const createSignedUrl = async (filePath) => {
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
             >
+                {/* --- HEADER (Thay đổi tiêu đề động) --- */}
                 <div className="flex justify-between items-center mb-6 p-6 border-b dark:border-slate-700">
                     <h3 className="text-2xl font-bold flex items-center gap-3">
                         <IdentificationCard size={30} className="text-violet-600 dark:text-violet-400" />
-                        <span>Duyệt Thông Tin Xác Thực</span>
+                        {/* (MỚI) Thay đổi tiêu đề khi từ chối */}
+                        <span>{isRejecting ? "Nhập Lý Do Từ Chối" : "Duyệt Thông Tin Xác Thực"}</span>
                     </h3>
                     <button onClick={onClose} disabled={isSaving} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
                         <X size={24} weight="bold" />
                     </button>
                 </div>
                 
-                {/* (SỬA v13) Đổi bố cục sang Dọc (space-y-6) */}
-                <div className="overflow-y-auto px-6 pb-6 simple-scrollbar">
-                    {loading && ( <div className="flex justify-center items-center p-20"> <CircleNotch size={40} className="animate-spin text-violet-500" /> </div> )}
-                    
-                    {!loading && !identity && ( <p className="text-center text-gray-500 p-20 italic text-lg">Khách hàng này chưa gửi thông tin xác thực.</p> )}
-                    
-                    {!loading && identity && (
-                        <div className="space-y-6">
-                            {/* (SỬA v13) Phần 1: Ảnh Scan (luôn ở trên) */}
-                            <div className="space-y-4">
-                                <h4 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Ảnh Scan</h4>
-                                {/* (SỬA v13) Đặt 2 ảnh cạnh nhau */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium dark:text-gray-400">Mặt trước</label>
-                                        {frontImageUrl ? (
-                                            <a href={frontImageUrl} target="_blank" rel="noopener noreferrer"><img src={frontImageUrl} alt="Mặt trước CMND" className="w-full rounded-lg border dark:border-slate-600" /></a>
-                                        ) : (<p className="text-sm italic text-gray-500">Chưa tải lên</p>)}
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium dark:text-gray-400">Mặt sau</label>
-                                        {backImageUrl ? (
-                                            <a href={backImageUrl} target="_blank" rel="noopener noreferrer"><img src={backImageUrl} alt="Mặt sau CMND" className="w-full rounded-lg border dark:border-slate-600" /></a>
-                                        ) : (<p className="text-sm italic text-gray-500">Chưa tải lên</p>)}
-                                    </div>
-                                </div>
+                {/* --- BODY & FOOTER (Quản lý bằng AnimatePresence) --- */}
+                <AnimatePresence mode="wait">
+                    {isRejecting ? (
+                        /* --- (MỚI) UI KHI TỪ CHỐI --- */
+                        <motion.div
+                            key="rejecting"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="flex flex-col flex-1 min-h-0" // Fix flex
+                        >
+                            <div className="overflow-y-auto px-6 pb-6 simple-scrollbar flex-1">
+                                <p className="text-base text-gray-700 dark:text-gray-300 mb-5">
+                                    Vui lòng nhập lý do từ chối hồ sơ của 
+                                    <strong className="text-sky-600 dark:text-sky-400"> {customer.full_name || customer.email}</strong>. 
+                                    <br/>
+                                    Lý do này sẽ được hiển thị cho khách hàng.
+                                </p>
+                                <InputWrapper 
+                                    label="Lý do từ chối (bắt buộc, tối thiểu 10 ký tự)" 
+                                    icon={<WarningCircle size={18} className="mr-2 text-red-500" />} // Dùng icon đã import
+                                >
+                                    <textarea 
+                                        name="reject_reason" 
+                                        value={rejectReason} 
+                                        onChange={(e) => setRejectReason(e.target.value)} 
+                                        className="form-input-style min-h-[120px]" 
+                                        placeholder="Ví dụ: Ảnh CMND bị mờ, không đọc được thông tin..."
+                                        disabled={isSaving}
+                                    />
+                                </InputWrapper>
                             </div>
+                            
+                            <div className="p-6 flex justify-end gap-4 border-t dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 rounded-b-2xl">
+                                <button type="button" onClick={() => setIsRejecting(false)} disabled={isSaving} className="modal-button-secondary min-w-[120px]">
+                                    Hủy
+                                </button>
+                                <button type="button" onClick={handleConfirmRejection} disabled={isSaving} className="modal-button-danger min-w-[120px]">
+                                    {isSaving ? <CircleNotch className="animate-spin" /> : 'Xác Nhận Từ Chối'}
+                                </button>
+                            </div>
+                        </motion.div>
 
-                            {/* (SỬA v13) Phần 2: Form nhập liệu (luôn ở dưới) */}
-                            <div className="space-y-4 pt-6 border-t dark:border-slate-700">
-                                <h4 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Thông tin (Admin nhập)</h4>
-                                <InputWrapper label="Số CMND/CCCD" icon={<IdentificationCard size={18} className="mr-2" />}>
-                                    <input type="text" name="id_number" value={formData.id_number} onChange={handleChange} className="form-input-style" placeholder="Nhập số từ ảnh..." />
-                                </InputWrapper>
-                                <InputWrapper label="Họ và Tên" icon={<User size={18} className="mr-2" />}>
-                                    <input type="text" name="full_name" value={formData.full_name} onChange={handleChange} className="form-input-style" placeholder="Nhập tên từ ảnh..." />
-                                </InputWrapper>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <InputWrapper label="Ngày sinh" icon={<CalendarBlank size={18} className="mr-2" />}>
-                                        <input type="date" name="dob" value={formData.dob} onChange={handleChange} className="form-input-style" />
-                                    </InputWrapper>
-                                    <InputWrapper label="Ngày cấp" icon={<CalendarBlank size={18} className="mr-2" />}>
-                                        <input type="date" name="issue_date" value={formData.issue_date} onChange={handleChange} className="form-input-style" />
-                                    </InputWrapper>
-                                </div>
-                                <InputWrapper label="Nơi cấp" icon={<House size={18} className="mr-2" />}>
-                                    <input type="text" name="issue_place" value={formData.issue_place} onChange={handleChange} className="form-input-style" placeholder="Nhập nơi cấp từ ảnh..." />
-                                </InputWrapper>
+                    ) : (
+                        /* --- UI MẶC ĐỊNH (DUYỆT) --- */
+                        <motion.div
+                            key="browsing"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="flex flex-col flex-1 min-h-0" // Fix cho flexbox overflow
+                        >
+                            <div className="overflow-y-auto px-6 pb-6 simple-scrollbar flex-1">
+                                {loading && ( <div className="flex justify-center items-center p-20"> <CircleNotch size={40} className="animate-spin text-violet-500" /> </div> )}
+                                
+                                {!loading && !identity && ( <p className="text-center text-gray-500 p-20 italic text-lg">Khách hàng này chưa gửi thông tin xác thực.</p> )}
+                                
+                                {!loading && identity && (
+                                    <div className="space-y-6">
+                                        {/* (SỬA v13) Phần 1: Ảnh Scan (luôn ở trên) */}
+                                        <div className="space-y-4">
+                                            <h4 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Ảnh Scan</h4>
+                                            {/* (SỬA v13) Đặt 2 ảnh cạnh nhau */}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-medium dark:text-gray-400">Mặt trước</label>
+                                                    {frontImageUrl ? (
+                                                        <a href={frontImageUrl} target="_blank" rel="noopener noreferrer"><img src={frontImageUrl} alt="Mặt trước CMND" className="w-full rounded-lg border dark:border-slate-600" /></a>
+                                                    ) : (<p className="text-sm italic text-gray-500">Chưa tải lên</p>)}
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-medium dark:text-gray-400">Mặt sau</label>
+                                                    {backImageUrl ? (
+                                                        <a href={backImageUrl} target="_blank" rel="noopener noreferrer"><img src={backImageUrl} alt="Mặt sau CMND" className="w-full rounded-lg border dark:border-slate-600" /></a>
+                                                    ) : (<p className="text-sm italic text-gray-500">Chưa tải lên</p>)}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* (SỬA v13) Phần 2: Form nhập liệu (luôn ở dưới) */}
+                                        <div className="space-y-4 pt-6 border-t dark:border-slate-700">
+                                            <h4 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Thông tin (Admin nhập)</h4>
+                                            <InputWrapper label="Số CMND/CCCD" icon={<IdentificationCard size={18} className="mr-2" />}>
+                                                <input type="text" name="id_number" value={formData.id_number} onChange={handleChange} className="form-input-style" placeholder="Nhập số từ ảnh..." />
+                                            </InputWrapper>
+                                            <InputWrapper label="Họ và Tên" icon={<User size={18} className="mr-2" />}>
+                                                <input type="text" name="full_name" value={formData.full_name} onChange={handleChange} className="form-input-style" placeholder="Nhập tên từ ảnh..." />
+                                            </InputWrapper>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <InputWrapper label="Ngày sinh" icon={<CalendarBlank size={18} className="mr-2" />}>
+                                                    <input type="date" name="dob" value={formData.dob} onChange={handleChange} className="form-input-style" />
+                                                </InputWrapper>
+                                                <InputWrapper label="Ngày cấp" icon={<CalendarBlank size={18} className="mr-2" />}>
+                                                    <input type="date" name="issue_date" value={formData.issue_date} onChange={handleChange} className="form-input-style" />
+                                                </InputWrapper>
+                                            </div>
+                                            <InputWrapper label="Nơi cấp" icon={<House size={18} className="mr-2" />}>
+                                                <input type="text" name="issue_place" value={formData.issue_place} onChange={handleChange} className="form-input-style" placeholder="Nhập nơi cấp từ ảnh..." />
+                                            </InputWrapper>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                        </div>
+                            
+                            {/* Footer gốc */}
+                            {!loading && identity && (
+                                <div className="p-6 flex justify-end gap-4 border-t dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 rounded-b-2xl">
+                                    <button type="button" onClick={() => handleDecision('rejected')} disabled={isSaving} className="modal-button-danger min-w-[120px]">
+                                        {isSaving ? <CircleNotch className="animate-spin" /> : 'Từ chối'}
+                                    </button>
+                                    <button type="button" onClick={() => handleDecision('approved')} disabled={isSaving} className="modal-button-primary min-w-[120px]">
+                                        {isSaving ? <CircleNotch className="animate-spin" /> : 'Duyệt Hồ Sơ'}
+                                    </button>
+                                </div>
+                            )}
+                        </motion.div>
                     )}
-                </div>
-                {/* (SỬA v13) KẾT THÚC THAY ĐỔI BỐ CỤC */}
-
-                {!loading && identity && (
-                    <div className="p-6 flex justify-end gap-4 border-t dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 rounded-b-2xl">
-                        <button type="button" onClick={() => handleDecision('rejected')} disabled={isSaving} className="modal-button-danger min-w-[120px]">
-                            {isSaving ? <CircleNotch className="animate-spin" /> : 'Từ chối'}
-                        </button>
-                        <button type="button" onClick={() => handleDecision('approved')} disabled={isSaving} className="modal-button-primary min-w-[120px]">
-                            {isSaving ? <CircleNotch className="animate-spin" /> : 'Duyệt Hồ Sơ'}
-                        </button>
-                    </div>
-                )}
+                </AnimatePresence>
             </motion.div>
         </motion.div>
     );
 };
-// --- (*** KẾT THÚC v13 ***) ---
+// --- (*** KẾT THÚC SỬA ***) ---
 
 // --- (*** FIX v7.7 ***) Component InputWrapper (Đã di chuyển ra ngoài) ---
 const InputWrapper = ({ label, icon, children }) => (
@@ -775,7 +871,7 @@ export default function ManageCustomersSupabase() {
   const handleUpdateCustomer = useCallback(async (formData) => {
     if (!editingCustomer || isSaving) return;
     setIsSaving(true);
-    // (SỬA THEO YÊU CẦU) Tên (full_name) và Email đã bị disabled, nhưng vẫn gửi đi để đảm bảo
+    // (SỬA THEO YÊU CẦU) Tên (full_name) và Email đã bị disabled
     const updateData = { full_name: formData.full_name, address: formData.address, phone_number: formData.phone_number, ngay_sinh: formData.ngay_sinh, };
     try {
       const { error } = await supabase.from("Users").update(updateData).eq("id", editingCustomer.id);
@@ -1189,7 +1285,7 @@ export default function ManageCustomersSupabase() {
         .badge-status-pro {
             @apply px-3 py-1 text-xs font-semibold rounded-md inline-flex items-center gap-1.5;
         }
-      `}</style>
+      `}</style>L
     </motion.div>
   );
 }

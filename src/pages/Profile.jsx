@@ -1,11 +1,15 @@
 // src/pages/Profile.jsx
+/* *** (SỬA THEO YÊU CẦU) Thêm Lý Do Từ Chối ***
+  1. (Logic) Sửa `IdentityForm` để kiểm tra và hiển thị
+     `identity.rejection_reason` nếu `identity.status === 'rejected'`.
+  2. (UI) Thêm một khối thông báo lỗi màu đỏ (Alert Box)
+     để hiển thị lý do này cho khách hàng.
+  3. (Logic) Cập nhật `handleSubmit` của `IdentityForm` để
+     bảo toàn `rejection_reason` cũ khi user gửi lại (upsert),
+     đảm bảo nó không bị xóa mất cho đến khi Admin duyệt/từ chối lại.
+*/
 /* *** (SỬA LỖI v38.2 - Fix Lỗi Reference & Thêm Style Tier) ***
-  1. (Fix) Sửa lỗi typo 'activeTop' -> 'activeTab' 
-     tại TabButton "Bảo mật & Mật khẩu".
-  2. (Fix) Cập nhật AnimatedNameDisplay để hiển thị Tier
-     (VIP, Tiêu chuẩn, v.v.)
-  3. (Fix) Cập nhật <style jsx> để thêm hiệu ứng
-     Vàng (VIP), Xám (Tiêu chuẩn), Xanh lá (Thường xuyên), Xanh dương (Mới).
+  (Giữ nguyên các bình luận cũ...)
 */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -419,7 +423,7 @@ const ChangePasswordForm = ({ user, identity }) => {
 };
 
 
-/* ------------------ IdentityForm (GIỮ NGUYÊN) ------------------ */
+/* ------------------ (*** SỬA LẠI THEO YÊU CẦU ***) IdentityForm ------------------ */
 const IdentityForm = ({ user, session, identity, loading, onRefresh }) => { 
   const [isEditing, setIsEditing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -475,14 +479,20 @@ const IdentityForm = ({ user, session, identity, loading, onRefresh }) => {
       
       const updates = {
         id: user.id, 
-        status: 'pending', 
+        status: 'pending', // Luôn set 'pending' khi user gửi/gửi lại
         front_image_url: front_image_path || identity?.front_image_url,
         back_image_url: back_image_path || identity?.back_image_url,
+        
+        // Giữ lại thông tin cũ (nếu có) mà user không thể sửa
         id_number: identity?.id_number || null,
         full_name: identity?.full_name || null,
         dob: identity?.dob || null,
         issue_date: identity?.issue_date || null,
         issue_place: identity?.issue_place || null,
+        
+        // (MỚI) Giữ lại lý do từ chối cũ (nếu có)
+        // Admin sẽ ghi đè (nếu từ chối lại) hoặc xóa (nếu duyệt)
+        rejection_reason: identity?.rejection_reason || null 
       };
       
       const { error } = await supabase
@@ -510,8 +520,12 @@ const IdentityForm = ({ user, session, identity, loading, onRefresh }) => {
     return <div className="flex justify-center mt-10"><CircleNotch size={32} className="animate-spin text-sky-500" /></div>;
   }
 
+  // (*** SỬA LẠI THEO YÊU CẦU ***)
+  // Logic hiển thị trạng thái và lý do
   if (identity && !isEditing) {
     let statusBadge;
+    let rejectionInfo = null; // (MỚI) Thêm biến cho lý do
+
     switch (identity.status) {
       case 'approved':
         statusBadge = (
@@ -526,6 +540,18 @@ const IdentityForm = ({ user, session, identity, loading, onRefresh }) => {
             <XCircle weight="bold" className="text-red-600" /> Bị Từ Chối
           </div>
         );
+        
+        // (MỚI) Thêm phần hiển thị lý do
+        if (identity.rejection_reason) {
+          rejectionInfo = (
+            <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/30 rounded-lg">
+              <h5 className="font-semibold text-red-700 dark:text-red-300 mb-1">Lý do từ chối (từ Admin):</h5>
+              <p className="text-sm text-red-600 dark:text-red-200 italic">
+                "{identity.rejection_reason}"
+              </p>
+            </div>
+          );
+        }
         break;
       default: // 'pending'
         statusBadge = (
@@ -534,6 +560,8 @@ const IdentityForm = ({ user, session, identity, loading, onRefresh }) => {
           </div>
         );
     }
+    
+    // Render UI hiển thị trạng thái
     return (
       <div className="">
         <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
@@ -541,15 +569,23 @@ const IdentityForm = ({ user, session, identity, loading, onRefresh }) => {
         </h3>
         <div className="bg-gradient-to-br from-white/60 to-slate-50 dark:from-slate-800/60 p-5 rounded-2xl border dark:border-slate-700 space-y-3">
           {statusBadge}
+          {rejectionInfo} {/* (MỚI) Hiển thị lý do ở đây */}
+          
           <p className="text-sm text-slate-600 dark:text-slate-300 pt-2">
-            Trạng thái hồ sơ của bạn. Bạn có thể gửi lại thông tin nếu bị từ chối hoặc cần cập nhật.
+            {/* (MỚI) Thay đổi text động */}
+            {identity.status === 'rejected' 
+              ? "Vui lòng xem lý do từ chối ở trên và gửi lại thông tin chính xác."
+              : "Trạng thái hồ sơ của bạn. Bạn có thể gửi lại thông tin nếu bị từ chối hoặc cần cập nhật."
+            }
           </p>
           <motion.button
             onClick={() => setIsEditing(true)}
             className="px-4 py-2 bg-gradient-to-r from-[#6366f1] to-[#22d3ee] text-white rounded-2xl inline-flex items-center gap-2"
             whileHover={{ scale: 1.03 }}
           >
-            <Sparkle size={18} className="inline mr-2" /> Cập nhật / Gửi lại thông tin
+            <Sparkle size={18} className="inline mr-2" />
+            {/* (MỚI) Thay đổi text động */}
+            {identity.status === 'rejected' ? "Gửi Lại Thông Tin" : "Cập nhật / Gửi lại thông tin"}
           </motion.button>
         </div>
       </div>
@@ -562,6 +598,17 @@ const IdentityForm = ({ user, session, identity, loading, onRefresh }) => {
       <h3 className="text-2xl font-sora font-semibold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
         <Palette size={22} className="text-violet-600" /> {identity ? 'Cập nhật Thông tin Xác thực' : 'Bổ sung Thông tin Xác thực (CMND/CCCD)'}
       </h3>
+      
+      {/* (MỚI) Hiển thị lại lý do từ chối cũ (nếu có) khi user đang edit */}
+      {identity?.status === 'rejected' && identity?.rejection_reason && (
+           <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/30 rounded-lg">
+             <h5 className="font-semibold text-red-700 dark:text-red-300 mb-1">Lý do bị từ chối lần trước:</h5>
+             <p className="text-sm text-red-600 dark:text-red-200 italic">
+               "{identity.rejection_reason}"
+             </p>
+           </div>
+      )}
+      
       <p className="text-sm text-slate-600 dark:text-slate-300 -mt-2">
         Vui lòng tải lên ảnh scan 2 mặt CMND/CCCD của bạn. Admin sẽ xem xét và điền thông tin giúp bạn.
       </p>
@@ -576,7 +623,7 @@ const IdentityForm = ({ user, session, identity, loading, onRefresh }) => {
         <InputGroup label="Ảnh Scan Mặt sau CMND/CCCD">
           <label htmlFor="back-image-upload" className="flex items-center gap-2 w-full py-3 pl-11 pr-3 border rounded-xl bg-white/5 text-slate-500 cursor-pointer">
             <FileArrowUp className="text-pink-600" size={18} />
-            <span className="truncate">{backImage ? backImage.name : (identity?.back_image_url ? "Đã tải lên (Mặt sau)" : 'Nhấp để tải lên')}</span>
+            <span className="truncate">{backImage ? backImage.name : (identity?.back_image_url ? "Đã tải lên (Mặt sau)" : 'Nhập để tải lên')}</span>
           </label>
           <input id="back-image-upload" type="file" onChange={(e) => handleFileChange(e, 'back')} className="hidden" accept="image/*" />
         </InputGroup>
@@ -695,6 +742,7 @@ export default function Profile() {
   }, [authUser]); // Chỉ phụ thuộc vào authUser
 
   // SỬA v38: Thêm hàm fetch 'user_identity' (giữ nguyên logic cũ)
+  // (SỬA THEO YÊU CẦU: Hàm select('*') này sẽ tự động lấy cả cột 'rejection_reason' mới)
   const fetchIdentity = useCallback(async () => {
     if (!authUser) {
       setLoadingIdentity(false);
@@ -704,7 +752,7 @@ export default function Profile() {
     try {
       const { data, error } = await supabase
         .from('user_identity')
-        .select('*')
+        .select('*') // Sẽ lấy cả 'rejection_reason'
         .eq('id', authUser.id)
         .single();
         
