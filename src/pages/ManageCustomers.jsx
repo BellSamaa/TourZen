@@ -1285,7 +1285,7 @@ export default function ManageCustomersSupabase() {
         .badge-status-pro {
             @apply px-3 py-1 text-xs font-semibold rounded-md inline-flex items-center gap-1.5;
         }
-      `}</style>L
+      `}</style>
     </motion.div>
   );
 }
