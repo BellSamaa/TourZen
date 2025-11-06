@@ -1,4 +1,4 @@
-// ManageCustomersSupabase.jsx
+// ManageCustomers.jsx
 /* *** (SỬA THEO YÊU CẦU) Thêm Validation cho SĐT & Địa chỉ ***
   1. (Logic) Thêm 'phoneRegex' từ file Login.jsx.
   2. (Logic) Bổ sung logic kiểm tra SĐT/Địa chỉ vào 'handleSubmit'
@@ -599,7 +599,8 @@ const CustomerForm = ({ initialData, onSubmit, isSaving, onCancel }) => {
     <form onSubmit={handleSubmit}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
         <InputWrapper label="Họ và Tên" icon={<User size={18} className="mr-2" />}>
-          <input type="text" name="full_name" value={formData.full_name} onChange={handleChange} className="form-input-style" placeholder="Nguyễn Văn A" required />
+          {/* <<< (SỬA THEO YÊU CẦU) Vô hiệu hóa Tên ở chế độ Edit >>> */}
+          <input type="text" name="full_name" value={formData.full_name} onChange={handleChange} className={`form-input-style ${isEditMode ? 'bg-gray-100 dark:bg-slate-700 cursor-not-allowed' : ''}`} placeholder="Nguyễn Văn A" required disabled={isEditMode} />
         </InputWrapper>
         <InputWrapper label="Email" icon={<Envelope size={18} className="mr-2" />}>
           <input type="email" name="email" value={formData.email} onChange={handleChange} className={`form-input-style ${isEditMode ? 'bg-gray-100 dark:bg-slate-700 cursor-not-allowed' : ''}`} placeholder="example@gmail.com" required disabled={isEditMode} />
@@ -774,6 +775,7 @@ export default function ManageCustomersSupabase() {
   const handleUpdateCustomer = useCallback(async (formData) => {
     if (!editingCustomer || isSaving) return;
     setIsSaving(true);
+    // (SỬA THEO YÊU CẦU) Tên (full_name) và Email đã bị disabled, nhưng vẫn gửi đi để đảm bảo
     const updateData = { full_name: formData.full_name, address: formData.address, phone_number: formData.phone_number, ngay_sinh: formData.ngay_sinh, };
     try {
       const { error } = await supabase.from("Users").update(updateData).eq("id", editingCustomer.id);
