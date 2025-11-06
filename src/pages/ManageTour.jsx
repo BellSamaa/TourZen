@@ -1,5 +1,13 @@
 // src/pages/ManageTour.jsx
 // (V29-Sửa đổi: 1. Thay Biểu đồ Review bằng Tour Yêu Thích Nhất. 2. Nâng cấp Modal Thêm Đơn Hàng)
+// (*** GEMINI SỬA v30 ***)
+// YÊU CẦU:
+// 1. [EditModal] Khóa mục Khách hàng (read-only).
+// 2. [EditModal] Cho phép sửa Ngày đi & Số lượng (thêm logic fetch departures & update slot).
+// 3. [EditModal] Bỏ nút "Gửi lại email xác nhận".
+// 4. [AddModal] Tự động tính "Tổng tiền" (giống Payment.jsx).
+// 5. [AddModal] Thêm validation (phải có người lớn).
+// 6. [ManageTour] Cập nhật fetchTours (lấy giá) và handleSaveDetails (logic slot).
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { Link } from 'react-router-dom';
@@ -13,7 +21,12 @@ import {
     Receipt, // Icon Hóa đơn
     Star, // Icon Sao
     ChatCircleDots, // Icon Bình luận
-    UserCircle // Icon user
+    UserCircle, // Icon user
+    // (THÊM v30) Icons cho số lượng
+    User as FaUser, 
+    UserFocus as FaUserTie, // Giả lập FaUserTie
+    Child as FaChild, 
+    Baby as FaBaby 
 } from "@phosphor-icons/react";
 
 // (V8) Import Modal Hóa đơn
@@ -339,7 +352,7 @@ const FavoriteTourStats = () => {
 // --- (HẾT) Component Tour Yêu Thích Nhất ---
 
 
-// --- (GIỮ NGUYÊN V8) Component Modal Chi tiết/Sửa Đơn hàng ---
+// --- (*** CẬP NHẬT V30) Component Modal Chi tiết/Sửa Đơn hàng ---
 const EditBookingModal = ({ 
     booking, 
     onClose, 
@@ -351,9 +364,17 @@ const EditBookingModal = ({
 }) => {
     if (!booking) return null;
     
+    // (SỬA v30) Thêm state cho departures và số lượng
     const [formData, setFormData] = useState({
         user_id: booking.user?.id || '',
         product_id: booking.product?.id || '',
+        // (THÊM v30)
+        departure_id: booking.departure_id || '',
+        num_adult: booking.num_adult || 0,
+        num_child: booking.num_child || 0,
+        num_elder: booking.num_elder || 0,
+        num_infant: booking.num_infant || 0,
+        // (HẾT THÊM v30)
         hotel_product_id: booking.hotel?.id || '',
         transport_product_id: booking.transport?.id || '',
         flight_product_id: booking.flight?.id || '',
@@ -361,12 +382,22 @@ const EditBookingModal = ({
         total_price: booking.total_price || 0,
         notes: booking.notes || ''
     });
+    // (THÊM v30) State cho lịch khởi hành
+    const [departures, setDepartures] = useState([]);
+    const [loadingDepartures, setLoadingDepartures] = useState(false);
+    
     const [isSaving, setIsSaving] = useState(false);
 
+    // (SỬA v30) Cập nhật useEffect (chạy 1 lần)
     useEffect(() => {
         setFormData({
             user_id: booking.user?.id || '',
             product_id: booking.product?.id || '',
+            departure_id: booking.departure_id || '',
+            num_adult: booking.num_adult || 0,
+            num_child: booking.num_child || 0,
+            num_elder: booking.num_elder || 0,
+            num_infant: booking.num_infant || 0,
             hotel_product_id: booking.hotel?.id || '',
             transport_product_id: booking.transport?.id || '',
             flight_product_id: booking.flight?.id || '',
@@ -375,23 +406,97 @@ const EditBookingModal = ({
             notes: booking.notes || ''
         });
     }, [booking]);
+    
+    // (THÊM v30) useEffect fetch lịch khởi hành (giống AddModal)
+    useEffect(() => {
+        if (!formData.product_id) { setDepartures([]); setFormData(prev => ({ ...prev, departure_id: '' })); return; }
+        const fetchDepartures = async () => {
+            setLoadingDepartures(true);
+            const today = new Date().toISOString().split('T')[0];
+            const { data, error } = await supabase.from("Departures").select("*").eq("product_id", formData.product_id).gte("departure_date", today).order("departure_date", { ascending: true });
+            
+            if (error) { toast.error("Lỗi tải lịch khởi hành."); } 
+            else { 
+                // (SỬA) Phải bao gồm cả departure_id HIỆN TẠI (kể cả nếu nó đã qua)
+                const currentDepId = booking.departure_id;
+                const currentDepInList = data.find(d => d.id === currentDepId);
+                
+                if (!currentDepInList && booking.product_id === formData.product_id) {
+                     // Nếu ngày đi đã cũ và không có trong list, fetch nó
+                     const { data: oldDep, error: oldDepErr } = await supabase.from("Departures").select("*").eq("id", currentDepId).single();
+                     if (oldDep && !oldDepErr) {
+                         // Thêm vào đầu danh sách
+                         setDepartures([oldDep, ...data]);
+                     } else {
+                         setDepartures(data || []);
+                     }
+                } else {
+                     setDepartures(data || []); 
+                }
+            }
+            setLoadingDepartures(false);
+        };
+        fetchDepartures();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [formData.product_id]); // Chỉ chạy khi đổi tour
 
     const handleChange = (e) => {
         const { name, value, type } = e.target;
+        
+        let newValue = value;
+        if (type === 'number') {
+             newValue = parseInt(value, 10);
+             if (isNaN(newValue) || newValue < 0) newValue = 0;
+        }
+
         setFormData(prev => ({
             ...prev,
-            [name]: type === 'number' ? parseFloat(value || 0) : value
+            [name]: newValue
         }));
         
         if (name === 'product_id' && value !== booking.product?.id) {
-            toast.error("Bạn đã đổi Tour. Ngày đi có thể không còn hợp lệ. Vui lòng Hủy và Tạo đơn mới nếu cần đổi ngày.");
+            toast.error("Bạn đã đổi Tour. Vui lòng chọn lại Ngày đi.");
+            setFormData(prev => ({ ...prev, departure_id: '' })); // Reset ngày đi
         }
     };
     
+    // (SỬA v30) Logic tính toán
+    const selectedDeparture = useMemo(() => { return departures.find(d => d.id === formData.departure_id); }, [formData.departure_id, departures]);
+    const currentGuests = (formData.num_adult || 0) + (formData.num_child || 0) + (formData.num_elder || 0) + (formData.num_infant || 0);
+    // (SỬA) Logic tính slot còn lại (phải cộng slot của booking này vào nếu là ngày hiện tại)
+    const remainingSlots = useMemo(() => {
+        if (!selectedDeparture) return 0;
+        let baseRemaining = (selectedDeparture.max_slots || 0) - (selectedDeparture.booked_slots || 0);
+        // Nếu là ngày đi cũ VÀ tour cũ, cộng trả lại slot của booking này để tính
+        if (selectedDeparture.id === booking.departure_id && formData.product_id === booking.product_id) {
+             baseRemaining += (booking.quantity || 0);
+        }
+        return baseRemaining;
+    }, [selectedDeparture, booking, formData.product_id]);
+
+
+    // (SỬA v30) Cập nhật handleSave
     const handleSave = async () => {
+         // (THÊM v30) Validation
+        if (currentGuests <= 0) { toast.error("Số lượng khách phải lớn hơn 0."); return; }
+        if (!formData.departure_id) { toast.error("Vui lòng chọn ngày khởi hành."); return; }
+        if ((formData.num_adult + formData.num_elder) === 0 && (formData.num_child > 0 || formData.num_infant > 0)) { toast.error("Phải có ít nhất 1 người lớn hoặc người già đi kèm."); return; }
+        
+        // Chỉ check slot nếu booking đang 'confirmed' (vì pending/cancelled ko giữ slot)
+        if (booking.status === 'confirmed' && currentGuests > remainingSlots) { 
+            toast.error(`Số khách (${currentGuests}) vượt quá số chỗ còn lại (${remainingSlots}).`); return; 
+        }
+        
         setIsSaving(true);
-        const finalData = { ...formData };
-        await onSaveDetails(booking.id, finalData); // Gọi hàm prop
+        const selectedDep = departures.find(d => d.id === formData.departure_id);
+        
+        const finalData = { 
+            ...formData,
+            departure_date: selectedDep?.departure_date || null // (THÊM) Gửi cả ngày đi
+        };
+        
+        // (SỬA v30) Pass cả object booking
+        await onSaveDetails(booking, finalData); 
         setIsSaving(false);
     };
 
@@ -401,7 +506,7 @@ const EditBookingModal = ({
               onStatusChange(booking, newStatus); 
          }
     };
-    const sendConfirmationEmail = (email) => { toast.success(`Đã gửi lại email xác nhận đến ${email} (chức năng giả lập).`); };
+    // (XÓA v30) const sendConfirmationEmail = ...
 
     return (
         <motion.div
@@ -425,19 +530,22 @@ const EditBookingModal = ({
                 {/* Body */}
                 <div className="p-6 space-y-5 overflow-y-auto flex-1 text-sm simple-scrollbar">
                     
-                    {/* Thông tin Khách hàng (Thành select) */}
+                    {/* (SỬA v30) Thông tin Khách hàng (Read-only) */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                         <div>
-                            <label className="label-modal font-semibold" htmlFor="user_id_edit">Khách hàng:</label>
-                            <select id="user_id_edit" name="user_id" value={formData.user_id} onChange={handleChange} className="input-style w-full mt-1">
-                                <option value="">-- Chọn User --</option>
-                                {allUsers.map(u => <option key={u.id} value={u.id}>{u.full_name || u.email}</option>)}
-                            </select>
+                            <label className="label-modal font-semibold" htmlFor="user_id_edit">Khách hàng (Chỉ đọc):</label>
+                            {/* (SỬA v30) Đổi <select> -> <span> */}
+                            <span className="value-modal block mt-1 p-2 border border-dashed dark:border-slate-600 rounded bg-slate-50 dark:bg-slate-700/50">
+                                {allUsers.find(u => u.id === formData.user_id)?.full_name || 
+                                 allUsers.find(u => u.id === formData.user_id)?.email || 
+                                 booking.user?.full_name || // Fallback
+                                 'N/A'}
+                            </span>
                         </div>
                         <div>
                             <strong className="label-modal">Email (từ user):</strong> 
                             <span className="value-modal block mt-1 p-2 border border-dashed dark:border-slate-600 rounded">
-                                {allUsers.find(u => u.id === formData.user_id)?.email || 'N/A'}
+                                {allUsers.find(u => u.id === formData.user_id)?.email || booking.user?.email || 'N/A'}
                             </span>
                         </div>
                         <div>
@@ -463,24 +571,54 @@ const EditBookingModal = ({
                             </select>
                         </div>
                         
-                        {/* (GIỮ CHỈ ĐỌC) Ngày đi & Số lượng */}
-                        <div className="grid grid-cols-2 gap-4">
+                        {/* (*** SỬA v30) Ngày đi & Số lượng (Editable) ***/}
+                        <div>
+                            <label className="label-modal font-semibold" htmlFor="departure_id_edit">Ngày đi *</label>
+                            <select 
+                                id="departure_id_edit" 
+                                name="departure_id" 
+                                value={formData.departure_id} 
+                                onChange={handleChange} 
+                                className="input-style w-full mt-1" 
+                                required 
+                                disabled={loadingDepartures || departures.length === 0}
+                            >
+                                <option value="" disabled>-- {loadingDepartures ? "Đang tải lịch..." : (formData.product_id ? "Chọn ngày đi" : "Vui lòng chọn tour trước")} --</option>
+                                {departures.map(d => {
+                                    // Tính slot (phải cộng slot của booking này vào nếu là ngày hiện tại)
+                                    let remaining = (d.max_slots || 0) - (d.booked_slots || 0);
+                                    if (d.id === booking.departure_id && formData.product_id === booking.product_id) {
+                                         remaining += (booking.quantity || 0);
+                                    }
+                                    const isCurrent = d.id === formData.departure_id;
+                                    
+                                    return <option key={d.id} value={d.id} disabled={remaining <= 0 && !isCurrent}> 
+                                        {d.departure_date} (Còn {remaining} chỗ) 
+                                    </option>
+                                })}
+                            </select>
+                             {booking.status === 'confirmed' && selectedDeparture && currentGuests > remainingSlots && <p className="text-xs text-red-500 mt-1">Số lượng khách ({currentGuests}) vượt quá số chỗ còn lại ({remainingSlots})!</p>}
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3">
                             <div>
-                                <strong className="label-modal">Ngày đi (Chỉ đọc):</strong> 
-                                <span className="value-modal block mt-1 p-2 border border-dashed dark:border-slate-600 rounded bg-slate-50 dark:bg-slate-700/50">
-                                    {formatShortDate(booking.departure_date)}
-                                </span>
+                                <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="num_adult_edit"><FaUser size={14}/> Người lớn *</label>
+                                <input type="number" id="num_adult_edit" name="num_adult" value={formData.num_adult} onChange={handleChange} min={0} className="input-style w-full mt-1" required/>
                             </div>
                             <div>
-                                <strong className="label-modal">Số lượng (Chỉ đọc):</strong> 
-                                <span className="value-modal block mt-1 p-2 border border-dashed dark:border-slate-600 rounded bg-slate-50 dark:bg-slate-700/50">
-                                    {formatQuantity(booking)} ({booking.quantity} người)
-                                </span>
+                                <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="num_elder_edit"><FaUserTie size={14}/> Người già</label>
+                                <input type="number" id="num_elder_edit" name="num_elder" value={formData.num_elder} onChange={handleChange} min={0} className="input-style w-full mt-1"/>
+                            </div>
+                            <div>
+                                <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="num_child_edit"><FaChild size={14}/> Trẻ em</label>
+                                <input type="number" id="num_child_edit" name="num_child" value={formData.num_child} onChange={handleChange} min={0} className="input-style w-full mt-1"/>
+                            </div>
+                            <div>
+                                <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="num_infant_edit"><FaBaby size={14}/> Sơ sinh</label>
+                                <input type="number" id="num_infant_edit" name="num_infant" value={formData.num_infant} onChange={handleChange} min={0} className="input-style w-full mt-1"/>
                             </div>
                         </div>
-                        <p className="text-xs text-orange-600 dark:text-orange-400 italic text-center">
-                            * Để thay đổi <span className="font-semibold">Ngày đi</span> hoặc <span className="font-semibold">Số lượng</span>, vui lòng <span className="font-semibold">Hủy</span> đơn này (để hoàn slot) và <span className="font-semibold">Tạo Đơn Hàng Mới</span>.
-                        </p>
+                        {/* (XÓA v30) Xóa P tag cảnh báo */}
                     </div>
 
                     {/* Dịch vụ kèm theo & Voucher (Thành select/input) */}
@@ -577,15 +715,13 @@ const EditBookingModal = ({
                                 <XCircle weight="bold"/> Hủy đơn 
                              </button>
                         </div>
-                        {booking.status === 'confirmed' && booking.user?.email && (
-                            <button onClick={() => sendConfirmationEmail(booking.user.email)} className="button-secondary text-sm mt-4 flex items-center gap-1.5"> <Envelope/> Gửi lại email xác nhận </button>
-                        )}
+                        {/* (*** XÓA v30) Bỏ nút gửi email *** */}
                      </div>
                 </div>
                 {/* Footer (Giữ nguyên) */}
                 <div className="p-4 border-t dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-b-lg">
                     <button type="button" onClick={onClose} disabled={isSaving} className="modal-button-secondary">Đóng</button>
-                    <button type="button" onClick={handleSave} disabled={isSaving} className="modal-button-primary flex items-center gap-1.5">
+                    <button type="button" onClick={handleSave} disabled={isSaving || loadingDepartures} className="modal-button-primary flex items-center gap-1.5">
                         {isSaving ? <CircleNotch className="animate-spin" size={18} /> : <FloppyDisk size={18} />}
                         Lưu thay đổi chi tiết
                     </button>
@@ -727,7 +863,7 @@ const ViewReviewModal = ({ review, onClose }) => {
 };
 
 
-// --- (*** CẬP NHẬT V29-SỬA) Component Modal Thêm Đơn Hàng ---
+// --- (*** CẬP NHẬT V30) Component Modal Thêm Đơn Hàng ---
 const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
     // (MỚI) Thêm state cho dịch vụ
     const [formData, setFormData] = useState({ 
@@ -759,20 +895,67 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
         setFormData(prev => ({ ...prev, [name]: type === 'number' ? parseInt(value, 10) || 0 : value }));
     };
 
-    const selectedDeparture = useMemo(() => { return departures.find(d => d.id == formData.departure_id); }, [formData.departure_id, departures]);
-    const currentGuests = formData.num_adult + formData.num_child + formData.num_elder + formData.num_infant;
+    const selectedDeparture = useMemo(() => { return departures.find(d => d.id === formData.departure_id); }, [formData.departure_id, departures]);
+    const currentGuests = (formData.num_adult || 0) + (formData.num_child || 0) + (formData.num_elder || 0) + (formData.num_infant || 0);
     const remainingSlots = selectedDeparture ? (selectedDeparture.max_slots || 0) - (selectedDeparture.booked_slots || 0) : 0;
 
-    // (*** CẬP NHẬT V29-SỬA) Logic handleSubmit giống Payment.jsx
+    // (*** THÊM v30) Logic tự động tính tiền (Giống Payment.jsx) ***
+    const calculatedTotal = useMemo(() => {
+        let tourSub = 0;
+        let serviceSub = 0;
+        const guestCount = currentGuests;
+
+        // 1. Tính tiền Tour
+        const selectedTour = tours.find(t => t.id === formData.product_id);
+        if (selectedTour) {
+            const priceAdult = selectedTour.selling_price_adult || 0;
+            const priceChild = selectedTour.selling_price_child || 0;
+            const priceElder = selectedTour.selling_price_elder || priceAdult; // Giá người già = người lớn nếu null
+            
+            tourSub = (formData.num_adult * priceAdult) +
+                      (formData.num_child * priceChild) +
+                      (formData.num_elder * priceElder);
+        }
+
+        // 2. Tính tiền Dịch vụ
+        const hotel = allServices.hotels.find(s => s.id === formData.hotel_product_id);
+        if (hotel) serviceSub += (hotel.price || 0);
+        
+        const transport = allServices.transport.find(s => s.id === formData.transport_product_id);
+        if (transport) serviceSub += (transport.price || 0);
+
+        // Vé máy bay tính theo đầu người
+        const flight = allServices.flights.find(s => s.id === formData.flight_product_id);
+        if (flight && guestCount > 0) {
+            serviceSub += ((flight.price || 0) * guestCount);
+        }
+        
+        return tourSub + serviceSub;
+    }, [
+        formData.product_id, formData.num_adult, formData.num_child, formData.num_elder, formData.num_infant,
+        formData.hotel_product_id, formData.transport_product_id, formData.flight_product_id,
+        tours, allServices, currentGuests
+    ]);
+
+    // (THÊM v30) Cập nhật formData.total_price khi calculatedTotal thay đổi
+    useEffect(() => {
+        setFormData(prev => ({ ...prev, total_price: calculatedTotal }));
+    }, [calculatedTotal]);
+    // (*** HẾT THÊM v30 ***)
+
+    // (*** CẬP NHẬT V30) Logic handleSubmit
     const handleSubmit = async (e) => {
         e.preventDefault();
-        // --- (GIỮ NGUYÊN) Validations ---
+        // --- (SỬA v30) Validations ---
         if (!formData.user_id) { toast.error("Vui lòng chọn khách hàng."); return; }
         if (!formData.product_id) { toast.error("Vui lòng chọn tour."); return; }
         if (!formData.departure_id) { toast.error("Vui lòng chọn ngày khởi hành."); return; }
         if (currentGuests <= 0) { toast.error("Số lượng khách phải lớn hơn 0."); return; }
+        // (THÊM v30)
+        if ((formData.num_adult + formData.num_elder) === 0 && (formData.num_child > 0 || formData.num_infant > 0)) { toast.error("Phải có ít nhất 1 người lớn hoặc người già đi kèm."); return; }
         if (currentGuests > remainingSlots) { toast.error(`Số khách (${currentGuests}) vượt quá số chỗ còn lại (${remainingSlots}).`); return; }
-        if (formData.total_price <= 0) { toast.error("Tổng tiền phải lớn hơn 0 (Admin tự nhập)."); return; }
+        // (SỬA v30)
+        if (formData.total_price < 0) { toast.error("Tổng tiền không thể là số âm."); return; }
         
         setIsSubmitting(true);
         
@@ -828,7 +1011,7 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
                 num_child: formData.num_child, 
                 num_elder: formData.num_elder, 
                 num_infant: formData.num_infant, 
-                total_price: formData.total_price, 
+                total_price: formData.total_price, // (SỬA v30) Lấy từ state (đã tự tính)
                 status: formData.status, 
                 notes: formData.notes,
                 payment_method: 'direct', // Mặc định
@@ -955,27 +1138,38 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t dark:border-slate-700">
                         <div>
-                            <label className="label-modal font-semibold" htmlFor="num_adult">Người lớn *</label>
+                            <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="num_adult"><FaUser size={14}/> Người lớn *</label>
                             <input type="number" id="num_adult" name="num_adult" value={formData.num_adult} onChange={handleChange} min={0} className="input-style w-full mt-1" required/>
                         </div>
                          <div>
-                            <label className="label-modal font-semibold" htmlFor="num_elder">Người già</label>
+                            <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="num_elder"><FaUserTie size={14}/> Người già</label>
                             <input type="number" id="num_elder" name="num_elder" value={formData.num_elder} onChange={handleChange} min={0} className="input-style w-full mt-1"/>
                         </div>
                         <div>
-                            <label className="label-modal font-semibold" htmlFor="num_child">Trẻ em</label>
+                            <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="num_child"><FaChild size={14}/> Trẻ em</label>
                             <input type="number" id="num_child" name="num_child" value={formData.num_child} onChange={handleChange} min={0} className="input-style w-full mt-1"/>
                         </div>
                         <div>
-                            <label className="label-modal font-semibold" htmlFor="num_infant">Sơ sinh</label>
+                            <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="num_infant"><FaBaby size={14}/> Sơ sinh</label>
                             <input type="number" id="num_infant" name="num_infant" value={formData.num_infant} onChange={handleChange} min={0} className="input-style w-full mt-1"/>
                         </div>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-2 gap-4 pt-3 border-t dark:border-slate-700">
+                        
+                        {/* (*** SỬA v30) Đổi Total Price thành ReadOnly *** */}
                         <div>
-                            <label className="label-modal font-semibold" htmlFor="total_price">Tổng tiền (Admin tự nhập) *</label>
-                            <input type="number" id="total_price" name="total_price" value={formData.total_price} onChange={handleChange} min={0} className="input-style w-full mt-1 !text-lg !font-bold !text-red-600" required placeholder="0 ₫"/>
+                            <label className="label-modal font-semibold" htmlFor="total_price">Tổng tiền (Tự động tính)</label>
+                            <input 
+                                type="text" 
+                                id="total_price" 
+                                name="total_price" 
+                                value={formatCurrency(formData.total_price)} 
+                                readOnly 
+                                className="input-style w-full mt-1 !text-lg !font-bold !text-red-600 bg-gray-100 dark:bg-neutral-800"
+                            />
                         </div>
+                        {/* (*** HẾT SỬA v30 ***) */}
+
                         <div>
                             <label className="label-modal font-semibold" htmlFor="status">Trạng thái ban đầu *</label>
                             <select id="status" name="status" value={formData.status} onChange={handleChange} className="input-style w-full mt-1" required>
@@ -1117,7 +1311,7 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
     // (*** KẾT THÚC SỬA LỖI V29 ***)
     
 
-    // (GIỮ NGUYÊN V8) useEffect để fetch Users, Tours & Services
+    // (*** CẬP NHẬT V30) useEffect để fetch Users, Tours (với giá) & Services
     useEffect(() => {
         const fetchAddModalData = async () => {
             setLoadingAddData(true);
@@ -1130,10 +1324,10 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
                 if (usersError) throw usersError;
                 setAllUsers(usersData || []);
                 
-                // Fetch Tours (approved)
+                // Fetch Tours (approved) (SỬA v30: Thêm giá)
                 const { data: toursData, error: toursError } = await supabase
                     .from('Products')
-                    .select('id, name')
+                    .select('id, name, selling_price_adult, selling_price_child, selling_price_elder') // (SỬA v30)
                     .eq('product_type', 'tour')
                     .eq('approval_status', 'approved')
                     .order('name', { ascending: true });
@@ -1192,12 +1386,20 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
         setIsFetchingPage(true); 
         let needsSlotUpdate = false;
         let slotChange = 0;
-        if (booking.status === 'confirmed' && newStatus !== 'confirmed') { needsSlotUpdate = true; slotChange = booking.quantity; }
-        else if (booking.status !== 'confirmed' && newStatus === 'confirmed') { needsSlotUpdate = true; slotChange = -booking.quantity; }
+        // (SỬA v30) Lấy số lượng từ booking (có thể đã bị sửa)
+        const currentQuantity = (booking.num_adult || 0) + (booking.num_child || 0) + (booking.num_elder || 0) + (booking.num_infant || 0);
+        
+        if (booking.status === 'confirmed' && newStatus !== 'confirmed') { needsSlotUpdate = true; slotChange = currentQuantity; } // Hoàn slot
+        else if (booking.status !== 'confirmed' && newStatus === 'confirmed') { needsSlotUpdate = true; slotChange = -currentQuantity; } // Trừ slot
+        
         try {
-            if (needsSlotUpdate && booking.departure_id) {
-                const { error: rpcError } = await supabase.rpc('update_departure_slot', { departure_id_input: booking.departure_id, change_amount: slotChange });
-                if (rpcError) throw new Error(`Lỗi cập nhật slot: ${rpcError.message}`);
+            if (needsSlotUpdate && booking.departure_id && slotChange !== 0) {
+                 // (SỬA v30) Dùng book_tour_slot (an toàn hơn)
+                 const { error: rpcError, data: rpcData } = await supabase.rpc('book_tour_slot', { 
+                    departure_id_input: booking.departure_id, 
+                    guest_count_input: slotChange // (slotChange < 0 = trừ slot)
+                 });
+                if (rpcError || !rpcData) throw new Error(`Lỗi cập nhật slot (hết chỗ?): ${rpcError.message}`);
             }
             const { error: updateError } = await supabase.from('Bookings').update({ status: newStatus }).eq('id', booking.id);
             if (updateError) throw updateError;
@@ -1245,7 +1447,7 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
              }
             
             // (CẬP NHẬT V20) Hoàn slot nếu cần
-            if (needsSlotUpdate && booking.departure_id) {
+            if (needsSlotUpdate && booking.departure_id && slotChange > 0) {
                  const { error: rpcError } = await supabase.rpc('update_departure_slot', { departure_id_input: booking.departure_id, change_amount: slotChange });
                  if (rpcError) { 
                      console.warn(`Lỗi hoàn trả slot khi xóa booking ${booking.id}: ${rpcError.message}`); 
@@ -1269,25 +1471,73 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
         }
     };
     
-    // (GIỮ NGUYÊN V8) Handler để lưu chỉnh sửa chi tiết
-    const handleSaveDetails = async (bookingId, updatedData) => {
+    // (*** CẬP NHẬT V30) Handler để lưu chỉnh sửa chi tiết (logic slot) ***
+    const handleSaveDetails = async (booking, updatedData) => {
         setIsFetchingPage(true);
+        
+        // Lấy dữ liệu mới
+        const new_qty = (updatedData.num_adult || 0) + (updatedData.num_child || 0) + (updatedData.num_elder || 0) + (updatedData.num_infant || 0);
+        const old_qty = booking.quantity || 0;
+        const new_dep_id = updatedData.departure_id;
+        const old_dep_id = booking.departure_id;
+        
         try {
+            // Logic cập nhật Slot (chỉ khi 'confirmed' VÀ có thay đổi)
+            if (booking.status === 'confirmed' && (new_dep_id !== old_dep_id || new_qty !== old_qty)) {
+                
+                // 1. Rollback chỗ cũ (Hoàn trả slotChange = old_qty)
+                if (old_qty > 0 && old_dep_id) {
+                     await supabase.rpc('update_departure_slot', { 
+                        departure_id_input: old_dep_id, 
+                        change_amount: old_qty 
+                     });
+                }
+
+                // 2. Thử book chỗ mới (Trừ slotChange = -new_qty)
+                if (new_qty > 0 && new_dep_id) {
+                    const { error: rpcError, data: rpcData } = await supabase.rpc('book_tour_slot', { 
+                        departure_id_input: new_dep_id, 
+                        guest_count_input: new_qty 
+                    });
+
+                    if (rpcError || !rpcData) {
+                        // 3. Lỗi -> Book lại chỗ cũ (Rollback cái rollback)
+                        if (old_qty > 0 && old_dep_id) {
+                             await supabase.rpc('update_departure_slot', { 
+                                departure_id_input: old_dep_id, 
+                                change_amount: -old_qty 
+                             });
+                        }
+                        throw new Error(`Hết chỗ cho ngày mới. Đã khôi phục chỗ cũ. (${rpcError?.message || ''})`);
+                    }
+                }
+            }
+            
+            // 4. Payload cập nhật
              const dataToUpdate = {
-                user_id: updatedData.user_id,
+                // user_id: updatedData.user_id, // (XÓA) Không cho sửa user
                 product_id: updatedData.product_id,
                 hotel_product_id: updatedData.hotel_product_id || null,
                 transport_product_id: updatedData.transport_product_id || null,
                 flight_product_id: updatedData.flight_product_id || null,
                 voucher_code: updatedData.voucher_code || null,
                 total_price: updatedData.total_price,
-                notes: updatedData.notes
+                notes: updatedData.notes,
+                
+                // (THÊM) Thêm các trường mới
+                departure_id: new_dep_id,
+                departure_date: updatedData.departure_date, // Modal đã cung cấp
+                quantity: new_qty,
+                num_adult: updatedData.num_adult,
+                num_child: updatedData.num_child,
+                num_elder: updatedData.num_elder,
+                num_infant: updatedData.num_infant
              };
 
              const { error } = await supabase
                 .from('Bookings')
                 .update(dataToUpdate)
-                .eq('id', bookingId);
+                .eq('id', booking.id); 
              
              if (error) throw error;
              
@@ -1298,10 +1548,15 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
         } catch (err) {
              console.error("Lỗi lưu chi tiết:", err);
              toast.error(`Lỗi: ${err.message}`);
+             // Lỗi ở đây (ví dụ Hết chỗ) sẽ không đóng modal,
+             // nhưng fetchBookings(false) bên dưới vẫn chạy
+             fetchBookings(false); // (SỬA v30) Re-fetch ngay cả khi lỗi để đồng bộ
         } finally {
              setIsFetchingPage(false);
         }
     };
+    // (*** HẾT CẬP NHẬT V30 ***)
+
 
     const handleViewDetails = (booking) => { setModalBooking(booking); };
     const handleDeleteClick = (booking) => { setBookingToDelete(booking); };
@@ -1506,7 +1761,7 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
                         booking={modalBooking} 
                         onClose={() => setModalBooking(null)} 
                         onStatusChange={handleStatusChange} 
-                        onSaveDetails={handleSaveDetails}
+                        onSaveDetails={handleSaveDetails} // (SỬA v30) Prop này đã được cập nhật logic
                         allUsers={allUsers}
                         allTours={allTours}
                         allServices={allServices}
@@ -1518,7 +1773,7 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
                 {showAddModal && (
                     <AddBookingModal
                         users={allUsers}
-                        tours={allTours}
+                        tours={allTours} // (SỬA v30) Prop này đã có giá
                         allServices={allServices} 
                         onClose={() => setShowAddModal(false)}
                         onSuccess={() => fetchBookings(false)} 
