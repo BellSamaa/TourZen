@@ -1,4 +1,5 @@
 // src/components/TourCard.jsx
+// (V2 - Sửa lỗi logic hiển thị rating 0 sao thành 4.5 sao)
 
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -114,10 +115,23 @@ const handleBookNow = () => {
                 <MapPin size={14} className="inline mr-1 flex-shrink-0" /> {/* Added flex-shrink-0 */}
                 <span className="truncate">{tour.location || 'N/A'}</span> {/* Added truncate and fallback */}
             </p>
-            <div className="flex items-center gap-1 text-amber-500 flex-shrink-0"> {/* Added flex-shrink-0 */}
-                <Star size={14} fill="currentColor" />
-                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{tour.rating || "4.5"}</span>
-            </div>
+            
+            {/* === SỬA ĐỔI TẠI ĐÂY === */}
+            {/* Chỉ hiển thị khối sao này nếu rating > 0 */}
+            {tour.rating > 0 ? (
+                <div className="flex items-center gap-1 text-amber-500 flex-shrink-0">
+                    <Star size={14} fill="currentColor" />
+                    {/* Dùng toFixed(1) để hiển thị đẹp (ví dụ: 5.0 thay vì 5) */}
+                    <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                        {tour.rating.toFixed(1)}
+                    </span>
+                </div>
+            ) : (
+                // Nếu rating là 0, hiển thị text này
+                <span className="text-xs text-gray-400 italic">Chưa có đánh giá</span>
+            )}
+            {/* === KẾT THÚC SỬA ĐỔI === */}
+
         </div>
 
         <h3 className="text-lg font-bold text-gray-800 dark:text-white line-clamp-2 mb-2 flex-grow hover:text-sky-600 transition-colors">
