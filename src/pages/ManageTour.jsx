@@ -674,12 +674,18 @@ const EditBookingModal = ({
                          <textarea id="notes_edit" name="notes" value={formData.notes} onChange={handleChange} rows={3} className="input-style w-full mt-1.5 !text-base" placeholder="Không có ghi chú" />
                     </div>
 
-                     {/* Tổng tiền (Editable - Giữ nguyên) */}
-                     <div className="pt-4 border-t dark:border-slate-700 flex justify-end items-center gap-3">
-                        <label className="text-lg font-semibold value-modal" htmlFor="total_price_edit">Tổng tiền:</label>
-                        {/* --- ĐÃ THÊM class 'no-spin' --- */}
-                        <input id="total_price_edit" name="total_price" type="number" value={formData.total_price} onChange={handleChange} className="input-style w-48 !text-2xl font-bold !text-red-600 dark:!text-red-400 text-right no-spin" />
-                     </div>
+{/* Tổng tiền (Read-only) */}
+<div className="pt-4 border-t dark:border-slate-700 flex justify-end items-center gap-3">
+   <label className="text-lg font-semibold value-modal" htmlFor="total_price_edit">Tổng tiền:</label>
+   <input 
+       id="total_price_edit" 
+       name="total_price" 
+       type="text" 
+       value={formatCurrency(formData.total_price)} 
+       readOnly 
+       className="input-style w-48 !text-2xl font-bold !text-red-600 dark:!text-red-400 text-right bg-gray-100 dark:bg-slate-700 cursor-not-allowed" 
+   />
+</div>
 
                      {/* Thay đổi trạng thái (Style mới - Giữ nguyên) */}
                      <div className="pt-5 border-t dark:border-slate-700">
