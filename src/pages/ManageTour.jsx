@@ -355,6 +355,7 @@ const FavoriteTourStats = () => {
 
 
 // --- (*** CẬP NHẬT V30) Component Modal Chi tiết/Sửa Đơn hàng ---
+// --- (*** CẬP NHẬT V30) Component Modal Chi tiết/Sửa Đơn hàng ---
 const EditBookingModal = ({ 
     booking, 
     onClose, 
@@ -676,7 +677,8 @@ const EditBookingModal = ({
                      {/* Tổng tiền (Editable - Giữ nguyên) */}
                      <div className="pt-4 border-t dark:border-slate-700 flex justify-end items-center gap-3">
                         <label className="text-lg font-semibold value-modal" htmlFor="total_price_edit">Tổng tiền:</label>
-                        <input id="total_price_edit" name="total_price" type="number" value={formData.total_price} onChange={handleChange} className="input-style no-spinners w-48 !text-2xl font-bold !text-red-600 dark:!text-red-400 text-right" />
+                        {/* --- ĐÃ THÊM class 'no-spin' --- */}
+                        <input id="total_price_edit" name="total_price" type="number" value={formData.total_price} onChange={handleChange} className="input-style w-48 !text-2xl font-bold !text-red-600 dark:!text-red-400 text-right no-spin" />
                      </div>
 
                      {/* Thay đổi trạng thái (Style mới - Giữ nguyên) */}
@@ -730,6 +732,12 @@ const EditBookingModal = ({
                 </div>
             </motion.div>
             <style jsx>{`
+                 /* --- ĐÃ THÊM CSS ẨN NÚT MŨI TÊN --- */
+                 .no-spin::-webkit-outer-spin-button,
+                 .no-spin::-webkit-inner-spin-button { -webkit-appearance: none !important; margin: 0 !important; }
+                 .no-spin { -moz-appearance: textfield !important; }
+                 /* ----------------------------------- */
+
                  .label-modal { @apply font-medium text-gray-500 dark:text-gray-400 block text-xs uppercase tracking-wider mb-0.5; }
                  .value-modal { @apply text-gray-800 dark:text-white text-base; }
                  .button-status-base { @apply flex items-center justify-center gap-1.5 px-4 py-3 text-sm font-semibold rounded-md transition-all duration-200 disabled:opacity-100 disabled:cursor-not-allowed min-w-[120px]; }
@@ -745,8 +753,6 @@ const EditBookingModal = ({
         </motion.div>
     );
 };
-
-
 // --- (CẬP NHẬT V20) Component Modal Xác nhận Xóa ---
 const DeleteConfirmationModal = ({ booking, onClose, onConfirm }) => {
     const [isDeleting, setIsDeleting] = useState(false);
@@ -1202,14 +1208,7 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
                  .simple-scrollbar::-webkit-scrollbar-track { background: transparent; }
                  .simple-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
                  .dark .simple-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
-                 .no-spinners::-webkit-outer-spin-button,
-                 .no-spinners::-webkit-inner-spin-button {
-                   -webkit-appearance: none;
-                   margin: 0;
-                 }
-                 .no-spinners {
-                   -moz-appearance: textfield;
-                 }
+                 
             `}</style>
         </motion.div>
     );
