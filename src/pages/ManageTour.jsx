@@ -676,7 +676,7 @@ const EditBookingModal = ({
                      {/* Tổng tiền (Editable - Giữ nguyên) */}
                      <div className="pt-4 border-t dark:border-slate-700 flex justify-end items-center gap-3">
                         <label className="text-lg font-semibold value-modal" htmlFor="total_price_edit">Tổng tiền:</label>
-                        <input id="total_price_edit" name="total_price" type="number" value={formData.total_price} onChange={handleChange} className="input-style w-48 !text-2xl font-bold !text-red-600 dark:!text-red-400 text-right" />
+                        <input id="total_price_edit" name="total_price" type="number" value={formData.total_price} onChange={handleChange} className="input-style no-spinners w-48 !text-2xl font-bold !text-red-600 dark:!text-red-400 text-right" />
                      </div>
 
                      {/* Thay đổi trạng thái (Style mới - Giữ nguyên) */}
@@ -1202,6 +1202,14 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
                  .simple-scrollbar::-webkit-scrollbar-track { background: transparent; }
                  .simple-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
                  .dark .simple-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
+                 .no-spinners::-webkit-outer-spin-button,
+                 .no-spinners::-webkit-inner-spin-button {
+                   -webkit-appearance: none;
+                   margin: 0;
+                 }
+                 .no-spinners {
+                   -moz-appearance: textfield;
+                 }
             `}</style>
         </motion.div>
     );
