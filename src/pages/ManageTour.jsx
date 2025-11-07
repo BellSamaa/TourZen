@@ -354,8 +354,7 @@ const FavoriteTourStats = () => {
 // --- (HẾT) Component Tour Yêu Thích Nhất ---
 
 
-// --- (*** CẬP NHẬT V30) Component Modal Chi tiết/Sửa Đơn hàng ---
-// --- (*** CẬP NHẬT V30) Component Modal Chi tiết/Sửa Đơn hàng ---
+// --- (*** CẬP NHẬT V31: EditModal Tự động tính tiền & Read-only) ---
 const EditBookingModal = ({ 
     booking, 
     onClose, 
@@ -367,17 +366,14 @@ const EditBookingModal = ({
 }) => {
     if (!booking) return null;
     
-    // (SỬA v30) Thêm state cho departures và số lượng
     const [formData, setFormData] = useState({
         user_id: booking.user?.id || '',
         product_id: booking.product?.id || '',
-        // (THÊM v30)
         departure_id: booking.departure_id || '',
         num_adult: booking.num_adult || 0,
         num_child: booking.num_child || 0,
         num_elder: booking.num_elder || 0,
         num_infant: booking.num_infant || 0,
-        // (HẾT THÊM v30)
         hotel_product_id: booking.hotel?.id || '',
         transport_product_id: booking.transport?.id || '',
         flight_product_id: booking.flight?.id || '',
@@ -385,13 +381,11 @@ const EditBookingModal = ({
         total_price: booking.total_price || 0,
         notes: booking.notes || ''
     });
-    // (THÊM v30) State cho lịch khởi hành
     const [departures, setDepartures] = useState([]);
     const [loadingDepartures, setLoadingDepartures] = useState(false);
-    
     const [isSaving, setIsSaving] = useState(false);
 
-    // (SỬA v30) Cập nhật useEffect (chạy 1 lần)
+    // useEffect reset form khi mở modal
     useEffect(() => {
         setFormData({
             user_id: booking.user?.id || '',
@@ -410,7 +404,7 @@ const EditBookingModal = ({
         });
     }, [booking]);
     
-    // (THÊM v30) useEffect fetch lịch khởi hành (giống AddModal)
+    // useEffect fetch lịch khởi hành
     useEffect(() => {
         if (!formData.product_id) { setDepartures([]); setFormData(prev => ({ ...prev, departure_id: '' })); return; }
         const fetchDepartures = async () => {
@@ -420,19 +414,12 @@ const EditBookingModal = ({
             
             if (error) { toast.error("Lỗi tải lịch khởi hành."); } 
             else { 
-                // (SỬA) Phải bao gồm cả departure_id HIỆN TẠI (kể cả nếu nó đã qua)
                 const currentDepId = booking.departure_id;
                 const currentDepInList = data.find(d => d.id === currentDepId);
-                
                 if (!currentDepInList && booking.product_id === formData.product_id) {
-                     // Nếu ngày đi đã cũ và không có trong list, fetch nó
                      const { data: oldDep, error: oldDepErr } = await supabase.from("Departures").select("*").eq("id", currentDepId).single();
-                     if (oldDep && !oldDepErr) {
-                         // Thêm vào đầu danh sách
-                         setDepartures([oldDep, ...data]);
-                     } else {
-                         setDepartures(data || []);
-                     }
+                     if (oldDep && !oldDepErr) setDepartures([oldDep, ...data]);
+                     else setDepartures(data || []);
                 } else {
                      setDepartures(data || []); 
                 }
@@ -441,64 +428,78 @@ const EditBookingModal = ({
         };
         fetchDepartures();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [formData.product_id]); // Chỉ chạy khi đổi tour
+    }, [formData.product_id]);
 
     const handleChange = (e) => {
         const { name, value, type } = e.target;
-        
         let newValue = value;
         if (type === 'number') {
              newValue = parseInt(value, 10);
              if (isNaN(newValue) || newValue < 0) newValue = 0;
         }
-
-        setFormData(prev => ({
-            ...prev,
-            [name]: newValue
-        }));
-        
+        setFormData(prev => ({ ...prev, [name]: newValue }));
         if (name === 'product_id' && value !== booking.product?.id) {
             toast.error("Bạn đã đổi Tour. Vui lòng chọn lại Ngày đi.");
-            setFormData(prev => ({ ...prev, departure_id: '' })); // Reset ngày đi
+            setFormData(prev => ({ ...prev, departure_id: '' }));
         }
     };
     
-    // (SỬA v30) Logic tính toán
     const selectedDeparture = useMemo(() => { return departures.find(d => d.id === formData.departure_id); }, [formData.departure_id, departures]);
     const currentGuests = (formData.num_adult || 0) + (formData.num_child || 0) + (formData.num_elder || 0) + (formData.num_infant || 0);
-    // (SỬA) Logic tính slot còn lại (phải cộng slot của booking này vào nếu là ngày hiện tại)
     const remainingSlots = useMemo(() => {
         if (!selectedDeparture) return 0;
         let baseRemaining = (selectedDeparture.max_slots || 0) - (selectedDeparture.booked_slots || 0);
-        // Nếu là ngày đi cũ VÀ tour cũ, cộng trả lại slot của booking này để tính
         if (selectedDeparture.id === booking.departure_id && formData.product_id === booking.product_id) {
              baseRemaining += (booking.quantity || 0);
         }
         return baseRemaining;
     }, [selectedDeparture, booking, formData.product_id]);
 
+    // (*** MỚI V31: Logic TỰ ĐỘNG TÍNH TIỀN ***)
+    const calculatedTotal = useMemo(() => {
+        let tourSub = 0;
+        let serviceSub = 0;
+        const guestCount = (formData.num_adult || 0) + (formData.num_child || 0) + (formData.num_elder || 0) + (formData.num_infant || 0);
 
-    // (SỬA v30) Cập nhật handleSave
+        // 1. Tính tiền Tour
+        const selectedTour = allTours.find(t => t.id === formData.product_id);
+        if (selectedTour) {
+            const priceAdult = selectedTour.selling_price_adult || 0;
+            const priceChild = selectedTour.selling_price_child || 0;
+            const priceElder = selectedTour.selling_price_elder || priceAdult;
+            tourSub = (formData.num_adult * priceAdult) + (formData.num_child * priceChild) + (formData.num_elder * priceElder);
+        }
+
+        // 2. Tính tiền Dịch vụ
+        const hotel = allServices.hotels.find(s => s.id === formData.hotel_product_id);
+        if (hotel) serviceSub += (hotel.price || 0);
+        const transport = allServices.transport.find(s => s.id === formData.transport_product_id);
+        if (transport) serviceSub += (transport.price || 0);
+        const flight = allServices.flights.find(s => s.id === formData.flight_product_id);
+        if (flight && guestCount > 0) serviceSub += ((flight.price || 0) * guestCount);
+        
+        return tourSub + serviceSub;
+    }, [
+        formData.product_id, formData.num_adult, formData.num_child, formData.num_elder, formData.num_infant,
+        formData.hotel_product_id, formData.transport_product_id, formData.flight_product_id,
+        allTours, allServices
+    ]);
+
+    // (*** MỚI V31: Cập nhật vào state khi tính xong ***)
+    useEffect(() => {
+        setFormData(prev => ({ ...prev, total_price: calculatedTotal }));
+    }, [calculatedTotal]);
+
     const handleSave = async () => {
-         // (THÊM v30) Validation
         if (currentGuests <= 0) { toast.error("Số lượng khách phải lớn hơn 0."); return; }
         if (!formData.departure_id) { toast.error("Vui lòng chọn ngày khởi hành."); return; }
         if ((formData.num_adult + formData.num_elder) === 0 && (formData.num_child > 0 || formData.num_infant > 0)) { toast.error("Phải có ít nhất 1 người lớn hoặc người già đi kèm."); return; }
-        
-        // Chỉ check slot nếu booking đang 'confirmed' (vì pending/cancelled ko giữ slot)
         if (booking.status === 'confirmed' && currentGuests > remainingSlots) { 
             toast.error(`Số khách (${currentGuests}) vượt quá số chỗ còn lại (${remainingSlots}).`); return; 
         }
-        
         setIsSaving(true);
         const selectedDep = departures.find(d => d.id === formData.departure_id);
-        
-        const finalData = { 
-            ...formData,
-            departure_date: selectedDep?.departure_date || null // (THÊM) Gửi cả ngày đi
-        };
-        
-        // (SỬA v30) Pass cả object booking
+        const finalData = { ...formData, departure_date: selectedDep?.departure_date || null };
         await onSaveDetails(booking, finalData); 
         setIsSaving(false);
     };
@@ -509,7 +510,6 @@ const EditBookingModal = ({
               onStatusChange(booking, newStatus); 
          }
     };
-    // (XÓA v30) const sendConfirmationEmail = ...
 
     return (
         <motion.div
@@ -523,26 +523,18 @@ const EditBookingModal = ({
                 className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col"
                 onClick={(e) => e.stopPropagation()}
              >
-                {/* Header */}
                 <div className="flex justify-between items-center p-5 border-b dark:border-slate-700">
                     <h3 className="text-xl font-semibold text-slate-800 dark:text-white">
                         Chi tiết Đơn hàng #{booking.id.slice(-8).toUpperCase()}
                     </h3>
                     <button onClick={onClose} className="text-gray-400 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"> <X size={22} weight="bold" /> </button>
                 </div>
-                {/* Body */}
                 <div className="p-6 space-y-5 overflow-y-auto flex-1 text-sm simple-scrollbar">
-                    
-                    {/* (SỬA v30) Thông tin Khách hàng (Read-only) */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                         <div>
-                            <label className="label-modal font-semibold" htmlFor="user_id_edit">Khách hàng (Chỉ đọc):</label>
-                            {/* (SỬA v30) Đổi <select> -> <span> */}
+                            <label className="label-modal font-semibold">Khách hàng (Chỉ đọc):</label>
                             <span className="value-modal block mt-1 p-2 border border-dashed dark:border-slate-600 rounded bg-slate-50 dark:bg-slate-700/50">
-                                {allUsers.find(u => u.id === formData.user_id)?.full_name || 
-                                 allUsers.find(u => u.id === formData.user_id)?.email || 
-                                 booking.user?.full_name || // Fallback
-                                 'N/A'}
+                                {allUsers.find(u => u.id === formData.user_id)?.full_name || allUsers.find(u => u.id === formData.user_id)?.email || booking.user?.full_name || 'N/A'}
                             </span>
                         </div>
                         <div>
@@ -551,20 +543,10 @@ const EditBookingModal = ({
                                 {allUsers.find(u => u.id === formData.user_id)?.email || booking.user?.email || 'N/A'}
                             </span>
                         </div>
-                        <div>
-                            <strong className="label-modal">Ngày đặt:</strong> 
-                            <span className="value-modal block mt-1">{formatDate(booking.created_at)}</span>
-                        </div>
-                        {/* (MỚI) Hiển thị PTTT (chỉ đọc) */}
-                        <div>
-                            <strong className="label-modal">Phương thức TT:</strong> 
-                            <span className="value-modal block mt-1 font-semibold text-blue-600 dark:text-blue-400">
-                                {formatPaymentMethod(booking.payment_method)}
-                            </span>
-                        </div>
+                        <div><strong className="label-modal">Ngày đặt:</strong> <span className="value-modal block mt-1">{formatDate(booking.created_at)}</span></div>
+                        <div><strong className="label-modal">Phương thức TT:</strong> <span className="value-modal block mt-1 font-semibold text-blue-600 dark:text-blue-400">{formatPaymentMethod(booking.payment_method)}</span></div>
                     </div>
                     
-                    {/* Thông tin Tour (Thành select) */}
                     <div className="border-t pt-4 dark:border-slate-700 space-y-4">
                         <div>
                             <label className="label-modal font-semibold" htmlFor="product_id_edit">Tour:</label>
@@ -573,162 +555,76 @@ const EditBookingModal = ({
                                 {allTours.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                             </select>
                         </div>
-                        
-                        {/* (*** SỬA v30) Ngày đi & Số lượng (Editable) ***/}
                         <div>
                             <label className="label-modal font-semibold" htmlFor="departure_id_edit">Ngày đi *</label>
-                            <select 
-                                id="departure_id_edit" 
-                                name="departure_id" 
-                                value={formData.departure_id} 
-                                onChange={handleChange} 
-                                className="input-style w-full mt-1" 
-                                required 
-                                disabled={loadingDepartures || departures.length === 0}
-                            >
+                            <select id="departure_id_edit" name="departure_id" value={formData.departure_id} onChange={handleChange} className="input-style w-full mt-1" required disabled={loadingDepartures || departures.length === 0}>
                                 <option value="" disabled>-- {loadingDepartures ? "Đang tải lịch..." : (formData.product_id ? "Chọn ngày đi" : "Vui lòng chọn tour trước")} --</option>
                                 {departures.map(d => {
-                                    // Tính slot (phải cộng slot của booking này vào nếu là ngày hiện tại)
                                     let remaining = (d.max_slots || 0) - (d.booked_slots || 0);
-                                    if (d.id === booking.departure_id && formData.product_id === booking.product_id) {
-                                         remaining += (booking.quantity || 0);
-                                    }
-                                    const isCurrent = d.id === formData.departure_id;
-                                    
-                                    return <option key={d.id} value={d.id} disabled={remaining <= 0 && !isCurrent}> 
-                                        {d.departure_date} (Còn {remaining} chỗ) 
-                                    </option>
+                                    if (d.id === booking.departure_id && formData.product_id === booking.product_id) remaining += (booking.quantity || 0);
+                                    return <option key={d.id} value={d.id} disabled={remaining <= 0 && d.id !== formData.departure_id}> {d.departure_date} (Còn {remaining} chỗ) </option>
                                 })}
                             </select>
                              {booking.status === 'confirmed' && selectedDeparture && currentGuests > remainingSlots && <p className="text-xs text-red-500 mt-1">Số lượng khách ({currentGuests}) vượt quá số chỗ còn lại ({remainingSlots})!</p>}
                         </div>
-
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3">
-                            <div>
-                                <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="num_adult_edit"><FaUser size={14}/> Người lớn *</label>
-                                <input type="number" id="num_adult_edit" name="num_adult" value={formData.num_adult} onChange={handleChange} min={0} className="input-style w-full mt-1" required/>
-                            </div>
-                            <div>
-                                <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="num_elder_edit"><FaUserTie size={14}/> Người già</label>
-                                <input type="number" id="num_elder_edit" name="num_elder" value={formData.num_elder} onChange={handleChange} min={0} className="input-style w-full mt-1"/>
-                            </div>
-                            <div>
-                                <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="num_child_edit"><FaChild size={14}/> Trẻ em</label>
-                                <input type="number" id="num_child_edit" name="num_child" value={formData.num_child} onChange={handleChange} min={0} className="input-style w-full mt-1"/>
-                            </div>
-                            <div>
-                                <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="num_infant_edit"><FaBaby size={14}/> Sơ sinh</label>
-                                <input type="number" id="num_infant_edit" name="num_infant" value={formData.num_infant} onChange={handleChange} min={0} className="input-style w-full mt-1"/>
-                            </div>
+                            <div><label className="label-modal font-semibold flex items-center gap-1.5"><FaUser size={14}/> Người lớn *</label><input type="number" name="num_adult" value={formData.num_adult} onChange={handleChange} min={0} className="input-style w-full mt-1" required/></div>
+                            <div><label className="label-modal font-semibold flex items-center gap-1.5"><FaUserTie size={14}/> Người già</label><input type="number" name="num_elder" value={formData.num_elder} onChange={handleChange} min={0} className="input-style w-full mt-1"/></div>
+                            <div><label className="label-modal font-semibold flex items-center gap-1.5"><FaChild size={14}/> Trẻ em</label><input type="number" name="num_child" value={formData.num_child} onChange={handleChange} min={0} className="input-style w-full mt-1"/></div>
+                            <div><label className="label-modal font-semibold flex items-center gap-1.5"><FaBaby size={14}/> Sơ sinh</label><input type="number" name="num_infant" value={formData.num_infant} onChange={handleChange} min={0} className="input-style w-full mt-1"/></div>
                         </div>
-                        {/* (XÓA v30) Xóa P tag cảnh báo */}
                     </div>
 
-                    {/* Dịch vụ kèm theo & Voucher (Thành select/input) */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-4 border-t dark:border-slate-700">
                         <div>
-                            <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="hotel_product_id_edit"><Buildings size={18}/> Khách sạn:</label>
-                            <select id="hotel_product_id_edit" name="hotel_product_id" value={formData.hotel_product_id} onChange={handleChange} className="input-style w-full mt-1">
+                            <label className="label-modal font-semibold flex items-center gap-1.5"><Buildings size={18}/> Khách sạn:</label>
+                            <select name="hotel_product_id" value={formData.hotel_product_id} onChange={handleChange} className="input-style w-full mt-1">
                                 <option value="">Không chọn</option>
-                                {allServices.hotels.map(s => 
-                                    <option key={s.id} value={s.id} disabled={s.inventory <= 0}>
-                                        {s.name} ({formatCurrency(s.price)})
-                                        {s.inventory <= 0 ? ' (Hết hàng)' : ` (Còn ${s.inventory})`}
-                                    </option>
-                                )}
+                                {allServices.hotels.map(s => <option key={s.id} value={s.id} disabled={s.inventory <= 0}>{s.name} ({formatCurrency(s.price)}){s.inventory <= 0 ? ' (Hết hàng)' : ''}</option>)}
                             </select>
                         </div>
                         <div>
-                            <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="transport_product_id_edit"><Car size={18}/> Vận chuyển:</label>
-                            <select id="transport_product_id_edit" name="transport_product_id" value={formData.transport_product_id} onChange={handleChange} className="input-style w-full mt-1">
+                            <label className="label-modal font-semibold flex items-center gap-1.5"><Car size={18}/> Vận chuyển:</label>
+                            <select name="transport_product_id" value={formData.transport_product_id} onChange={handleChange} className="input-style w-full mt-1">
                                 <option value="">Không chọn</option>
-                                {allServices.transport.map(s => 
-                                    <option key={s.id} value={s.id} disabled={s.inventory <= 0}>
-                                        {s.name} ({formatCurrency(s.price)})
-                                        {s.inventory <= 0 ? ' (Hết hàng)' : ` (Còn ${s.inventory})`}
-                                    </option>
-                                )}
+                                {allServices.transport.map(s => <option key={s.id} value={s.id} disabled={s.inventory <= 0}>{s.name} ({formatCurrency(s.price)}){s.inventory <= 0 ? ' (Hết hàng)' : ''}</option>)}
                             </select>
                         </div>
                         <div>
-                            <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="flight_product_id_edit"><AirplaneTilt size={18}/> Chuyến bay:</label>
-                            <select id="flight_product_id_edit" name="flight_product_id" value={formData.flight_product_id} onChange={handleChange} className="input-style w-full mt-1">
+                            <label className="label-modal font-semibold flex items-center gap-1.5"><AirplaneTilt size={18}/> Chuyến bay:</label>
+                            <select name="flight_product_id" value={formData.flight_product_id} onChange={handleChange} className="input-style w-full mt-1">
                                 <option value="">Không chọn</option>
-                                {allServices.flights.map(s => 
-                                    <option key={s.id} value={s.id} disabled={s.inventory <= 0}>
-                                        {s.name} ({formatCurrency(s.price)})
-                                        {s.inventory <= 0 ? ' (Hết hàng)' : ` (Còn ${s.inventory})`}
-                                    </option>
-                                )}
+                                {allServices.flights.map(s => <option key={s.id} value={s.id} disabled={s.inventory <= 0}>{s.name} ({formatCurrency(s.price)}){s.inventory <= 0 ? ' (Hết hàng)' : ''}</option>)}
                             </select>
                         </div>
-                        <div>
-                            <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="voucher_code_edit"><VoucherIcon size={18}/> Voucher:</label>
-                            <input id="voucher_code_edit" name="voucher_code" value={formData.voucher_code} onChange={handleChange} className="input-style w-full mt-1" placeholder="Không có"/>
-                        </div>
+                        <div><label className="label-modal font-semibold flex items-center gap-1.5"><VoucherIcon size={18}/> Voucher:</label><input name="voucher_code" value={formData.voucher_code} onChange={handleChange} className="input-style w-full mt-1" placeholder="Không có"/></div>
                     </div>
                     
-                    {/* Ghi chú (Editable - Giữ nguyên) */}
                     <div className="pt-4 border-t dark:border-slate-700">
-                         <label className="label-modal font-semibold" htmlFor="notes_edit">Ghi chú (có thể sửa):</label>
-                         <textarea id="notes_edit" name="notes" value={formData.notes} onChange={handleChange} rows={3} className="input-style w-full mt-1.5 !text-base" placeholder="Không có ghi chú" />
+                         <label className="label-modal font-semibold">Ghi chú (có thể sửa):</label>
+                         <textarea name="notes" value={formData.notes} onChange={handleChange} rows={3} className="input-style w-full mt-1.5 !text-base" placeholder="Không có ghi chú" />
                     </div>
 
-{/* Tổng tiền (Read-only) */}
-<div className="pt-4 border-t dark:border-slate-700 flex justify-end items-center gap-3">
-   <label className="text-lg font-semibold value-modal" htmlFor="total_price_edit">Tổng tiền:</label>
-   <input 
-       id="total_price_edit" 
-       name="total_price" 
-       type="text" 
-       value={formatCurrency(formData.total_price)} 
-       readOnly 
-       className="input-style w-48 !text-2xl font-bold !text-red-600 dark:!text-red-400 text-right bg-gray-100 dark:bg-slate-700 cursor-not-allowed" 
-   />
-</div>
+                     {/* (*** MỚI V31: Tổng tiền Read-only & Auto-calc ***) */}
+                     <div className="pt-4 border-t dark:border-slate-700 flex justify-end items-center gap-3">
+                        <label className="text-lg font-semibold value-modal">Tổng tiền (Tự động):</label>
+                        <input 
+                            type="text" 
+                            value={formatCurrency(formData.total_price)} 
+                            readOnly 
+                            className="input-style w-48 !text-2xl font-bold !text-red-600 dark:!text-red-400 text-right bg-gray-100 dark:bg-slate-700/50 cursor-not-allowed" 
+                        />
+                     </div>
 
-                     {/* Thay đổi trạng thái (Style mới - Giữ nguyên) */}
                      <div className="pt-5 border-t dark:border-slate-700">
                         <label className="label-modal text-base font-semibold mb-2">Cập nhật trạng thái:</label>
                         <div className="flex flex-col sm:flex-row gap-3 mt-1">
-                             <button 
-                                onClick={() => handleLocalStatusChange('confirmed')} 
-                                disabled={booking.status === 'confirmed'} 
-                                className={`flex-1 button-status-base ${
-                                    booking.status === 'confirmed' 
-                                    ? 'bg-green-600 text-white shadow-inner' 
-                                    : 'bg-white dark:bg-slate-700 hover:bg-green-50 dark:hover:bg-green-900/30 border border-green-500 text-green-600 dark:text-green-400'
-                                }`}
-                             > 
-                                <CheckCircle weight="bold"/> Xác nhận 
-                             </button>
-                             <button 
-                                onClick={() => handleLocalStatusChange('pending')} 
-                                disabled={booking.status === 'pending'} 
-                                className={`flex-1 button-status-base ${
-                                    booking.status === 'pending' 
-                                    ? 'bg-gray-500 text-white shadow-inner' 
-                                    : 'bg-white dark:bg-slate-700 hover:bg-gray-50 dark:hover:bg-gray-900/30 border border-gray-500 text-gray-600 dark:text-gray-400'
-                                }`}
-                             > 
-                                <Clock weight="bold"/> Chờ xử lý 
-                             </button>
-                             <button 
-                                onClick={() => handleLocalStatusChange('cancelled')} 
-                                disabled={booking.status === 'cancelled'} 
-                                className={`flex-1 button-status-base ${
-                                    booking.status === 'cancelled' 
-                                    ? 'bg-red-600 text-white shadow-inner' 
-                                    : 'bg-white dark:bg-slate-700 hover:bg-red-50 dark:hover:bg-red-900/30 border border-red-500 text-red-600 dark:text-red-400'
-                                }`}
-                             > 
-                                <XCircle weight="bold"/> Hủy đơn 
-                             </button>
+                             <button onClick={() => handleLocalStatusChange('confirmed')} disabled={booking.status === 'confirmed'} className={`flex-1 button-status-base ${booking.status === 'confirmed' ? 'bg-green-600 text-white shadow-inner' : 'bg-white dark:bg-slate-700 hover:bg-green-50 dark:hover:bg-green-900/30 border border-green-500 text-green-600 dark:text-green-400'}`}> <CheckCircle weight="bold"/> Xác nhận </button>
+                             <button onClick={() => handleLocalStatusChange('pending')} disabled={booking.status === 'pending'} className={`flex-1 button-status-base ${booking.status === 'pending' ? 'bg-gray-500 text-white shadow-inner' : 'bg-white dark:bg-slate-700 hover:bg-gray-50 dark:hover:bg-gray-900/30 border border-gray-500 text-gray-600 dark:text-gray-400'}`}> <Clock weight="bold"/> Chờ xử lý </button>
+                             <button onClick={() => handleLocalStatusChange('cancelled')} disabled={booking.status === 'cancelled'} className={`flex-1 button-status-base ${booking.status === 'cancelled' ? 'bg-red-600 text-white shadow-inner' : 'bg-white dark:bg-slate-700 hover:bg-red-50 dark:hover:bg-red-900/30 border border-red-500 text-red-600 dark:text-red-400'}`}> <XCircle weight="bold"/> Hủy đơn </button>
                         </div>
-                        {/* (*** XÓA v30) Bỏ nút gửi email *** */}
                      </div>
                 </div>
-                {/* Footer (Giữ nguyên) */}
                 <div className="p-4 border-t dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-b-lg">
                     <button type="button" onClick={onClose} disabled={isSaving} className="modal-button-secondary">Đóng</button>
                     <button type="button" onClick={handleSave} disabled={isSaving || loadingDepartures} className="modal-button-primary flex items-center gap-1.5">
@@ -738,12 +634,6 @@ const EditBookingModal = ({
                 </div>
             </motion.div>
             <style jsx>{`
-                 /* --- ĐÃ THÊM CSS ẨN NÚT MŨI TÊN --- */
-                 .no-spin::-webkit-outer-spin-button,
-                 .no-spin::-webkit-inner-spin-button { -webkit-appearance: none !important; margin: 0 !important; }
-                 .no-spin { -moz-appearance: textfield !important; }
-                 /* ----------------------------------- */
-
                  .label-modal { @apply font-medium text-gray-500 dark:text-gray-400 block text-xs uppercase tracking-wider mb-0.5; }
                  .value-modal { @apply text-gray-800 dark:text-white text-base; }
                  .button-status-base { @apply flex items-center justify-center gap-1.5 px-4 py-3 text-sm font-semibold rounded-md transition-all duration-200 disabled:opacity-100 disabled:cursor-not-allowed min-w-[120px]; }
@@ -754,7 +644,6 @@ const EditBookingModal = ({
                  .input-style { @apply border border-gray-300 p-2 rounded-md w-full dark:bg-neutral-700 dark:border-neutral-600 dark:text-white focus:ring-sky-500 focus:border-sky-500 transition-colors duration-200 text-sm; }
                  .modal-button-secondary { @apply px-5 py-2 bg-neutral-200 dark:bg-neutral-600 rounded-md font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-500 text-sm disabled:opacity-50 transition-colors; }
                  .modal-button-primary { @apply px-5 py-2 bg-sky-600 text-white rounded-md font-semibold hover:bg-sky-700 text-sm disabled:opacity-50 transition-colors; }
-                 .button-secondary { @apply bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-neutral-600 dark:hover:bg-neutral-500 dark:text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm disabled:opacity-50; }
             `}</style>
         </motion.div>
     );
