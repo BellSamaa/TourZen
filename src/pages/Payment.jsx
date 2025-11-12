@@ -6,6 +6,14 @@
   3. (Giữ nguyên) Sửa lỗi build v38.5
   4. (Giữ nguyên) Cập nhật hàm handleApplyVoucher.
 */
+/* *** (SỬA THEO YÊU CẦU) Làm cố định Thông tin Liên hệ ***
+  1. (XÓA) Xóa state 'contactInfo', 'useEffect' liên quan và 'handleInputChange'.
+  2. (CẬP NHẬT) Sửa JSX phần Thông tin Liên hệ thành hiển thị read-only.
+  3. (CẬP NHẬT) Sửa 'handleCheckout' để
+     a. Validate thông tin từ 'currentUser.user_metadata'.
+     b. Điều hướng về '/account-profile' nếu thiếu Tên/SĐT.
+     c. Gửi 'contactInfo' (tạo từ currentUser) khi navigate.
+*/
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -44,6 +52,7 @@ const officeBranches = [
 
 // --- Hàm slugify ---
 function slugify(text) {
+  // ... (code giữ nguyên)
   if (!text) return '';
   return text.toString().toLowerCase()
     .normalize('NFD') // Chuẩn hóa Unicode (tách dấu)
@@ -57,6 +66,7 @@ function slugify(text) {
 
 // --- Component InfoInput ---
 const InfoInput = ({ icon: Icon, ...props }) => (
+    // ... (code giữ nguyên)
     <div className="relative">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
              {Icon && <Icon className="text-gray-400" />}
@@ -70,6 +80,7 @@ const InfoInput = ({ icon: Icon, ...props }) => (
 
 // --- Component QuantityInput ---
 const QuantityInput = ({ label, icon: Icon, value, onDecrease, onIncrease, max, min = 0, disabled = false }) => (
+    // ... (code giữ nguyên)
     <div className="flex items-center justify-between">
         <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
             {Icon && <Icon className="text-gray-500" />} 
@@ -89,12 +100,14 @@ const QuantityInput = ({ label, icon: Icon, value, onDecrease, onIncrease, max, 
 
 // --- Hàm format tiền tệ ---
 const formatCurrency = (num) => {
+    // ... (code giữ nguyên)
     if (typeof num !== 'number' || isNaN(num)) return "0 ₫";
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(num);
 };
 
 // --- Hàm tính tổng tiền cho từng item (giống logic tourSubtotal) ---
 const calculateItemTotal = (item) =>
+  // ... (code giữ nguyên)
   (item.adults || 0) * (item.priceAdult || 0) +
   (item.children || 0) * (item.priceChild || 0) +
   (item.elders || 0) * (item.priceElder || item.priceAdult || 0) + // Infant free
@@ -119,7 +132,8 @@ export default function Payment() {
     const [buyNowInfants, setBuyNowInfants] = useState(0);
 
     // State khác
-    const [contactInfo, setContactInfo] = useState({ name: "", phone: "", email: "", address: "" });
+    // (XÓA THEO YÊU CẦU) Xóa state contactInfo
+    // const [contactInfo, setContactInfo] = useState({ name: "", phone: "", email: "", address: "" });
     const [notes, setNotes] = useState("");
     const [paymentMethod, setPaymentMethod] = useState("direct");
     
@@ -132,22 +146,26 @@ export default function Payment() {
     const [notification, setNotification] = useState({ message: "", type: "" });
 
     // State Dịch vụ
+    // ... (code state dịch vụ giữ nguyên)
     const [availableServices, setAvailableServices] = useState({ hotels: [], transport: [], flights: [] });
-    // (THAY THẾ) State Dịch vụ: Lưu theo key của item
     const [selectedServices, setSelectedServices] = useState({}); // { [itemKey]: { hotel: '', transport: '', flight: '' } }
     const [loadingServices, setLoadingServices] = useState(true);
 
     // State Voucher
+    // ... (code state voucher giữ nguyên)
     const [voucherCode, setVoucherCode] = useState("");
     const [voucherDiscount, setVoucherDiscount] = useState(0);
     const [voucherMessage, setVoucherMessage] = useState({ type: "", text: "" });
     const [isCheckingVoucher, setIsCheckingVoucher] = useState(false);
 
     // State Lịch khởi hành
+    // ... (code state lịch khởi hành giữ nguyên)
     const [departuresData, setDeparturesData] = useState({}); // { tourId: [departures...] }
     const [loadingDepartures, setLoadingDepartures] = useState({}); // { tourId: boolean }
 
     // --- Memos ---
+    // (code displayItems, totalPassengers, tourSubtotal, serviceCosts, finalTotal, paymentDeadline, formattedDeadline giữ nguyên)
+    // ...
     // Tạo cấu trúc displayItems thống nhất
     const displayItems = useMemo(() => {
         if (isBuyNow && buyNowTourData) {
@@ -281,21 +299,16 @@ export default function Payment() {
     }, [paymentDeadline]);
 
     // --- useEffects ---
-    // 1. Lấy thông tin User (Giữ nguyên)
-    useEffect(() => {
-        if (currentUser) {
-            setContactInfo(prev => ({
-                ...prev,
-                email: currentUser.email || '',
-                name: currentUser.user_metadata?.full_name || prev.name,
-                phone: currentUser.user_metadata?.phone || prev.phone,
-                address: currentUser.user_metadata?.address || prev.address
-            }));
-        }
-    }, [currentUser]);
+    // (XÓA THEO YÊU CẦU) Xóa useEffect điền contactInfo
+    // useEffect(() => {
+    //     if (currentUser) {
+    //         setContactInfo(prev => ({ ... }));
+    //     }
+    // }, [currentUser]);
 
     // 2. Lấy Dịch vụ kèm theo (Giữ nguyên)
     useEffect(() => {
+        // ... (code giữ nguyên)
         async function getApprovedServices() {
             setLoadingServices(true);
             const { data, error } = await supabase
@@ -320,6 +333,7 @@ export default function Payment() {
 
     // 3. Lấy Lịch khởi hành (Giữ nguyên)
     const fetchDeparturesForTour = useCallback(async (tourId) => {
+        // ... (code giữ nguyên)
         if (!tourId || departuresData[tourId]) return; 
 
         setLoadingDepartures(prev => ({ ...prev, [tourId]: true }));
@@ -337,6 +351,7 @@ export default function Payment() {
     }, [departuresData]); 
 
     useEffect(() => {
+        // ... (code giữ nguyên)
         const tourIdsToFetch = new Set();
         if (isBuyNow && buyNowTourData?.id) {
             tourIdsToFetch.add(buyNowTourData.id);
@@ -352,6 +367,7 @@ export default function Payment() {
     // --- Handlers ---
     // (Giữ nguyên)
     const maxGuests = useMemo(() => {
+        // ... (code giữ nguyên)
         if (!isBuyNow || !buyNowDepartureId) return Infinity; 
         const departure = (departuresData[buyNowTourData.id] || []).find(d => d.id === buyNowDepartureId);
         return departure ? Math.max(0, (departure.max_slots || 0) - (departure.booked_slots || 0)) : Infinity;
@@ -359,6 +375,7 @@ export default function Payment() {
     
     // (Giữ nguyên)
     const handleBuyNowQtyChange = (type, delta) => {
+        // ... (code giữ nguyên)
         const currentTotal = buyNowAdults + buyNowChildren + buyNowElders + buyNowInfants;
         const potentialTotal = currentTotal + delta;
         const currentAdultsAndElders = buyNowAdults + buyNowElders;
@@ -394,6 +411,7 @@ export default function Payment() {
 
     // (Giữ nguyên)
     const handleCartQtyChange = (key, type, delta) => {
+        // ... (code giữ nguyên)
         const item = cartItemsFromContext.find(i => i.key === key);
         if (!item) return;
 
@@ -427,6 +445,7 @@ export default function Payment() {
 
     // (Giữ nguyên)
     const handleCartDepartureSelect = (itemKey, departureId) => {
+        // ... (code giữ nguyên)
         if (updateCartItemDeparture) {
             updateCartItemDeparture(itemKey, departureId); 
              const item = cartItemsFromContext.find(i => i.key === itemKey);
@@ -439,6 +458,7 @@ export default function Payment() {
 
     // (MỚI) Handler để cập nhật state dịch vụ
     const handleServiceChange = (itemKey, serviceType, serviceId) => {
+        // ... (code giữ nguyên)
         setSelectedServices(prev => ({
             ...prev,
             [itemKey]: {
@@ -448,17 +468,20 @@ export default function Payment() {
         }));
     };
 
-    const handleInputChange = (e, setState) => {
-        const { name, value } = e.target;
-        setState(prev => ({ ...prev, [name]: value }));
-    };
+    // (XÓA THEO YÊU CẦU) Xóa handleInputChange
+    // const handleInputChange = (e, setState) => {
+    //     const { name, value } = e.target;
+    //     setState(prev => ({ ...prev, [name]: value }));
+    // };
     const showNotification = (message, type = "error") => {
+        // ... (code giữ nguyên)
         setNotification({ message, type });
         setTimeout(() => setNotification({ message: "", type: "" }), 4000); 
     };
     
     // *** (ĐÃ SỬA V38.4) HÀM VOUCHER ĐỂ DÙNG MÃ THẬT ***
     const handleApplyVoucher = async () => { 
+        // ... (code giữ nguyên)
         if (!voucherCode) return;
         setIsCheckingVoucher(true);
         setVoucherMessage({ type: '', text: '' });
@@ -515,18 +538,37 @@ export default function Payment() {
     };
     // *** (KẾT THÚC SỬA) ***
 
-    // --- (CẬP NHẬT v38.6) HÀM CHECKOUT (Thêm branch_address) ---
+    // --- (CẬP NHẬT v38.6 & SỬA THEO YÊU CẦU) HÀM CHECKOUT ---
     const handleCheckout = async (e) => { 
         e.preventDefault();
 
-        // 1. Kiểm tra dữ liệu (Giữ nguyên)
+        // 1. Kiểm tra dữ liệu
         if (!currentUser) { showNotification("Bạn cần đăng nhập..."); navigate('/login', { state: { from: location } }); return; }
-        if (!contactInfo.name || !contactInfo.phone || !contactInfo.email) { showNotification("Vui lòng điền đủ thông tin liên lạc."); return; }
+
+        // (SỬA THEO YÊU CẦU) Kiểm tra thông tin từ currentUser
+        const userName = currentUser.user_metadata?.full_name;
+        const userPhone = currentUser.user_metadata?.phone;
+
+        if (!userName || !userPhone) {
+            showNotification("Thông tin tài khoản (Họ tên, SĐT) chưa đầy đủ. Vui lòng cập nhật hồ sơ trước khi thanh toán.");
+            // Chuyển hướng người dùng đến trang hồ sơ (giả định là '/account-profile')
+            navigate('/account-profile'); 
+            return; 
+        }
+        if (!currentUser.email) {
+             showNotification("Lỗi: Không tìm thấy email tài khoản.");
+             return;
+        }
+        // (XÓA THEO YÊU CẦU) Dòng 'contactInfo' cũ
+        // if (!contactInfo.name || !contactInfo.phone || !contactInfo.email) { showNotification("Vui lòng điền đủ thông tin liên lạc."); return; }
+        
+        // (Giữ nguyên)
         if (displayItems.length === 0) { showNotification("Giỏ hàng trống."); return; }
         if (!agreedToTerms) { showNotification("Bạn phải đồng ý điều khoản."); return; }
 
         let invalidItem = false;
         displayItems.forEach(item => {
+            // ... (code kiểm tra item giữ nguyên)
             if (!item.departure_id) { showNotification(`Vui lòng chọn ngày khởi hành cho tour "${item.title}".`); invalidItem = true; }
             const guests = (item.adults || 0) + (item.children || 0) + (item.elders || 0) + (item.infants || 0);
             if (guests <= 0) { showNotification(`Vui lòng chọn số lượng khách cho tour "${item.title}".`); invalidItem = true; }
@@ -539,9 +581,8 @@ export default function Payment() {
         let bookingErrorOccurred = false;
         let successfulBookingIds = [];
         const bookingPromises = []; 
-        // (XÓA) totalAllGuests không cần ở đây nữa
 
-        // 2. Xử lý từng tour
+        // 2. Xử lý từng tour (code giữ nguyên)
         for (const item of displayItems) {
             const numAdults = item.adults || 0;
             const numChildren = item.children || 0;
@@ -562,6 +603,7 @@ export default function Payment() {
         	 }
 
             // (THAY THẾ) 2.2. Giữ chỗ DỊCH VỤ (cho từng item)
+            // ... (code giữ nguyên)
             const itemServices = selectedServices[item.key] || {};
             const itemGuests = quantity; // Lấy số khách của item này
 
@@ -603,7 +645,7 @@ export default function Payment() {
             }
             // (HẾT THAY THẾ)
 
-            // 2.3. Tạo bản ghi Booking nếu RPC thành công
+            // 2.3. Tạo bản ghi Booking nếu RPC thành công (code giữ nguyên)
             const itemTotalPrice = calculateItemTotal(item); 
             const bookingPayload = {
                 user_id: currentUser.id, product_id: item.tourId,
@@ -647,13 +689,19 @@ export default function Payment() {
                 if (!isBuyNow) clearCart(); 
                 toast.success("Đã giữ chỗ thành công!");
                 
-                // Điều hướng (Giữ nguyên)
+                // Điều hướng
                 if (paymentMethod === 'virtual_qr') {
                     navigate('/virtual-payment', { 
                         state: { 
                             bookingIds: successfulBookingIds,
                             finalTotal: finalTotal, 
-                            contactInfo: contactInfo, 
+                            // (SỬA THEO YÊU CẦU) Tạo object contactInfo từ currentUser
+                            contactInfo: {
+                                name: currentUser.user_metadata?.full_name,
+                                phone: currentUser.user_metadata?.phone,
+                                email: currentUser.email,
+                                address: currentUser.user_metadata?.address
+                            }, 
                             deadline: formattedDeadline
                         } 
                     });
@@ -670,6 +718,7 @@ export default function Payment() {
                 }
 
             } catch (insertError) { 
+                 // ... (code rollback giữ nguyên)
                  console.error("Lỗi insert Bookings:", insertError);
                  toast.error("Lỗi khi lưu đơn hàng. Đang thử hoàn lại chỗ...");
                  bookingErrorOccurred = true;
@@ -701,6 +750,7 @@ export default function Payment() {
     // --- Render ---
     // (Giữ nguyên)
     if (!isBuyNow && cartItemsFromContext.length === 0) {
+        // ... (code giữ nguyên)
         return (
             <div className="text-center py-20 max-w-lg mx-auto">
                  <Ticket size={80} className="mx-auto text-neutral-300 dark:text-neutral-600" />
@@ -730,6 +780,7 @@ export default function Payment() {
                      <div className="lg:col-span-2 space-y-6">
                         {/* Mục Tour & Số lượng */}
                         <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg overflow-hidden border dark:border-neutral-700">
+                            {/* ... (code render tour, số lượng, dịch vụ... giữ nguyên) ... */}
                             <h2 className="text-xl font-semibold p-5 border-b dark:border-neutral-700 flex items-center gap-2 text-gray-800 dark:text-white">
                                 <FaUmbrellaBeach className="text-sky-500" />
                                 <span>Tour đã chọn & Số lượng khách</span>
@@ -925,19 +976,64 @@ export default function Payment() {
                             </AnimatePresence>
                         </div>
                         
-                        {/* Thông tin liên lạc (Giữ nguyên) */}
+                        {/* (SỬA THEO YÊU CẦU) Thông tin liên lạc (Cố định) */}
                         <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg p-5 border dark:border-neutral-700">
                            <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white flex items-center gap-2"><FaUserFriends className="text-sky-500"/> THÔNG TIN LIÊN LẠC</h2>
+                           
+                           {/* (THAY THẾ) Hiển thị thông tin cố định */}
                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <InfoInput icon={FaUser} name="name" placeholder="Họ và tên *" value={contactInfo.name} onChange={(e) => handleInputChange(e, setContactInfo)} required />
-                                <InfoInput icon={IoIosCall} name="phone" placeholder="Số điện thoại *" value={contactInfo.phone} onChange={(e) => handleInputChange(e, setContactInfo)} required />
-                                <InfoInput icon={IoIosMail} name="email" type="email" placeholder="Email *" value={contactInfo.email} onChange={(e) => handleInputChange(e, setContactInfo)} required />
-                                <InfoInput icon={FaMapMarkerAlt} name="address" placeholder="Địa chỉ" value={contactInfo.address} onChange={(e) => handleInputChange(e, setContactInfo)} />
+                                
+                                {/* HỌ TÊN */}
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                         <FaUser className="text-gray-400" />
+                                    </div>
+                                    <div className="w-full pl-10 pr-3 py-2 border border-gray-200 rounded-md bg-gray-100 dark:bg-neutral-700/50 dark:border-neutral-600 dark:text-white h-[42px] flex items-center">
+                                        <span className="font-medium text-sm truncate">{currentUser.user_metadata?.full_name || <i className="opacity-70">Chưa có Họ Tên</i>}</span>
+                                    </div>
+                                </div>
+
+                                {/* SĐT */}
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                         <IoIosCall className="text-gray-400" size={18} />
+                                    </div>
+                                    <div className="w-full pl-10 pr-3 py-2 border border-gray-200 rounded-md bg-gray-100 dark:bg-neutral-700/50 dark:border-neutral-600 dark:text-white h-[42px] flex items-center">
+                                        <span className="font-medium text-sm">{currentUser.user_metadata?.phone || <i className="opacity-70">Chưa có SĐT</i>}</span>
+                                    </div>
+                                </div>
+                                
+                                {/* EMAIL */}
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                         <IoIosMail className="text-gray-400" size={18} />
+                                    </div>
+                                    <div className="w-full pl-10 pr-3 py-2 border border-gray-200 rounded-md bg-gray-100 dark:bg-neutral-700/50 dark:border-neutral-600 dark:text-white h-[42px] flex items-center">
+                                        <span className="font-medium text-sm truncate">{currentUser.email || <i className="opacity-70">Chưa có Email</i>}</span>
+                                    </div>
+                                </div>
+
+                                {/* ĐỊA CHỈ */}
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                         <FaMapMarkerAlt className="text-gray-400" />
+                                    </div>
+                                    <div className="w-full pl-10 pr-3 py-2 border border-gray-200 rounded-md bg-gray-100 dark:bg-neutral-700/50 dark:border-neutral-600 dark:text-white h-[42px] flex items-center">
+                                        <span className="font-medium text-sm truncate">{currentUser.user_metadata?.address || <i className="opacity-70">Chưa có Địa chỉ</i>}</span>
+                                    </div>
+                                </div>
+
                            </div>
-                           <p className="text-xs text-gray-500 mt-3 italic">* Thông tin bắt buộc</p>
+                           
+                           {/* (THAY THẾ) Thêm thông báo và link */}
+                           <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 italic">
+                               Thông tin được lấy từ tài khoản của bạn.
+                               {/* (Giả định trang hồ sơ là /account-profile) */}
+                               <Link to="/account-profile" className="text-sky-600 dark:text-sky-400 hover:underline ml-1 font-medium">(Thay đổi tại Hồ sơ)</Link>
+                           </p>
                         </div>
-                        
-                        {/* (ĐÃ DI CHUYỂN) Khối dịch vụ cộng thêm gốc đã bị xóa khỏi đây */}
+                        {/* (HẾT SỬA) */}
+
                         
                         {/* Ghi chú (Giữ nguyên) */}
                         <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg p-5 border dark:border-neutral-700">
@@ -947,6 +1043,7 @@ export default function Payment() {
                         
                         {/* <<< SỬA v38.6: Phương thức thanh toán (Thêm dropdown) >>> */}
                         <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg p-5 border dark:border-neutral-700">
+                            {/* ... (code phương thức thanh toán giữ nguyên) ... */}
                             <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">PHƯƠNG THỨC THANH TOÁN</h2>
                             <div className="space-y-3">
                                 {/* Thanh toán trực tiếp */}
@@ -996,6 +1093,7 @@ export default function Payment() {
                      {/* Cột Phải: Tóm tắt (Giữ nguyên) */}
                      <aside className="lg:col-span-1">
                          <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg border dark:border-neutral-700 p-5 sticky top-24">
+                             {/* ... (code tóm tắt đơn hàng giữ nguyên) ... */}
                              <h2 className="text-xl font-semibold mb-4 pb-4 border-b dark:border-neutral-700 text-gray-800 dark:text-white">TÓM TẮT ĐƠN HÀNG</h2>
                              {displayItems.length === 0 ? ( 
                                 <p className="text-gray-500 italic text-center">Không có tour nào trong giỏ.</p> 
