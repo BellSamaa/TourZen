@@ -1379,17 +1379,16 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
     const to = from + ITEMS_PER_PAGE - 1;
 
     const selectQuery = `
-      id,created_at,departure_date,status,total_price,quantity,
-      num_adult,num_child,num_elder,num_infant,departure_id,
-      user:user_id(id,full_name,email),
-      product:product_id(id,name,image_url),
-      /* (XÓA V32) hotel:hotel_product_id(id,name), */
-      transport:Products!Bookings_transport_product_id_fkey(id,name,price,product_type,details),
-      flight:flight_product_id(id,name,price,product_type,details),
-      voucher_code,voucher_discount,notes,payment_method,
-      Invoices(id),
-      Reviews!booking_id(id,rating,comment,reviewer:user_id(full_name,email))
-    `.replace(/\s+/g, '');
+                id,created_at,departure_date,status,total_price,quantity,
+                num_adult,num_child,num_elder,num_infant,departure_id,
+                user:user_id(id,full_name,email),
+                product:product_id(id,name,image_url),
+                transport:Products!Bookings_transport_product_id_fkey(id,name,price,product_type,details),
+                flight:flight_product_id(id,name,price,product_type,details),
+                voucher_code,voucher_discount,notes,payment_method,
+                Invoices(id),
+                Reviews!booking_id(id,rating,comment,reviewer:user_id(full_name,email))
+            `.replace(/\s+/g, ''); // <-- Dòng comment hotel đã được xóa
 
     let query = supabase.from("Bookings").select(selectQuery, { count: "exact" });
 

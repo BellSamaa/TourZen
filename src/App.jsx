@@ -3,6 +3,7 @@
 // (ĐÃ SỬA: Sửa lỗi useLocation, lỗi layout 'position: absolute' và sai path route)
 // (SỬA v3: Thêm VNPAYPage và sửa sai route VirtualPayment)
 // (SỬA THEO YÊU CẦU: Thêm logic bảo vệ route cho Admin và Supplier)
+// *** (SỬA LỖI v39) BỔ SUNG ROUTE CHO VIRTUALPAYMENT / PAYMENTSUCCESS ***
 
 import React from "react";
 // SỬA 1: Thêm 'useLocation'
@@ -19,7 +20,8 @@ import Home from "./pages/Home.jsx";
 import TourList from "./pages/TourList.jsx";
 import TourDetail from "./pages/TourDetail.jsx";
 import Payment from "./pages/Payment.jsx";
-import PaymentSuccess from "./pages/PaymentSuccess.jsx";
+// (SỬA) Import đúng trang PaymentSuccess
+import PaymentSuccess from "./pages/PaymentSuccess.jsx"; 
 import Cart from "./pages/Cart.jsx";
 import Login from "./pages/Login.jsx";
 import About from "./pages/About.jsx";
@@ -136,14 +138,16 @@ export default function App() {
                         <Route path="tour/:id" element={<TourDetail />} />
                         <Route path="cart" element={<Cart />} />
                         <Route path="payment" element={<Payment />} />
-                            {/* SỬA 4: Đổi path để khớp với navigate() trong Payment.jsx */}
-                        <Route path="booking-success" element={<PaymentSuccess />} />
   
-                        {/* *** SỬA v3: SỬA VÀ THÊM 2 ROUTE THANH TOÁN *** */}
-                        {/* 1. Trang VNPAY (từ Booking.jsx) trỏ đến VNPAYPage.jsx */}
-                        <Route path="payment/vnpay" element={<VNPAYPage />} />
-                        {/* 2. Trang Virtual Payment (từ Payment.jsx) để sửa lỗi 404 */}
+                        {/* *** (SỬA LỖI v39) BỔ SUNG 2 ROUTE BỊ THIẾU DẪN ĐẾN 404 *** */}
+                        {/* 1. Trang Virtual Payment (từ Payment.jsx) */}
                         <Route path="virtual-payment" element={<VirtualPayment />} />
+                        {/* 2. Trang Success (từ Payment.jsx hoặc VirtualPayment.jsx) */}
+                        <Route path="booking-success" element={<PaymentSuccess />} />
+                        {/* *** KẾT THÚC SỬA *** */}
+
+                        {/* Trang VNPAY (nếu bạn có dùng) */}
+                        <Route path="payment/vnpay" element={<VNPAYPage />} />
 
                         <Route path="services" element={<Services />} />
                         <Route path="my-bookings" element={<MyBookings />} />
@@ -175,7 +179,7 @@ export default function App() {
                         </Route>
                     </Route>
 
-                    {/* 2. Supplier Dashboard Routes (SỬA: Bọc bằng SupplierRoute) */}
+                   s  {/* 2. Supplier Dashboard Routes (SỬA: Bọc bằng SupplierRoute) */}
                     <Route element={<SupplierRoute />}>
                         <Route path="/supplier/*" element={<SupplierDashboard />}> {/* Vẫn giữ /* */}
                              {/* Các route con của supplier sẽ nằm trong SupplierDashboard.jsx (thông qua Outlet) */}
@@ -194,7 +198,7 @@ ci                      <Route path="transport" element={<ManageTrans
                    {/* Route 404 chung nếu không khớp các path trên */}
                     {/* Đã được xử lý bên trong SiteLayout và các Dashboard */}
 
-                </Routes>
+               _D</Routes>
             </CartProvider>
         </AuthProvider>
     );
@@ -224,7 +228,7 @@ function AdminNotFound() {
         </motion.p>
          <motion.div
               initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
+     _        animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.5, delay: 0.4 }}
               className="mt-6"
           >

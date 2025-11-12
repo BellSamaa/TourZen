@@ -4,6 +4,11 @@
 //    vì RLS đang chặn request này từ user 'anon', gây lỗi 406.
 // 2. (Fix) Chuyển logic bắt email trùng lặp xuống phần 'insertError',
 //    dựa vào 'unique constraint "Users_email_key"'.
+/* *** (SỬA LỖI v39) ĐỒNG BỘ AUTH "ẢO" VÀ "THẬT" ***
+   1. (SỬA) Cập nhật localStorage.setItem để lưu SĐT (phone_number) 
+      và Địa chỉ (address) khi User đăng nhập "ảo".
+   2. (SỬA) Mô phỏng cấu trúc 'user_metadata' để Payment.jsx đọc.
+*/
 
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -69,21 +74,8 @@ export default function Login() {
                 // ========== KẾT THÚC CẬP NHẬT ==========
 
                 // *** (SỬA LỖI v27) XÓA BƯỚC KIỂM TRA EMAIL (GÂY LỖI 406) ***
-                // Lý do: RLS (Row Level Security) đang chặn request 'SELECT' 
-                // từ người dùng ẩn danh (anonymous).
+                // (Giữ nguyên)
                 
-                // const { data: existingUser } = await supabase
-                //     .from('Users')
-                //     .select('email')
-                //     .eq('email', form.email)
-                //     .single();
-                //
-                // if (existingUser) {
-                //     throw new Error("Email đã được sử dụng. Vui lòng dùng email khác.");
-                // }
-                // *** KẾT THÚC SỬA v27 ***
-
-
                 const hashedPassword = btoa(form.password);
                 
                 // (Giữ nguyên) DB Trigger sẽ tự động gán mã KHxxxx
@@ -102,7 +94,6 @@ export default function Login() {
 
                 if (insertError) {
                     // *** (SỬA v27) Bắt lỗi email trùng lặp tại đây ***
-                    // (Giả định cột email của bạn có unique constraint là "Users_email_key")
                     if (insertError.message.includes('unique constraint "Users_email_key"')) {
                          throw new Error("Email đã được sử dụng. Vui lòng dùng email khác.");
                     }
@@ -169,27 +160,28 @@ export default function Login() {
                     } catch (e) {
                         throw new Error("Đã xảy ra lỗi khi kiểm tra mật khẩu (Base64).");
                     }
-                    // File: Login.jsx
-// ...
-                    // (SỬA) Lưu đầy đủ thông tin và mô phỏng cấu trúc user_metadata
+
+                    // *** (SỬA LỖI v39) LƯU ĐẦY ĐỦ THÔNG TIN VÀO LOCALSTORAGE ***
                     localStorage.setItem('user', JSON.stringify({
                         id: userProfile.id,
                         email: userProfile.email,
                         role: userProfile.role,
                         customer_code: userProfile.customer_code,
                         
-                        // THÊM DỮ LIỆU GỐC ĐỂ PAYMENT.JSX ĐỌC
-                        full_name: userProfile.full_name, // Thêm gốc
-                        phone_number: userProfile.phone_number, // Thêm SĐT
-                        address: userProfile.address, // Thêm Địa chỉ
+                        // THÊM CÁC TRƯỜNG GỐC MÀ PAYMENT.JSX CẦN
+                        full_name: userProfile.full_name,
+                        phone_number: userProfile.phone_number, // Lấy từ DB
+                        address: userProfile.address, // Lấy từ DB
 
-                        // Bắt chước cấu trúc metadata để các trang khác (như Payment) đọc đồng nhất
+                        // MÔ PHỎNG user_metadata ĐỂ ĐỒNG BỘ
                         user_metadata: {
                             full_name: userProfile.full_name,
-                            phone: userProfile.phone_number, // Lấy từ 'phone_number' của bảng Users
-                            address: userProfile.address   // Lấy từ 'address' của bảng Users
+                            phone: userProfile.phone_number, // Gán 'phone'
+                            address: userProfile.address   // Gán 'address'
                         }
                     }));
+                    // *** KẾT THÚC SỬA ***
+
                     from = location.state?.from?.pathname || "/";
                 }
                 setSuccess("Đăng nhập thành công! 🎉");

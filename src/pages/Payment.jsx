@@ -6,18 +6,11 @@
   3. (Giữ nguyên) Sửa lỗi build v38.5
   4. (Giữ nguyên) Cập nhật hàm handleApplyVoucher.
 */
-/* *** (SỬA THEO YÊU CẦU) Làm cố định Thông tin Liên hệ ***
-  1. (XÓA) Xóa state 'contactInfo', 'useEffect' liên quan và 'handleInputChange'.
-  2. (CẬP NHẬT) Sửa JSX phần Thông tin Liên hệ thành hiển thị read-only.
-  3. (CẬP NHẬT) Sửa 'handleCheckout' để
-     a. Validate thông tin từ 'currentUser.user_metadata'.
-     b. Điều hướng về '/account-profile' nếu thiếu Tên/SĐT.
-     c. Gửi 'contactInfo' (tạo từ currentUser) khi navigate.
-*/
 /* *** (SỬA LỖI v39) ĐỒNG BỘ AUTH "ẢO" VÀ "THẬT" ***
-   (Áp dụng theo hướng dẫn trước)
+   (Áp dụng theo hướng dẫn)
    1. (SỬA) Sửa `handleCheckout` để đọc `user_metadata` HOẶC `root`.
    2. (SỬA) Sửa JSX để đọc `user_metadata` HOẶC `root`.
+   3. (SỬA) Sửa `contactInfo` khi navigate để đọc "an toàn".
 */
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
@@ -550,15 +543,17 @@ export default function Payment() {
         // 1. Kiểm tra dữ liệu
         if (!currentUser) { showNotification("Bạn cần đăng nhập..."); navigate('/login', { state: { from: location } }); return; }
 
-        // (SỬA) Kiểm tra thông tin "an toàn" (đọc từ metadata HOẶC gốc)
+        // *** (SỬA LỖI v39) ***
+        // Kiểm tra thông tin "an toàn" (đọc từ metadata HOẶC gốc)
         const userName = currentUser.user_metadata?.full_name || currentUser.full_name;
-        // (SỬA) Đọc 'phone' từ metadata hoặc 'phone_number' từ gốc
+        // Đọc 'phone' từ metadata hoặc 'phone_number' từ gốc
         const userPhone = currentUser.user_metadata?.phone || currentUser.phone_number; 
+        // *** KẾT THÚC SỬA ***
 
         if (!userName || !userPhone) {
             showNotification("Thông tin tài khoản (Họ tên, SĐT) chưa đầy đủ. Vui lòng cập nhật hồ sơ trước khi thanh toán.");
             // Chuyển hướng người dùng đến trang hồ sơ (giả định là '/account-profile')
-            navigate('/account-profile'); 
+            navigate('/profile'); // Sửa thành /profile cho khớp App.jsx
             return; 
         }
         if (!currentUser.email) {
@@ -701,13 +696,16 @@ export default function Payment() {
                         state: { 
                             bookingIds: successfulBookingIds,
                             finalTotal: finalTotal, 
-                            // (SỬA LỖI v39) Tạo object contactInfo (an toàn)
+                            
+                            // *** (SỬA LỖI v39) GỬI contactInfo ĐÃ SỬA ***
                             contactInfo: {
                                 name: currentUser.user_metadata?.full_name || currentUser.full_name,
                                 phone: currentUser.user_metadata?.phone || currentUser.phone_number,
                                 email: currentUser.email,
                                 address: currentUser.user_metadata?.address || currentUser.address
                             }, 
+                            // *** KẾT THÚC SỬA ***
+                            
                             deadline: formattedDeadline
                         } 
                     });
@@ -982,7 +980,7 @@ export default function Payment() {
                             </AnimatePresence>
                         </div>
                         
-                        {/* (SỬA LỖI v39) Thông tin liên lạc (ĐỌC AN TOÀN) */}
+                        {/* *** (SỬA LỖI v39) Thông tin liên lạc (ĐỌC AN TOÀN) *** */}
                         <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg p-5 border dark:border-neutral-700">
                            <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white flex items-center gap-2"><FaUserFriends className="text-sky-500"/> THÔNG TIN LIÊN LẠC</h2>
                            
@@ -1041,14 +1039,13 @@ export default function Payment() {
 
                            </div>
                            
-                           {/* (THAY THẾ) Thêm thông báo và link */}
                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 italic">
                                Thông tin được lấy từ tài khoản của bạn.
-                               {/* (Giả định trang hồ sơ là /account-profile) */}
-                               <Link to="/account-profile" className="text-sky-600 dark:text-sky-400 hover:underline ml-1 font-medium">(Thay đổi tại Hồ sơ)</Link>
+                               {/* (SỬA) Sửa link cho khớp App.jsx */}
+                               <Link to="/profile" className="text-sky-600 dark:text-sky-400 hover:underline ml-1 font-medium">(Thay đổi tại Hồ sơ)</Link>
                            </p>
                         </div>
-                        {/* (HẾT SỬA) */}
+                        {/* *** (HẾT SỬA) *** */}
 
                         
                         {/* Ghi chú (Giữ nguyên) */}
