@@ -1,10 +1,10 @@
 // src/pages/BookingHistory.jsx
 // ...
-// (*** GEMINI SỬA v6: Thử sử dụng path alias '~/ ' để fix lỗi build ***)
+// (*** GEMINI SỬA v7: Thêm đuôi file .js và .jsx vào import để fix lỗi build ***)
 
 import React, { useState, useEffect, useCallback } from "react";
-import { getSupabase } from "~/lib/supabaseClient"; // <<< SỬA LỖI BUILD: Thử dùng alias ~/
-import { useAuth } from "~/context/AuthContext"; // <<< SỬA LỖI BUILD: Thử dùng alias ~/
+import { getSupabase } from "../lib/supabaseClient.js"; // <<< SỬA LỖI BUILD: Thêm .js
+import { useAuth } from "../context/AuthContext.jsx"; // <<< SỬA LỖI BUILD: Thêm .jsx
 // <<< SỬA v3: Thêm FaCalendarCheck >>>
 import { FaSpinner, FaBoxOpen, FaStar, FaRegStar, FaMoneyBillWave, FaClock, FaMapMarkerAlt, FaCalendarCheck } from "react-icons/fa"; // <<< KHÔI PHỤC ICON
 // <<< SỬA v4: Thêm icons Dịch vụ và Hủy >>>

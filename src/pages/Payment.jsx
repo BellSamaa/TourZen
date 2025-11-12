@@ -14,6 +14,11 @@
      b. Điều hướng về '/account-profile' nếu thiếu Tên/SĐT.
      c. Gửi 'contactInfo' (tạo từ currentUser) khi navigate.
 */
+/* *** (SỬA LỖI v39) ĐỒNG BỘ AUTH "ẢO" VÀ "THẬT" ***
+   (Áp dụng theo hướng dẫn trước)
+   1. (SỬA) Sửa `handleCheckout` để đọc `user_metadata` HOẶC `root`.
+   2. (SỬA) Sửa JSX để đọc `user_metadata` HOẶC `root`.
+*/
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -538,16 +543,17 @@ export default function Payment() {
     };
     // *** (KẾT THÚC SỬA) ***
 
-    // --- (CẬP NHẬT v38.6 & SỬA THEO YÊU CẦU) HÀM CHECKOUT ---
+    // --- (SỬA LỖI v39) HÀM CHECKOUT (ĐỌC DỮ LIỆU AN TOÀN) ---
     const handleCheckout = async (e) => { 
         e.preventDefault();
 
         // 1. Kiểm tra dữ liệu
         if (!currentUser) { showNotification("Bạn cần đăng nhập..."); navigate('/login', { state: { from: location } }); return; }
 
-        // (SỬA THEO YÊU CẦU) Kiểm tra thông tin từ currentUser
-        const userName = currentUser.user_metadata?.full_name;
-        const userPhone = currentUser.user_metadata?.phone;
+        // (SỬA) Kiểm tra thông tin "an toàn" (đọc từ metadata HOẶC gốc)
+        const userName = currentUser.user_metadata?.full_name || currentUser.full_name;
+        // (SỬA) Đọc 'phone' từ metadata hoặc 'phone_number' từ gốc
+        const userPhone = currentUser.user_metadata?.phone || currentUser.phone_number; 
 
         if (!userName || !userPhone) {
             showNotification("Thông tin tài khoản (Họ tên, SĐT) chưa đầy đủ. Vui lòng cập nhật hồ sơ trước khi thanh toán.");
@@ -695,12 +701,12 @@ export default function Payment() {
                         state: { 
                             bookingIds: successfulBookingIds,
                             finalTotal: finalTotal, 
-                            // (SỬA THEO YÊU CẦU) Tạo object contactInfo từ currentUser
+                            // (SỬA LỖI v39) Tạo object contactInfo (an toàn)
                             contactInfo: {
-                                name: currentUser.user_metadata?.full_name,
-                                phone: currentUser.user_metadata?.phone,
+                                name: currentUser.user_metadata?.full_name || currentUser.full_name,
+                                phone: currentUser.user_metadata?.phone || currentUser.phone_number,
                                 email: currentUser.email,
-                                address: currentUser.user_metadata?.address
+                                address: currentUser.user_metadata?.address || currentUser.address
                             }, 
                             deadline: formattedDeadline
                         } 
@@ -976,11 +982,10 @@ export default function Payment() {
                             </AnimatePresence>
                         </div>
                         
-                        {/* (SỬA THEO YÊU CẦU) Thông tin liên lạc (Cố định) */}
+                        {/* (SỬA LỖI v39) Thông tin liên lạc (ĐỌC AN TOÀN) */}
                         <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg p-5 border dark:border-neutral-700">
                            <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white flex items-center gap-2"><FaUserFriends className="text-sky-500"/> THÔNG TIN LIÊN LẠC</h2>
                            
-                           {/* (THAY THẾ) Hiển thị thông tin cố định */}
                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 
                                 {/* HỌ TÊN */}
@@ -989,7 +994,10 @@ export default function Payment() {
                                          <FaUser className="text-gray-400" />
                                     </div>
                                     <div className="w-full pl-10 pr-3 py-2 border border-gray-200 rounded-md bg-gray-100 dark:bg-neutral-700/50 dark:border-neutral-600 dark:text-white h-[42px] flex items-center">
-                                        <span className="font-medium text-sm truncate">{currentUser.user_metadata?.full_name || <i className="opacity-70">Chưa có Họ Tên</i>}</span>
+                                        <span className="font-medium text-sm truncate">
+                                            {/* (SỬA) Đọc 2 chiều */}
+                                            {currentUser.user_metadata?.full_name || currentUser.full_name || <i className="opacity-70">Chưa có Họ Tên</i>}
+                                        </span>
                                     </div>
                                 </div>
 
@@ -999,7 +1007,10 @@ export default function Payment() {
                                          <IoIosCall className="text-gray-400" size={18} />
                                     </div>
                                     <div className="w-full pl-10 pr-3 py-2 border border-gray-200 rounded-md bg-gray-100 dark:bg-neutral-700/50 dark:border-neutral-600 dark:text-white h-[42px] flex items-center">
-                                        <span className="font-medium text-sm">{currentUser.user_metadata?.phone || <i className="opacity-70">Chưa có SĐT</i>}</span>
+                                        <span className="font-medium text-sm">
+                                            {/* (SỬA) Đọc 2 chiều (metadata.phone HOẶC gốc.phone_number) */}
+                                            {currentUser.user_metadata?.phone || currentUser.phone_number || <i className="opacity-70">Chưa có SĐT</i>}
+                                        </span>
                                     </div>
                                 </div>
                                 
@@ -1009,7 +1020,9 @@ export default function Payment() {
                                          <IoIosMail className="text-gray-400" size={18} />
                                     </div>
                                     <div className="w-full pl-10 pr-3 py-2 border border-gray-200 rounded-md bg-gray-100 dark:bg-neutral-700/50 dark:border-neutral-600 dark:text-white h-[42px] flex items-center">
-                                        <span className="font-medium text-sm truncate">{currentUser.email || <i className="opacity-70">Chưa có Email</i>}</span>
+                                        <span className="font-medium text-sm truncate">
+                                            {currentUser.email || <i className="opacity-70">Chưa có Email</i>}
+                                        </span>
                                     </div>
                                 </div>
 
@@ -1019,7 +1032,10 @@ export default function Payment() {
                                          <FaMapMarkerAlt className="text-gray-400" />
                                     </div>
                                     <div className="w-full pl-10 pr-3 py-2 border border-gray-200 rounded-md bg-gray-100 dark:bg-neutral-700/50 dark:border-neutral-600 dark:text-white h-[42px] flex items-center">
-                                        <span className="font-medium text-sm truncate">{currentUser.user_metadata?.address || <i className="opacity-70">Chưa có Địa chỉ</i>}</span>
+                                        <span className="font-medium text-sm truncate">
+                                            {/* (SỬA) Đọc 2 chiều */}
+                                            {currentUser.user_metadata?.address || currentUser.address || <i className="opacity-70">Chưa có Địa chỉ</i>}
+                                        </span>
                                     </div>
                                 </div>
 

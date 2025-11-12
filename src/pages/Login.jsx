@@ -169,12 +169,26 @@ export default function Login() {
                     } catch (e) {
                         throw new Error("Đã xảy ra lỗi khi kiểm tra mật khẩu (Base64).");
                     }
+                    // File: Login.jsx
+// ...
+                    // (SỬA) Lưu đầy đủ thông tin và mô phỏng cấu trúc user_metadata
                     localStorage.setItem('user', JSON.stringify({
                         id: userProfile.id,
                         email: userProfile.email,
-                        full_name: userProfile.full_name,
                         role: userProfile.role,
-                        customer_code: userProfile.customer_code
+                        customer_code: userProfile.customer_code,
+                        
+                        // THÊM DỮ LIỆU GỐC ĐỂ PAYMENT.JSX ĐỌC
+                        full_name: userProfile.full_name, // Thêm gốc
+                        phone_number: userProfile.phone_number, // Thêm SĐT
+                        address: userProfile.address, // Thêm Địa chỉ
+
+                        // Bắt chước cấu trúc metadata để các trang khác (như Payment) đọc đồng nhất
+                        user_metadata: {
+                            full_name: userProfile.full_name,
+                            phone: userProfile.phone_number, // Lấy từ 'phone_number' của bảng Users
+                            address: userProfile.address   // Lấy từ 'address' của bảng Users
+                        }
                     }));
                     from = location.state?.from?.pathname || "/";
                 }

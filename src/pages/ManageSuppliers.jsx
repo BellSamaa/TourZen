@@ -4,6 +4,7 @@
 // (Nâng cấp Form NCC: Thêm icons vào các ô input)
 // (YÊU CẦU MỚI: Thêm thông báo Realtime khi hết hàng - inventory = 0)
 // (YÊU CẦU MỚI v2: Hiển thị SĐT/Địa chỉ của NCC và của Người liên hệ (User) trong bảng)
+// (ĐÃ XÓA LOGIC LIÊN QUAN ĐẾN 'HOTEL')
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -48,7 +49,7 @@ const StatCard = ({ title, value, icon }) => (
 const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
-        name: '', price: 0, description: '', product_type: 'hotel', 
+        name: '', price: 0, description: '', product_type: 'transport', 
         supplier_id: supplierId, approval_status: 'pending', is_published: false,
         inventory: 99, details: {}, tour_code: ''
     });
@@ -66,7 +67,7 @@ const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
         } else { // Nếu là Thêm mới
             setIsNew(true);
             setFormData({
-                name: '', price: 0, description: '', product_type: 'hotel', 
+                name: '', price: 0, description: '', product_type: 'transport', 
                 supplier_id: supplierId, approval_status: 'pending', is_published: false,
                 inventory: 99, details: {}, tour_code: ''
             });
@@ -194,7 +195,6 @@ const EditProductModal = ({ product, onClose, onSaved, supplierId }) => {
                         <div>
                             <label htmlFor="edit-product-type" className="label-style text-lg">Loại Dịch vụ *</label>
                             <select id="edit-product-type" name="product_type" value={formData.product_type} onChange={handleChange} required className="input-style text-lg !text-base" disabled={!isNew}>
-                                <option value="hotel">Hotel (Khách sạn)</option>
                                 <option value="transport">Transport (Vận chuyển)</option>
                                 <option value="flight">Flight (Hàng không)</option>
                             </select>
@@ -314,7 +314,6 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
     
     const ProductIcon = ({ type }) => {
         const iconSize = 24;
-        if (type === 'hotel') return <Buildings size={iconSize} title="Hotel" className="text-green-500" />;
         if (type === 'transport') return <Car size={iconSize} title="Vận chuyển (Transport)" className="text-orange-500" />;
         if (type === 'flight') return <AirplaneTilt size={iconSize} title="Hàng không (Flight)" className="text-purple-500" />;
         return <Package size={iconSize} className="text-blue-500" />;
@@ -336,7 +335,7 @@ const SupplierProductsApproval = ({ supplierId, supplierName }) => {
         <div>
             <div className="flex justify-between items-center mb-4">
                  <h4 className="text-xl font-bold text-sky-700 dark:text-sky-400 flex items-center gap-3">
-                    <GlobeHemisphereEast size={28} /> Dịch vụ (Hotel, Transport, Flight)
+                    <GlobeHemisphereEast size={28} /> Dịch vụ (Transport, Flight)
                  </h4>
                 <button 
                     onClick={() => setEditingProduct({ isNew: true })}
@@ -495,9 +494,6 @@ const ServicesModal = ({ supplier, onClose }) => {
 const getSupplierType = (name) => {
     const lowerName = name.toLowerCase();
     
-    if (lowerName.includes('khách sạn') || lowerName.includes('resort') || lowerName.includes('hotel')) {
-        return { type: 'Hotel', className: 'badge-green' };
-    }
     if (lowerName.includes('hàng không') || lowerName.includes('airline') || lowerName.includes('vietjet')) {
         return { type: 'Airline', className: 'badge-purple' };
     }
@@ -530,8 +526,8 @@ export default function ManageSuppliers() {
     
     const [viewingServicesFor, setViewingServicesFor] = useState(null); 
     
-    // (FIX 2) State MỚI cho thống kê DỊCH VỤ
-    const [productStats, setProductStats] = useState({ hotel: 0, flight: 0, transport: 0 });
+    // (FIX 2) State MỚI cho thống kê DỊCH VỤ (Đã xóa hotel)
+    const [productStats, setProductStats] = useState({ flight: 0, transport: 0 });
 
     const fetchSuppliers = useCallback(async (isInitialLoad = false) => {
         if(!isInitialLoad) setIsFetchingPage(true); 
@@ -588,13 +584,12 @@ export default function ManageSuppliers() {
                 .neq('product_type', 'tour');
             
             if (data) {
-                let hotel = 0, flight = 0, transport = 0;
+                let flight = 0, transport = 0;
                 for (const prod of data) {
-                    if (prod.product_type === 'hotel') hotel++;
-                    else if (prod.product_type === 'flight') flight++;
+                    if (prod.product_type === 'flight') flight++;
                     else if (prod.product_type === 'transport') transport++;
                 }
-                setProductStats({ hotel, flight, transport });
+                setProductStats({ flight, transport });
             }
         }
         fetchProductStats();
@@ -612,7 +607,6 @@ export default function ManageSuppliers() {
         const getProductTypeName = (type) => {
             if (type === 'flight') return 'Chuyến bay';
             if (type === 'transport') return 'Xe';
-            if (type === 'hotel') return 'Phòng khách sạn';
             return 'Dịch vụ';
         };
 
@@ -790,11 +784,6 @@ export default function ManageSuppliers() {
                     title="Tổng nhà cung cấp" 
                     value={suppliers.length} 
                     icon={<Briefcase size={28} weight="duotone"/>}
-                />
-                 <StatCard 
-                    title="Dịch vụ Khách sạn" 
-                    value={productStats.hotel} 
-                    icon={<Buildings size={28} weight="duotone"/>}
                 />
                  <StatCard 
                     title="Dịch vụ Hàng không" 
@@ -1057,7 +1046,6 @@ export default function ManageSuppliers() {
                 .action-button { @apply p-2.5 rounded-xl transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-slate-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-md; }
                 .badge-base { @apply px-3.5 py-1.5 text-base font-bold rounded-full inline-flex items-center gap-2; }
                 .badge-blue { @apply bg-blue-200 text-blue-900 dark:bg-blue-900 dark:text-blue-300; }
-                .badge-green { @apply bg-green-200 text-green-900 dark:bg-green-900 dark:text-green-300; }
                 .badge-purple { @apply bg-purple-200 text-purple-900 dark:bg-purple-900 dark:text-purple-300; }
                 .badge-orange { @apply bg-orange-200 text-orange-900 dark:bg-orange-900 dark:text-orange-300; }
                 .badge-status-active { @apply bg-green-200 text-green-900 dark:bg-green-900/40 dark:text-green-400; }
