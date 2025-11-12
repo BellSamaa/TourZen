@@ -1,9 +1,10 @@
 // File: supabase/functions/admin-update-user/index.ts
-// (PHIÊN BẢN SỬA LỖI - Phân biệt tài khoản "Ảo" và "Auth")
+// (PHIÊN BẢN SỬA LỖI - Sửa SyntaxError: 'btoa' -> 'encode')
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { btoa } from 'https://deno.land/std@0.177.0/encoding/base64.ts'
+// === SỬA LỖI: Import đúng hàm 'encode' ===
+import { encode } from 'https://deno.land/std@0.177.0/encoding/base64.ts'
 
 // DANH SÁCH CÁC TRANG WEB ĐƯỢC PHÉP GỌI
 const allowedOrigins = [
@@ -52,8 +53,7 @@ serve(async (req) => {
       password      // Mật khẩu MỚI (nếu có)
     } = await req.json()
 
-    // 2. === BƯỚC QUAN TRỌNG: KIỂM TRA ROLE GỐC ===
-    // Ta cần biết user này là "ảo" hay "thật"
+    // 2. === KIỂM TRA ROLE GỐC ===
     const { data: existingUser, error: lookupError } = await supabaseAdmin
       .from('Users')
       .select('role') // Chỉ cần lấy role gốc
@@ -83,6 +83,7 @@ serve(async (req) => {
           authUpdateData
         )
         if (authError) {
+          // Lỗi "user not allowed" trước đó là ở đây
           throw new Error(`Lỗi cập nhật Auth: ${authError.message}`)
         }
       }
@@ -91,11 +92,8 @@ serve(async (req) => {
     }
 
     // 4. === XỬ LÝ HỆ THỐNG PROFILE (public.Users) ===
-    // (Luôn luôn chạy cho cả hai loại tài khoản)
-    
     const profileUpdateData: { [key: string]: any } = {}
     
-    // Các trường chung
     if (role !== undefined) profileUpdateData.role = role
     if (is_active !== undefined) profileUpdateData.is_active = is_active
     if (full_name !== undefined) profileUpdateData.full_name = full_name
@@ -103,10 +101,9 @@ serve(async (req) => {
     if (phone_number !== undefined) profileUpdateData.phone_number = phone_number
 
     // === XỬ LÝ MẬT KHẨU CHO USER "ẢO" ===
-    // Nếu đây là user "ảo" (role 'user') VÀ có mật khẩu mới
     if (!isRealAuthUser && password) {
-      // Mã hóa mật khẩu sang Base64 giống như file Login.jsx
-      profileUpdateData.password = btoa(password) 
+      // === SỬA LỖI: Dùng 'encode' thay vì 'btoa' ===
+      profileUpdateData.password = encode(password) 
     }
     
     // Cập nhật bảng public.Users
