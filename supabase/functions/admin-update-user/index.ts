@@ -1,9 +1,8 @@
 // File: supabase/functions/admin-update-user/index.ts
-// (PHIÊN BẢN SỬA LỖI - Sửa SyntaxError: 'btoa' -> 'encode')
+// (PHIÊN BẢN SỬA LỖI - Kiểm tra auth.users thay vì role)
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-// === SỬA LỖI: Import đúng hàm 'encode' ===
 import { encode } from 'https://deno.land/std@0.177.0/encoding/base64.ts'
 
 // DANH SÁCH CÁC TRANG WEB ĐƯỢC PHÉP GỌI
@@ -53,18 +52,21 @@ serve(async (req) => {
       password      // Mật khẩu MỚI (nếu có)
     } = await req.json()
 
-    // 2. === KIỂM TRA ROLE GỐC ===
-    const { data: existingUser, error: lookupError } = await supabaseAdmin
-      .from('Users')
-      .select('role') // Chỉ cần lấy role gốc
-      .eq('id', user_id)
-      .single()
+    // 2. === SỬA LOGIC: KIỂM TRA USER "THẬT" HAY "ẢO" ===
+    // Thử lấy user từ auth.users bằng ID
+    let isRealAuthUser = false;
+    const { data: authUser, error: authUserError } = await supabaseAdmin.auth.admin.getUserById(user_id);
+    
+    if (authUser && authUser.user && !authUserError) {
+        // Tìm thấy user trong auth.users -> Đây là user "thật"
+        isRealAuthUser = true;
+    } else if (authUserError && authUserError.message !== 'User not found') {
+        // Nếu là lỗi khác (không phải 'User not found'), thì đó là lỗi nghiêm trọng
+        throw new Error(`Lỗi kiểm tra Auth: ${authUserError.message}`);
+    }
+    // Nếu authUserError.message == 'User not found', isRealAuthUser vẫn là false (Đây là user "ảo")
+    
 
-    if (lookupError) throw new Error(`Không tìm thấy user: ${lookupError.message}`)
-    
-    const original_role = existingUser.role
-    const isRealAuthUser = (original_role === 'admin' || original_role === 'supplier')
-    
     // 3. === XỬ LÝ HỆ THỐNG AUTH (Nếu là tài khoản "thật") ===
     if (isRealAuthUser) {
       console.log(`Đang cập nhật user "thật" (SupaAuth): ${user_id}`)
@@ -74,6 +76,7 @@ serve(async (req) => {
         authUpdateData.password = password
       }
       if (full_name !== undefined) {
+        // Cập nhật 'full_name' trong 'raw_user_meta_data' của Auth
         authUpdateData.data = { full_name: full_name }
       }
 
@@ -83,7 +86,7 @@ serve(async (req) => {
           authUpdateData
         )
         if (authError) {
-          // Lỗi "user not allowed" trước đó là ở đây
+          // Logic mới này đã ngăn lỗi "User not found" ở đây
           throw new Error(`Lỗi cập nhật Auth: ${authError.message}`)
         }
       }
@@ -92,6 +95,7 @@ serve(async (req) => {
     }
 
     // 4. === XỬ LÝ HỆ THỐNG PROFILE (public.Users) ===
+    // (Luôn luôn chạy cho cả hai loại tài khoản)
     const profileUpdateData: { [key: string]: any } = {}
     
     if (role !== undefined) profileUpdateData.role = role
@@ -102,7 +106,6 @@ serve(async (req) => {
 
     // === XỬ LÝ MẬT KHẨU CHO USER "ẢO" ===
     if (!isRealAuthUser && password) {
-      // === SỬA LỖI: Dùng 'encode' thay vì 'btoa' ===
       profileUpdateData.password = encode(password) 
     }
     
