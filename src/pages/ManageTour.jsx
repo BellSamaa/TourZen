@@ -12,6 +12,7 @@
 // 1. Thay thế 'Child' (không tồn tại) bằng 'Person'
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
+import Select from 'react-select';
 import { Link } from 'react-router-dom';
 import { getSupabase } from "../lib/supabaseClient";
 import toast from 'react-hot-toast';
@@ -767,6 +768,103 @@ const ViewReviewModal = ({ review, onClose }) => {
 
 
 // --- (*** CẬP NHẬT V30) Component Modal Thêm Đơn Hàng ---
+// (*** THÊM MỚI ***)
+// Helper: Tạo style tùy chỉnh cho react-select để khớp với theme (dark/light)
+// Chúng ta cần dùng !important để ghi đè style mặc định của thư viện
+const customReactSelectStyles = {
+    control: (provided, state) => ({
+        ...provided,
+        backgroundColor: 'var(--tw-bg-neutral-700) !important', // dark:bg-neutral-700
+        borderColor: 'var(--tw-border-neutral-600) !important', // dark:border-neutral-600
+        borderRadius: '0.375rem', // rounded-md
+        padding: '2px', // Tương đương p-2 của input-style
+        minHeight: '42px', // Đảm bảo chiều cao
+        boxShadow: state.isFocused ? '0 0 0 1px var(--tw-ring-sky-500)' : 'none',
+        '&:hover': {
+            borderColor: state.isFocused ? 'var(--tw-ring-sky-500)' : 'var(--tw-border-neutral-600) !important',
+        },
+    }),
+    valueContainer: (provided) => ({
+        ...provided,
+        padding: '0 6px',
+    }),
+    singleValue: (provided) => ({
+        ...provided,
+        color: 'white !important', // dark:text-white
+    }),
+    placeholder: (provided) => ({
+        ...provided,
+        color: '#a3a3a3 !important', // Tương đương text-neutral-400
+    }),
+    menu: (provided) => ({
+        ...provided,
+        backgroundColor: 'var(--tw-bg-neutral-800) !important', // dark:bg-neutral-800
+        border: '1px solid var(--tw-border-neutral-600) !important',
+    }),
+    option: (provided, state) => ({
+        ...provided,
+        backgroundColor: state.isSelected
+            ? 'var(--tw-bg-sky-600) !important'
+            : state.isFocused
+            ? 'var(--tw-bg-neutral-700) !important'
+            : 'transparent',
+        color: 'white !important',
+        '&:active': {
+            backgroundColor: 'var(--tw-bg-neutral-600) !important',
+        },
+    }),
+    input: (provided) => ({
+        ...provided,
+        color: 'white !important', // Màu chữ khi gõ
+    }),
+    indicatorSeparator: () => ({
+        display: 'none', // Bỏ gạch ngăn
+    }),
+    dropdownIndicator: (provided) => ({
+        ...provided,
+        color: '#a3a3a3 !important', // Màu icon dropdown
+        '&:hover': {
+            color: 'white !important',
+        },
+    }),
+    clearIndicator: (provided) => ({
+        ...provided,
+        color: '#a3a3a3 !important',
+        '&:hover': {
+            color: 'white !important',
+        },
+    }),
+};
+
+// Hàm lấy style dựa trên theme
+const getSelectStyles = () => {
+    // Giả sử bạn có class 'dark' trên <html>
+    const isDarkMode = document.documentElement.classList.contains('dark');
+    
+    if (isDarkMode) {
+        return customReactSelectStyles;
+    }
+    
+    // Style cho Light Mode (tương tự input-style)
+    return {
+        control: (provided, state) => ({
+            ...provided,
+            borderColor: state.isFocused ? '#0ea5e9' : '#d1d5db', // focus:border-sky-500, border-gray-300
+            borderRadius: '0.375rem',
+            padding: '2px',
+            minHeight: '42px',
+            boxShadow: state.isFocused ? '0 0 0 1px #0ea5e9' : 'none',
+            '&:hover': {
+                 borderColor: state.isFocused ? '#0ea5e9' : '#d1d5db',
+            }
+        }),
+        menu: (provided) => ({
+            ...provided,
+            zIndex: 50 // Đảm bảo menu nằm trên
+        }),
+        // các style khác giữ mặc định của thư viện cho light mode là ổn
+    };
+};
 const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
     // (MỚI) Thêm state cho dịch vụ
     const [formData, setFormData] = useState({ 
@@ -780,6 +878,23 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
     const [departures, setDepartures] = useState([]);
     const [loadingDepartures, setLoadingDepartures] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    // (MỚI) State cho style của react-select
+    const [selectStyles, setSelectStyles] = useState(getSelectStyles());
+    
+    // (MỚI) Lắng nghe thay đổi theme
+    useEffect(() => {
+        const observer = new MutationObserver(() => {
+            setSelectStyles(getSelectStyles());
+        });
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        
+        // Cập nhật style khi mount
+        setSelectStyles(getSelectStyles());
+        
+        return () => observer.disconnect();
+    }, []);
+
 
     useEffect(() => {
         if (!formData.product_id) { setDepartures([]); setFormData(prev => ({ ...prev, departure_id: '' })); return; }
@@ -797,12 +912,30 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
         const { name, value, type } = e.target;
         setFormData(prev => ({ ...prev, [name]: type === 'number' ? parseInt(value, 10) || 0 : value }));
     };
+    
+    // (*** THÊM MỚI: Handler cho react-select ***)
+    const handleUserChange = (selectedOption) => {
+        setFormData(prev => ({ ...prev, user_id: selectedOption ? selectedOption.value : '' }));
+    };
+    
+    const handleTourChange = (selectedOption) => {
+        setFormData(prev => ({ 
+            ...prev, 
+            product_id: selectedOption ? selectedOption.value : '',
+            departure_id: '' // Reset ngày đi khi đổi tour
+        }));
+    };
+    
+    const handleDepartureChange = (selectedOption) => {
+        setFormData(prev => ({ ...prev, departure_id: selectedOption ? selectedOption.value : '' }));
+    };
+    // (*** HẾT THÊM MỚI ***)
 
     const selectedDeparture = useMemo(() => { return departures.find(d => d.id === formData.departure_id); }, [formData.departure_id, departures]);
     const currentGuests = (formData.num_adult || 0) + (formData.num_child || 0) + (formData.num_elder || 0) + (formData.num_infant || 0);
     const remainingSlots = selectedDeparture ? (selectedDeparture.max_slots || 0) - (selectedDeparture.booked_slots || 0) : 0;
 
-    // (*** THÊM v30) Logic tự động tính tiền (Giống Payment.jsx) ***
+    // (*** THÊM v30) Logic tự động tính tiền (Giữ nguyên) ***
     const calculatedTotal = useMemo(() => {
         let tourSub = 0;
         let serviceSub = 0;
@@ -844,9 +977,8 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
     useEffect(() => {
         setFormData(prev => ({ ...prev, total_price: calculatedTotal }));
     }, [calculatedTotal]);
-    // (*** HẾT THÊM v30 ***)
-
-    // (*** CẬP NHẬT V30) Logic handleSubmit
+    
+    // (*** CẬP NHẬT V30) Logic handleSubmit (Giữ nguyên)
     const handleSubmit = async (e) => {
         e.preventDefault();
         // --- (SỬA v30) Validations ---
@@ -961,7 +1093,35 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
             setIsSubmitting(false);
         }
     };
-    // (*** HẾT CẬP NHẬT handleSubmit ***)
+    
+    // (*** THÊM MỚI: Chuẩn bị options cho react-select ***)
+    const userOptions = useMemo(() => 
+        users.map(u => ({
+            value: u.id,
+            label: `${u.full_name || ''} (${u.email || 'N/A'})`
+        })), [users]);
+
+    const tourOptions = useMemo(() =>
+        tours.map(t => ({
+            value: t.id,
+            label: t.name
+        })), [tours]);
+        
+    const departureOptions = useMemo(() =>
+        departures.map(d => {
+            const remaining = (d.max_slots || 0) - (d.booked_slots || 0);
+            return {
+                value: d.id,
+                label: `${d.departure_date} (Còn ${remaining} chỗ)`,
+                isDisabled: remaining <= 0
+            };
+        }), [departures]);
+        
+    // (*** THÊM MỚI: Lấy giá trị object đầy đủ cho react-select ***)
+    const selectedUser = userOptions.find(u => u.value === formData.user_id) || null;
+    const selectedTour = tourOptions.find(t => t.value === formData.product_id) || null;
+    const selectedDepartureOption = departureOptions.find(d => d.value === formData.departure_id) || null;
+
 
     return (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4" onClick={onClose} >
@@ -970,36 +1130,62 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
                     <h3 className="text-xl font-semibold text-slate-800 dark:text-white">Tạo Đơn Hàng Mới (Admin)</h3>
                     <button onClick={onClose} className="text-gray-400 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"> <X size={22} weight="bold" /> </button>
                 </div>
+                
+                {/* (*** BẮT ĐẦU SỬA FORM ***) */}
                 <form id="add-booking-form" onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 simple-scrollbar">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="label-modal font-semibold" htmlFor="user_id">Khách hàng *</label>
-                            <select id="user_id" name="user_id" value={formData.user_id} onChange={handleChange} className="input-style w-full mt-1" required>
-                                <option value="" disabled>-- Chọn User --</option>
-                                {users.map(u => <option key={u.id} value={u.id}>{u.full_name || u.email}</option>)}
-                            </select>
+                            {/* (*** SỬA 1 ***) */}
+                            <Select
+                                id="user_id"
+                                name="user_id"
+                                options={userOptions}
+                                value={selectedUser}
+                                onChange={handleUserChange}
+                                placeholder="-- Gõ để tìm User --"
+                                isClearable
+                                styles={selectStyles} // Áp dụng style
+                                className="mt-1"
+                            />
                         </div>
                         <div>
                             <label className="label-modal font-semibold" htmlFor="product_id">Tour *</label>
-                            <select id="product_id" name="product_id" value={formData.product_id} onChange={handleChange} className="input-style w-full mt-1" required>
-                                <option value="" disabled>-- Chọn Tour --</option>
-                                {tours.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                            </select>
+                             {/* (*** SỬA 2 ***) */}
+                            <Select
+                                id="product_id"
+                                name="product_id"
+                                options={tourOptions}
+                                value={selectedTour}
+                                onChange={handleTourChange}
+                                placeholder="-- Gõ để tìm Tour --"
+                                isClearable
+                                styles={selectStyles} // Áp dụng style
+                                className="mt-1"
+                            />
                         </div>
                     </div>
                     <div>
                         <label className="label-modal font-semibold" htmlFor="departure_id">Ngày khởi hành *</label>
-                        <select id="departure_id" name="departure_id" value={formData.departure_id} onChange={handleChange} className="input-style w-full mt-1" required disabled={loadingDepartures || departures.length === 0}>
-                            <option value="" disabled>-- {loadingDepartures ? "Đang tải lịch..." : (formData.product_id ? "Chọn ngày đi" : "Vui lòng chọn tour trước")} --</option>
-                            {departures.map(d => {
-                                const remaining = (d.max_slots || 0) - (d.booked_slots || 0);
-                                return <option key={d.id} value={d.id} disabled={remaining <= 0}> {d.departure_date} (Còn {remaining} chỗ) </option>
-                            })}
-                        </select>
+                         {/* (*** SỬA 3 ***) */}
+                        <Select
+                            id="departure_id"
+                            name="departure_id"
+                            options={departureOptions}
+                            value={selectedDepartureOption}
+                            onChange={handleDepartureChange}
+                            placeholder={loadingDepartures ? "Đang tải lịch..." : (formData.product_id ? "Gõ để tìm ngày đi" : "Vui lòng chọn tour trước")}
+                            isDisabled={loadingDepartures || !formData.product_id}
+                            isClearable
+                            styles={selectStyles} // Áp dụng style
+                            className="mt-1"
+                        />
                          {selectedDeparture && currentGuests > remainingSlots && <p className="text-xs text-red-500 mt-1">Số lượng khách ({currentGuests}) vượt quá số chỗ còn lại ({remainingSlots})!</p>}
                     </div>
                     
-                    {/* (MỚI V29-SỬA) Dịch vụ kèm theo */}
+                    {/* (*** HẾT SỬA FORM ***) */}
+                    
+                    {/* (MỚI V29-SỬA) Dịch vụ kèm theo (Giữ nguyên) */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t dark:border-slate-700">
                         <div>
                             <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="hotel_product_id_add"><Buildings size={16}/> Khách sạn:</label>
@@ -1039,6 +1225,7 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
                         </div>
                     </div>
 
+                    {/* (Các phần còn lại giữ nguyên) */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t dark:border-slate-700">
                         <div>
                             <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="num_adult"><FaUser size={14}/> Người lớn *</label>
@@ -1059,7 +1246,6 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-2 gap-4 pt-3 border-t dark:border-slate-700">
                         
-                        {/* (*** SỬA v30) Đổi Total Price thành ReadOnly *** */}
                         <div>
                             <label className="label-modal font-semibold" htmlFor="total_price">Tổng tiền (Tự động tính)</label>
                             <input 
@@ -1071,7 +1257,6 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
                                 className="input-style w-full mt-1 !text-lg !font-bold !text-red-600 bg-gray-100 dark:bg-neutral-800"
                             />
                         </div>
-                        {/* (*** HẾT SỬA v30 ***) */}
 
                         <div>
                             <label className="label-modal font-semibold" htmlFor="status">Trạng thái ban đầu *</label>
@@ -1095,6 +1280,13 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
                 </div>
             </motion.div>
              <style jsx>{`
+                 /* (Thêm style cho react-select) */
+                 /* Do react-select tạo ra các class-name động, 
+                  chúng ta phải dùng :global() để style chúng.
+                  Tuy nhiên, cách tốt nhất là dùng prop 'styles' như tôi đã làm ở trên.
+                  Nếu dùng 'styles', chúng ta không cần thêm CSS ở đây.
+                 */
+                 
                  .label-modal { @apply font-medium text-gray-500 dark:text-gray-400 block text-xs uppercase tracking-wider mb-0.5; }
                  .input-style { @apply border border-gray-300 p-2 rounded-md w-full dark:bg-neutral-700 dark:border-neutral-600 dark:text-white focus:ring-sky-500 focus:border-sky-500 transition-colors duration-200 text-sm; }
                  .modal-button-secondary { @apply px-5 py-2 bg-neutral-200 dark:bg-neutral-600 rounded-md font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-500 text-sm disabled:opacity-50 transition-colors; }
@@ -1104,6 +1296,15 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
                  .simple-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
                  .dark .simple-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
                  
+                 /* (MỚI) Định nghĩa biến CSS cho style dark mode của react-select */
+                 :global(html.dark) {
+                    --tw-bg-neutral-700: #3f3f46;
+                    --tw-bg-neutral-800: #262626;
+                    --tw-bg-neutral-600: #52525b;
+                    --tw-border-neutral-600: #52525b;
+                    --tw-ring-sky-500: #0ea5e9;
+                    --tw-bg-sky-600: #0284c7;
+                 }
             `}</style>
         </motion.div>
     );
