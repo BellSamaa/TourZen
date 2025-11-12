@@ -1,40 +1,19 @@
 // src/pages/BookingHistory.jsx
-// (SỬA LỖI: Thay thế `supabase.auth.getUser()` bằng `useAuth()` để hỗ trợ "Tài khoản ảo")
-// (SỬA LỖI v2: Tự động UPSERT user "ảo" vào bảng Users khi đánh giá)
-// (SỬA v3: (YÊU CẦU) Hiển thị chi tiết thanh toán trực tiếp giống PaymentSuccess)
-// (*** GEMINI SỬA v4: Hiển thị Dịch vụ (Xe/Bay) & Thêm nút Hủy cho thanh toán 'direct' ***)
-// (*** GEMINI SỬA v5: Fix lỗi build "Expected ; but found _" ***)
+// ...
+// (*** GEMINI SỬA v6: Thử sử dụng path alias '@/' để fix lỗi build ***)
 
 import React, { useState, useEffect, useCallback } from "react";
-import { getSupabase } from "lib/supabaseClient"; // <<< SỬA LỖI BUILD: Bỏ ../
-import { useAuth } from "context/AuthContext"; // <<< SỬA LỖI BUILD: Bỏ ../
+import { getSupabase } from "@/lib/supabaseClient"; // <<< SỬA LỖI BUILD: Thử dùng alias @/
+import { useAuth } from "@/context/AuthContext"; // <<< SỬA LỖI BUILD: Thử dùng alias @/
 // <<< SỬA v3: Thêm FaCalendarCheck >>>
-// --- (SỬA LỖI BUILD: Vô hiệu hóa import, dùng stub bên dưới) ---
-// import { FaSpinner, FaBoxOpen, FaStar, FaRegStar, FaMoneyBillWave, FaClock, FaMapMarkerAlt, FaCalendarCheck } from "react-icons/fa";
+import { FaSpinner, FaBoxOpen, FaStar, FaRegStar, FaMoneyBillWave, FaClock, FaMapMarkerAlt, FaCalendarCheck } from "react-icons/fa"; // <<< KHÔI PHỤC ICON
 // <<< SỬA v4: Thêm icons Dịch vụ và Hủy >>>
-// import { CircleNotch, Buildings, Car, AirplaneTilt, XCircle } from "phosphor-react";
+import { CircleNotch, Buildings, Car, AirplaneTilt, XCircle } from "phosphor-react"; // <<< KHÔI PHỤC ICON
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 
-// --- (THÊM MỚI: STUB ICONS ĐỂ FIX LỖI BUILD) ---
-// Thay thế react-icons/fa
-const FaSpinner = ({ className }) => <span role="img" aria-label="loading" className={className}>...</span>;
-const FaBoxOpen = (props) => <span role="img" aria-label="box" {...props}>📦</span>;
-const FaStar = (props) => <span role="img" aria-label="star" {...props}>⭐</span>;
-const FaRegStar = (props) => <span role="img" aria-label="star-outline" {...props}>☆</span>;
-const FaMoneyBillWave = (props) => <span role="img" aria-label="money" {...props}>💸</span>;
-const FaClock = (props) => <span role="img" aria-label="clock" {...props}>⏰</span>;
-const FaMapMarkerAlt = (props) => <span role="img" aria-label="map-pin" {...props}>📍</span>;
-const FaCalendarCheck = (props) => <span role="img" aria-label="calendar" {...props}>📅</span>;
-
-// Thay thế phosphor-react
-const CircleNotch = ({ className, ...props }) => <span role="img" aria-label="loading" className={className} {...props}>...</span>;
-const Buildings = (props) => <span role="img" aria-label="buildings" {...props}>🏢</span>;
-const Car = (props) => <span role="img" aria-label="car" {...props}>🚗</span>;
-const AirplaneTilt = (props) => <span role="img" aria-label="airplane" {...props}>✈️</span>;
-const XCircle = (props) => <span role="img" aria-label="cancel" {...props}>ⓧ</span>;
-// --- KẾT THÚC STUB ---
+// --- (XÓA STUB ICONS) ---
 
 const supabase = getSupabase();
 
