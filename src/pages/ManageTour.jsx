@@ -10,6 +10,7 @@
 // 6. [ManageTour] Cập nhật fetchTours (lấy giá) và handleSaveDetails (logic slot).
 // (*** GEMINI SỬA v30.1 - FIX BUILD ERROR ***)
 // 1. Thay thế 'Child' (không tồn tại) bằng 'Person'
+// (*** GEMINI SỬA v32 - XÓA KHÁCH SẠN ***)
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import Select from 'react-select';
@@ -20,7 +21,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
     Package, CaretLeft, CaretRight, CircleNotch, X, MagnifyingGlass, Funnel, List, ArrowClockwise,
     User, CalendarBlank, UsersThree, Tag, Wallet, CheckCircle, XCircle, Clock, Info, PencilSimple, Trash, Plus, WarningCircle, Envelope,
-    Buildings, AirplaneTilt, Car, Ticket as VoucherIcon, Bank, Image as ImageIcon, FloppyDisk,
+    /* (XÓA V32) Buildings, */ AirplaneTilt, Car, Ticket as VoucherIcon, Bank, Image as ImageIcon, FloppyDisk,
     Receipt, // Icon Hóa đơn
     Star, // Icon Sao
     ChatCircleDots, // Icon Bình luận
@@ -358,6 +359,7 @@ const FavoriteTourStats = () => {
 // --- (*** CẬP NHẬT V31: EditModal Tự động tính tiền & Read-only) ---
 // --- (*** CẬP NHẬT V31: EditModal Tự động tính tiền & Read-only) ---
 // (*** CẬP NHẬT THEO YÊU CẦU: Khóa chỉnh sửa/hủy đơn QR ***)
+// (*** CẬP NHẬT V32: XÓA KHÁCH SẠN ***)
 const EditBookingModal = ({ 
     booking, 
     onClose, 
@@ -365,7 +367,7 @@ const EditBookingModal = ({
     onSaveDetails,
     allUsers,
     allTours,
-    allServices // { hotels: [], transport: [], flights: [] }
+    allServices // { transport: [], flights: [] } (XÓA V32)
 }) => {
     if (!booking) return null;
 
@@ -380,7 +382,7 @@ const EditBookingModal = ({
         num_child: booking.num_child || 0,
         num_elder: booking.num_elder || 0,
         num_infant: booking.num_infant || 0,
-        hotel_product_id: booking.hotel?.id || '',
+        // (XÓA V32) hotel_product_id: booking.hotel?.id || '',
         transport_product_id: booking.transport?.id || '',
         flight_product_id: booking.flight?.id || '',
         voucher_code: booking.voucher_code || '',
@@ -401,7 +403,7 @@ const EditBookingModal = ({
             num_child: booking.num_child || 0,
             num_elder: booking.num_elder || 0,
             num_infant: booking.num_infant || 0,
-            hotel_product_id: booking.hotel?.id || '',
+            // (XÓA V32) hotel_product_id: booking.hotel?.id || '',
             transport_product_id: booking.transport?.id || '',
             flight_product_id: booking.flight?.id || '',
             voucher_code: booking.voucher_code || '',
@@ -462,6 +464,7 @@ const EditBookingModal = ({
     }, [selectedDeparture, booking, formData.product_id]);
 
     // (*** MỚI V31: Logic TỰ ĐỘNG TÍNH TIỀN ***)
+    // (*** CẬP NHẬT V32: XÓA KHÁCH SẠN ***)
     const calculatedTotal = useMemo(() => {
         let tourSub = 0;
         let serviceSub = 0;
@@ -477,8 +480,8 @@ const EditBookingModal = ({
         }
 
         // 2. Tính tiền Dịch vụ
-        const hotel = allServices.hotels.find(s => s.id === formData.hotel_product_id);
-        if (hotel) serviceSub += (hotel.price || 0);
+        // (XÓA V32) const hotel = allServices.hotels.find(s => s.id === formData.hotel_product_id);
+        // (XÓA V32) if (hotel) serviceSub += (hotel.price || 0);
         const transport = allServices.transport.find(s => s.id === formData.transport_product_id);
         if (transport) serviceSub += (transport.price || 0);
         const flight = allServices.flights.find(s => s.id === formData.flight_product_id);
@@ -487,7 +490,7 @@ const EditBookingModal = ({
         return tourSub + serviceSub;
     }, [
         formData.product_id, formData.num_adult, formData.num_child, formData.num_elder, formData.num_infant,
-        formData.hotel_product_id, formData.transport_product_id, formData.flight_product_id,
+        /* (XÓA V32) formData.hotel_product_id, */ formData.transport_product_id, formData.flight_product_id,
         allTours, allServices
     ]);
 
@@ -601,15 +604,9 @@ const EditBookingModal = ({
                         </div>
                     </div>
 
+                    {/* (*** CẬP NHẬT V32: XÓA KHÁCH SẠN ***) */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-4 border-t dark:border-slate-700">
-                        <div>
-                            <label className="label-modal font-semibold flex items-center gap-1.5"><Buildings size={18}/> Khách sạn:</label>
-                            {/* (*** SỬA: Thêm disabled={isQrLocked} ***) */}
-                            <select name="hotel_product_id" value={formData.hotel_product_id} onChange={handleChange} className="input-style w-full mt-1" disabled={isQrLocked}>
-                                <option value="">Không chọn</option>
-                                {allServices.hotels.map(s => <option key={s.id} value={s.id} disabled={s.inventory <= 0}>{s.name} ({formatCurrency(s.price)}){s.inventory <= 0 ? ' (Hết hàng)' : ''}</option>)}
-                            </select>
-                        </div>
+                        {/* (XÓA V32) Khối Khách sạn */}
                         <div>
                             <label className="label-modal font-semibold flex items-center gap-1.5"><Car size={18}/> Vận chuyển:</label>
                             {/* (*** SỬA: Thêm disabled={isQrLocked} ***) */}
@@ -802,6 +799,7 @@ const ViewReviewModal = ({ review, onClose }) => {
 
 
 // --- (*** CẬP NHẬT V30) Component Modal Thêm Đơn Hàng ---
+// (*** CẬP NHẬT V32: XÓA KHÁCH SẠN ***)
 // (*** THÊM MỚI ***)
 // Helper: Tạo style tùy chỉnh cho react-select để khớp với theme (dark/light)
 // Chúng ta cần dùng !important để ghi đè style mặc định của thư viện
@@ -905,7 +903,7 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
         user_id: '', product_id: '', departure_id: '', 
         num_adult: 1, num_child: 0, num_elder: 0, num_infant: 0, 
         total_price: 0, status: 'pending', notes: '',
-        hotel_product_id: '', // (MỚI)
+        // (XÓA V32) hotel_product_id: '', // (MỚI)
         transport_product_id: '', // (MỚI)
         flight_product_id: '' // (MỚI)
     });
@@ -970,6 +968,7 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
     const remainingSlots = selectedDeparture ? (selectedDeparture.max_slots || 0) - (selectedDeparture.booked_slots || 0) : 0;
 
     // (*** THÊM v30) Logic tự động tính tiền (Giữ nguyên) ***
+    // (*** CẬP NHẬT V32: XÓA KHÁCH SẠN ***)
     const calculatedTotal = useMemo(() => {
         let tourSub = 0;
         let serviceSub = 0;
@@ -988,8 +987,8 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
         }
 
         // 2. Tính tiền Dịch vụ
-        const hotel = allServices.hotels.find(s => s.id === formData.hotel_product_id);
-        if (hotel) serviceSub += (hotel.price || 0);
+        // (XÓA V32) const hotel = allServices.hotels.find(s => s.id === formData.hotel_product_id);
+        // (XÓA V32) if (hotel) serviceSub += (hotel.price || 0);
         
         const transport = allServices.transport.find(s => s.id === formData.transport_product_id);
         if (transport) serviceSub += (transport.price || 0);
@@ -1003,7 +1002,7 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
         return tourSub + serviceSub;
     }, [
         formData.product_id, formData.num_adult, formData.num_child, formData.num_elder, formData.num_infant,
-        formData.hotel_product_id, formData.transport_product_id, formData.flight_product_id,
+        /* (XÓA V32) formData.hotel_product_id, */ formData.transport_product_id, formData.flight_product_id,
         tours, allServices, currentGuests
     ]);
 
@@ -1013,6 +1012,7 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
     }, [calculatedTotal]);
     
     // (*** CẬP NHẬT V30) Logic handleSubmit (Giữ nguyên)
+    // (*** CẬP NHẬT V32: XÓA KHÁCH SẠN ***)
     const handleSubmit = async (e) => {
         e.preventDefault();
         // --- (SỬA v30) Validations ---
@@ -1029,7 +1029,7 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
         setIsSubmitting(true);
         
         let tourSlotBooked = false;
-        let servicesBooked = { hotel: false, transport: false, flight: false };
+        let servicesBooked = { /* (XÓA V32) hotel: false, */ transport: false, flight: false };
         const guestCount = currentGuests; // Lấy số khách
 
         try {
@@ -1046,9 +1046,7 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
             // 2. Giữ chỗ Dịch vụ (Chỉ giữ nếu status là 'confirmed')
             if (formData.status === 'confirmed') {
                 const servicePromises = [];
-                if (formData.hotel_product_id) {
-                    servicePromises.push(supabase.rpc('book_service_slot', { product_id_input: formData.hotel_product_id, quantity_input: 1 }).then(res => ({ ...res, type: 'hotel' })));
-                }
+                // (XÓA V32) if (formData.hotel_product_id) { ... }
                 if (formData.transport_product_id) {
                     servicePromises.push(supabase.rpc('book_service_slot', { product_id_input: formData.transport_product_id, quantity_input: 1 }).then(res => ({ ...res, type: 'transport' })));
                 }
@@ -1086,7 +1084,7 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
                 payment_method: 'direct', // Mặc định
                 
                 // (MỚI) Thêm dịch vụ
-                hotel_product_id: formData.hotel_product_id || null,
+                // (XÓA V32) hotel_product_id: formData.hotel_product_id || null,
                 transport_product_id: formData.transport_product_id || null,
                 flight_product_id: formData.flight_product_id || null,
             };
@@ -1105,6 +1103,7 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
             toast.error(`Lỗi: ${err.message}`);
 
             // (MỚI) ROLLBACK LOGIC
+            // (*** CẬP NHẬT V32: XÓA KHÁCH SẠN ***)
             if (formData.status === 'confirmed') {
                 toast.warn("Đang thử hoàn lại chỗ...");
                 // Rollback tour slot
@@ -1112,9 +1111,7 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
                     await supabase.rpc('book_tour_slot', { departure_id_input: formData.departure_id, guest_count_input: -guestCount });
                 }
                 // Rollback service slots
-                if (servicesBooked.hotel) {
-                    await supabase.rpc('book_service_slot', { product_id_input: formData.hotel_product_id, quantity_input: -1 });
-                }
+                // (XÓA V32) if (servicesBooked.hotel) { ... }
                 if (servicesBooked.transport) {
                     await supabase.rpc('book_service_slot', { product_id_input: formData.transport_product_id, quantity_input: -1 });
                 }
@@ -1220,19 +1217,9 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
                     {/* (*** HẾT SỬA FORM ***) */}
                     
                     {/* (MỚI V29-SỬA) Dịch vụ kèm theo (Giữ nguyên) */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t dark:border-slate-700">
-                        <div>
-                            <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="hotel_product_id_add"><Buildings size={16}/> Khách sạn:</label>
-                            <select id="hotel_product_id_add" name="hotel_product_id" value={formData.hotel_product_id} onChange={handleChange} className="input-style w-full mt-1">
-                                <option value="">Không chọn</option>
-                                {allServices.hotels.map(s => 
-                                    <option key={s.id} value={s.id} disabled={s.inventory <= 0}>
-                                        {s.name} ({formatCurrency(s.price)})
-                                        {s.inventory <= 0 ? ' (Hết hàng)' : ` (Còn ${s.inventory})`}
-                                    </option>
-                                )}
-                            </select>
-                        </div>
+                    {/* (*** CẬP NHẬT V32: XÓA KHÁCH SẠN ***) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t dark:border-slate-700">
+                        {/* (XÓA V32) Khối Khách sạn */}
                         <div>
                             <label className="label-modal font-semibold flex items-center gap-1.5" htmlFor="transport_product_id_add"><Car size={16}/> Vận chuyển:</label>
                             <select id="transport_product_id_add" name="transport_product_id" value={formData.transport_product_id} onChange={handleChange} className="input-style w-full mt-1">
@@ -1347,6 +1334,7 @@ const AddBookingModal = ({ users, tours, allServices, onClose, onSuccess }) => {
 
 
 // --- Component chính: Quản lý Đặt Tour ---
+// (*** CẬP NHẬT V32: XÓA KHÁCH SẠN ***)
 export default function ManageTour() {
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -1369,7 +1357,7 @@ export default function ManageTour() {
     const [showAddModal, setShowAddModal] = useState(false);
     const [allUsers, setAllUsers] = useState([]);
     const [allTours, setAllTours] = useState([]);
-    const [allServices, setAllServices] = useState({ hotels: [], transport: [], flights: [] });
+    const [allServices, setAllServices] = useState({ /* (XÓA V32) hotels: [], */ transport: [], flights: [] });
     const [loadingAddData, setLoadingAddData] = useState(false);
     
     // (V8) State cho Modal Hóa đơn
@@ -1380,6 +1368,7 @@ export default function ManageTour() {
 
     
     // (*** CẬP NHẬT V29: Sử dụng logic Subquery (Snippet 2) do người dùng cung cấp ***)
+    // (*** CẬP NHẬT V32: XÓA KHÁCH SẠN ***)
 const fetchBookings = useCallback(async (isInitialLoad = false) => {
   if (!isInitialLoad) setIsFetchingPage(true);
   else setLoading(true);
@@ -1394,7 +1383,7 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
       num_adult,num_child,num_elder,num_infant,departure_id,
       user:user_id(id,full_name,email),
       product:product_id(id,name,image_url),
-      hotel:hotel_product_id(id,name),
+      /* (XÓA V32) hotel:hotel_product_id(id,name), */
       transport:Products!Bookings_transport_product_id_fkey(id,name,price,product_type,details),
       flight:flight_product_id(id,name,price,product_type,details),
       voucher_code,voucher_discount,notes,payment_method,
@@ -1451,6 +1440,7 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
     
 
     // (*** CẬP NHẬT V30) useEffect để fetch Users, Tours (với giá) & Services
+    // (*** CẬP NHẬT V32: XÓA KHÁCH SẠN ***)
     useEffect(() => {
         const fetchAddModalData = async () => {
             setLoadingAddData(true);
@@ -1477,12 +1467,12 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
                 const { data: servicesData, error: servicesError } = await supabase
                     .from('Products')
                     .select('id, name, price, product_type, details, inventory')
-                    .in('product_type', ['hotel', 'transport', 'flight']) 
+                    .in('product_type', [/* (XÓA V32) 'hotel', */ 'transport', 'flight']) 
                     .eq('approval_status', 'approved')
                     .eq('is_published', true);
                 if (servicesError) throw servicesError;
                 setAllServices({
-                    hotels: servicesData.filter(s => s.product_type === 'hotel'),
+                    // (XÓA V32) hotels: servicesData.filter(s => s.product_type === 'hotel'),
                     transport: servicesData.filter(s => s.product_type === 'transport'),
                     flights: servicesData.filter(s => s.product_type === 'flight')
                 });
@@ -1611,6 +1601,7 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
     };
     
     // (*** CẬP NHẬT V30) Handler để lưu chỉnh sửa chi tiết (logic slot) ***
+    // (*** CẬP NHẬT V32: XÓA KHÁCH SẠN ***)
     const handleSaveDetails = async (booking, updatedData) => {
         setIsFetchingPage(true);
         
@@ -1656,7 +1647,7 @@ const fetchBookings = useCallback(async (isInitialLoad = false) => {
              const dataToUpdate = {
                 // user_id: updatedData.user_id, // (XÓA) Không cho sửa user
                 product_id: updatedData.product_id,
-                hotel_product_id: updatedData.hotel_product_id || null,
+                // (XÓA V32) hotel_product_id: updatedData.hotel_product_id || null,
                 transport_product_id: updatedData.transport_product_id || null,
                 flight_product_id: updatedData.flight_product_id || null,
                 voucher_code: updatedData.voucher_code || null,
