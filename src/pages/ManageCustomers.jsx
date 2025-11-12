@@ -894,10 +894,22 @@ export default function ManageCustomersSupabase() {
     const insertData = { ...formData, role: 'user' };
     try {
       const { error } = await supabase.from("Users").insert([insertData]); 
+      
+      // (*** GEMINI SỬA: Phân biệt lỗi Email và SĐT ***)
       if (error) {
-        if (error.code === '23505') { throw new Error("Email này đã tồn tại trong hệ thống."); }
+        // Mã '23505' là mã chung cho 'unique_violation'
+        if (error.code === '23505' || error.message.includes('unique constraint')) { 
+            if (error.message.includes('"Users_email_key"')) {
+                throw new Error("Email này đã tồn tại trong hệ thống.");
+            }
+            if (error.message.includes('"Users_phone_number_key"')) {
+                throw new Error("Số điện thoại này đã tồn tại trong hệ thống.");
+            }
+        }
+        // (*** KẾT THÚC SỬA ***)
         throw error;
       }
+
       toast.success("Thêm khách hàng mới thành công!");
       setIsAddingCustomer(false);
       fetchCustomers();

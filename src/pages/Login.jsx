@@ -97,6 +97,13 @@ export default function Login() {
                     if (insertError.message.includes('unique constraint "Users_email_key"')) {
                          throw new Error("Email đã được sử dụng. Vui lòng dùng email khác.");
                     }
+                    // (*** GEMINI THÊM MỚI: Bắt lỗi SĐT trùng lặp ***)
+                    // Tên 'Users_phone_number_key' phải khớp với tên constraint bạn tạo ở Bước 1
+                    else if (insertError.message.includes('unique constraint "Users_phone_number_key"')) {
+                         throw new Error("Số điện thoại đã được sử dụng. Vui lòng dùng SĐT khác.");
+                    }
+                    // (*** KẾT THÚC THÊM MỚI ***)
+                    
                     // Nếu là lỗi khác
                     throw new Error(`Không thể tạo tài khoản: ${insertError.message}`);
                 }

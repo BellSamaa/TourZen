@@ -1,8 +1,12 @@
 // ManageAccounts.jsx
+/* *** (SỬA THEO YÊU CẦU) BẮT LỖI TRÙNG SỐ ĐIỆN THOẠI (Constraint) ***
+  1. (Logic) Sửa khối `catch` trong `handleSubmit` của `AccountModal`.
+  2. (Logic) Thêm một điều kiện `if` để kiểm tra `error.message` 
+     có chứa chuỗi '"Users_phone_number_key"' hay không.
+  3. (UI) Nếu có, hiển thị toast.error "Số điện thoại này đã tồn tại...".
+*/
 /* *** (SỬA THEO YÊU CẦU) Thêm Validation cho SĐT & Địa chỉ ***
-  1. (Logic) Thêm 'phoneRegex' từ file Login.jsx.
-  2. (Logic) Bổ sung logic kiểm tra SĐT/Địa chỉ vào 'handleSubmit'
-     của 'AccountModal' để áp dụng cho cả Thêm mới và Chỉnh sửa.
+  (Giữ nguyên các bình luận cũ...)
 */
 /* *** (SỬA LỖI v26) Sửa lỗi Duplicate Key 'Users_account_code_key' ***
   (Giữ nguyên các bình luận cũ...)
@@ -222,15 +226,8 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
                     // (Logic này giống hệt Login.jsx và ManageCustomers.jsx)
 
                     // 1. Kiểm tra email đã tồn tại chưa (vì không dùng auth.signUp)
-                    const { data: existingUser } = await supabase
-                        .from('Users')
-                        .select('email')
-                        .eq('email', formData.email)
-                        .single();
-                    if (existingUser) {
-                        throw new Error("Email đã được sử dụng. Vui lòng dùng email khác.");
-                    }
-
+                    // (SỬA v27) ĐÃ BỊ XÓA TRONG LOGIN.JSX, CHÚNG TA BẮT LỖI Ở CATCH
+                    
                     // 2. Mã hóa mật khẩu
                     const hashedPassword = btoa(formData.password); 
 
@@ -261,18 +258,37 @@ const AccountModal = ({ account, onClose, onSuccess }) => {
             onClose();
             
         } catch (error) {
+            // *** (SỬA THEO YÊU CẦU) CẬP NHẬT LOGIC BẮT LỖI ***
             console.error("Lỗi Thêm/Sửa tài khoản:", error);
-            const errorMessage = error.message.includes("Edge Function") 
-                ? "Lỗi server: " + error.message
-                // (Sửa v26) Cải thiện thông báo lỗi
-                : (error.message.includes("Email already in use") ? "Email đã tồn tại trong hệ thống Auth." : error.message)
-                || 'Đã xảy ra lỗi không xác định.';
+            
+            let specificMessage = error.message;
+            
+            // (MỚI) Bắt lỗi trùng SĐT (từ Constraint DB)
+            if (error.message.includes('"Users_phone_number_key"')) {
+                specificMessage = "Số điện thoại này đã tồn tại trong hệ thống.";
+            } 
+            // (Giữ nguyên) Bắt lỗi trùng Email (từ Auth)
+            else if (error.message.includes("Email already in use")) {
+                specificMessage = "Email đã tồn tại trong hệ thống Auth.";
+            }
+            // (Giữ nguyên) Bắt lỗi trùng Email (từ Bảng "Ảo" - public.Users)
+            else if (error.message.includes('"Users_email_key"')) {
+                specificMessage = "Email này đã tồn tại trong hệ thống.";
+            }
+            // (Giữ nguyên) Bắt lỗi Edge Function
+            else if (error.message.includes("Edge Function")) {
+                specificMessage = "Lỗi server: " + error.message;
+            }
+
+            const errorMessage = specificMessage || 'Đã xảy ra lỗi không xác định.';
             toast.error(errorMessage);
+            // *** KẾT THÚC SỬA ***
+
         } finally {
             setLoading(false);
         }
     };
-    // --- KẾT THÚC SỬA LỖI v26 ---
+    // --- KẾT THÚC SỬA LỖI v26 (và SỬA MỚI) ---
 
     return (
         <motion.div
