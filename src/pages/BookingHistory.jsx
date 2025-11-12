@@ -2,14 +2,15 @@
 // (SỬA LỖI: Thay thế `supabase.auth.getUser()` bằng `useAuth()` để hỗ trợ "Tài khoản ảo")
 // (SỬA LỖI v2: Tự động UPSERT user "ảo" vào bảng Users khi đánh giá)
 // (SỬA v3: (YÊU CẦU) Hiển thị chi tiết thanh toán trực tiếp giống PaymentSuccess)
+// (*** GEMINI SỬA v4: Hiển thị Dịch vụ (Xe/Bay) & Thêm nút Hủy cho thanh toán 'direct' ***)
 
 import React, { useState, useEffect, useCallback } from "react";
 import { getSupabase } from "../lib/supabaseClient";
 import { useAuth } from "../context/AuthContext"; // <<< BƯỚC 1: IMPORT useAuth
 // <<< SỬA v3: Thêm FaCalendarCheck >>>
 import { FaSpinner, FaBoxOpen, FaStar, FaRegStar, FaMoneyBillWave, FaClock, FaMapMarkerAlt, FaCalendarCheck } from "react-icons/fa";
-// DÒNG ĐÚNG
-import { CircleNotch } from "phosphor-react";
+// <<< SỬA v4: Thêm icons Dịch vụ và Hủy >>>
+import { CircleNotch, Buildings, Car, AirplaneTilt, XCircle } from "phosphor-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -234,6 +235,10 @@ export default function BookingHistory() {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
 
+  // <<< THÊM v4: State cho nút Hủy >>>
+  const [cancellingId, setCancellingId] = useState(null);
+
+
   // Hàm fetch dữ liệu đặt tour của user
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -247,7 +252,7 @@ export default function BookingHistory() {
     }
     // (Không cần setCurrentUser nữa, vì 'user' từ context đã là state)
 
-    // <<< SỬA v3: Thêm departure_date và branch_address >>>
+    // <<< SỬA v4: Thêm Dịch vụ (hotel, transport, flight) và quantity >>>
     const { data, error: fetchError } = await supabase
       .from("Bookings")
       .select(`
@@ -260,8 +265,15 @@ export default function BookingHistory() {
         payment_method, 
         departure_date, 
         branch_address, 
+        quantity,
+        hotel_product_id,
+        transport_product_id,
+        flight_product_id,
         Products:Products!product_id ( id, name, image_url, location, duration, price ), 
-        Reviews ( id ) 
+        Reviews ( id ),
+        hotel:hotel_product_id(id, name, price),
+        transport:Products!Bookings_transport_product_id_fkey(id, name, price, product_type),
+        flight:flight_product_id(id, name, price, product_type)
       `)
       .eq("user_id", user.id) // <<< BƯỚC 4: SỬ DỤNG user.id TỪ CONTEXT
       .order('created_at', { ascending: false });
@@ -297,6 +309,43 @@ export default function BookingHistory() {
     handleCloseModal();
     fetchData(); // Tải lại danh sách
   };
+
+  // <<< THÊM v4: Hàm Hủy Đơn Hàng >>>
+  const handleCancelBooking = async (booking) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn hủy đơn hàng tour "${booking.Products.name}"?\n\n(Lưu ý: Chỉ áp dụng cho thanh toán trực tiếp chưa đến hạn.)`)) {
+      return;
+    }
+    
+    setCancellingId(booking.id);
+    try {
+      // Gọi RPC function (cần được tạo trong Supabase SQL Editor)
+      // Tên hàm này (user_cancel_booking) bạn phải tự tạo
+      const { data, error }_ = await supabase.rpc('user_cancel_booking', {
+        booking_id_input: booking.id
+      });
+
+      if (error) throw error;
+      
+      // Giả sử RPC trả về `true` nếu thành công, hoặc `false`/error message nếu thất bại
+      if (data === false) {
+          throw new Error("Không thể hủy đơn hàng này (có thể đã qua hạn hoặc đã thanh toán QR).");
+      }
+
+      toast.success("Đã hủy đơn hàng thành công.");
+      fetchData(); // Tải lại danh sách
+
+    } catch (err) {
+      console.error("Lỗi hủy đơn hàng:", err);
+      // Tách thông báo lỗi từ PostgREST
+      const message = err.message.includes("function user_cancel_booking")
+          ? "Bạn không có quyền hủy đơn này (Có thể đã thanh toán QR hoặc không phải đơn của bạn)."
+          : err.message;
+      toast.error(`Hủy thất bại: ${message}`);
+    } finally {
+      setCancellingId(null);
+    }
+  };
+  // <<< HẾT THÊM v4 >>>
 
 
   if (loading) {
@@ -355,6 +404,9 @@ export default function BookingHistory() {
               // <<< THÊM v3: Tính deadline cho render >>>
               const paymentDeadline = getPaymentDeadline(booking.departure_date);
 
+              // <<< THÊM v4: Điều kiện hủy >>>
+              const canCancel = booking.payment_method === 'direct' && (booking.status === 'pending' || booking.status === 'confirmed');
+
               return (
                 <motion.div
                   key={booking.id}
@@ -377,11 +429,40 @@ export default function BookingHistory() {
                                 <span className="flex items-center gap-2"><FaClock className="text-sky-500" /> Thời lượng: {tour?.duration || 'N/A'}</span>
                                 <span className="flex items-center gap-2"><FaMoneyBillWave className="text-sky-500" /> Giá gốc: {tour?.price ? formatCurrency(tour.price) : 'Liên hệ'}</span>
                             </div>
+
+                            {/* <<< THÊM MỚI v4: DỊCH VỤ ĐI KÈM >>> */}
+                            {(booking.hotel || booking.transport || booking.flight) && (
+                                <div className="mt-4 pt-3 border-t border-gray-200 dark:border-neutral-700">
+                                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Dịch vụ đi kèm:</h4>
+                                    <div className="space-y-1.5">
+                                        {booking.hotel && (
+                                            <span className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                                <Buildings size={18} className="text-green-500" weight="duotone" />
+                                                {booking.hotel.name} ({formatCurrency(booking.hotel.price)})
+                                            </span>
+                                        )}
+                                        {booking.transport && (
+                                            <span className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                                <Car size={18} className="text-orange-500" weight="duotone" />
+                                                {booking.transport.name} ({formatCurrency(booking.transport.price)})
+                                            </span>
+                                        )}
+                                        {booking.flight && (
+                                            <span className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                                <AirplaneTilt size={18} className="text-purple-500" weight="duotone" />
+                                                {booking.flight.name} ({formatCurrency(booking.flight.price)} / khách)
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            {/* <<< HẾT THÊM MỚI v4 >>> */}
+
                         </div>
                     </div>
                     <div className="p-4 md:p-6 flex justify-between items-start bg-gray-50 dark:bg-neutral-900/50">
                         <div className="text-sm text-gray-700 dark:text-gray-300 space-y-1 flex-1">
-                            <p>Mã đơn: <span className="font-medium text-gray-800 dark:text-white">#{booking.id.substring(0, 8)}...</span></p>
+                            <p>Mã đơn: <span className="font-medium text-gray-800 dark:text-white">#{booking.id.slice(-8).toUpperCase()}</span></p>
                             <p>Ngày đặt: {formatDate(booking.created_at)}</p>
                             
                             {/* <<< SỬA v3: Hiển thị chi tiết thanh toán >>> */}
@@ -408,9 +489,24 @@ export default function BookingHistory() {
                                 Tổng tiền: {formatCurrency(booking.total_price)}
                             </p>
                         </div>
+
+                        {/* <<< SỬA v4: Thêm nút Hủy >>> */}
                         <div className="flex flex-col items-end gap-3 flex-shrink-0 ml-4">
                             <StatusBadge status={booking.status} />
-                            {hasReview ? (
+
+                            {/* 1. Nút Hủy (Ưu tiên hiển thị nếu đủ điều kiện) */}
+                            {canCancel ? (
+                                <button
+                                    onClick={() => handleCancelBooking(booking)}
+                                    disabled={cancellingId === booking.id}
+                                    className="px-4 py-2 bg-red-100 text-red-700 font-semibold rounded-lg hover:bg-red-200 transition-colors text-sm flex items-center gap-2 disabled:opacity-50"
+                                >
+                                    {cancellingId === booking.id ? <CircleNotch size={18} className="animate-spin" /> : <XCircle size={18} />}
+                                    Hủy đơn
+                                </button>
+                            ) 
+                            // 2. Nếu không thể hủy, hiển thị logic đánh giá
+                            : hasReview ? (
                                 <span className="px-3 py-1.5 text-sm font-medium text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-300 rounded-lg">
                                     Đã đánh giá
                                 </span>
@@ -422,11 +518,13 @@ export default function BookingHistory() {
                                     Viết đánh giá
                                 </button>
                             ) : (
+                                // 3. Nếu cũng không thể đánh giá (vd: tour bị hủy, chưa diễn ra)
                                 <span className="px-3 py-1.5 text-sm text-gray-500" title={tour ? 'Bạn chỉ có thể đánh giá tour đã hoàn thành' : 'Không thể đánh giá tour đã bị xóa'}>
                                     (Chưa thể đánh giá)
                                 </span>
                             )}
                         </div>
+                        {/* <<< HẾT SỬA v4 >>> */}
                     </div>
                 </motion.div>
               );

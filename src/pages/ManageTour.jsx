@@ -356,6 +356,8 @@ const FavoriteTourStats = () => {
 
 
 // --- (*** CẬP NHẬT V31: EditModal Tự động tính tiền & Read-only) ---
+// --- (*** CẬP NHẬT V31: EditModal Tự động tính tiền & Read-only) ---
+// (*** CẬP NHẬT THEO YÊU CẦU: Khóa chỉnh sửa/hủy đơn QR ***)
 const EditBookingModal = ({ 
     booking, 
     onClose, 
@@ -366,6 +368,9 @@ const EditBookingModal = ({
     allServices // { hotels: [], transport: [], flights: [] }
 }) => {
     if (!booking) return null;
+
+    // (*** THÊM MỚI: Khóa nếu là thanh toán QR ***)
+    const isQrLocked = booking.payment_method === 'virtual_qr';
     
     const [formData, setFormData] = useState({
         user_id: booking.user?.id || '',
@@ -492,6 +497,10 @@ const EditBookingModal = ({
     }, [calculatedTotal]);
 
     const handleSave = async () => {
+        if (isQrLocked) {
+             toast.error("Không thể lưu đơn đã thanh toán QR.");
+             return;
+        }
         if (currentGuests <= 0) { toast.error("Số lượng khách phải lớn hơn 0."); return; }
         if (!formData.departure_id) { toast.error("Vui lòng chọn ngày khởi hành."); return; }
         if ((formData.num_adult + formData.num_elder) === 0 && (formData.num_child > 0 || formData.num_infant > 0)) { toast.error("Phải có ít nhất 1 người lớn hoặc người già đi kèm."); return; }
@@ -506,6 +515,10 @@ const EditBookingModal = ({
     };
 
     const handleLocalStatusChange = (newStatus) => {
+         if (isQrLocked) {
+             toast.error("Không thể đổi trạng thái đơn đã thanh toán QR.");
+             return;
+         }
          if (booking.status === newStatus) return;
          if (window.confirm(`Bạn có chắc muốn đổi trạng thái thành "${newStatus}"?`)) {
               onStatusChange(booking, newStatus); 
@@ -531,6 +544,15 @@ const EditBookingModal = ({
                     <button onClick={onClose} className="text-gray-400 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"> <X size={22} weight="bold" /> </button>
                 </div>
                 <div className="p-6 space-y-5 overflow-y-auto flex-1 text-sm simple-scrollbar">
+                    
+                    {/* (*** THÊM MỚI: Cảnh báo đơn QR ***) */}
+                    {isQrLocked && (
+                        <div className="p-3 mb-4 bg-yellow-100 dark:bg-yellow-900/40 border border-yellow-300 dark:border-yellow-700 rounded-md text-yellow-800 dark:text-yellow-200 text-sm flex items-center gap-2">
+                            <WarningCircle weight="bold" size={20} />
+                            <span>Đơn hàng thanh toán bằng QR không thể chỉnh sửa chi tiết hoặc thay đổi trạng thái.</span>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                         <div>
                             <label className="label-modal font-semibold">Khách hàng (Chỉ đọc):</label>
@@ -551,14 +573,16 @@ const EditBookingModal = ({
                     <div className="border-t pt-4 dark:border-slate-700 space-y-4">
                         <div>
                             <label className="label-modal font-semibold" htmlFor="product_id_edit">Tour:</label>
-                            <select id="product_id_edit" name="product_id" value={formData.product_id} onChange={handleChange} className="input-style w-full mt-1 !text-lg !font-semibold !text-sky-700 dark:!text-sky-400">
+                            {/* (*** SỬA: Thêm disabled={isQrLocked} ***) */}
+                            <select id="product_id_edit" name="product_id" value={formData.product_id} onChange={handleChange} className="input-style w-full mt-1 !text-lg !font-semibold !text-sky-700 dark:!text-sky-400" disabled={isQrLocked}>
                                 <option value="">-- Chọn Tour --</option>
                                 {allTours.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                             </select>
                         </div>
                         <div>
                             <label className="label-modal font-semibold" htmlFor="departure_id_edit">Ngày đi *</label>
-                            <select id="departure_id_edit" name="departure_id" value={formData.departure_id} onChange={handleChange} className="input-style w-full mt-1" required disabled={loadingDepartures || departures.length === 0}>
+                            {/* (*** SỬA: Thêm disabled={... || isQrLocked} ***) */}
+                            <select id="departure_id_edit" name="departure_id" value={formData.departure_id} onChange={handleChange} className="input-style w-full mt-1" required disabled={loadingDepartures || departures.length === 0 || isQrLocked}>
                                 <option value="" disabled>-- {loadingDepartures ? "Đang tải lịch..." : (formData.product_id ? "Chọn ngày đi" : "Vui lòng chọn tour trước")} --</option>
                                 {departures.map(d => {
                                     let remaining = (d.max_slots || 0) - (d.booked_slots || 0);
@@ -569,41 +593,47 @@ const EditBookingModal = ({
                              {booking.status === 'confirmed' && selectedDeparture && currentGuests > remainingSlots && <p className="text-xs text-red-500 mt-1">Số lượng khách ({currentGuests}) vượt quá số chỗ còn lại ({remainingSlots})!</p>}
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3">
-                            <div><label className="label-modal font-semibold flex items-center gap-1.5"><FaUser size={14}/> Người lớn *</label><input type="number" name="num_adult" value={formData.num_adult} onChange={handleChange} min={0} className="input-style w-full mt-1" required/></div>
-                            <div><label className="label-modal font-semibold flex items-center gap-1.5"><FaUserTie size={14}/> Người già</label><input type="number" name="num_elder" value={formData.num_elder} onChange={handleChange} min={0} className="input-style w-full mt-1"/></div>
-                            <div><label className="label-modal font-semibold flex items-center gap-1.5"><FaChild size={14}/> Trẻ em</label><input type="number" name="num_child" value={formData.num_child} onChange={handleChange} min={0} className="input-style w-full mt-1"/></div>
-                            <div><label className="label-modal font-semibold flex items-center gap-1.5"><FaBaby size={14}/> Sơ sinh</label><input type="number" name="num_infant" value={formData.num_infant} onChange={handleChange} min={0} className="input-style w-full mt-1"/></div>
+                            {/* (*** SỬA: Thêm disabled={isQrLocked} ***) */}
+                            <div><label className="label-modal font-semibold flex items-center gap-1.5"><FaUser size={14}/> Người lớn *</label><input type="number" name="num_adult" value={formData.num_adult} onChange={handleChange} min={0} className="input-style w-full mt-1" required disabled={isQrLocked}/></div>
+                            <div><label className="label-modal font-semibold flex items-center gap-1.5"><FaUserTie size={14}/> Người già</label><input type="number" name="num_elder" value={formData.num_elder} onChange={handleChange} min={0} className="input-style w-full mt-1" disabled={isQrLocked}/></div>
+                            <div><label className="label-modal font-semibold flex items-center gap-1.5"><FaChild size={14}/> Trẻ em</label><input type="number" name="num_child" value={formData.num_child} onChange={handleChange} min={0} className="input-style w-full mt-1" disabled={isQrLocked}/></div>
+                            <div><label className="label-modal font-semibold flex items-center gap-1.5"><FaBaby size={14}/> Sơ sinh</label><input type="number" name="num_infant" value={formData.num_infant} onChange={handleChange} min={0} className="input-style w-full mt-1" disabled={isQrLocked}/></div>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-4 border-t dark:border-slate-700">
                         <div>
                             <label className="label-modal font-semibold flex items-center gap-1.5"><Buildings size={18}/> Khách sạn:</label>
-                            <select name="hotel_product_id" value={formData.hotel_product_id} onChange={handleChange} className="input-style w-full mt-1">
+                            {/* (*** SỬA: Thêm disabled={isQrLocked} ***) */}
+                            <select name="hotel_product_id" value={formData.hotel_product_id} onChange={handleChange} className="input-style w-full mt-1" disabled={isQrLocked}>
                                 <option value="">Không chọn</option>
                                 {allServices.hotels.map(s => <option key={s.id} value={s.id} disabled={s.inventory <= 0}>{s.name} ({formatCurrency(s.price)}){s.inventory <= 0 ? ' (Hết hàng)' : ''}</option>)}
                             </select>
                         </div>
                         <div>
                             <label className="label-modal font-semibold flex items-center gap-1.5"><Car size={18}/> Vận chuyển:</label>
-                            <select name="transport_product_id" value={formData.transport_product_id} onChange={handleChange} className="input-style w-full mt-1">
+                            {/* (*** SỬA: Thêm disabled={isQrLocked} ***) */}
+                            <select name="transport_product_id" value={formData.transport_product_id} onChange={handleChange} className="input-style w-full mt-1" disabled={isQrLocked}>
                                 <option value="">Không chọn</option>
                                 {allServices.transport.map(s => <option key={s.id} value={s.id} disabled={s.inventory <= 0}>{s.name} ({formatCurrency(s.price)}){s.inventory <= 0 ? ' (Hết hàng)' : ''}</option>)}
                             </select>
                         </div>
                         <div>
                             <label className="label-modal font-semibold flex items-center gap-1.5"><AirplaneTilt size={18}/> Chuyến bay:</label>
-                            <select name="flight_product_id" value={formData.flight_product_id} onChange={handleChange} className="input-style w-full mt-1">
+                            {/* (*** SỬA: Thêm disabled={isQrLocked} ***) */}
+                            <select name="flight_product_id" value={formData.flight_product_id} onChange={handleChange} className="input-style w-full mt-1" disabled={isQrLocked}>
                                 <option value="">Không chọn</option>
                                 {allServices.flights.map(s => <option key={s.id} value={s.id} disabled={s.inventory <= 0}>{s.name} ({formatCurrency(s.price)}){s.inventory <= 0 ? ' (Hết hàng)' : ''}</option>)}
                             </select>
                         </div>
-                        <div><label className="label-modal font-semibold flex items-center gap-1.5"><VoucherIcon size={18}/> Voucher:</label><input name="voucher_code" value={formData.voucher_code} onChange={handleChange} className="input-style w-full mt-1" placeholder="Không có"/></div>
+                        {/* (*** SỬA: Thêm disabled={isQrLocked} ***) */}
+                        <div><label className="label-modal font-semibold flex items-center gap-1.5"><VoucherIcon size={18}/> Voucher:</label><input name="voucher_code" value={formData.voucher_code} onChange={handleChange} className="input-style w-full mt-1" placeholder="Không có" disabled={isQrLocked}/></div>
                     </div>
                     
                     <div className="pt-4 border-t dark:border-slate-700">
                          <label className="label-modal font-semibold">Ghi chú (có thể sửa):</label>
-                         <textarea name="notes" value={formData.notes} onChange={handleChange} rows={3} className="input-style w-full mt-1.5 !text-base" placeholder="Không có ghi chú" />
+                         {/* (*** SỬA: Thêm disabled={isQrLocked} ***) */}
+                         <textarea name="notes" value={formData.notes} onChange={handleChange} rows={3} className="input-style w-full mt-1.5 !text-base" placeholder="Không có ghi chú" disabled={isQrLocked}/>
                     </div>
 
                      {/* (*** MỚI V31: Tổng tiền Read-only & Auto-calc ***) */}
@@ -620,15 +650,17 @@ const EditBookingModal = ({
                      <div className="pt-5 border-t dark:border-slate-700">
                         <label className="label-modal text-base font-semibold mb-2">Cập nhật trạng thái:</label>
                         <div className="flex flex-col sm:flex-row gap-3 mt-1">
-                             <button onClick={() => handleLocalStatusChange('confirmed')} disabled={booking.status === 'confirmed'} className={`flex-1 button-status-base ${booking.status === 'confirmed' ? 'bg-green-600 text-white shadow-inner' : 'bg-white dark:bg-slate-700 hover:bg-green-50 dark:hover:bg-green-900/30 border border-green-500 text-green-600 dark:text-green-400'}`}> <CheckCircle weight="bold"/> Xác nhận </button>
-                             <button onClick={() => handleLocalStatusChange('pending')} disabled={booking.status === 'pending'} className={`flex-1 button-status-base ${booking.status === 'pending' ? 'bg-gray-500 text-white shadow-inner' : 'bg-white dark:bg-slate-700 hover:bg-gray-50 dark:hover:bg-gray-900/30 border border-gray-500 text-gray-600 dark:text-gray-400'}`}> <Clock weight="bold"/> Chờ xử lý </button>
-                             <button onClick={() => handleLocalStatusChange('cancelled')} disabled={booking.status === 'cancelled'} className={`flex-1 button-status-base ${booking.status === 'cancelled' ? 'bg-red-600 text-white shadow-inner' : 'bg-white dark:bg-slate-700 hover:bg-red-50 dark:hover:bg-red-900/30 border border-red-500 text-red-600 dark:text-red-400'}`}> <XCircle weight="bold"/> Hủy đơn </button>
+                             {/* (*** SỬA: Thêm disabled={... || isQrLocked} ***) */}
+                             <button onClick={() => handleLocalStatusChange('confirmed')} disabled={booking.status === 'confirmed' || isQrLocked} className={`flex-1 button-status-base ${booking.status === 'confirmed' ? 'bg-green-600 text-white shadow-inner' : 'bg-white dark:bg-slate-700 hover:bg-green-50 dark:hover:bg-green-900/30 border border-green-500 text-green-600 dark:text-green-400'}`}> <CheckCircle weight="bold"/> Xác nhận </button>
+                             <button onClick={() => handleLocalStatusChange('pending')} disabled={booking.status === 'pending' || isQrLocked} className={`flex-1 button-status-base ${booking.status === 'pending' ? 'bg-gray-500 text-white shadow-inner' : 'bg-white dark:bg-slate-700 hover:bg-gray-50 dark:hover:bg-gray-900/30 border border-gray-500 text-gray-600 dark:text-gray-400'}`}> <Clock weight="bold"/> Chờ xử lý </button>
+                             <button onClick={() => handleLocalStatusChange('cancelled')} disabled={booking.status === 'cancelled' || isQrLocked} className={`flex-1 button-status-base ${booking.status === 'cancelled' ? 'bg-red-600 text-white shadow-inner' : 'bg-white dark:bg-slate-700 hover:bg-red-50 dark:hover:bg-red-900/30 border border-red-500 text-red-600 dark:text-red-400'}`}> <XCircle weight="bold"/> Hủy đơn </button>
                         </div>
                      </div>
                 </div>
                 <div className="p-4 border-t dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-b-lg">
                     <button type="button" onClick={onClose} disabled={isSaving} className="modal-button-secondary">Đóng</button>
-                    <button type="button" onClick={handleSave} disabled={isSaving || loadingDepartures} className="modal-button-primary flex items-center gap-1.5">
+                    {/* (*** SỬA: Thêm disabled={... || isQrLocked} ***) */}
+                    <button type="button" onClick={handleSave} disabled={isSaving || loadingDepartures || isQrLocked} className="modal-button-primary flex items-center gap-1.5">
                         {isSaving ? <CircleNotch className="animate-spin" size={18} /> : <FloppyDisk size={18} />}
                         Lưu thay đổi chi tiết
                     </button>
@@ -643,6 +675,8 @@ const EditBookingModal = ({
                  .simple-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
                  .dark .simple-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
                  .input-style { @apply border border-gray-300 p-2 rounded-md w-full dark:bg-neutral-700 dark:border-neutral-600 dark:text-white focus:ring-sky-500 focus:border-sky-500 transition-colors duration-200 text-sm; }
+                 /* (*** SỬA: Thêm style cho input bị khóa ***) */
+                 .input-style:disabled { @apply bg-gray-100 dark:bg-slate-700/50 opacity-70 cursor-not-allowed; }
                  .modal-button-secondary { @apply px-5 py-2 bg-neutral-200 dark:bg-neutral-600 rounded-md font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-500 text-sm disabled:opacity-50 transition-colors; }
                  .modal-button-primary { @apply px-5 py-2 bg-sky-600 text-white rounded-md font-semibold hover:bg-sky-700 text-sm disabled:opacity-50 transition-colors; }
             `}</style>

@@ -462,7 +462,7 @@ export default function BookingHistory() {
                     </div>
                     <div className="p-4 md:p-6 flex justify-between items-start bg-gray-50 dark:bg-neutral-900/50">
                         <div className="text-sm text-gray-700 dark:text-gray-300 space-y-1 flex-1">
-                            <p>Mã đơn: <span className="font-medium text-gray-800 dark:text-white">#{booking.id.substring(0, 8)}...</span></p>
+                            <p>Mã đơn: <span className="font-medium text-gray-800 dark:text-white">#{booking.id.slice(-8).toUpperCase()}</span></p>
                             <p>Ngày đặt: {formatDate(booking.created_at)}</p>
                             
                             {/* <<< SỬA v3: Hiển thị chi tiết thanh toán >>> */}
