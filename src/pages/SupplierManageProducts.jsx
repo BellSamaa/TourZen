@@ -1,5 +1,5 @@
 // src/pages/SupplierManageProducts.jsx
-// (File này đã đúng logic, gọi ProductModal để sửa)
+// (File này đã loại bỏ hiển thị Giá NCC theo yêu cầu)
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
@@ -54,7 +54,7 @@ const SlotSummary = ({ departures }) => {
     );
 };
 
-// --- Hàm format tiền tệ ---
+// --- Hàm format tiền tệ (Giữ lại nếu cần dùng ở chỗ khác, dù UI đã ẩn) ---
 const formatCurrency = (num) => {
     if (typeof num !== 'number' || isNaN(num)) return "0 ₫";
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(num);
@@ -183,19 +183,15 @@ export default function SupplierManageProducts() {
                 Mã: {product.tour_code || "N/A"}
             </p>
 
-            {/* Giá NCC */}
-            <div className="text-xl font-bold text-red-600 mb-4">
-                {/* (ĐÚNG) Hiển thị giá NCC */}
-                {formatCurrency(product.supplier_price_adult || product.price || 0)} <span className="text-sm font-normal text-slate-500">(Giá NCC)</span>
-            </div>
+            {/* ĐÃ XÓA PHẦN HIỂN THỊ GIÁ Ở ĐÂY */}
 
             {/* Thông tin Slot */}
-            <div className="mb-4">
+            <div className="mb-4 mt-auto">
                 <SlotSummary departures={product.Departures || []} />
             </div>
 
             {/* Nút Hành động */}
-            <div className="mt-auto pt-4 border-t dark:border-slate-700 flex items-center justify-end gap-2">
+            <div className="mt-4 pt-4 border-t dark:border-slate-700 flex items-center justify-end gap-2">
                 <button
                     onClick={() => handleEdit(product)}
                     className="button-icon-sky"
@@ -234,11 +230,9 @@ export default function SupplierManageProducts() {
                 </div>
             </div>
         </td>
-        {/* Giá NCC */}
-        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-600">
-            {/* (ĐÚNG) Hiển thị giá NCC */}
-            {formatCurrency(product.supplier_price_adult || product.price || 0)} <span className="text-xs font-normal text-slate-500">(Giá NCC)</span>
-        </td>
+        
+        {/* ĐÃ XÓA CỘT GIÁ NCC Ở ĐÂY */}
+
         {/* Slots */}
         <td className="px-6 py-4 whitespace-nowrap text-sm">
             <SlotSummary departures={product.Departures || []} />
@@ -312,7 +306,7 @@ export default function SupplierManageProducts() {
               <thead className="bg-gray-50 dark:bg-slate-700">
                 <tr>
                   <th className="th-style">Tên Tour</th>
-                  <th className="th-style">Giá NCC</th>
+                  {/* ĐÃ XÓA TH GIÁ NCC Ở ĐÂY */}
                   <th className="th-style">Slots</th>
                   <th className="th-style">Trạng thái</th>
                   <th className="th-style text-right">Hành động</th>
