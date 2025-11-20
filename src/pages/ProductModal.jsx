@@ -1,5 +1,5 @@
 // src/pages/ProductModal.jsx
-// (Đã xóa cột Giá và input Giá trong phần Quản lý Lịch khởi hành)
+// (File MỚI: Modal cho Supplier Quản lý Tour & Lịch khởi hành)
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { getSupabase } from '../lib/supabaseClient';
@@ -13,76 +13,91 @@ import {
 
 const supabase = getSupabase();
 
+// --- Hàm format tiền tệ (cho hiển thị) ---
+const formatCurrency = (num) => {
+    if (typeof num !== 'number' || isNaN(num)) return "0 ₫";
+    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(num);
+};
+
 // --- Component con: Quản lý Lịch khởi hành (Editable) ---
+// SỬA: Đảm bảo initialDepartures là một mảng rỗng ngay trong default props
 const DeparturesManager = ({ productId, initialDepartures = [], onDeparturesChange }) => {
+    // SỬA: Khởi tạo state bằng initialDepartures an toàn, hoặc mảng rỗng
     const [departures, setDepartures] = useState(Array.isArray(initialDepartures) ? initialDepartures : []);
-    // SỬA: Bỏ state giá tiền, chỉ giữ date và slots
-    const [newDep, setNewDep] = useState({ date: '', max_slots: 20 });
+    // State cho dòng "Thêm mới"
+    const [newDep, setNewDep] = useState({ date: '', adult_price: 0, child_price: 0, max_slots: 20 });
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
+        // Tải các lịch khởi hành hiện có CỦA tour này (nếu đang edit)
         if (productId) {
             const fetchDepartures = async () => {
                 setLoading(true);
                 const today = new Date().toISOString().split('T')[0];
-                // SỬA: Không cần select adult_price, child_price nữa
                 const { data, error } = await supabase
                     .from('Departures')
-                    .select('id, departure_date, max_slots, booked_slots') 
+                    .select('*')
                     .eq('product_id', productId)
                     .gte('departure_date', today)
                     .order('departure_date', { ascending: true });
                 
                 if (error) { toast.error("Lỗi tải lịch khởi hành."); }
                 else { 
+                    // SỬA: Đảm bảo luôn set là mảng
                     const fetchedData = Array.isArray(data) ? data : [];
                     setDepartures(fetchedData); 
-                    onDeparturesChange(fetchedData); 
+                    onDeparturesChange(fetchedData); // Cập nhật lại state cha
                 }
                 setLoading(false);
             };
             fetchDepartures();
         } else {
+            // Nếu là tour mới, dùng initialDepartures. (State đã khởi tạo ở trên)
+            // LƯU Ý: Nếu không muốn load lại initialDepartures khi chuyển từ Edit sang Add New
+            // thì cần kiểm tra (productId === null && initialDepartures.length > 0)
+            // Hiện tại, state đã được khởi tạo an toàn, nên chỉ cần đảm bảo luôn là mảng.
             setDepartures(Array.isArray(initialDepartures) ? initialDepartures : []);
         }
+        // Thêm initialDepartures vào dependency array để reset khi chuyển từ Edit sang Add New
     }, [productId, onDeparturesChange, initialDepartures]); 
+    // ^ initialDepartures cần ở đây để reset state khi ProductModal reset
 
     const handleNewChange = (e) => {
         const { name, value } = e.target;
         setNewDep(prev => ({ ...prev, [name]: value }));
     };
 
-    // Thêm Lịch mới
+    // Thêm Lịch mới (chỉ thêm vào state tạm thời)
     const handleAddDeparture = () => {
-        // SỬA: Bỏ validate giá tiền (newDep.adult_price <= 0)
-        if (!newDep.date || newDep.max_slots <= 0) {
-            toast.error("Vui lòng nhập Ngày và Slots > 0.");
+        if (!newDep.date || newDep.max_slots <= 0 || newDep.adult_price <= 0) {
+            toast.error("Vui lòng nhập Ngày, Giá NCC (lớn) > 0, và Slots > 0.");
             return;
         }
         const newEntry = {
-            id: `temp-${Date.now()}`, 
-            product_id: productId,
+            id: `temp-${Date.now()}`, // ID tạm
+            product_id: productId, // Sẽ gán ID thật khi lưu tour
             departure_date: newDep.date,
-            // SỬA: Mặc định giá bằng 0 (ẩn khỏi UI nhưng giữ cấu trúc DB)
-            adult_price: 0,
-            child_price: 0,
+            adult_price: parseFloat(newDep.adult_price || 0),
+            child_price: parseFloat(newDep.child_price || 0),
             max_slots: parseInt(newDep.max_slots || 0, 10),
-            booked_slots: 0, 
+            booked_slots: 0, // Mới tạo
         };
         const updatedDepartures = [...departures, newEntry];
         setDepartures(updatedDepartures);
-        onDeparturesChange(updatedDepartures); 
-        
+        onDeparturesChange(updatedDepartures); // Báo cho cha
         // Reset form
-        setNewDep({ date: '', max_slots: 20 });
+        setNewDep({ date: '', adult_price: 0, child_price: 0, max_slots: 20 });
     };
 
+    // Xóa Lịch (chỉ xóa khỏi state tạm thời)
     const handleRemoveDeparture = (id) => {
         const updatedDepartures = departures.filter(d => d.id !== id);
         setDepartures(updatedDepartures);
-        onDeparturesChange(updatedDepartures); 
+        onDeparturesChange(updatedDepartures); // Báo cho cha
     };
     
+    // (Lưu ý: Logic lưu (upsert/delete) sẽ được thực hiện trong hàm handleSubmit của Modal chính)
+
     return (
         <div className="border-t pt-4 dark:border-neutral-700">
              <h4 className="text-base font-semibold dark:text-white mb-3">Quản lý Lịch khởi hành & Slots</h4>
@@ -93,17 +108,20 @@ const DeparturesManager = ({ productId, initialDepartures = [], onDeparturesChan
                       <thead className="bg-gray-100 dark:bg-neutral-700 sticky top-0">
                           <tr>
                               <th className="px-3 py-2 text-left">Ngày đi</th>
-                              {/* ĐÃ XÓA TH GIÁ LỚN / TRẺ */}
+                              <th className="px-3 py-2 text-left">Giá Lớn (NCC)</th>
+                              <th className="px-3 py-2 text-left">Giá Trẻ (NCC)</th>
                               <th className="px-3 py-2 text-left">Slots</th>
                               <th className="px-3 py-2 text-left">Đã đặt</th>
                               <th className="px-3 py-2 text-right"></th>
                           </tr>
                       </thead>
                       <tbody className="divide-y dark:divide-neutral-600">
+                          {/* SỬA: Đảm bảo departures là mảng bằng cách dùng Optional Chaining và Nullish Coalescing */}
                           {departures?.map(dep => (
                               <tr key={dep.id}>
                                   <td className="px-3 py-2">{dep.departure_date}</td>
-                                  {/* ĐÃ XÓA TD GIÁ LỚN / TRẺ */}
+                                  <td className="px-3 py-2">{formatCurrency(dep.adult_price)}</td>
+                                  <td className="px-3 py-2">{formatCurrency(dep.child_price)}</td>
                                   <td className="px-3 py-2 font-medium">{dep.max_slots || 0}</td>
                                   <td className="px-3 py-2 font-medium">{dep.booked_slots || 0}</td>
                                   <td className="px-3 py-2 text-right">
@@ -114,24 +132,31 @@ const DeparturesManager = ({ productId, initialDepartures = [], onDeparturesChan
                               </tr>
                           ))}
                            {departures.length === 0 && !loading && (
-                                <tr><td colSpan="4" className="p-4 text-center text-gray-500 italic">Chưa có lịch khởi hành.</td></tr>
+                                <tr><td colSpan="6" className="p-4 text-center text-gray-500 italic">Chưa có lịch khởi hành.</td></tr>
                            )}
                       </tbody>
                  </table>
              </div>
 
-             {/* Form Thêm mới - Layout mới gọn hơn */}
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3 p-3 border dark:border-neutral-600 rounded-md bg-gray-50 dark:bg-neutral-900/50">
+             {/* Form Thêm mới */}
+             <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3 p-3 border dark:border-neutral-600 rounded-md bg-gray-50 dark:bg-neutral-900/50">
                  <div>
                      <label className="label-style !text-xs">Ngày đi *</label>
                      <input type="date" name="date" value={newDep.date} onChange={handleNewChange} className="input-style !text-xs !p-1.5" min={new Date().toISOString().split('T')[0]}/>
                  </div>
-                 {/* ĐÃ XÓA INPUT GIÁ LỚN / TRẺ */}
+                 <div>
+                     <label className="label-style !text-xs">Giá Lớn (NCC) *</label>
+                     <input type="number" name="adult_price" value={newDep.adult_price} onChange={handleNewChange} className="input-style !text-xs !p-1.5" min="0"/>
+                 </div>
+                 <div>
+                     <label className="label-style !text-xs">Giá Trẻ (NCC)</label>
+                     <input type="number" name="child_price" value={newDep.child_price} onChange={handleNewChange} className="input-style !text-xs !p-1.5" min="0"/>
+                 </div>
                  <div>
                      <label className="label-style !text-xs">Max Slots *</label>
                      <input type="number" name="max_slots" value={newDep.max_slots} onChange={handleNewChange} className="input-style !text-xs !p-1.5" min="1"/>
                  </div>
-                 <div>
+                 <div className="col-span-2 md:col-span-1">
                       <label className="label-style !text-xs">&nbsp;</label>
                       <button type="button" onClick={handleAddDeparture} className="button-green w-full !py-1.5 !text-xs"> <Plus/> Thêm Lịch </button>
                  </div>
@@ -155,11 +180,12 @@ export default function ProductModal({ show, onClose, onSuccess, productToEdit, 
     };
     
     const [formData, setFormData] = useState(initialData);
-    const [departures, setDepartures] = useState([]); 
+    const [departures, setDepartures] = useState([]); // State lưu Lịch khởi hành
 
+    // SỬA LỖI: Dùng useCallback để ổn định hàm, tránh re-render vô hạn trong DeparturesManager
     const handleDeparturesChange = useCallback((newDeps) => {
         setDepartures(newDeps);
-    }, []); 
+    }, []); // Dependency rỗng vì setDepartures (từ useState) đã ổn định
 
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -169,6 +195,7 @@ export default function ProductModal({ show, onClose, onSuccess, productToEdit, 
             setFormData({
                 name: productToEdit.name || '',
                 description: productToEdit.description || '',
+                // (SỬA) Lấy giá NCC (tên cũ có thể là price)
                 supplier_price_adult: productToEdit.supplier_price_adult || productToEdit.price || 0,
                 supplier_price_child: productToEdit.supplier_price_child || productToEdit.child_price || 0,
                 supplier_price_infant: productToEdit.supplier_price_infant || productToEdit.infant_price || 0,
@@ -177,16 +204,19 @@ export default function ProductModal({ show, onClose, onSuccess, productToEdit, 
                 supplier_id: forceSupplierId || productToEdit.supplier_id || '',
                 image_url: productToEdit.image_url || '',
                 tour_code: productToEdit.tour_code || '',
+                // SỬA: Dùng Array.isArray() và Optional Chaining để an toàn hơn
                 itinerary: Array.isArray(productToEdit.itinerary) && productToEdit.itinerary.length > 0
                     ? productToEdit.itinerary.map((item, index) => ({
+                        // Đảm bảo item là object trước khi truy cập thuộc tính
                           title: item?.title || `Ngày ${index + 1}`,
                           content: item?.content || (typeof item === 'string' ? item : '')
                       }))
                     : [{ title: 'Ngày 1', content: '' }],
             });
+            // Departures sẽ được load bởi component <DeparturesManager />
         } else {
-            setFormData(initialData); 
-            setDepartures([]); 
+            setFormData(initialData); // Reset cho tour mới
+            setDepartures([]); // Reset
         }
     }, [productToEdit, forceSupplierId]);
 
@@ -216,25 +246,16 @@ export default function ProductModal({ show, onClose, onSuccess, productToEdit, 
         }));
     };
 
-    const handleImageUpload = async (e) => { 
-        // ... Logic upload ảnh (Giữ nguyên logic cũ nếu có)
-    };
+    // (Tương tự AdminModal)
+    const handleImageUpload = async (e) => { /* ... (Logic tải ảnh lên Storage) ... */ };
 
     // --- (QUAN TRỌNG) Xử lý Submit của NCC ---
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
-        // 1. Validation
         if (!formData.name || !formData.supplier_id) {
             toast.error("Tên tour và Nhà cung cấp là bắt buộc."); return;
         }
-        
-        // Ép kiểu số cẩn thận
-        const adultPrice = parseFloat(formData.supplier_price_adult);
-        const childPrice = parseFloat(formData.supplier_price_child || 0);
-        const infantPrice = parseFloat(formData.supplier_price_infant || 0);
-
-        if (isNaN(adultPrice) || adultPrice <= 0) {
+        if (formData.supplier_price_adult <= 0) {
              toast.error("Giá NCC (Người lớn) phải lớn hơn 0."); return;
         }
         if (departures.length === 0) {
@@ -243,108 +264,113 @@ export default function ProductModal({ show, onClose, onSuccess, productToEdit, 
 
         setLoading(true);
 
-        try {
-            // 2. Chuẩn bị dữ liệu Product
-            const productPayload = {
-                name: formData.name,
-                description: formData.description,
-                price: adultPrice, 
-                child_price: childPrice,
-                infant_price: infantPrice,
-                supplier_price_adult: adultPrice,
-                supplier_price_child: childPrice,
-                supplier_price_infant: infantPrice,
-                location: formData.location,
-                duration: formData.duration,
-                supplier_id: formData.supplier_id,
-                image_url: formData.image_url,
-                tour_code: formData.tour_code,
-                itinerary: formData.itinerary,
-                product_type: productType,
-                approval_status: 'pending',
-                is_published: false, 
-            };
+        const productPayload = {
+            name: formData.name,
+            description: formData.description,
+            // (SỬA) Lưu giá NCC (có thể dùng tên cột cũ)
+            price: formData.supplier_price_adult, // (Cột 'price' cho adult)
+            child_price: formData.supplier_price_child, // (Cột 'child_price')
+            infant_price: formData.supplier_price_infant, // (Cột 'infant_price')
+            // (MỚI) Lưu vào các cột giá NCC chuẩn (nếu DB đã có)
+            supplier_price_adult: formData.supplier_price_adult,
+            supplier_price_child: formData.supplier_price_child,
+            supplier_price_infant: formData.supplier_price_infant,
+            
+            location: formData.location,
+            duration: formData.duration,
+            supplier_id: formData.supplier_id,
+            image_url: formData.image_url,
+            tour_code: formData.tour_code,
+            itinerary: formData.itinerary,
+            product_type: productType,
+            
+            // (SỬA) BẮT BUỘC: Đặt lại trạng thái chờ duyệt
+            approval_status: 'pending',
+            is_published: false, // Chờ admin duyệt mới đăng
+        };
 
+        try {
             let productId = productToEdit?.id;
             
-            // 3. Thực hiện Lưu Product
+            // 1. Lưu/Cập nhật Sản phẩm (Tour)
             if (productId) {
-                const { error } = await supabase.from('Products').update(productPayload).eq('id', productId);
-                if (error) throw error;
+                // Update
+                const { error: productError } = await supabase
+                    .from('Products')
+                    .update(productPayload)
+                    .eq('id', productId);
+                if (productError) throw productError;
             } else {
-                const { data, error } = await supabase.from('Products').insert(productPayload).select('id').single();
-                if (error) throw error;
-                productId = data.id; 
+                // Insert
+                const { data: productData, error: productError } = await supabase
+                    .from('Products')
+                    .insert(productPayload)
+                    .select('id')
+                    .single();
+                if (productError) throw productError;
+                productId = productData.id; // Lấy ID của tour mới tạo
             }
             
-            // 4. Xử lý Lịch khởi hành (Departures) - TÁCH INSERT VÀ UPDATE
+            // 2. Đồng bộ Lịch khởi hành (Departures)
             if (productId) {
-                // -- Bước 4a: Xóa các slot đã bị xóa khỏi giao diện --
+                // SỬA: Đảm bảo productToEdit?.Departures là mảng
                 const originalDepIds = Array.isArray(productToEdit?.Departures) ? productToEdit.Departures.map(d => d.id) : [];
-                const currentDepIds = departures.filter(d => !String(d.id).startsWith('temp-')).map(d => d.id);
-                const idsToDelete = originalDepIds.filter(id => !currentDepIds.includes(id));
-                
-                if (idsToDelete.length > 0) {
-                    await supabase.from('Departures').delete().in('id', idsToDelete);
+                // Lấy danh sách ID mới
+                const newDepIds = departures.map(d => d.id);
+
+                // Lịch cần xóa (Có trong gốc nhưng không có trong state mới)
+                const departuresToDelete = originalDepIds.filter(id => !newDepIds.includes(id));
+                if (departuresToDelete.length > 0) {
+                    const { error: deleteError } = await supabase
+                        .from('Departures')
+                        .delete()
+                        .in('id', departuresToDelete);
+                    if (deleteError) console.warn("Lỗi xóa slot cũ:", deleteError);
                 }
 
-                // -- Bước 4b: Phân loại Thêm mới vs Cập nhật --
-                const newDepartures = [];
-                const updateDepartures = [];
+                // Lịch cần Thêm/Cập nhật (Upsert)
+                const departuresToUpsert = departures.map(dep => ({
+                    id: String(dep.id).startsWith('temp-') ? undefined : dep.id, // Bỏ ID tạm
+                    product_id: productId, // Gán ID tour
+                    departure_date: dep.departure_date,
+                    adult_price: dep.adult_price,
+                    child_price: dep.child_price,
+                    max_slots: dep.max_slots,
+                    booked_slots: dep.booked_slots || 0,
+                }));
 
-                departures.forEach(dep => {
-                    const payload = {
-                        product_id: productId,
-                        departure_date: dep.departure_date,
-                        // QUAN TRỌNG: Luôn lấy giá từ form chính để đảm bảo > 0
-                        adult_price: adultPrice, 
-                        child_price: childPrice,
-                        max_slots: parseInt(dep.max_slots),
-                        booked_slots: dep.booked_slots || 0
-                    };
 
-                    if (String(dep.id).startsWith('temp-')) {
-                        // Đây là slot mới -> Thêm vào danh sách insert
-                        newDepartures.push(payload);
-                    } else {
-                        // Đây là slot cũ -> Thêm ID để update
-                        updateDepartures.push({ ...payload, id: dep.id });
-                    }
-                });
-
-                // -- Bước 4c: Thực thi Insert (Cho slot mới) --
-                if (newDepartures.length > 0) {
-                    const { error: insertError } = await supabase.from('Departures').insert(newDepartures);
-                    if (insertError) throw insertError;
-                }
-
-                // -- Bước 4d: Thực thi Update (Cho slot cũ) --
-                // (Dùng vòng lặp để update từng cái hoặc upsert nếu bảng hỗ trợ tốt, ở đây dùng update an toàn)
-                if (updateDepartures.length > 0) {
-                    for (const item of updateDepartures) {
-                        const { error: updateError } = await supabase
+                if (departuresToUpsert.length > 0) {
+                    for (const departure of departuresToUpsert) {
+                        const { error: upsertError } = await supabase
                             .from('Departures')
-                            .update(item)
-                            .eq('id', item.id);
-                        if (updateError) throw updateError;
+                            .upsert(departure, {
+                                onConflict: 'id',
+                                returning: 'minimal' 
+                            });
+
+                        // Nếu một mục bị lỗi, dừng lại và báo lỗi ngay
+                        if (upsertError) {
+                            throw upsertError;
+                        }
                     }
                 }
             }
 
-            toast.success("Lưu thành công!");
-            onSuccess(); 
-            onClose(); 
+            toast.success(productToEdit ? "Cập nhật tour thành công!" : "Thêm tour thành công!");
+            toast('Tour của bạn đã được gửi chờ Admin phê duyệt.', { icon: '⏳' });
+            onSuccess(); // Tải lại danh sách
+            onClose(); // Đóng modal
 
-        } catch (error) {
-            console.error("Chi tiết lỗi:", error); 
-            // Hiển thị lỗi chi tiết hơn cho user
-            let msg = error.message;
-            if (error.code === '23514') msg = "Dữ liệu vi phạm quy tắc (Ví dụ: Giá hoặc Slots phải lớn hơn 0).";
-            toast.error(`Lỗi: ${msg}`); 
-        } finally {
-            setLoading(false);
-        }
-    };
+} catch (error) {
+            console.error("Chi tiết lỗi Supabase:", error); // In toàn bộ object lỗi ra console
+            toast.error(`Lỗi: ${error.details || error.message}`); // Ưu tiên hiển thị 'details' nếu có
+        }
+        finally {
+            setLoading(false);
+        }
+    };
+
 
     if (!show) return null;
 
@@ -354,7 +380,7 @@ export default function ProductModal({ show, onClose, onSuccess, productToEdit, 
                 className="bg-white dark:bg-neutral-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col"
                 initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }}
             >
-                {/* Header */}
+                {/* Header Modal */}
                 <div className="flex justify-between items-center p-4 border-b dark:border-neutral-700 flex-shrink-0">
                     <h3 className="text-xl font-semibold dark:text-white">
                         {productToEdit ? "Chỉnh sửa Tour" : "Thêm Tour mới (Chi tiết)"}
@@ -362,7 +388,7 @@ export default function ProductModal({ show, onClose, onSuccess, productToEdit, 
                     <button onClick={onClose} disabled={loading || uploading} className="text-gray-400 p-2 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-50"><X size={20}/></button>
                 </div>
 
-                {/* Form */}
+                {/* Form Body */}
                 <form id="supplier-tour-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
                     {/* Thông tin cơ bản */}
                     <fieldset className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -373,12 +399,13 @@ export default function ProductModal({ show, onClose, onSuccess, productToEdit, 
                        <div> <label className="label-style">Nhà cung cấp *</label> 
                             <select name="supplier_id" value={formData.supplier_id} onChange={handleChange} required className="input-style" disabled={!!forceSupplierId}> 
                                 <option value="">-- Chọn NCC --</option> 
+                                {/* SỬA: Đảm bảo suppliers là mảng khi map */}
                                 {suppliers?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)} 
                             </select> 
                        </div>
                     </fieldset>
 
-                    {/* Phần Giá NCC (Vẫn giữ ở cấp Tour để làm giá gốc) */}
+                    {/* Phần Giá NCC */}
                     <fieldset className="border dark:border-neutral-600 p-4 rounded-md">
                         <legend className="text-base font-semibold mb-3 px-2 dark:text-white flex items-center gap-2"><CurrencyCny weight="bold"/> Giá Nhà Cung Cấp (Giá gốc)</legend>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -389,12 +416,16 @@ export default function ProductModal({ show, onClose, onSuccess, productToEdit, 
                          <p className="text-xs text-gray-500 mt-3 italic">* Đây là giá gốc bạn cung cấp. Admin sẽ duyệt và đặt giá bán sau.</p>
                     </fieldset>
                     
-                    {/* Ảnh & Mô tả & Lịch trình (Giữ nguyên) */}
+                    {/* Ảnh */}
                     <div> <label className="label-style">Ảnh minh họa</label> <div className="flex items-center gap-2"> <input type="text" name="image_url" value={formData.image_url} onChange={handleChange} className="input-style flex-1"/> <label className="modal-button-secondary cursor-pointer !py-2.5 !px-3"><CloudArrowUp/> {uploading ? <CircleNotch/> : "Tải lên"} <input type="file" onChange={handleImageUpload} className="hidden" accept="image/*"/> </label> </div> {formData.image_url && ( <img src={formData.image_url} alt="Preview" className="mt-2 h-24 w-auto rounded-md object-cover"/> )} </div>
+                    {/* Mô tả */}
                     <div> <label className="label-style">Mô tả Tour</label> <textarea name="description" value={formData.description} onChange={handleChange} className="input-style h-24"/> </div>
+                    
+                    {/* Lịch trình */}
                     <div className="border-t pt-4 dark:border-neutral-700"> 
                         <h4 className="text-base font-semibold mb-2 dark:text-white flex items-center gap-2"><ListDashes/> Lịch trình chi tiết</h4> 
                         <div className="space-y-3 max-h-48 overflow-y-auto pr-2"> 
+                             {/* SỬA: Đảm bảo formData.itinerary là mảng khi map */}
                              {formData.itinerary?.map((item, index) => ( 
                                  <div key={index} className="flex gap-2 items-start"> 
                                      <input value={item.title} onChange={(e) => handleItineraryChange(index, 'title', e.target.value)} placeholder="Tiêu đề (VD: Ngày 1)" className="input-style !w-32 !text-sm"/> 
@@ -406,16 +437,17 @@ export default function ProductModal({ show, onClose, onSuccess, productToEdit, 
                         <button type="button" onClick={addItineraryItem} className="button-secondary !text-xs !py-1 mt-2"><Plus/> Thêm ngày</button> 
                     </div>
 
-                    {/* Lịch khởi hành (Đã cập nhật UI bên trên) */}
+                    {/* Lịch khởi hành (Editable) */}
                     <DeparturesManager 
                         productId={productToEdit?.id}
+                        // SỬA: Đảm bảo initialDepartures luôn là mảng rỗng nếu không có productToEdit hoặc Departures
                         initialDepartures={productToEdit?.Departures || []} 
-                        onDeparturesChange={handleDeparturesChange} 
+                        onDeparturesChange={handleDeparturesChange} // SỬA LỖI: Dùng hàm đã useCallback
                     />
 
                 </form>
 
-                {/* Footer */}
+                {/* Footer Modal - Nút bấm */}
                 <div className="p-4 border-t dark:border-neutral-700 flex justify-end items-center gap-3 bg-gray-50 dark:bg-neutral-800 rounded-b-lg flex-shrink-0">
                     <button type="button" onClick={onClose} disabled={loading} className="modal-button-secondary">Hủy</button>
                     <button type="submit" form="supplier-tour-form" disabled={loading || uploading} className="modal-button-primary flex items-center gap-2"> 
@@ -425,6 +457,7 @@ export default function ProductModal({ show, onClose, onSuccess, productToEdit, 
                 </div>
             </motion.div>
             
+            {/* CSS nội bộ (giữ nguyên từ các file cũ) */}
             <style jsx>{`
                 .label-style { @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1; }
                 .input-style { @apply border border-gray-300 p-2 rounded-md w-full dark:bg-neutral-700 dark:border-neutral-600 dark:text-white focus:ring-sky-500 focus:border-sky-500 transition-colors duration-200 text-sm; }
