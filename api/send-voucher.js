@@ -1,54 +1,74 @@
+// pages/api/sendEmail.js
 import { Resend } from "resend";
 
-// Khởi tạo Resend với API Key từ file .env
+/**
+ * Expected body JSON:
+ * {
+ *   to: "customer@example.com",
+ *   subject: "Xác nhận đặt tour",
+ *   html: "<h1>...</h1>",
+ *   text?: "plain text fallback"
+ * }
+ */
+
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method Not Allowed" });
+    res.setHeader("Allow", "POST");
+    return res.status(405).json({ ok: false, message: "Method not allowed" });
   }
 
   try {
-    const { name, phone, email, promo } = req.body;
+    const { to, subject, html, text } = req.body ?? {};
 
-    if (!name || !phone || !email || !promo) {
-      return res.status(400).json({ error: "Thiếu thông tin bắt buộc" });
+    // Basic validation
+    if (!to || !subject || !html) {
+      return res.status(400).json({ ok: false, message: "Missing required fields: to, subject, html" });
     }
 
-    // Gửi email
-    const { data, error } = await resend.emails.send({
-      // ✅ SỬA Ở ĐÂY: Dùng email mặc định của Resend để test
-      // Khi deploy thật, bạn cần thay bằng email đã xác thực với Resend (vd: voucher@tourzen.com)
-      from: 'TourZen <onboarding@resend.dev>', 
-      to: [email],
-      subject: `Voucher ${promo.title} của bạn đã sẵn sàng!`,
-      // Sử dụng React component để tạo email cho đẹp hơn (tùy chọn)
-      // react: EmailTemplate({ name: name, promo: promo }),
-      html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-          <h2>Xin chào ${name},</h2>
-          <p>Cảm ơn bạn đã quan tâm đến chương trình khuyến mãi: <strong>${promo.title}</strong>.</p>
-          <p>TourZen gửi tặng bạn mã voucher dưới đây:</p>
-          <div style="text-align: center; margin: 20px 0;">
-            <p style="font-size: 28px; font-weight: bold; background: #e0f2fe; color: #0c4a6e; padding: 15px 25px; display: inline-block; border-radius: 8px; border: 2px dashed #7dd3fc;">
-              ${promo.voucherCode}
-            </p>
-          </div>
-          <p>Voucher có giá trị giảm <strong>${promo.discountPercent}%</strong> cho các tour liên quan.</p>
-          <p>Chúc bạn có những chuyến đi tuyệt vời cùng TourZen!</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-          <p style="font-size: 0.8em; color: #777;">Email này được gửi tự động. Vui lòng không trả lời.</p>
-        </div>
-      `,
+    // Very basic email format check (improve if needed)
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      return res.status(400).json({ ok: false, message: "Invalid recipient email" });
+    }
+
+    // Send email via Resend
+    const sendResult = await resend.emails.send({
+      from: process.env.EMAIL_FROM || "TourZen <no-reply@tourzen.vn>", // must be a verified domain/address
+      to,
+      subject,
+      html,
+      // Provide a text fallback (either provided or stripped from html)
+      text: text || htmlToTextFallback(html),
     });
 
-    if (error) {
-        return res.status(400).json(error);
-    }
-
-    return res.status(200).json({ message: "Voucher đã gửi thành công!", data });
+    // Optional: return the resend response id / status
+    return res.status(200).json({ ok: true, data: sendResult });
   } catch (error) {
-    console.error("Lỗi gửi voucher:", error);
-    return res.status(500).json({ error: "Gửi thất bại, thử lại sau." });
+    console.error("[/api/sendEmail] error:", error);
+    // Avoid leaking internal details to client; send message and possibly code
+    return res.status(500).json({
+      ok: false,
+      message: "Failed to send email",
+      error: (error && error.message) || "unknown_error",
+    });
   }
+}
+
+/** Simple HTML -> plain text fallback */
+function htmlToTextFallback(html) {
+  // naive approach: remove tags, decode entities minimally
+  if (!html) return "";
+  // Remove script/style blocks
+  let text = html.replace(/<script[\s\S]*?<\/script>/gi, "");
+  text = text.replace(/<style[\s\S]*?<\/style>/gi, "");
+  // Replace <br>, <p>, <li> with newlines
+  text = text.replace(/<(br|BR)\s*\/?>/g, "\n");
+  text = text.replace(/<\/p>/gi, "\n\n");
+  text = text.replace(/<\/li>/gi, "\n");
+  // Strip remaining tags
+  text = text.replace(/<\/?[^>]+(>|$)/g, "");
+  // Collapse multiple spaces/newlines
+  text = text.replace(/\s{2,}/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+  return text;
 }
