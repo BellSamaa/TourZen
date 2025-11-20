@@ -223,10 +223,18 @@ export default function ProductModal({ show, onClose, onSuccess, productToEdit, 
     // --- (QUAN TRỌNG) Xử lý Submit của NCC ---
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        // 1. Validation
         if (!formData.name || !formData.supplier_id) {
             toast.error("Tên tour và Nhà cung cấp là bắt buộc."); return;
         }
-        if (formData.supplier_price_adult <= 0) {
+        
+        // Ép kiểu số cẩn thận
+        const adultPrice = parseFloat(formData.supplier_price_adult);
+        const childPrice = parseFloat(formData.supplier_price_child || 0);
+        const infantPrice = parseFloat(formData.supplier_price_infant || 0);
+
+        if (isNaN(adultPrice) || adultPrice <= 0) {
              toast.error("Giá NCC (Người lớn) phải lớn hơn 0."); return;
         }
         if (departures.length === 0) {
@@ -235,82 +243,108 @@ export default function ProductModal({ show, onClose, onSuccess, productToEdit, 
 
         setLoading(true);
 
-        const productPayload = {
-            name: formData.name,
-            description: formData.description,
-            price: formData.supplier_price_adult, 
-            child_price: formData.supplier_price_child, 
-            infant_price: formData.supplier_price_infant, 
-            supplier_price_adult: formData.supplier_price_adult,
-            supplier_price_child: formData.supplier_price_child,
-            supplier_price_infant: formData.supplier_price_infant,
-            
-            location: formData.location,
-            duration: formData.duration,
-            supplier_id: formData.supplier_id,
-            image_url: formData.image_url,
-            tour_code: formData.tour_code,
-            itinerary: formData.itinerary,
-            product_type: productType,
-            
-            approval_status: 'pending',
-            is_published: false, 
-        };
-
         try {
+            // 2. Chuẩn bị dữ liệu Product
+            const productPayload = {
+                name: formData.name,
+                description: formData.description,
+                price: adultPrice, 
+                child_price: childPrice,
+                infant_price: infantPrice,
+                supplier_price_adult: adultPrice,
+                supplier_price_child: childPrice,
+                supplier_price_infant: infantPrice,
+                location: formData.location,
+                duration: formData.duration,
+                supplier_id: formData.supplier_id,
+                image_url: formData.image_url,
+                tour_code: formData.tour_code,
+                itinerary: formData.itinerary,
+                product_type: productType,
+                approval_status: 'pending',
+                is_published: false, 
+            };
+
             let productId = productToEdit?.id;
             
-            // 1. Lưu Tour
+            // 3. Thực hiện Lưu Product
             if (productId) {
-                const { error: productError } = await supabase.from('Products').update(productPayload).eq('id', productId);
-                if (productError) throw productError;
+                const { error } = await supabase.from('Products').update(productPayload).eq('id', productId);
+                if (error) throw error;
             } else {
-                const { data: productData, error: productError } = await supabase.from('Products').insert(productPayload).select('id').single();
-                if (productError) throw productError;
-                productId = productData.id; 
+                const { data, error } = await supabase.from('Products').insert(productPayload).select('id').single();
+                if (error) throw error;
+                productId = data.id; 
             }
             
-            // 2. Lưu Lịch trình (Departures)
+            // 4. Xử lý Lịch khởi hành (Departures) - TÁCH INSERT VÀ UPDATE
             if (productId) {
+                // -- Bước 4a: Xóa các slot đã bị xóa khỏi giao diện --
                 const originalDepIds = Array.isArray(productToEdit?.Departures) ? productToEdit.Departures.map(d => d.id) : [];
-                const newDepIds = departures.map(d => d.id);
-
-                const departuresToDelete = originalDepIds.filter(id => !newDepIds.includes(id));
-                if (departuresToDelete.length > 0) {
-                    await supabase.from('Departures').delete().in('id', departuresToDelete);
+                const currentDepIds = departures.filter(d => !String(d.id).startsWith('temp-')).map(d => d.id);
+                const idsToDelete = originalDepIds.filter(id => !currentDepIds.includes(id));
+                
+                if (idsToDelete.length > 0) {
+                    await supabase.from('Departures').delete().in('id', idsToDelete);
                 }
 
-                const departuresToUpsert = departures.map(dep => ({
-                    id: String(dep.id).startsWith('temp-') ? undefined : dep.id, 
-                    product_id: productId, 
-                    departure_date: dep.departure_date,
-                    adult_price: 0, // Luôn set 0 vì đã ẩn UI
-                    child_price: 0, // Luôn set 0 vì đã ẩn UI
-                    max_slots: dep.max_slots,
-                    booked_slots: dep.booked_slots || 0,
-                }));
+                // -- Bước 4b: Phân loại Thêm mới vs Cập nhật --
+                const newDepartures = [];
+                const updateDepartures = [];
 
-                if (departuresToUpsert.length > 0) {
-                    for (const departure of departuresToUpsert) {
-                        const { error: upsertError } = await supabase.from('Departures').upsert(departure, { onConflict: 'id' });
-                        if (upsertError) throw upsertError;
+                departures.forEach(dep => {
+                    const payload = {
+                        product_id: productId,
+                        departure_date: dep.departure_date,
+                        // QUAN TRỌNG: Luôn lấy giá từ form chính để đảm bảo > 0
+                        adult_price: adultPrice, 
+                        child_price: childPrice,
+                        max_slots: parseInt(dep.max_slots),
+                        booked_slots: dep.booked_slots || 0
+                    };
+
+                    if (String(dep.id).startsWith('temp-')) {
+                        // Đây là slot mới -> Thêm vào danh sách insert
+                        newDepartures.push(payload);
+                    } else {
+                        // Đây là slot cũ -> Thêm ID để update
+                        updateDepartures.push({ ...payload, id: dep.id });
+                    }
+                });
+
+                // -- Bước 4c: Thực thi Insert (Cho slot mới) --
+                if (newDepartures.length > 0) {
+                    const { error: insertError } = await supabase.from('Departures').insert(newDepartures);
+                    if (insertError) throw insertError;
+                }
+
+                // -- Bước 4d: Thực thi Update (Cho slot cũ) --
+                // (Dùng vòng lặp để update từng cái hoặc upsert nếu bảng hỗ trợ tốt, ở đây dùng update an toàn)
+                if (updateDepartures.length > 0) {
+                    for (const item of updateDepartures) {
+                        const { error: updateError } = await supabase
+                            .from('Departures')
+                            .update(item)
+                            .eq('id', item.id);
+                        if (updateError) throw updateError;
                     }
                 }
             }
 
-            toast.success(productToEdit ? "Cập nhật tour thành công!" : "Thêm tour thành công!");
-            toast('Tour của bạn đã được gửi chờ Admin phê duyệt.', { icon: '⏳' });
+            toast.success("Lưu thành công!");
             onSuccess(); 
             onClose(); 
 
         } catch (error) {
-            console.error("Chi tiết lỗi Supabase:", error); 
-            toast.error(`Lỗi: ${error.details || error.message}`); 
+            console.error("Chi tiết lỗi:", error); 
+            // Hiển thị lỗi chi tiết hơn cho user
+            let msg = error.message;
+            if (error.code === '23514') msg = "Dữ liệu vi phạm quy tắc (Ví dụ: Giá hoặc Slots phải lớn hơn 0).";
+            toast.error(`Lỗi: ${msg}`); 
         } finally {
             setLoading(false);
         }
     };
-
 
     if (!show) return null;
 
